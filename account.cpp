@@ -523,8 +523,8 @@ void weechat::account::mam_cache_cleanup()
     try {
         if (mam_db_env)
         {
-            mdb_dbi_close(mam_db_env.handle(), mam_dbi.messages.handle());
-            mdb_dbi_close(mam_db_env.handle(), mam_dbi.timestamps.handle());
+            // Don't call mdb_dbi_close() - it's not thread-safe and handles
+            // are automatically cleaned up when the environment is closed
             mam_db_env.close();
             mam_db_env = nullptr;
         }
