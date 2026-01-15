@@ -71,12 +71,26 @@ bool account_read_cb(weechat::config_section& section,
         if (option_id == "resource") rc &= rc_ok(account->option_resource = value);
         if (option_id == "status") rc &= rc_ok(account->option_status = value);
         if (option_id == "pgp_path") rc &= rc_ok(account->option_pgp_path = value);
-        if (option_id == "pgp_keyid") rc &= rc_ok(account->option_pgp_keyid = value);
+        if (option_id == "pgp_keyid") 
+        {
+            rc &= rc_ok(account->option_pgp_keyid = value);
+            // Trigger autoconnect after the last option from old configs
+            // (pgp_keys is new and may not exist in old config files)
+            if (!account->reloading_from_config)
+            {
+                account->load_pgp_keys();
+                bool ac_global = std::stoul(std::unique_ptr<char, decltype(free)*>(
+                                                weechat_info_get("auto_connect", NULL), &free).get());
+                bool ac_local = account->autoconnect();
+                if (ac_local && ac_global)
+                    account->connect();
+            }
+        }
         if (option_id == "pgp_keys") rc &= rc_ok(account->option_pgp_keys = value);
 
         if (!account->reloading_from_config)
         {
-            account->load_pgp_keys();  // Safe to call - only loads for existing channels
+            account->load_pgp_keys();
             bool ac_global = std::stoul(std::unique_ptr<char, decltype(free)*>(
                                             weechat_info_get("auto_connect", NULL), &free).get());
             bool ac_local = account->autoconnect();
