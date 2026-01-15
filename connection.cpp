@@ -1348,7 +1348,14 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza)
                                        set__last__text);
                 }
                 else
+                {
+                    // MAM fetch complete, update last fetch timestamp
+                    channel->second.last_mam_fetch = time(NULL);
+                    weechat_printf(channel->second.buffer, 
+                                  "%sMAM history loaded",
+                                  weechat_prefix("network"));
                     account.mam_query_remove(mam_query.id);
+                }
             }
             else
             {

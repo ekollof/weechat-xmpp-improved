@@ -245,8 +245,36 @@ weechat::channel::channel(weechat::account& account,
 
     if (type != weechat::channel::chat_type::MUC)
     {
-        time_t start = time(NULL) - (7 * 86400);  // 7 days ago
-        time_t end = time(NULL);
+        time_t now = time(NULL);
+        time_t start;
+        
+        // If we've fetched recently, only get new messages since last fetch
+        if (last_mam_fetch > 0 && (now - last_mam_fetch) < 300)  // Less than 5 minutes
+        {
+            // Fetch only messages since last fetch
+            start = last_mam_fetch;
+            weechat_printf(buffer, "%sFetching MAM messages since last check (%ld seconds ago)...",
+                          weechat_prefix("network"),
+                          now - last_mam_fetch);
+        }
+        else
+        {
+            // Fetch last 7 days
+            start = now - (7 * 86400);
+            if (last_mam_fetch > 0)
+            {
+                weechat_printf(buffer, "%sFetching MAM messages (last check was %ld seconds ago, fetching 7 days)...",
+                              weechat_prefix("network"),
+                              now - last_mam_fetch);
+            }
+            else
+            {
+                weechat_printf(buffer, "%sFetching MAM messages (7 days)...",
+                              weechat_prefix("network"));
+            }
+        }
+        
+        time_t end = now;
         fetch_mam(xmpp_uuid_gen(account.context), &start, &end, nullptr);
     }
 }

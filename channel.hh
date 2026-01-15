@@ -106,6 +106,8 @@ namespace weechat
         std::vector<typing> self_typings;
         std::vector<typing> typings;
         std::unordered_map<std::string, member> members;
+        
+        time_t last_mam_fetch = 0;
 
     public:
         struct t_gui_buffer *buffer;
