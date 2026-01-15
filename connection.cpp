@@ -328,9 +328,10 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza)
                                                                     ? nick : from)).first->second;
             }
             channel->add_typing(user);
+            // For PMs, always use bare JID; for MUCs use nick
             const char *display_name = channel->type == weechat::channel::chat_type::MUC 
                 ? nick 
-                : (user->profile.display_name ? user->profile.display_name : from_bare);
+                : from_bare;
             weechat_printf(channel->buffer, "...\t%s%s typing",
                            weechat_color("gray"),
                            display_name);
