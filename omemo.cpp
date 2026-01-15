@@ -2396,10 +2396,6 @@ xmpp_stanza_t *omemo::encode(weechat::account *account, const char *jid,
 
 omemo::~omemo()
 {
-    // Safety check: if plugin is destroyed, skip LMDB cleanup
-    // LMDB has internal allocations that cause crashes during global cleanup
-    if (!weechat::plugin::instance || !weechat::plugin::instance->ptr())
-        return;
-        
-    // Explicit cleanup would go here, but currently db_env destructor handles it
+    // Note: Member destructors (identity_key_pair, db_env, etc.) will run automatically
+    // Don't try to skip cleanup with early return - member destructors run anyway
 }
