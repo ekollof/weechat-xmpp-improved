@@ -999,14 +999,22 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza)
 
         if (weechat_strcasecmp(type, "result") == 0)
         {
-            const char *from_jid = xmpp_stanza_get_from(stanza);
-            struct t_gui_buffer *output_buffer = account.buffer;
+            const char *stanza_id = xmpp_stanza_get_id(stanza);
+            bool user_initiated = stanza_id && account.user_disco_queries.count(stanza_id);
             
-            weechat_printf(output_buffer, "");
-            weechat_printf(output_buffer, "%sService Discovery for %s%s:", 
-                          weechat_color("chat_prefix_network"),
-                          weechat_color("chat_server"), 
-                          from_jid ? from_jid : "server");
+            if (user_initiated)
+            {
+                account.user_disco_queries.erase(stanza_id);
+                
+                const char *from_jid = xmpp_stanza_get_from(stanza);
+                struct t_gui_buffer *output_buffer = account.buffer;
+                
+                weechat_printf(output_buffer, "");
+                weechat_printf(output_buffer, "%sService Discovery for %s%s:", 
+                              weechat_color("chat_prefix_network"),
+                              weechat_color("chat_server"), 
+                              from_jid ? from_jid : "server");
+            }
             
             xmpp_stanza_t *identity = xmpp_stanza_get_child_by_name(query, "identity");
             while (identity)
@@ -1022,13 +1030,16 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza)
                 if (const char *attr = xmpp_stanza_get_attribute(identity, "type"))
                     type = attr;
 
-                weechat_printf(output_buffer, "  %sIdentity:%s %s/%s %s%s%s",
-                              weechat_color("chat_prefix_network"),
-                              weechat_color("reset"),
-                              category.c_str(), type.c_str(),
-                              weechat_color("chat_delimiters"),
-                              name.empty() ? "" : name.c_str(),
-                              weechat_color("reset"));
+                if (user_initiated)
+                {
+                    weechat_printf(account.buffer, "  %sIdentity:%s %s/%s %s%s%s",
+                                  weechat_color("chat_prefix_network"),
+                                  weechat_color("reset"),
+                                  category.c_str(), type.c_str(),
+                                  weechat_color("chat_delimiters"),
+                                  name.empty() ? "" : name.c_str(),
+                                  weechat_color("reset"));
+                }
 
                 if (category == "conference")
                 {
@@ -1053,17 +1064,20 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza)
                 identity = xmpp_stanza_get_next(identity);
             }
             
-            xmpp_stanza_t *feature = xmpp_stanza_get_child_by_name(query, "feature");
-            if (feature)
+            if (user_initiated)
             {
-                weechat_printf(output_buffer, "  %sFeatures:",
-                              weechat_color("chat_prefix_network"));
-                while (feature)
+                xmpp_stanza_t *feature = xmpp_stanza_get_child_by_name(query, "feature");
+                if (feature)
                 {
-                    const char *var = xmpp_stanza_get_attribute(feature, "var");
-                    if (var)
-                        weechat_printf(output_buffer, "    %s", var);
-                    feature = xmpp_stanza_get_next(feature);
+                    weechat_printf(account.buffer, "  %sFeatures:",
+                                  weechat_color("chat_prefix_network"));
+                    while (feature)
+                    {
+                        const char *var = xmpp_stanza_get_attribute(feature, "var");
+                        if (var)
+                            weechat_printf(account.buffer, "    %s", var);
+                        feature = xmpp_stanza_get_next(feature);
+                    }
                 }
             }
         }

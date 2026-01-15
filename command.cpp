@@ -1234,6 +1234,8 @@ int command__disco(const void *pointer, void *data,
         target = xmpp_jid_domain(ptr_account->context, ptr_account->jid().data());
 
     char *id = xmpp_uuid_gen(ptr_account->context);
+    ptr_account->user_disco_queries.insert(id);
+    
     xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "get", id);
     xmpp_stanza_set_to(iq, target);
     
