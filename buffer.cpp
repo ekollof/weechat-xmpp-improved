@@ -142,6 +142,22 @@ char *buffer__encryption_bar_cb(const void *pointer, void *data,
         return strdup("");
 }
 
+int buffer__switch_cb(const void *pointer, void *data,
+                      const char *signal, const char *type_data,
+                      void *signal_data)
+{
+    (void) pointer;
+    (void) data;
+    (void) signal;
+    (void) type_data;
+    (void) signal_data;
+    
+    // Update encryption bar item when switching buffers
+    weechat_bar_item_update("xmpp_encryption");
+    
+    return WEECHAT_RC_OK;
+}
+
 int buffer__nickcmp_cb(const void *pointer, void *data,
                        struct t_gui_buffer *buffer,
                        const char *nick1,

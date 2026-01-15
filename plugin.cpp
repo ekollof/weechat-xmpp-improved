@@ -121,6 +121,10 @@ void weechat::plugin::init(int argc, char *argv[])
                                                   &buffer__encryption_bar_cb,
                                                   nullptr, nullptr);
 
+    weechat_hook_signal("buffer_switch",
+                        &buffer__switch_cb,
+                        nullptr, nullptr);
+
     weechat_hook_signal("input_text_changed",
                         &input__text_changed_cb, // TODO: port
                         nullptr, nullptr);

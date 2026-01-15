@@ -20,6 +20,10 @@ char *buffer__encryption_bar_cb(const void *pointer, void *data,
                                 struct t_gui_buffer *buffer,
                                 struct t_hashtable *extra_info);
 
+int buffer__switch_cb(const void *pointer, void *data,
+                      const char *signal, const char *type_data,
+                      void *signal_data);
+
 int buffer__nickcmp_cb(const void *pointer, void *data,
                        struct t_gui_buffer *buffer,
                        const char *nick1,
