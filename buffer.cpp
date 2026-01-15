@@ -167,6 +167,34 @@ int buffer__close_cb(const void *pointer, void *data,
         {
             if (ptr_account->connected())
             {
+                // Send unavailable presence to leave MUC
+                if (ptr_channel->type == weechat::channel::chat_type::MUC)
+                {
+                    xmpp_stanza_t *pres = xmpp_presence_new(ptr_account->context);
+                    xmpp_stanza_set_type(pres, "unavailable");
+                    
+                    // Build full JID with resource (room@server/nick)
+                    const char* nick = weechat_buffer_get_string(buffer, "localvar_nick");
+                    if (nick && nick[0])
+                    {
+                        char *pres_jid = xmpp_jid_new(
+                            ptr_account->context,
+                            xmpp_jid_node(ptr_account->context, ptr_channel->id.data()),
+                            xmpp_jid_domain(ptr_account->context, ptr_channel->id.data()),
+                            nick);
+                        xmpp_stanza_set_to(pres, pres_jid);
+                    }
+                    else
+                    {
+                        xmpp_stanza_set_to(pres, ptr_channel->id.data());
+                    }
+                    
+                    xmpp_stanza_set_from(pres, ptr_account->jid().data());
+                    
+                    xmpp_send(ptr_account->connection, pres);
+                    xmpp_stanza_release(pres);
+                }
+                
                 ptr_account->channels.erase(ptr_channel->name);
             }
         }
