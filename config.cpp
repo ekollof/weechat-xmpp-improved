@@ -76,7 +76,7 @@ bool account_read_cb(weechat::config_section& section,
 
         if (!account->reloading_from_config)
         {
-            account->load_pgp_keys();
+            account->load_pgp_keys();  // Safe to call - only loads for existing channels
             bool ac_global = std::stoul(std::unique_ptr<char, decltype(free)*>(
                                             weechat_info_get("auto_connect", NULL), &free).get());
             bool ac_local = account->autoconnect();
