@@ -1000,6 +1000,68 @@ int command__trap(const void *pointer, void *data,
     return WEECHAT_RC_OK;
 }
 
+
+int command__ping(const void *pointer, void *data,
+                  struct t_gui_buffer *buffer, int argc,
+                  char **argv, char **argv_eol)
+{
+    weechat::account *ptr_account = NULL;
+    weechat::channel *ptr_channel = NULL;
+    xmpp_stanza_t *iq;
+    const char *target = NULL;
+
+    (void) pointer;
+    (void) data;
+    (void) argv_eol;
+
+    buffer__get_account_and_channel(buffer, &ptr_account, &ptr_channel);
+
+    if (!ptr_account)
+        return WEECHAT_RC_ERROR;
+
+    if (!ptr_account->connected())
+    {
+        weechat_printf(buffer, "%sxmpp: you are not connected to server",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    // Determine ping target: specified argument, channel JID, or server
+    if (argc > 1)
+        target = argv[1];
+    else if (ptr_channel)
+        target = ptr_channel->id.data();
+    else
+        target = NULL;  // Ping the server
+
+    // Create ping IQ
+    char *id = xmpp_uuid_gen(ptr_account->context);
+    iq = xmpp_iq_new(ptr_account->context, "get", id);
+    
+    if (target)
+    {
+        xmpp_stanza_set_to(iq, target);
+        weechat_printf(buffer, "xmpp: sending ping to %s", target);
+    }
+    else
+    {
+        weechat_printf(buffer, "xmpp: sending ping to server");
+    }
+    
+    xmpp_stanza_t *ping = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(ping, "ping");
+    xmpp_stanza_set_ns(ping, "urn:xmpp:ping");
+    
+    xmpp_stanza_add_child(iq, ping);
+    xmpp_stanza_release(ping);
+    
+    xmpp_send(ptr_account->connection, iq);
+    xmpp_stanza_release(iq);
+    xmpp_free(ptr_account->context, id);
+
+    return WEECHAT_RC_OK;
+}
+
 void command__init()
 {
     struct t_hook *hook;
@@ -1127,4 +1189,13 @@ void command__init()
         NULL, &command__trap, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /trap");
+
+    hook = weechat_hook_command(
+        "ping",
+        N_("send an xmpp ping"),
+        N_("[jid]"),
+        N_("jid: optional target jid (defaults to current channel or server)"),
+        NULL, &command__ping, NULL, NULL);
+    if (!hook)
+        weechat_printf(NULL, "Failed to setup command /ping");
 }
