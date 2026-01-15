@@ -104,6 +104,44 @@ char *buffer__typing_bar_cb(const void *pointer, void *data,
     }
 }
 
+char *buffer__encryption_bar_cb(const void *pointer, void *data,
+                                struct t_gui_bar_item *item,
+                                struct t_gui_window *window,
+                                struct t_gui_buffer *buffer,
+                                struct t_hashtable *extra_info)
+{
+    weechat::account *account;
+    weechat::channel *channel;
+
+    (void) pointer;
+    (void) data;
+    (void) item;
+    (void) window;
+    (void) extra_info;
+
+    account = NULL;
+    channel = NULL;
+
+    buffer__get_account_and_channel(buffer, &account, &channel);
+
+    if (!channel)
+        return strdup("");
+
+    // Check encryption status
+    if (channel->omemo.enabled)
+        return strdup("🔒OMEMO");
+    else if (channel->pgp.enabled)
+        return strdup("🔒PGP");
+    else if (channel->transport != weechat::channel::transport::PLAIN)
+    {
+        std::string status = "🔒";
+        status += weechat::channel::transport_name(channel->transport);
+        return strdup(status.c_str());
+    }
+    else
+        return strdup("");
+}
+
 int buffer__nickcmp_cb(const void *pointer, void *data,
                        struct t_gui_buffer *buffer,
                        const char *nick1,

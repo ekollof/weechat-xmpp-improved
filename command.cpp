@@ -816,6 +816,8 @@ int command__omemo(const void *pointer, void *data,
 
     ptr_channel->set_transport(weechat::channel::transport::OMEMO, 0);
 
+    weechat_bar_item_update("xmpp_encryption");
+
     return WEECHAT_RC_OK;
 }
 
@@ -858,6 +860,8 @@ int command__pgp(const void *pointer, void *data,
 
     ptr_channel->set_transport(weechat::channel::transport::PGP, 0);
 
+    weechat_bar_item_update("xmpp_encryption");
+
     return WEECHAT_RC_OK;
 }
 
@@ -892,6 +896,8 @@ int command__plain(const void *pointer, void *data,
     ptr_channel->pgp.enabled = 0;
 
     ptr_channel->set_transport(weechat::channel::transport::PLAIN, 0);
+
+    weechat_bar_item_update("xmpp_encryption");
 
     return WEECHAT_RC_OK;
 }

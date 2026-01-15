@@ -117,6 +117,10 @@ void weechat::plugin::init(int argc, char *argv[])
                                              &buffer__typing_bar_cb, // TODO: port
                                              nullptr, nullptr);
 
+    m_encryption_bar_item = weechat_bar_item_new(encryption_bar_item_name.data(),
+                                                  &buffer__encryption_bar_cb,
+                                                  nullptr, nullptr);
+
     weechat_hook_signal("input_text_changed",
                         &input__text_changed_cb, // TODO: port
                         nullptr, nullptr);
@@ -132,8 +136,11 @@ void weechat::plugin::end() {
     // Set flag to prevent any in-flight callbacks from proceeding
     weechat::g_plugin_unloading = true;
     
-    if (m_typing_bar_item) // raii?
+    if (m_typing_bar_item)
         weechat_bar_item_remove(m_typing_bar_item);
+
+    if (m_encryption_bar_item)
+        weechat_bar_item_remove(m_encryption_bar_item);
 
     weechat::account::disconnect_all();
 

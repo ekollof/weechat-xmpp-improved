@@ -14,6 +14,12 @@ char *buffer__typing_bar_cb(const void *pointer, void *data,
                             struct t_gui_buffer *buffer,
                             struct t_hashtable *extra_info);
 
+char *buffer__encryption_bar_cb(const void *pointer, void *data,
+                                struct t_gui_bar_item *item,
+                                struct t_gui_window *window,
+                                struct t_gui_buffer *buffer,
+                                struct t_hashtable *extra_info);
+
 int buffer__nickcmp_cb(const void *pointer, void *data,
                        struct t_gui_buffer *buffer,
                        const char *nick1,

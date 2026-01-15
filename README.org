@@ -71,6 +71,21 @@
   2. Use =/account connect <account-name>= with the name set at
      add-time.
 
+** Encryption Status Indicator
+
+   The plugin provides a bar item =xmpp_encryption= that displays the current
+   encryption status of the active buffer. It will show:
+   - =🔒OMEMO= when OMEMO encryption is enabled
+   - =🔒PGP= when PGP encryption is enabled
+   - Empty when using plain text
+
+   To add it to your status bar:
+   #+begin_src
+   /set weechat.bar.status.items "[time],[buffer_last_number],[buffer_plugin],buffer_number+:+buffer_name+(buffer_modes)+{buffer_nicklist_count}+buffer_zoom+buffer_filter,xmpp_encryption,[lag],[hotlist],completion"
+   #+end_src
+
+   Or simply add =xmpp_encryption= to your existing status bar items configuration.
+
 * Installing
 
   Place xmpp.so in the appropriate place for weechat plugins.
