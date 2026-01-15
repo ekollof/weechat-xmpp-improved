@@ -27,6 +27,35 @@
 #include "gcrypt.hh"
 #include "util.hh"
 
+// Compatibility wrapper for weechat string_base_encode/decode API changes
+// ----------------------------------------------------------------------------
+// WeeChat 4.3.0 (May 2024) changed the API for base64 encoding/decoding:
+//   - Old API (<4.3.0): weechat_string_base_encode(64, ...)      [int parameter]
+//   - New API (>=4.3.0): weechat_string_base_encode("64", ...)   [const char* parameter]
+//
+// Since weechat functions are macros wrapping function pointers, we cannot use
+// compile-time detection. Instead, manually set the parameter based on your WeeChat version:
+//
+// For WeeChat >= 4.3.0 (Arch, recent distros): Use "64" (string)
+// For WeeChat < 4.3.0 (Ubuntu 24.04, older distros): Use 64 (int)
+//
+// Change the #if 1 to #if 0 below to switch between versions:
+#if 1  // Set to 0 for WeeChat < 4.3.0
+    #define WEECHAT_BASE64 "64"
+#else
+    #define WEECHAT_BASE64 64
+#endif
+
+namespace weechat_compat {
+    inline int base64_encode(const char *from, int length, char *to) {
+        return weechat_string_base_encode(WEECHAT_BASE64, from, length, to);
+    }
+    
+    inline int base64_decode(const char *from, char *to) {
+        return weechat_string_base_decode(WEECHAT_BASE64, from, to);
+    }
+}
+
 using namespace weechat::xmpp;
 using t_omemo = omemo;
 
@@ -53,25 +82,25 @@ const char *OMEMO_ADVICE = "[OMEMO encrypted message (XEP-0384)]";
 size_t base64_decode(const char *buffer, size_t length, uint8_t **result)
 {
     *result = (uint8_t*)calloc(length + 1, sizeof(uint8_t));
-    return weechat_string_base_decode(64, buffer, (char*)*result);
+    return weechat_compat::base64_decode(buffer, (char*)*result);
 }
 
 size_t base64_encode(const uint8_t *buffer, size_t length, char **result)
 {
     *result = (char*)calloc(length * 2, sizeof(char));
-    return weechat_string_base_encode(64, (char*)buffer, length, *result);
+    return weechat_compat::base64_encode((char*)buffer, length, *result);
 }
 
 std::vector<std::uint8_t> base64_decode(std::string_view buffer)
 {
     auto result = std::make_unique<std::uint8_t[]>(buffer.size() + 1);
-    return std::vector<std::uint8_t>(result.get(), result.get() + weechat_string_base_decode(64, buffer.data(), (char*)result.get()));
+    return std::vector<std::uint8_t>(result.get(), result.get() + weechat_compat::base64_decode(buffer.data(), (char*)result.get()));
 }
 
 std::string base64_encode(std::vector<std::uint8_t> buffer)
 {
     auto result = std::make_unique<char[]>(buffer.size() * 2);
-    return std::string(result.get(), result.get() + weechat_string_base_encode(64, (char*)buffer.data(), buffer.size(), result.get()));
+    return std::string(result.get(), result.get() + weechat_compat::base64_encode((char*)buffer.data(), buffer.size(), result.get()));
 }
 
 int aes_decrypt(const uint8_t *ciphertext, size_t ciphertext_len,

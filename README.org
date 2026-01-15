@@ -89,6 +89,29 @@
   - doctest (test)
   - weechat (>= v3.0)
 
+** WeeChat Version Compatibility
+
+   *Important*: WeeChat 4.3.0 (May 2024) introduced an API change for base64
+   encoding/decoding functions. This fork is currently configured for WeeChat >= 4.3.0.
+
+   If you're using an older WeeChat version (< 4.3.0) and get compilation errors 
+   about =invalid conversion from 'int' to 'const char*'=, you need to adjust the 
+   API compatibility setting:
+
+   1. Open =omemo.cpp=
+   2. Find the section around line 42:
+      #+begin_src cpp
+      #if 1  // Set to 0 for WeeChat < 4.3.0
+          #define WEECHAT_BASE64 "64"
+      #else
+          #define WEECHAT_BASE64 64
+      #endif
+      #+end_src
+   3. Change =#if 1= to =#if 0= for WeeChat < 4.3.0
+   4. Rebuild with =make clean && make=
+
+   To check your WeeChat version: =weechat --version=
+
 * Building
 
   #+begin_src sh
