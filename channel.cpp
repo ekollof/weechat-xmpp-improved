@@ -401,7 +401,8 @@ int weechat::channel::add_typing(weechat::user *user)
     {
         weechat::channel::typing& new_typing = typings.emplace_back();
         new_typing.user = user;
-        new_typing.name = user->profile.display_name;
+        // Use the user's ID (JID) instead of display_name to show proper JID
+        new_typing.name = user->id ? user->id : "";
 
         the_typing = &new_typing;
         ret = 1;
@@ -463,7 +464,8 @@ int weechat::channel::add_self_typing(weechat::user *user)
     {
         weechat::channel::typing& new_typing = self_typings.emplace_back();
         new_typing.user = user;
-        new_typing.name = user ? user->profile.display_name : "";
+        // Use the user's ID (JID) instead of display_name to show proper JID
+        new_typing.name = user ? (user->id ? user->id : "") : "";
 
         the_typing = &new_typing;
         ret = 1;
