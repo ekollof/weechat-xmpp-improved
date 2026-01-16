@@ -3,6 +3,10 @@
 
 WEECHATHOME ?= ~/.local/share/weechat/
 
+install-deps:
+	@echo "Installing system dependencies..."
+	./install-deps.sh
+
 install: xmpp.so
 ifeq ($(shell id -u),0)
 	mkdir -p $(DESTDIR)$(LIBDIR)/weechat/plugins
@@ -22,4 +26,4 @@ release: xmpp.so
 	mkdir src$@
 	objcopy --dump-section .source=/dev/stdout $@ | tar -C src$@ xz
 
-.PHONY: install release .xmpp.so.%
+.PHONY: install install-deps release .xmpp.so.%
