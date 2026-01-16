@@ -543,6 +543,17 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                 const char *items_node = xmpp_stanza_get_attribute(items, "node");
                 from = xmpp_stanza_get_from(stanza);
                 to = xmpp_stanza_get_to(stanza);
+                
+                // Log all PEP events for debugging/future features (XEP-0163)
+                if (items_node)
+                {
+                    weechat_printf_date_tags(account.buffer, 0, "xmpp_pep",
+                                            "%sPEP event from %s: %s",
+                                            weechat_prefix("network"),
+                                            from ? from : account.jid().data(),
+                                            items_node);
+                }
+                
                 if (items_node
                     && weechat_strcasecmp(items_node,
                                           "eu.siacs.conversations.axolotl.devicelist") == 0)
@@ -1051,6 +1062,7 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash)
     FEATURE("http://jabber.org/protocol/disco#items");
     FEATURE("http://jabber.org/protocol/muc");
     FEATURE("http://jabber.org/protocol/nick+notify");
+    FEATURE("http://jabber.org/protocol/pep");
     FEATURE("jabber:iq:version");
     FEATURE("jabber:x:conference");
     FEATURE("jabber:x:oob");

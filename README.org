@@ -58,6 +58,7 @@
     - Bookmark management - /bookmark command to add, delete, list, and toggle autojoin for MUC rooms
     - Room explorer - /list command to search public MUC rooms via search.jabber.network
     - Entity capability caching (XEP-0115) - caches disco#info results to reduce network queries
+    - Personal Eventing Protocol (XEP-0163) - receives and logs PEP events for avatars, bookmarks, etc.
 
   *Known limitation*: Plugin reload while weechat is running is not supported due to 
   fundamental race conditions with timer hooks. Always restart weechat instead of 
