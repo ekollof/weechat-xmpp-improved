@@ -1673,11 +1673,18 @@ bool weechat::connection::sm_handler(xmpp_stanza_t *stanza)
             int32_t unacked = (int32_t)account.sm_h_outbound - (int32_t)ack_count;
             if (unacked < 0) unacked = 0;
             
-            weechat_printf(account.buffer, "%sReceived ack: h=%u (sent=%u, unacked=%d)",
-                          weechat_prefix("network"),
-                          ack_count,
-                          account.sm_h_outbound,
-                          unacked);
+            // Only log if there were unacked stanzas or if it's been a while
+            static time_t last_ack_log = 0;
+            time_t now = time(NULL);
+            if (unacked > 0 || (now - last_ack_log) > 300)  // Log every 5 minutes if quiet
+            {
+                weechat_printf(account.buffer, "%sReceived ack: h=%u (sent=%u, unacked=%d)",
+                              weechat_prefix("network"),
+                              ack_count,
+                              account.sm_h_outbound,
+                              unacked);
+                last_ack_log = now;
+            }
         }
         else
         {
