@@ -1683,6 +1683,9 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
     (void)error;
     (void)stream_error;
 
+    weechat_printf(account.buffer, "%s[DEBUG] conn_handler: status=%d, error=%d",
+                  weechat_prefix("network"), (int)status, error);
+
     if (status == event::connect)
     {
         account.disconnected = 0;
@@ -1885,6 +1888,8 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
     }
     else
     {
+        weechat_printf(account.buffer, "%s[DEBUG] Disconnecting due to status=%d",
+                      weechat_prefix("error"), (int)status);
         account.disconnect(1);
       //xmpp_stop(account.context); //keep context?
     }
