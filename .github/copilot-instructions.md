@@ -18,10 +18,22 @@ This is a WeeChat plugin for XMPP/Jabber written in C++. It uses libstrophe for 
 
 - Minimize changes - make surgical, targeted fixes
 - Use existing code style and patterns consistently
-- Prefer C++14 features (project standard)
+- **Use C++23 features** (project standard via `-std=c++23`)
 - Use `nullptr` not `NULL`
 - RAII for resource management
 - Keep functions focused and concise
+
+### C++23 Memory Safety Features to Leverage
+
+- **`std::unique_ptr` / `std::shared_ptr`**: Already used extensively - prefer over raw pointers
+- **`std::optional`**: Already used - better than null pointers for optional values
+- **`std::string_view`**: Already used - safer than `const char*` for read-only strings
+- **`std::span`**: Consider using for array views instead of pointer+size pairs
+- **`std::expected`**: Use for error handling instead of exceptions (C++23)
+- **Range-based algorithms**: `std::ranges::` for safer iteration
+- **`std::make_unique` / `std::make_shared`**: Always prefer over `new`
+- **Move semantics**: Use `std::move` to avoid unnecessary copies
+- **Structured bindings**: `auto [key, value] = map.find(...)` for cleaner code
 
 ### WeeChat Plugin Conventions
 
@@ -206,7 +218,7 @@ When implementing a new feature:
 - **Origin**: Fork of bqv/weechat-xmpp
 - **Remote**: git.hackerheaven.org:ekollof/weechat-xmpp-fixed.git
 - **Branch**: master
-- **Language**: C++14
+- **Language**: C++23 (`-std=c++23`)
 - **Dependencies**: libstrophe, LMDB, WeeChat API
 
 ## Useful Commands
