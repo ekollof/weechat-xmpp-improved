@@ -2084,6 +2084,196 @@ int command__mood(const void *pointer, void *data,
     return WEECHAT_RC_OK;
 }
 
+int command__activity(const void *pointer, void *data,
+                      struct t_gui_buffer *buffer, int argc,
+                      char **argv, char **argv_eol)
+{
+    weechat::account *ptr_account = NULL;
+    weechat::channel *ptr_channel = NULL;
+
+    (void) pointer;
+    (void) data;
+    (void) argv;
+
+    buffer__get_account_and_channel(buffer, &ptr_account, &ptr_channel);
+
+    if (!ptr_account)
+        return WEECHAT_RC_ERROR;
+
+    if (!ptr_account->connected())
+    {
+        weechat_printf(buffer, "%sxmpp: you are not connected to server",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    // XEP-0108 activity categories and specific activities
+    // Format: category/specific (e.g., "working/coding")
+    const char *valid_categories[] = {
+        "doing_chores", "drinking", "eating", "exercising", "grooming",
+        "having_appointment", "inactive", "relaxing", "talking", "traveling",
+        "working", NULL
+    };
+
+    const char *category = NULL;
+    const char *specific = NULL;
+    const char *text = NULL;
+
+    if (argc >= 2)
+    {
+        // Parse "category" or "category/specific"
+        char *activity_str = strdup(argv[1]);
+        char *slash = strchr(activity_str, '/');
+        
+        if (slash)
+        {
+            *slash = '\0';
+            category = activity_str;
+            specific = slash + 1;
+        }
+        else
+        {
+            category = activity_str;
+        }
+        
+        if (argc >= 3)
+            text = argv_eol[2];
+    }
+
+    // Build PEP activity publish stanza
+    // <iq type='set'>
+    //   <pubsub xmlns='http://jabber.org/protocol/pubsub'>
+    //     <publish node='http://jabber.org/protocol/activity'>
+    //       <item>
+    //         <activity xmlns='http://jabber.org/protocol/activity'>
+    //           <working>  <!-- category -->
+    //             <coding/>  <!-- specific, optional -->
+    //           </working>
+    //           <text>Writing XMPP code</text>  <!-- optional -->
+    //         </activity>
+    //       </item>
+    //     </publish>
+    //   </pubsub>
+    // </iq>
+
+    char *id = xmpp_uuid_gen(ptr_account->context);
+    xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "set", id);
+    xmpp_free(ptr_account->context, id);
+
+    xmpp_stanza_t *pubsub = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(pubsub, "pubsub");
+    xmpp_stanza_set_ns(pubsub, "http://jabber.org/protocol/pubsub");
+
+    xmpp_stanza_t *publish = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(publish, "publish");
+    xmpp_stanza_set_attribute(publish, "node", "http://jabber.org/protocol/activity");
+
+    xmpp_stanza_t *item = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(item, "item");
+
+    xmpp_stanza_t *activity_elem = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(activity_elem, "activity");
+    xmpp_stanza_set_ns(activity_elem, "http://jabber.org/protocol/activity");
+
+    if (category)
+    {
+        // Validate category
+        bool valid = false;
+        for (int i = 0; valid_categories[i] != NULL; i++)
+        {
+            if (weechat_strcasecmp(category, valid_categories[i]) == 0)
+            {
+                valid = true;
+                break;
+            }
+        }
+
+        if (!valid)
+        {
+            weechat_printf(buffer, "%sxmpp: invalid activity category '%s'", 
+                          weechat_prefix("error"), category);
+            weechat_printf(buffer, "%sValid categories: working, relaxing, eating, drinking, traveling, etc.",
+                          weechat_prefix("error"));
+            
+            free((void*)category);
+            xmpp_stanza_release(activity_elem);
+            xmpp_stanza_release(item);
+            xmpp_stanza_release(publish);
+            xmpp_stanza_release(pubsub);
+            xmpp_stanza_release(iq);
+            return WEECHAT_RC_OK;
+        }
+
+        // Add category element
+        xmpp_stanza_t *category_elem = xmpp_stanza_new(ptr_account->context);
+        xmpp_stanza_set_name(category_elem, category);
+
+        // Add specific activity if provided
+        if (specific)
+        {
+            xmpp_stanza_t *specific_elem = xmpp_stanza_new(ptr_account->context);
+            xmpp_stanza_set_name(specific_elem, specific);
+            xmpp_stanza_add_child(category_elem, specific_elem);
+            xmpp_stanza_release(specific_elem);
+        }
+
+        xmpp_stanza_add_child(activity_elem, category_elem);
+        xmpp_stanza_release(category_elem);
+
+        // Add optional text
+        if (text)
+        {
+            xmpp_stanza_t *text_elem = xmpp_stanza_new(ptr_account->context);
+            xmpp_stanza_set_name(text_elem, "text");
+            xmpp_stanza_t *text_content = xmpp_stanza_new(ptr_account->context);
+            xmpp_stanza_set_text(text_content, text);
+            xmpp_stanza_add_child(text_elem, text_content);
+            xmpp_stanza_add_child(activity_elem, text_elem);
+            xmpp_stanza_release(text_content);
+            xmpp_stanza_release(text_elem);
+        }
+
+        free((void*)category);
+    }
+    // If no activity specified, publish empty <activity/> to clear
+
+    xmpp_stanza_add_child(item, activity_elem);
+    xmpp_stanza_add_child(publish, item);
+    xmpp_stanza_add_child(pubsub, publish);
+    xmpp_stanza_add_child(iq, pubsub);
+
+    ptr_account->connection.send(iq);
+
+    xmpp_stanza_release(activity_elem);
+    xmpp_stanza_release(item);
+    xmpp_stanza_release(publish);
+    xmpp_stanza_release(pubsub);
+    xmpp_stanza_release(iq);
+
+    if (category)
+    {
+        if (specific && text)
+            weechat_printf(buffer, "%sxmpp: activity set to '%s/%s': %s",
+                          weechat_prefix("network"), argv[1], specific, text);
+        else if (specific)
+            weechat_printf(buffer, "%sxmpp: activity set to '%s/%s'",
+                          weechat_prefix("network"), argv[1], specific);
+        else if (text)
+            weechat_printf(buffer, "%sxmpp: activity set to '%s': %s",
+                          weechat_prefix("network"), argv[1], text);
+        else
+            weechat_printf(buffer, "%sxmpp: activity set to '%s'",
+                          weechat_prefix("network"), argv[1]);
+    }
+    else
+    {
+        weechat_printf(buffer, "%sxmpp: activity cleared",
+                      weechat_prefix("network"));
+    }
+
+    return WEECHAT_RC_OK;
+}
+
 int command__selfping(const void *pointer, void *data,
                      struct t_gui_buffer *buffer, int argc,
                      char **argv, char **argv_eol)
@@ -3166,6 +3356,27 @@ void command__init()
         NULL, &command__mood, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /mood");
+
+    hook = weechat_hook_command(
+        "activity",
+        N_("set or clear your activity (XEP-0108)"),
+        N_("[<category>[/<specific>] [text]]"),
+        N_("category: activity category (working, relaxing, eating, drinking, etc.)\n"
+           "specific: optional specific activity (e.g., working/coding)\n"
+           "    text: optional descriptive text\n\n"
+           "Sets your current activity which is published via PEP.\n"
+           "Examples:\n"
+           "  /activity working\n"
+           "  /activity working/coding\n"
+           "  /activity working/coding Implementing XEP-0108\n"
+           "  /activity relaxing/reading\n"
+           "  /activity eating\n"
+           "  /activity (clears activity)\n\n"
+           "Categories: doing_chores, drinking, eating, exercising, grooming,\n"
+           "            having_appointment, inactive, relaxing, talking, traveling, working"),
+        NULL, &command__activity, NULL, NULL);
+    if (!hook)
+        weechat_printf(NULL, "Failed to setup command /activity");
 
     hook = weechat_hook_command(
         "edit",

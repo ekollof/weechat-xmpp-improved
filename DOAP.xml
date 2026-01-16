@@ -114,6 +114,15 @@
 
     <implements>
       <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0108.html'/>
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>1.3.1</xmpp:version>
+        <xmpp:note xml:lang='en'>User Activity - publish and subscribe to activity updates via PEP</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0115.html'/>
         <xmpp:status>complete</xmpp:status>
         <xmpp:version>1.6.0</xmpp:version>
@@ -332,7 +341,7 @@
       <Version>
         <revision>0.3.0-fork</revision>
         <created>2026-01-16</created>
-        <xmpp:note xml:lang='en'>Fork with bug fixes and enhancements: typing indicators, auto-encryption detection, bookmark management, room discovery, capability caching, Stream Management (XEP-0198), Message Retraction (XEP-0424), Message Moderation (XEP-0425), Message Styling (XEP-0393), Stanza IDs (XEP-0359), Message Hints (XEP-0334), Message Reactions (XEP-0444), Message Replies (XEP-0461), Message Fastening (XEP-0422), Chat State Notifications (XEP-0085), User Mood (XEP-0107)</xmpp:note>
+        <xmpp:note xml:lang='en'>Fork with bug fixes and enhancements: typing indicators, auto-encryption detection, bookmark management, room discovery, capability caching, Stream Management (XEP-0198), Message Retraction (XEP-0424), Message Moderation (XEP-0425), Message Styling (XEP-0393), Stanza IDs (XEP-0359), Message Hints (XEP-0334), Message Reactions (XEP-0444), Message Replies (XEP-0461), Message Fastening (XEP-0422), Chat State Notifications (XEP-0085), User Mood (XEP-0107), User Activity (XEP-0108)</xmpp:note>
       </Version>
     </release>
   </Project>
