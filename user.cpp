@@ -169,7 +169,10 @@ weechat::user::user(weechat::account *account, weechat::channel *channel,
     this->profile.display_name = display_name ?
         strdup(display_name) : strdup("");
 
-    // Only add to nicklist if this user is in a channel, not for roster contacts
+    // Add to nicklist:
+    // - For MUC users: add to channel nicklist
+    // - For roster contacts: add to account buffer nicklist (will be shown when online)
     if (channel)
         nicklist_add(account, channel);
+    // Note: Roster contacts added to nicklist when they come online in presence_handler
 }

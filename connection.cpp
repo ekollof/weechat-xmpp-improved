@@ -289,6 +289,23 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool top_level
         user->is_away = show ? *show == "away" : false;
         user->profile.role = NULL;
         user->profile.affiliation = NULL;
+        
+        // For roster contacts (not in a MUC), manage account buffer nicklist
+        if (!channel)
+        {
+            if (binding.type && *binding.type == "unavailable")
+            {
+                // User went offline, remove from account nicklist
+                user->nicklist_remove(&account, nullptr);
+            }
+            else
+            {
+                // User is online (or status update), add/update in account nicklist
+                user->nicklist_remove(&account, nullptr);  // Remove first to avoid duplicates
+                user->nicklist_add(&account, nullptr);
+            }
+        }
+        
         if (channel)
         {
             if (auto signature = binding.signature(); signature)
