@@ -1524,6 +1524,180 @@ int command__react(const void *pointer, void *data,
     return WEECHAT_RC_OK;
 }
 
+int command__reply(const void *pointer, void *data,
+                   struct t_gui_buffer *buffer, int argc,
+                   char **argv, char **argv_eol)
+{
+    weechat::account *ptr_account = NULL;
+    weechat::channel *ptr_channel = NULL;
+
+    (void) pointer;
+    (void) data;
+    (void) argv;
+
+    buffer__get_account_and_channel(buffer, &ptr_account, &ptr_channel);
+
+    if (!ptr_account)
+        return WEECHAT_RC_ERROR;
+
+    if (!ptr_channel)
+    {
+        weechat_printf(buffer, "%sxmpp: you must be in a channel to reply to messages",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    if (!ptr_account->connected())
+    {
+        weechat_printf(buffer, "%sxmpp: you are not connected to server",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    if (argc < 2)
+    {
+        weechat_printf(buffer, "%sxmpp: missing reply message",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    const char *reply_text = argv_eol[1];
+
+    // Find the last message in buffer (not from us)
+    void *lines = weechat_hdata_pointer(weechat_hdata_get("buffer"),
+                                        buffer, "lines");
+    if (!lines)
+    {
+        weechat_printf(buffer, "%sxmpp: no lines found in buffer",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    void *last_line = weechat_hdata_pointer(weechat_hdata_get("lines"),
+                                            lines, "last_line");
+    const char *target_id = NULL;
+    std::string own_nick = std::string(ptr_account->jid());
+
+    while (last_line)
+    {
+        void *line_data = weechat_hdata_pointer(weechat_hdata_get("line"),
+                                                last_line, "data");
+        if (line_data)
+        {
+            // Check if this message is not from us
+            int tags_count = weechat_hdata_integer(weechat_hdata_get("line_data"),
+                                                   line_data, "tags_count");
+            bool from_self = false;
+            char str_tag[24] = {0};
+            
+            for (int n_tag = 0; n_tag < tags_count; n_tag++)
+            {
+                snprintf(str_tag, sizeof(str_tag), "%d|tags_array", n_tag);
+                const char *tag = weechat_hdata_string(weechat_hdata_get("line_data"),
+                                                       line_data, str_tag);
+                
+                // Check if message is from self
+                if (strlen(tag) > strlen("nick_") &&
+                    strncmp(tag, "nick_", strlen("nick_")) == 0)
+                {
+                    const char *nick = tag + strlen("nick_");
+                    if (weechat_strcasecmp(nick, own_nick.c_str()) == 0)
+                    {
+                        from_self = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (!from_self)
+            {
+                // Found a message not from us - extract its ID
+                for (int n_tag = 0; n_tag < tags_count; n_tag++)
+                {
+                    snprintf(str_tag, sizeof(str_tag), "%d|tags_array", n_tag);
+                    const char *tag = weechat_hdata_string(weechat_hdata_get("line_data"),
+                                                           line_data, str_tag);
+                    if (strlen(tag) > strlen("id_") &&
+                        strncmp(tag, "id_", strlen("id_")) == 0)
+                    {
+                        target_id = tag + strlen("id_");
+                        break;
+                    }
+                }
+                
+                if (target_id)
+                    break;
+            }
+        }
+
+        last_line = weechat_hdata_pointer(weechat_hdata_get("line"),
+                                          last_line, "prev_line");
+    }
+
+    if (!target_id)
+    {
+        weechat_printf(buffer, "%sxmpp: no message found to reply to",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    // Send the reply using XEP-0461
+    // The message goes to the channel with a <reply> element
+    const char *to = ptr_channel->name.c_str();
+    const char *type = (ptr_channel->type == weechat::channel::chat_type::MUC) 
+                        ? "groupchat" : "chat";
+
+    xmpp_stanza_t *message = xmpp_message_new(ptr_account->context, type, to, NULL);
+    char *uuid = xmpp_uuid_gen(ptr_account->context);
+    xmpp_stanza_set_id(message, uuid);
+    xmpp_free(ptr_account->context, uuid);
+
+    // Add <body> with reply text
+    xmpp_stanza_t *body = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(body, "body");
+    xmpp_stanza_t *body_text = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_text(body_text, reply_text);
+    xmpp_stanza_add_child(body, body_text);
+    xmpp_stanza_add_child(message, body);
+
+    // Add <reply xmlns='urn:xmpp:reply:0' id='target-id' />
+    xmpp_stanza_t *reply_elem = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(reply_elem, "reply");
+    xmpp_stanza_set_ns(reply_elem, "urn:xmpp:reply:0");
+    xmpp_stanza_set_attribute(reply_elem, "id", target_id);
+    xmpp_stanza_set_attribute(reply_elem, "to", to);
+    xmpp_stanza_add_child(message, reply_elem);
+
+    // Add store hint for MAM
+    xmpp_stanza_t *store_hint = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(store_hint, "store");
+    xmpp_stanza_set_ns(store_hint, "urn:xmpp:hints");
+    xmpp_stanza_add_child(message, store_hint);
+
+    // Add origin-id for XEP-0359
+    xmpp_stanza_t *origin_id = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(origin_id, "origin-id");
+    xmpp_stanza_set_ns(origin_id, "urn:xmpp:sid:0");
+    char *origin_uuid = xmpp_uuid_gen(ptr_account->context);
+    xmpp_stanza_set_attribute(origin_id, "id", origin_uuid);
+    xmpp_free(ptr_account->context, origin_uuid);
+    xmpp_stanza_add_child(message, origin_id);
+
+    ptr_account->connection.send(message);
+
+    xmpp_stanza_release(body_text);
+    xmpp_stanza_release(body);
+    xmpp_stanza_release(reply_elem);
+    xmpp_stanza_release(store_hint);
+    xmpp_stanza_release(origin_id);
+    xmpp_stanza_release(message);
+
+    weechat_printf(buffer, "%sxmpp: reply sent",
+                  weechat_prefix("network"));
+
+    return WEECHAT_RC_OK;
+}
+
 int command__ping(const void *pointer, void *data,
                   struct t_gui_buffer *buffer, int argc,
                   char **argv, char **argv_eol)
@@ -2690,6 +2864,20 @@ void command__init()
         NULL, &command__react, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /react");
+
+    hook = weechat_hook_command(
+        "reply",
+        N_("reply to the last message (XEP-0461)"),
+        N_("<message>"),
+        N_("message: your reply text\n\n"
+           "Replies to the last message (not yours) in the buffer with context.\n"
+           "The reply includes a reference to the original message.\n"
+           "Examples:\n"
+           "  /reply Thanks for the info!\n"
+           "  /reply I agree with that"),
+        NULL, &command__reply, NULL, NULL);
+    if (!hook)
+        weechat_printf(NULL, "Failed to setup command /reply");
 
     hook = weechat_hook_command(
         "disco",

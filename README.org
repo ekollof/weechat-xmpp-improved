@@ -62,6 +62,7 @@
     - Message retraction (XEP-0424) - /retract command to delete last sent message with MAM support
     - Message styling (XEP-0393) - automatic rendering of formatted text
     - Message reactions (XEP-0444) - /react command to send emoji reactions to messages
+    - Message replies (XEP-0461) - /reply command to reply to messages with context
     - Unique and stable stanza IDs (XEP-0359) - tracks message IDs for reliable references
     - Message processing hints (XEP-0334) - optimizes MAM storage for transient messages
     - Complete chat state notifications - active, composing, paused, inactive, gone
@@ -101,6 +102,7 @@
     - ✅ XEP-0410: MUC Self-Ping (/selfping for membership verification)
     - ✅ XEP-0424: Message Retraction (/retract command)
     - ✅ XEP-0444: Message Reactions (/react command)
+    - ✅ XEP-0461: Message Replies (/reply command)
 
 *** Additional Implemented XEPs
     - ✅ XEP-0048: Bookmark Storage (/bookmark command)
@@ -334,6 +336,26 @@
     *Note:* Reacts to the last message from another user in the current buffer.
     Reactions are displayed appended to the original message in blue brackets.
     Works in both PM and MUC channels. The server must support XEP-0444.
+
+*** /reply
+    Reply to the last received message with context (XEP-0461: Message Replies)
+
+    *Usage:*
+    #+begin_src
+    /reply <message>
+    #+end_src
+
+    *Examples:*
+    #+begin_src
+    /reply Thanks for the info!
+    /reply I agree with that
+    /reply Great idea, let's do it
+    #+end_src
+
+    *Note:* Replies to the last message from another user in the current buffer.
+    The reply includes a reference to the original message, displayed with a 
+    cyan arrow (↪) and excerpt of the original message. Works in both PM and 
+    MUC channels. The server must support XEP-0461.
 
 *** /whois
     Get vCard information about an XMPP user (XEP-0054: vcard-temp)

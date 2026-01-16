@@ -1210,6 +1210,86 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
     if (display_prefix.empty())
         display_prefix = user::as_prefix_raw(from_bare);
     
+    // XEP-0461: Message Replies - extract reply context
+    xmpp_stanza_t *reply_elem = xmpp_stanza_get_child_by_name_and_ns(stanza, "reply", "urn:xmpp:reply:0");
+    const char *reply_to_id = reply_elem ? xmpp_stanza_get_attribute(reply_elem, "id") : NULL;
+    std::string reply_prefix;
+    
+    if (reply_to_id)
+    {
+        // Find the original message being replied to
+        void *lines = weechat_hdata_pointer(weechat_hdata_get("buffer"),
+                                            channel->buffer, "lines");
+        if (lines)
+        {
+            void *last_line = weechat_hdata_pointer(weechat_hdata_get("lines"),
+                                                    lines, "last_line");
+            while (last_line)
+            {
+                void *line_data = weechat_hdata_pointer(weechat_hdata_get("line"),
+                                                        last_line, "data");
+                if (line_data)
+                {
+                    int tags_count = weechat_hdata_integer(weechat_hdata_get("line_data"),
+                                                           line_data, "tags_count");
+                    char str_tag[24] = {0};
+                    for (int n_tag = 0; n_tag < tags_count; n_tag++)
+                    {
+                        snprintf(str_tag, sizeof(str_tag), "%d|tags_array", n_tag);
+                        const char *tag = weechat_hdata_string(weechat_hdata_get("line_data"),
+                                                               line_data, str_tag);
+                        if (strlen(tag) > strlen("id_") &&
+                            weechat_strcasecmp(tag+strlen("id_"), reply_to_id) == 0)
+                        {
+                            // Found the original message - get excerpt
+                            const char *orig_message = weechat_hdata_string(
+                                weechat_hdata_get("line_data"), line_data, "message");
+                            
+                            if (orig_message)
+                            {
+                                // Extract just the text part (after tab if present)
+                                const char *msg_text = strchr(orig_message, '\t');
+                                if (msg_text)
+                                    msg_text++; // Skip the tab
+                                else
+                                    msg_text = orig_message;
+                                
+                                // Create prefix showing what message this is replying to (max 40 chars)
+                                char excerpt[45];
+                                if (strlen(msg_text) > 40)
+                                {
+                                    strncpy(excerpt, msg_text, 40);
+                                    excerpt[40] = '\0';
+                                    strcat(excerpt, "...");
+                                }
+                                else
+                                {
+                                    strcpy(excerpt, msg_text);
+                                }
+                                
+                                reply_prefix = std::string(weechat_color("cyan")) + 
+                                             "↪ " + excerpt + " " +
+                                             weechat_color("resetcolor");
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                last_line = weechat_hdata_pointer(weechat_hdata_get("line"),
+                                                  last_line, "prev_line");
+            }
+        }
+        
+        // If we didn't find the original, just show reply indicator
+        if (reply_prefix.empty())
+        {
+            reply_prefix = std::string(weechat_color("cyan")) + 
+                         "↪ [reply] " +
+                         weechat_color("resetcolor");
+        }
+    }
+    
     // Apply XEP-0393 Message Styling
     const char *display_text = text;
     std::string styled_text;
@@ -1221,6 +1301,14 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
     else if (difftext)
     {
         display_text = difftext;
+    }
+    
+    // Prepend reply context if this is a reply
+    std::string final_text;
+    if (!reply_prefix.empty())
+    {
+        final_text = reply_prefix + (display_text ? display_text : "");
+        display_text = final_text.c_str();
     }
     
     if (channel_id == from_bare && to == channel->id)
@@ -1314,6 +1402,7 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash)
     FEATURE("urn:xmpp:message-correct:0");
     FEATURE("urn:xmpp:message-retract:1");
     FEATURE("urn:xmpp:reactions:0");  // XEP-0444: Message Reactions
+    FEATURE("urn:xmpp:reply:0");  // XEP-0461: Message Replies
     FEATURE("urn:xmpp:sid:0");  // XEP-0359: Stanza IDs
     FEATURE("urn:xmpp:styling:0");
     FEATURE("urn:xmpp:ping");
