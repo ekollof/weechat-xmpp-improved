@@ -1705,34 +1705,35 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         xmpp_stanza_t *pres__c, *pres__status, *pres__status__text,
             *pres__x, *pres__x__text;
 
-        this->handler_add<jabber::iq::version>(
-            "iq", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
-                auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
-                if (connection != conn) throw std::invalid_argument("connection != conn");
-                return connection.version_handler(stanza) ? 1 : 0;
-            });
-        this->handler_add(
-            "presence", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
-                auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
-                if (connection != conn) throw std::invalid_argument("connection != conn");
-                return connection.presence_handler(stanza) ? 1 : 0;
-            });
-        this->handler_add(
-            "message", /*type*/ nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
-                auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
-                if (connection != conn) throw std::invalid_argument("connection != conn");
-                return connection.message_handler(stanza) ? 1 : 0;
-            });
-        this->handler_add(
-            "iq", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
-                auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
-                if (connection != conn) throw std::invalid_argument("connection != conn");
-                return connection.iq_handler(stanza) ? 1 : 0;
-            });
-
-        // Stream Management handlers (XEP-0198) - only add once
+        // Only add handlers once (they persist across reconnects via libstrophe)
         if (!account.sm_handlers_registered)
         {
+            this->handler_add<jabber::iq::version>(
+                "iq", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
+                    auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
+                    if (connection != conn) throw std::invalid_argument("connection != conn");
+                    return connection.version_handler(stanza) ? 1 : 0;
+                });
+            this->handler_add(
+                "presence", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
+                    auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
+                    if (connection != conn) throw std::invalid_argument("connection != conn");
+                    return connection.presence_handler(stanza) ? 1 : 0;
+                });
+            this->handler_add(
+                "message", /*type*/ nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
+                    auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
+                    if (connection != conn) throw std::invalid_argument("connection != conn");
+                    return connection.message_handler(stanza) ? 1 : 0;
+                });
+            this->handler_add(
+                "iq", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
+                    auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
+                    if (connection != conn) throw std::invalid_argument("connection != conn");
+                    return connection.iq_handler(stanza) ? 1 : 0;
+                });
+
+            // Stream Management handlers (XEP-0198)
             this->handler_add(
                 "enabled", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
                     auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
