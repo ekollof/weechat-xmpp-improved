@@ -285,14 +285,18 @@ void weechat::account::disconnect(int reconnect)
     
     // Clear libstrophe's internal SM state to prevent auto-resume
     // This is critical - libstrophe persists SM state across reconnects!
-    xmpp_conn_t *conn_ptr = connection;  // Uses operator xmpp_conn_t*()
-    if (conn_ptr)
+    // Must check if connection is valid AND connected before accessing state
+    if (is_connected)
     {
-        xmpp_sm_state_t *sm_state = xmpp_conn_get_sm_state(conn_ptr);
-        if (sm_state)
+        xmpp_conn_t *conn_ptr = connection;  // Uses operator xmpp_conn_t*()
+        if (conn_ptr)
         {
-            xmpp_free_sm_state(sm_state);
-            xmpp_conn_set_sm_state(conn_ptr, nullptr);
+            xmpp_sm_state_t *sm_state = xmpp_conn_get_sm_state(conn_ptr);
+            if (sm_state)
+            {
+                xmpp_free_sm_state(sm_state);
+                xmpp_conn_set_sm_state(conn_ptr, nullptr);
+            }
         }
     }
         
