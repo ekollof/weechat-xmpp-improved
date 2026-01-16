@@ -1293,6 +1293,66 @@ int command__ping(const void *pointer, void *data,
     return WEECHAT_RC_OK;
 }
 
+int command__whois(const void *pointer, void *data,
+                  struct t_gui_buffer *buffer, int argc,
+                  char **argv, char **argv_eol)
+{
+    weechat::account *ptr_account = NULL;
+    weechat::channel *ptr_channel = NULL;
+    xmpp_stanza_t *iq;
+    const char *target = NULL;
+
+    (void) pointer;
+    (void) data;
+    (void) argv_eol;
+
+    buffer__get_account_and_channel(buffer, &ptr_account, &ptr_channel);
+
+    if (!ptr_account)
+        return WEECHAT_RC_ERROR;
+
+    if (!ptr_account->connected())
+    {
+        weechat_printf(buffer, "%sxmpp: you are not connected to server",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    // Determine target: specified argument or current channel
+    if (argc > 1)
+        target = argv[1];
+    else if (ptr_channel && ptr_channel->type == weechat::channel::chat_type::PM)
+        target = ptr_channel->id.data();
+    else
+    {
+        weechat_printf(buffer, "%s%s: missing JID argument",
+                      weechat_prefix("error"),
+                      argv[0]);
+        return WEECHAT_RC_OK;
+    }
+
+    // Request vCard using XEP-0054
+    char *id = xmpp_uuid_gen(ptr_account->context);
+    iq = xmpp_iq_new(ptr_account->context, "get", id);
+    xmpp_stanza_set_to(iq, target);
+    
+    xmpp_stanza_t *vcard = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(vcard, "vCard");
+    xmpp_stanza_set_ns(vcard, "vcard-temp");
+    
+    xmpp_stanza_add_child(iq, vcard);
+    xmpp_stanza_release(vcard);
+    
+    weechat_printf(buffer, "%sRequesting vCard for %s...",
+                   weechat_prefix("network"), target);
+    
+    ptr_account->connection.send(iq);
+    xmpp_stanza_release(iq);
+    xmpp_free(ptr_account->context, id);
+
+    return WEECHAT_RC_OK;
+}
+
 int command__disco(const void *pointer, void *data,
                    struct t_gui_buffer *buffer, int argc,
                    char **argv, char **argv_eol)
@@ -2093,4 +2153,13 @@ void command__init()
         NULL, &command__list, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /list");
+
+    hook = weechat_hook_command(
+        "whois",
+        N_("get vCard information about an XMPP user (XEP-0054)"),
+        N_("[<jid>]"),
+        N_("jid: user JID to query (uses current PM channel if not specified)"),
+        NULL, &command__whois, NULL, NULL);
+    if (!hook)
+        weechat_printf(NULL, "Failed to setup command /whois");
 }

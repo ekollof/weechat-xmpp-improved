@@ -87,6 +87,15 @@
 
     <implements>
       <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0054.html'/>
+        <xmpp:status>partial</xmpp:status>
+        <xmpp:version>1.2</xmpp:version>
+        <xmpp:note xml:lang='en'>vcard-temp (requesting vCards only, not publishing)</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0115.html'/>
         <xmpp:status>complete</xmpp:status>
         <xmpp:version>1.6.0</xmpp:version>

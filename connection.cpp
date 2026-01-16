@@ -1238,6 +1238,79 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
         }
     }
     
+    // Handle vCard responses (XEP-0054)
+    xmpp_stanza_t *vcard = xmpp_stanza_get_child_by_name_and_ns(
+        stanza, "vCard", "vcard-temp");
+    if (vcard && type && weechat_strcasecmp(type, "result") == 0)
+    {
+        const char *from_jid = from ? from : account.jid().data();
+        
+        weechat_printf(account.buffer, "%svCard for %s:",
+                      weechat_prefix("network"), from_jid);
+        
+        // Extract and display vCard fields
+        xmpp_stanza_t *fn = xmpp_stanza_get_child_by_name(vcard, "FN");
+        if (fn)
+        {
+            char *fn_text = xmpp_stanza_get_text(fn);
+            if (fn_text)
+            {
+                weechat_printf(account.buffer, "  Name: %s", fn_text);
+                xmpp_free(account.context, fn_text);
+            }
+        }
+        
+        xmpp_stanza_t *nickname = xmpp_stanza_get_child_by_name(vcard, "NICKNAME");
+        if (nickname)
+        {
+            char *nick_text = xmpp_stanza_get_text(nickname);
+            if (nick_text)
+            {
+                weechat_printf(account.buffer, "  Nickname: %s", nick_text);
+                xmpp_free(account.context, nick_text);
+            }
+        }
+        
+        xmpp_stanza_t *email = xmpp_stanza_get_child_by_name(vcard, "EMAIL");
+        if (email)
+        {
+            xmpp_stanza_t *userid = xmpp_stanza_get_child_by_name(email, "USERID");
+            if (userid)
+            {
+                char *email_text = xmpp_stanza_get_text(userid);
+                if (email_text)
+                {
+                    weechat_printf(account.buffer, "  Email: %s", email_text);
+                    xmpp_free(account.context, email_text);
+                }
+            }
+        }
+        
+        xmpp_stanza_t *url = xmpp_stanza_get_child_by_name(vcard, "URL");
+        if (url)
+        {
+            char *url_text = xmpp_stanza_get_text(url);
+            if (url_text)
+            {
+                weechat_printf(account.buffer, "  URL: %s", url_text);
+                xmpp_free(account.context, url_text);
+            }
+        }
+        
+        xmpp_stanza_t *desc = xmpp_stanza_get_child_by_name(vcard, "DESC");
+        if (desc)
+        {
+            char *desc_text = xmpp_stanza_get_text(desc);
+            if (desc_text)
+            {
+                weechat_printf(account.buffer, "  Description: %s", desc_text);
+                xmpp_free(account.context, desc_text);
+            }
+        }
+        
+        return true;
+    }
+    
     query = xmpp_stanza_get_child_by_name_and_ns(
         stanza, "query", "http://jabber.org/protocol/disco#info");
     if (query && type)

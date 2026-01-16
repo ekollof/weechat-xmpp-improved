@@ -222,6 +222,23 @@
     *Note:* The original message will be updated with a visual indicator 
     showing the diff between the old and new text.
 
+*** /whois
+    Get vCard information about an XMPP user (XEP-0054: vcard-temp)
+
+    *Usage:*
+    #+begin_src
+    /whois [<jid>]
+    #+end_src
+
+    *Examples:*
+    #+begin_src
+    /whois friend@example.com
+    /whois (in a PM buffer - uses the current contact)
+    #+end_src
+
+    *Note:* Displays available vCard information including full name, 
+    nickname, email, URL, and description if provided by the user.
+
 ** Encryption
 
 *** /omemo
