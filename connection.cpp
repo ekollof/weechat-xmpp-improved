@@ -1939,8 +1939,44 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
     }
     else
     {
-        weechat_printf(account.buffer, "%s[DEBUG] Disconnecting due to status=%d",
-                      weechat_prefix("error"), (int)status);
+        weechat_printf(account.buffer, "%s[DEBUG] Disconnecting due to status=%d, error=%d",
+                      weechat_prefix("error"), (int)status, error);
+        
+        if (stream_error)
+        {
+            const char *err_text = stream_error->text;
+            const char *err_type = stream_error->type == XMPP_SE_BAD_FORMAT ? "bad-format" :
+                                   stream_error->type == XMPP_SE_BAD_NS_PREFIX ? "bad-namespace-prefix" :
+                                   stream_error->type == XMPP_SE_CONFLICT ? "conflict" :
+                                   stream_error->type == XMPP_SE_CONN_TIMEOUT ? "connection-timeout" :
+                                   stream_error->type == XMPP_SE_HOST_GONE ? "host-gone" :
+                                   stream_error->type == XMPP_SE_HOST_UNKNOWN ? "host-unknown" :
+                                   stream_error->type == XMPP_SE_IMPROPER_ADDR ? "improper-addressing" :
+                                   stream_error->type == XMPP_SE_INTERNAL_SERVER_ERROR ? "internal-server-error" :
+                                   stream_error->type == XMPP_SE_INVALID_FROM ? "invalid-from" :
+                                   stream_error->type == XMPP_SE_INVALID_ID ? "invalid-id" :
+                                   stream_error->type == XMPP_SE_INVALID_NS ? "invalid-namespace" :
+                                   stream_error->type == XMPP_SE_INVALID_XML ? "invalid-xml" :
+                                   stream_error->type == XMPP_SE_NOT_AUTHORIZED ? "not-authorized" :
+                                   stream_error->type == XMPP_SE_POLICY_VIOLATION ? "policy-violation" :
+                                   stream_error->type == XMPP_SE_REMOTE_CONN_FAILED ? "remote-connection-failed" :
+                                   stream_error->type == XMPP_SE_RESOURCE_CONSTRAINT ? "resource-constraint" :
+                                   stream_error->type == XMPP_SE_RESTRICTED_XML ? "restricted-xml" :
+                                   stream_error->type == XMPP_SE_SEE_OTHER_HOST ? "see-other-host" :
+                                   stream_error->type == XMPP_SE_SYSTEM_SHUTDOWN ? "system-shutdown" :
+                                   stream_error->type == XMPP_SE_UNDEFINED_CONDITION ? "undefined-condition" :
+                                   stream_error->type == XMPP_SE_UNSUPPORTED_ENCODING ? "unsupported-encoding" :
+                                   stream_error->type == XMPP_SE_UNSUPPORTED_STANZA_TYPE ? "unsupported-stanza-type" :
+                                   stream_error->type == XMPP_SE_UNSUPPORTED_VERSION ? "unsupported-version" :
+                                   stream_error->type == XMPP_SE_XML_NOT_WELL_FORMED ? "xml-not-well-formed" :
+                                   "unknown";
+            
+            weechat_printf(account.buffer, "%s[DEBUG] Stream error: %s%s%s",
+                          weechat_prefix("error"),
+                          err_type,
+                          err_text ? " - " : "",
+                          err_text ? err_text : "");
+        }
         
         // Clear SM session on clean disconnect (server-initiated or normal close)
         // This prevents trying to resume a session the server has already closed

@@ -495,7 +495,7 @@ int command__enter(const void *pointer, void *data,
             xmpp_stanza_add_child(pres, pres__x);
             xmpp_stanza_release(pres__x);
 
-            xmpp_send(ptr_account->connection, pres);
+            ptr_account->connection.send( pres);
             xmpp_stanza_release(pres);
 
             if (argc > 2)
@@ -538,7 +538,7 @@ int command__enter(const void *pointer, void *data,
         xmpp_stanza_add_child(pres, pres__x);
         xmpp_stanza_release(pres__x);
 
-        xmpp_send(ptr_account->connection, pres);
+        ptr_account->connection.send( pres);
         xmpp_stanza_release(pres);
     }
 
@@ -590,7 +590,7 @@ int command__open(const void *pointer, void *data,
             pres = xmpp_presence_new(ptr_account->context);
             xmpp_stanza_set_to(pres, jid);
             xmpp_stanza_set_from(pres, ptr_account->jid().data());
-            xmpp_send(ptr_account->connection, pres);
+            ptr_account->connection.send( pres);
             xmpp_stanza_release(pres);
 
             auto channel = ptr_account->channels.find(jid);
@@ -667,7 +667,7 @@ int command__msg(const void *pointer, void *data,
                                    ptr_channel->type == weechat::channel::chat_type::MUC ? "groupchat" : "chat",
                                    ptr_channel->name.data(), NULL);
         xmpp_message_set_body(message, text);
-        xmpp_send(ptr_account->connection, message);
+        ptr_account->connection.send( message);
         xmpp_stanza_release(message);
         if (ptr_channel->type != weechat::channel::chat_type::MUC)
             weechat_printf_date_tags(ptr_channel->buffer, 0,
@@ -723,7 +723,7 @@ int command__me(const void *pointer, void *data,
                                    ptr_channel->type == weechat::channel::chat_type::MUC ? "groupchat" : "chat",
                                    ptr_channel->name.data(), NULL);
         xmpp_message_set_body(message, text);
-        xmpp_send(ptr_account->connection, message);
+        ptr_account->connection.send( message);
         xmpp_stanza_release(message);
         if (ptr_channel->type != weechat::channel::chat_type::MUC)
             weechat_printf_date_tags(ptr_channel->buffer, 0,
@@ -952,7 +952,7 @@ int command__xml(const void *pointer, void *data,
         {
             for (auto *stanza : sxml.elements)
             {
-                xmpp_send(ptr_account->connection, stanza);
+                ptr_account->connection.send( stanza);
                 xmpp_stanza_release(stanza);
             }
         }
@@ -967,7 +967,7 @@ int command__xml(const void *pointer, void *data,
                 return WEECHAT_RC_ERROR;
             }
 
-            xmpp_send(ptr_account->connection, stanza);
+            ptr_account->connection.send( stanza);
             xmpp_stanza_release(stanza);
         }
     }
@@ -1143,7 +1143,7 @@ int command__edit(const void *pointer, void *data,
     xmpp_stanza_add_child(message, message__store);
     xmpp_stanza_release(message__store);
 
-    xmpp_send(ptr_account->connection, message);
+    ptr_account->connection.send( message);
     xmpp_stanza_release(message);
     
     free(last_msg_id);
@@ -1213,7 +1213,7 @@ int command__ping(const void *pointer, void *data,
     xmpp_stanza_add_child(iq, ping);
     xmpp_stanza_release(ping);
     
-    xmpp_send(ptr_account->connection, iq);
+    ptr_account->connection.send( iq);
     xmpp_stanza_release(iq);
     xmpp_free(ptr_account->context, id);
 
@@ -1263,7 +1263,7 @@ int command__disco(const void *pointer, void *data,
     xmpp_stanza_add_child(iq, query);
     xmpp_stanza_release(query);
     
-    xmpp_send(ptr_account->connection, iq);
+    ptr_account->connection.send( iq);
     xmpp_stanza_release(iq);
     xmpp_free(ptr_account->context, id);
 
@@ -1362,7 +1362,7 @@ int command__roster(const void *pointer, void *data,
         xmpp_stanza_add_child(query, item);
         xmpp_stanza_add_child(iq, query);
         
-        xmpp_send(ptr_account->connection, iq);
+        ptr_account->connection.send( iq);
         
         xmpp_stanza_release(item);
         xmpp_stanza_release(query);
@@ -1375,7 +1375,7 @@ int command__roster(const void *pointer, void *data,
         xmpp_stanza_t *presence = xmpp_presence_new(ptr_account->context);
         xmpp_stanza_set_type(presence, "subscribe");
         xmpp_stanza_set_to(presence, jid);
-        xmpp_send(ptr_account->connection, presence);
+        ptr_account->connection.send( presence);
         xmpp_stanza_release(presence);
 
         return WEECHAT_RC_OK;
@@ -1404,7 +1404,7 @@ int command__roster(const void *pointer, void *data,
         xmpp_stanza_add_child(query, item);
         xmpp_stanza_add_child(iq, query);
         
-        xmpp_send(ptr_account->connection, iq);
+        ptr_account->connection.send( iq);
         
         xmpp_stanza_release(item);
         xmpp_stanza_release(query);

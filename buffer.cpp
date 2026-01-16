@@ -245,7 +245,7 @@ int buffer__close_cb(const void *pointer, void *data,
                     
                     xmpp_stanza_set_from(pres, ptr_account->jid().data());
                     
-                    xmpp_send(ptr_account->connection, pres);
+                    ptr_account->connection.send( pres);
                     xmpp_stanza_release(pres);
                 }
                 
