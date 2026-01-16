@@ -169,5 +169,7 @@ weechat::user::user(weechat::account *account, weechat::channel *channel,
     this->profile.display_name = display_name ?
         strdup(display_name) : strdup("");
 
-    nicklist_add(account, nullptr);
+    // Only add to nicklist if this user is in a channel, not for roster contacts
+    if (channel)
+        nicklist_add(account, channel);
 }
