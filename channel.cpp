@@ -1150,6 +1150,13 @@ void weechat::channel::send_typing(weechat::user *user)
 
         xmpp_stanza_add_child(message, message__composing);
         xmpp_stanza_release(message__composing);
+        
+        // XEP-0334: Don't store typing notifications
+        xmpp_stanza_t *no_store = xmpp_stanza_new(account.context);
+        xmpp_stanza_set_name(no_store, "no-store");
+        xmpp_stanza_set_ns(no_store, "urn:xmpp:hints");
+        xmpp_stanza_add_child(message, no_store);
+        xmpp_stanza_release(no_store);
 
         account.connection.send( message);
         xmpp_stanza_release(message);
@@ -1169,6 +1176,13 @@ void weechat::channel::send_paused(weechat::user *user)
 
     xmpp_stanza_add_child(message, message__paused);
     xmpp_stanza_release(message__paused);
+    
+    // XEP-0334: Don't store chat state notifications
+    xmpp_stanza_t *no_store = xmpp_stanza_new(account.context);
+    xmpp_stanza_set_name(no_store, "no-store");
+    xmpp_stanza_set_ns(no_store, "urn:xmpp:hints");
+    xmpp_stanza_add_child(message, no_store);
+    xmpp_stanza_release(no_store);
 
     account.connection.send( message);
     xmpp_stanza_release(message);
@@ -1187,6 +1201,13 @@ void weechat::channel::send_inactive(weechat::user *user)
 
     xmpp_stanza_add_child(message, message__inactive);
     xmpp_stanza_release(message__inactive);
+    
+    // XEP-0334: Don't store chat state notifications
+    xmpp_stanza_t *no_store = xmpp_stanza_new(account.context);
+    xmpp_stanza_set_name(no_store, "no-store");
+    xmpp_stanza_set_ns(no_store, "urn:xmpp:hints");
+    xmpp_stanza_add_child(message, no_store);
+    xmpp_stanza_release(no_store);
 
     account.connection.send( message);
     xmpp_stanza_release(message);
@@ -1205,6 +1226,13 @@ void weechat::channel::send_gone(weechat::user *user)
 
     xmpp_stanza_add_child(message, message__gone);
     xmpp_stanza_release(message__gone);
+    
+    // XEP-0334: Don't store chat state notifications
+    xmpp_stanza_t *no_store = xmpp_stanza_new(account.context);
+    xmpp_stanza_set_name(no_store, "no-store");
+    xmpp_stanza_set_ns(no_store, "urn:xmpp:hints");
+    xmpp_stanza_add_child(message, no_store);
+    xmpp_stanza_release(no_store);
 
     account.connection.send( message);
     xmpp_stanza_release(message);

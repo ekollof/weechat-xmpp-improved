@@ -1195,6 +1195,7 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash)
     FEATURE("storage:bookmarks+notify");
     FEATURE("urn:xmpp:avatar:metadata+notify");
     FEATURE("urn:xmpp:chat-markers:0");
+    FEATURE("urn:xmpp:hints");  // XEP-0334: Message Processing Hints
     FEATURE("urn:xmpp:idle:1");
   //FEATURE("urn:xmpp:jingle-message:0");
   //FEATURE("urn:xmpp:jingle:1");

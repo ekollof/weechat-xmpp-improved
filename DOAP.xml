@@ -278,7 +278,7 @@
       <Version>
         <revision>0.3.0-fork</revision>
         <created>2026-01-16</created>
-        <xmpp:note xml:lang='en'>Fork with bug fixes and enhancements: typing indicators, auto-encryption detection, bookmark management, room discovery, capability caching, Stream Management (XEP-0198), Message Retraction (XEP-0424), Message Styling (XEP-0393), Stanza IDs (XEP-0359)</xmpp:note>
+        <xmpp:note xml:lang='en'>Fork with bug fixes and enhancements: typing indicators, auto-encryption detection, bookmark management, room discovery, capability caching, Stream Management (XEP-0198), Message Retraction (XEP-0424), Message Styling (XEP-0393), Stanza IDs (XEP-0359), Message Hints (XEP-0334)</xmpp:note>
       </Version>
     </release>
   </Project>
