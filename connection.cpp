@@ -1732,11 +1732,7 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
                     
                     // Increment SM counter for top-level stanzas only (called by libstrophe)
                     if (connection.account.sm_enabled)
-                    {
                         connection.account.sm_h_inbound++;
-                        weechat_printf(connection.account.buffer, "%s[DEBUG SM] presence received (top-level), h_inbound=%u",
-                                      weechat_prefix("network"), connection.account.sm_h_inbound);
-                    }
                     
                     return connection.presence_handler(stanza, false) ? 1 : 0;  // Pass false since we already counted
                 });
@@ -1747,11 +1743,7 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
                     
                     // Increment SM counter for top-level stanzas only (called by libstrophe)
                     if (connection.account.sm_enabled)
-                    {
                         connection.account.sm_h_inbound++;
-                        weechat_printf(connection.account.buffer, "%s[DEBUG SM] message received (top-level), h_inbound=%u",
-                                      weechat_prefix("network"), connection.account.sm_h_inbound);
-                    }
                     
                     return connection.message_handler(stanza, false) ? 1 : 0;  // Pass false since we already counted
                 });
@@ -1762,12 +1754,7 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
                     
                     // Increment SM counter for top-level stanzas only (called by libstrophe)
                     if (connection.account.sm_enabled)
-                    {
-                        const char *id = xmpp_stanza_get_id(stanza);
                         connection.account.sm_h_inbound++;
-                        weechat_printf(connection.account.buffer, "%s[DEBUG SM] iq received (top-level, id=%s), h_inbound=%u",
-                                      weechat_prefix("network"), id ? id : "none", connection.account.sm_h_inbound);
-                    }
                     
                     return connection.iq_handler(stanza, false) ? 1 : 0;  // Pass false since we already counted
                 });
