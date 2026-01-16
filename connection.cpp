@@ -1570,6 +1570,43 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
         }
     }
     
+    // XEP-0066: Out of Band Data - extract URL from <x xmlns='jabber:x:oob'>
+    xmpp_stanza_t *oob_x = xmpp_stanza_get_child_by_name_and_ns(stanza, "x", "jabber:x:oob");
+    std::string oob_suffix;
+    if (oob_x)
+    {
+        xmpp_stanza_t *url_elem = xmpp_stanza_get_child_by_name(oob_x, "url");
+        if (url_elem)
+        {
+            char *url_text = xmpp_stanza_get_text(url_elem);
+            if (url_text)
+            {
+                // Optionally get description
+                xmpp_stanza_t *desc_elem = xmpp_stanza_get_child_by_name(oob_x, "desc");
+                char *desc_text = desc_elem ? xmpp_stanza_get_text(desc_elem) : NULL;
+                
+                // Format: [URL: url] or [URL: description (url)]
+                oob_suffix = std::string(" ") + 
+                            weechat_color("blue") + "[URL: ";
+                if (desc_text && strlen(desc_text) > 0)
+                {
+                    oob_suffix += desc_text;
+                    oob_suffix += " (";
+                    oob_suffix += url_text;
+                    oob_suffix += ")";
+                }
+                else
+                {
+                    oob_suffix += url_text;
+                }
+                oob_suffix += "]" + std::string(weechat_color("resetcolor"));
+                
+                xmpp_free(account.context, url_text);
+                if (desc_text) xmpp_free(account.context, desc_text);
+            }
+        }
+    }
+    
     // Apply XEP-0393 Message Styling
     const char *display_text = text;
     std::string styled_text;
@@ -1588,6 +1625,15 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
     if (!reply_prefix.empty())
     {
         final_text = reply_prefix + (display_text ? display_text : "");
+        display_text = final_text.c_str();
+    }
+    
+    // Append OOB URL if present
+    if (!oob_suffix.empty())
+    {
+        if (final_text.empty())
+            final_text = display_text ? display_text : "";
+        final_text += oob_suffix;
         display_text = final_text.c_str();
     }
     

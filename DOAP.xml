@@ -96,6 +96,15 @@
 
     <implements>
       <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0066.html'/>
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>1.5.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Out of Band Data - display URLs shared in messages with optional descriptions</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0085.html'/>
         <xmpp:status>complete</xmpp:status>
         <xmpp:version>2.1</xmpp:version>
