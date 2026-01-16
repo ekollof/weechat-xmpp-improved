@@ -68,6 +68,13 @@ namespace weechat
             bool autojoin;
         };
 
+        struct upload_request
+        {
+            std::string id;
+            std::string filename;
+            std::string channel_id;
+        };
+
     public:
         bool disconnected = false;
 
@@ -75,6 +82,10 @@ namespace weechat
         std::unordered_map<std::string, mam_query> mam_queries;
         std::unordered_map<std::string, roster_item> roster;
         std::unordered_map<std::string, bookmark_item> bookmarks;
+        std::unordered_map<std::string, upload_request> upload_requests;
+        
+        std::string upload_service;  // JID of upload service (discovered via disco)
+        size_t upload_max_size = 0;  // Max file size in bytes
 
     private:
         bool is_connected = false;

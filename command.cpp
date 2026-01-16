@@ -3139,6 +3139,138 @@ int command__list(const void *pointer, void *data,
     return WEECHAT_RC_OK;
 }
 
+int command__upload(const void *pointer, void *data,
+                    t_gui_buffer *buffer, int argc,
+                    char **argv, char **argv_eol)
+{
+    (void) pointer;
+    (void) data;
+    (void) argv_eol;
+
+    weechat::account *ptr_account = NULL;
+    weechat::channel *ptr_channel = NULL;
+    
+    buffer__get_account_and_channel(buffer, &ptr_account, &ptr_channel);
+
+    if (!ptr_account)
+        return WEECHAT_RC_ERROR;
+
+    if (!ptr_channel)
+    {
+        weechat_printf(buffer, "%s%s: command \"upload\" must be executed in an xmpp buffer",
+                      weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
+        return WEECHAT_RC_OK;
+    }
+
+    if (!ptr_account->connected())
+    {
+        weechat_printf(buffer, "%s%s: you are not connected to server",
+                      weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
+        return WEECHAT_RC_OK;
+    }
+
+    if (argc < 2)
+    {
+        weechat_printf(buffer, "%s%s: missing argument for \"%s\" command",
+                      weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME, "upload");
+        return WEECHAT_RC_OK;
+    }
+
+    std::string filename = argv[1];
+    
+    // Check if file exists and is readable
+    FILE *file = fopen(filename.c_str(), "rb");
+    if (!file)
+    {
+        weechat_printf(buffer, "%s%s: cannot open file: %s",
+                      weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
+                      filename.c_str());
+        return WEECHAT_RC_OK;
+    }
+    
+    // Get file size
+    fseek(file, 0, SEEK_END);
+    long filesize = ftell(file);
+    fclose(file);
+    
+    if (filesize <= 0)
+    {
+        weechat_printf(buffer, "%s%s: file is empty: %s",
+                      weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
+                      filename.c_str());
+        return WEECHAT_RC_OK;
+    }
+    
+    // Check against server max size if known
+    if (ptr_account->upload_max_size > 0 && (size_t)filesize > ptr_account->upload_max_size)
+    {
+        weechat_printf(buffer, "%s%s: file too large (max: %zu bytes, file: %ld bytes)",
+                      weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
+                      ptr_account->upload_max_size, filesize);
+        return WEECHAT_RC_OK;
+    }
+    
+    // Check if we have discovered upload service
+    if (ptr_account->upload_service.empty())
+    {
+        weechat_printf(buffer, "%s%s: upload service not discovered yet (try reconnecting)",
+                      weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
+        return WEECHAT_RC_OK;
+    }
+    
+    weechat_printf(buffer, "%sRequesting upload slot for %s (%ld bytes)...",
+                  weechat_prefix("network"), filename.c_str(), filesize);
+    
+    // Generate request ID
+    char *id = xmpp_uuid_gen(ptr_account->context);
+    
+    // Extract just the filename (no path)
+    size_t last_slash = filename.find_last_of("/\\");
+    std::string basename = (last_slash != std::string::npos) 
+        ? filename.substr(last_slash + 1) 
+        : filename;
+    
+    // Store upload request
+    ptr_account->upload_requests[id] = {id, filename, ptr_channel->id};
+    
+    // Build upload slot request
+    xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "get", id);
+    xmpp_stanza_set_to(iq, ptr_account->upload_service.c_str());
+    
+    xmpp_stanza_t *request = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(request, "request");
+    xmpp_stanza_set_ns(request, "urn:xmpp:http:upload:0");
+    
+    xmpp_stanza_t *filename_elem = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(filename_elem, "filename");
+    xmpp_stanza_t *filename_text = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_text(filename_text, basename.c_str());
+    xmpp_stanza_add_child(filename_elem, filename_text);
+    xmpp_stanza_release(filename_text);
+    xmpp_stanza_add_child(request, filename_elem);
+    xmpp_stanza_release(filename_elem);
+    
+    xmpp_stanza_t *size_elem = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(size_elem, "size");
+    xmpp_stanza_t *size_text = xmpp_stanza_new(ptr_account->context);
+    char size_str[32];
+    snprintf(size_str, sizeof(size_str), "%ld", filesize);
+    xmpp_stanza_set_text(size_text, size_str);
+    xmpp_stanza_add_child(size_elem, size_text);
+    xmpp_stanza_release(size_text);
+    xmpp_stanza_add_child(request, size_elem);
+    xmpp_stanza_release(size_elem);
+    
+    xmpp_stanza_add_child(iq, request);
+    xmpp_stanza_release(request);
+    
+    ptr_account->connection.send(iq);
+    xmpp_stanza_release(iq);
+    xmpp_free(ptr_account->context, id);
+
+    return WEECHAT_RC_OK;
+}
+
 void command__init()
 {
     struct t_hook *hook;
@@ -3501,6 +3633,16 @@ void command__init()
         NULL, &command__list, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /list");
+
+    hook = weechat_hook_command(
+        "upload",
+        N_("upload a file via HTTP File Upload (XEP-0363)"),
+        N_("<filename>"),
+        N_("filename: path to file to upload\n\n"
+           "The file will be uploaded to the server and a URL will be sent in the chat."),
+        "%(filename)", &command__upload, NULL, NULL);
+    if (!hook)
+        weechat_printf(NULL, "Failed to setup command /upload");
 
     hook = weechat_hook_command(
         "whois",

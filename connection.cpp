@@ -2064,6 +2064,49 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
         return true;
     }
     
+    // XEP-0363: HTTP File Upload - handle upload slot response
+    xmpp_stanza_t *slot = xmpp_stanza_get_child_by_name_and_ns(
+        stanza, "slot", "urn:xmpp:http:upload:0");
+    
+    if (slot && id && type && weechat_strcasecmp(type, "result") == 0)
+    {
+        auto req_it = account.upload_requests.find(id);
+        if (req_it != account.upload_requests.end())
+        {
+            // Extract PUT and GET URLs
+            xmpp_stanza_t *put_elem = xmpp_stanza_get_child_by_name(slot, "put");
+            xmpp_stanza_t *get_elem = xmpp_stanza_get_child_by_name(slot, "get");
+            
+            const char *put_url = put_elem ? xmpp_stanza_get_attribute(put_elem, "url") : NULL;
+            const char *get_url = get_elem ? xmpp_stanza_get_attribute(get_elem, "url") : NULL;
+            
+            if (put_url && get_url)
+            {
+                weechat_printf(account.buffer, "%sUpload slot received, uploading file...",
+                              weechat_prefix("network"));
+                
+                // TODO: Perform actual HTTP upload using libcurl
+                // For now, just send the GET URL as a placeholder
+                
+                auto channel_it = account.channels.find(req_it->second.channel_id);
+                if (channel_it != account.channels.end())
+                {
+                    // Send message with URL using XEP-0066 OOB
+                    channel_it->second.send_message(
+                        channel_it->second.id,
+                        get_url,
+                        std::optional<std::string>(get_url)
+                    );
+                    
+                    weechat_printf(account.buffer, "%sFile URL sent (upload not yet implemented): %s",
+                                  weechat_prefix("network"), get_url);
+                }
+            }
+            
+            account.upload_requests.erase(req_it);
+        }
+    }
+    
     // XEP-0191: Blocking Command
     xmpp_stanza_t *blocklist = xmpp_stanza_get_child_by_name_and_ns(
         stanza, "blocklist", "urn:xmpp:blocking");
