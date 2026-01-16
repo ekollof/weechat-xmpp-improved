@@ -1937,6 +1937,38 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
             xmpp_stanza_release(children[0]);
         }
 
+        // Restore existing PM buffers from previous session
+        struct t_hdata *hdata_buffer = weechat_hdata_get("buffer");
+        struct t_gui_buffer *ptr_buffer = (struct t_gui_buffer*)weechat_hdata_get_list(hdata_buffer, "gui_buffers");
+        
+        while (ptr_buffer)
+        {
+            if (weechat_buffer_get_pointer(ptr_buffer, "plugin") == weechat_plugin)
+            {
+                const char *ptr_type = weechat_buffer_get_string(ptr_buffer, "localvar_type");
+                const char *ptr_account_name = weechat_buffer_get_string(ptr_buffer, "localvar_account");
+                const char *ptr_remote_jid = weechat_buffer_get_string(ptr_buffer, "localvar_remote_jid");
+                
+                // Restore PM buffers only (MUCs will be restored via bookmarks)
+                if (ptr_type && strcmp(ptr_type, "private") == 0 &&
+                    ptr_account_name && account.name == ptr_account_name &&
+                    ptr_remote_jid && ptr_remote_jid[0])
+                {
+                    // Check if channel already exists
+                    if (!account.channels.contains(ptr_remote_jid))
+                    {
+                        weechat_printf(account.buffer, "%sRestoring PM buffer: %s",
+                                      weechat_prefix("network"), ptr_remote_jid);
+                        
+                        // Create channel object for existing buffer
+                        new weechat::channel(account, weechat::channel::chat_type::PM,
+                                           ptr_remote_jid, ptr_remote_jid);
+                    }
+                }
+            }
+            ptr_buffer = (struct t_gui_buffer*)weechat_hdata_move(hdata_buffer, ptr_buffer, 1);
+        }
+
         // Initialize Client State Indication (XEP-0352)
         account.last_activity = time(NULL);
         account.csi_active = true;
