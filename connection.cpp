@@ -38,6 +38,21 @@ void weechat::connection::init()
     libstrophe::initialize();
 }
 
+void weechat::connection::send(xmpp_stanza_t *stanza)
+{
+    // Increment outbound counter for actual stanzas (not SM elements)
+    const char *name = xmpp_stanza_get_name(stanza);
+    if (name && account.sm_enabled)
+    {
+        std::string stanza_name(name);
+        if (stanza_name == "message" || stanza_name == "presence" || stanza_name == "iq")
+        {
+            account.sm_h_outbound++;
+        }
+    }
+    m_conn.send(stanza);
+}
+
 bool weechat::connection::version_handler(xmpp_stanza_t *stanza)
 {
     const char *weechat_name = "weechat";
@@ -72,6 +87,10 @@ bool weechat::connection::version_handler(xmpp_stanza_t *stanza)
 
 bool weechat::connection::presence_handler(xmpp_stanza_t *stanza)
 {
+    // Increment inbound counter for Stream Management (XEP-0198)
+    if (account.sm_enabled)
+        account.sm_h_inbound++;
+
     weechat::user *user;
     weechat::channel *channel;
 
@@ -292,6 +311,10 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza)
 
 bool weechat::connection::message_handler(xmpp_stanza_t *stanza)
 {
+    // Increment inbound counter for Stream Management (XEP-0198)
+    if (account.sm_enabled)
+        account.sm_h_inbound++;
+
     weechat::channel *channel, *parent_channel;
     xmpp_stanza_t *x, *body, *delay, *topic, *replace, *request, *markable, *composing, *sent, *received, *result, *forwarded, *event, *items, *item, *list, *device, *encrypted;
     const char *type, *from, *nick, *from_bare, *to, *to_bare, *id, *thread, *replace_id, *timestamp;
@@ -1044,6 +1067,10 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash)
 
 bool weechat::connection::iq_handler(xmpp_stanza_t *stanza)
 {
+    // Increment inbound counter for Stream Management (XEP-0198)
+    if (account.sm_enabled)
+        account.sm_h_inbound++;
+
     xmpp_stanza_t *reply, *query, *text, *fin;
     xmpp_stanza_t         *pubsub, *items, *item, *list, *bundle, *device;
     xmpp_stanza_t         *storage, *conference, *nick;
@@ -1541,6 +1568,108 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza)
     return true;
 }
 
+bool weechat::connection::sm_handler(xmpp_stanza_t *stanza)
+{
+    const char *name = xmpp_stanza_get_name(stanza);
+    if (!name)
+        return true;
+
+    std::string element_name(name);
+
+    if (element_name == "enabled")
+    {
+        // Stream management successfully enabled
+        account.sm_enabled = true;
+        account.sm_h_inbound = 0;
+        account.sm_h_outbound = 0;
+        account.sm_last_ack = 0;
+
+        const char *id = xmpp_stanza_get_attribute(stanza, "id");
+        if (id)
+        {
+            account.sm_id = id;
+            weechat_printf(account.buffer, "%sStream Management enabled (resumable, id=%s)",
+                          weechat_prefix("network"), id);
+        }
+        else
+        {
+            weechat_printf(account.buffer, "%sStream Management enabled (not resumable)",
+                          weechat_prefix("network"));
+        }
+
+        // Set up periodic ack timer (every 30 seconds)
+        account.sm_ack_timer_hook = weechat_hook_timer(30 * 1000, 0, 0,
+                                                       &account::sm_ack_timer_cb, &account, nullptr);
+    }
+    else if (element_name == "resumed")
+    {
+        // Stream resumed successfully
+        const char *h = xmpp_stanza_get_attribute(stanza, "h");
+        if (h)
+        {
+            account.sm_last_ack = std::stoul(h);
+            weechat_printf(account.buffer, "%sStream resumed (h=%u)",
+                          weechat_prefix("network"), account.sm_last_ack);
+        }
+        else
+        {
+            weechat_printf(account.buffer, "%sStream resumed",
+                          weechat_prefix("network"));
+        }
+    }
+    else if (element_name == "failed")
+    {
+        // Stream management failed or resume failed
+        const char *xmlns_err = "urn:ietf:params:xml:ns:xmpp-stanzas";
+        xmpp_stanza_t *error = xmpp_stanza_get_child_by_name_and_ns(stanza, "unexpected-request", xmlns_err);
+        
+        if (error)
+        {
+            weechat_printf(account.buffer, "%sStream Management failed: unexpected-request",
+                          weechat_prefix("error"));
+        }
+        else
+        {
+            weechat_printf(account.buffer, "%sStream Management failed",
+                          weechat_prefix("error"));
+        }
+
+        // Reset SM state
+        account.sm_enabled = false;
+        account.sm_id = "";
+        account.sm_h_inbound = 0;
+        account.sm_h_outbound = 0;
+        account.sm_last_ack = 0;
+    }
+    else if (element_name == "a")
+    {
+        // Acknowledgement from server
+        const char *h = xmpp_stanza_get_attribute(stanza, "h");
+        if (h)
+        {
+            uint32_t ack_count = std::stoul(h);
+            account.sm_last_ack = ack_count;
+            
+            // Debug: show ack status
+            weechat_printf(account.buffer, "%sReceived ack: h=%u (sent=%u, unacked=%u)",
+                          weechat_prefix("network"),
+                          ack_count,
+                          account.sm_h_outbound,
+                          account.sm_h_outbound - ack_count);
+        }
+    }
+    else if (element_name == "r")
+    {
+        // Server requests acknowledgement
+        // Send answer with our current h value
+        this->send(stanza::xep0198::answer(account.sm_h_inbound)
+                  .build(account.context)
+                  .get());
+    }
+
+    return true;
+}
+
 bool weechat::connection::conn_handler(event status, int error, xmpp_stream_error_t *stream_error)
 {
     (void)error;
@@ -1576,6 +1705,38 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
                 auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
                 if (connection != conn) throw std::invalid_argument("connection != conn");
                 return connection.iq_handler(stanza) ? 1 : 0;
+            });
+
+        // Stream Management handlers (XEP-0198)
+        this->handler_add(
+            "enabled", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
+                auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
+                if (connection != conn) throw std::invalid_argument("connection != conn");
+                return connection.sm_handler(stanza) ? 1 : 0;
+            });
+        this->handler_add(
+            "resumed", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
+                auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
+                if (connection != conn) throw std::invalid_argument("connection != conn");
+                return connection.sm_handler(stanza) ? 1 : 0;
+            });
+        this->handler_add(
+            "failed", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
+                auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
+                if (connection != conn) throw std::invalid_argument("connection != conn");
+                return connection.sm_handler(stanza) ? 1 : 0;
+            });
+        this->handler_add(
+            "a", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
+                auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
+                if (connection != conn) throw std::invalid_argument("connection != conn");
+                return connection.sm_handler(stanza) ? 1 : 0;
+            });
+        this->handler_add(
+            "r", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
+                auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
+                if (connection != conn) throw std::invalid_argument("connection != conn");
+                return connection.sm_handler(stanza) ? 1 : 0;
             });
 
         /* Send initial <presence/> so that we appear online to contacts */
@@ -1704,6 +1865,12 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         // Set up idle timer (check every 60 seconds)
         account.idle_timer_hook = weechat_hook_timer(60 * 1000, 0, 0,
                                                      &account::idle_timer_cb, &account, nullptr);
+
+        // Enable Stream Management (XEP-0198) after authentication
+        // Request resumable session with max 300 seconds (5 minutes)
+        this->send(stanza::xep0198::enable(true, 300)
+                   .build(account.context)
+                   .get());
 
         (void) weechat_hook_signal_send("xmpp_account_connected",
                                         WEECHAT_HOOK_SIGNAL_STRING, account.name.data());

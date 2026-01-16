@@ -266,6 +266,13 @@ void weechat::account::disconnect(int reconnect)
         weechat_unhook(idle_timer_hook);
         idle_timer_hook = nullptr;
     }
+    
+    // Clean up Stream Management hooks
+    if (sm_ack_timer_hook)
+    {
+        weechat_unhook(sm_ack_timer_hook);
+        sm_ack_timer_hook = nullptr;
+    }
         
     if (is_connected)
     {
@@ -940,6 +947,30 @@ int weechat::account::activity_cb(const void *pointer, void *data,
         weechat_printf(account->buffer, "%sClient state: active",
                       weechat_prefix("network"));
     }
+
+    return WEECHAT_RC_OK;
+}
+
+// Stream Management (XEP-0198) - Ack timer callback
+int weechat::account::sm_ack_timer_cb(const void *pointer, void *data, int remaining_calls)
+{
+    (void) data;
+    (void) remaining_calls;
+
+    if (weechat::g_plugin_unloading || !weechat::plugin::instance)
+        return WEECHAT_RC_OK;
+
+    account *account = (struct account *)pointer;
+    if (!account || !account->connection || !xmpp_conn_is_connected(account->connection))
+        return WEECHAT_RC_OK;
+
+    if (!account->sm_enabled)
+        return WEECHAT_RC_OK;
+
+    // Request acknowledgement from server
+    account->connection.send(stanza::xep0198::request()
+                            .build(account->context)
+                            .get());
 
     return WEECHAT_RC_OK;
 }

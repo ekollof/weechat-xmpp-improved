@@ -38,9 +38,7 @@ namespace weechat {
             return m_conn;
         }
 
-        inline auto send(xmpp_stanza_t *stanza) {
-            m_conn.send(stanza);
-        }
+        void send(xmpp_stanza_t *stanza);
 
         inline auto context() {
             return m_conn.get_context();
@@ -69,6 +67,7 @@ namespace weechat {
         bool presence_handler(xmpp_stanza_t *stanza);
         bool message_handler(xmpp_stanza_t *stanza);
         bool iq_handler(xmpp_stanza_t *stanza);
+        bool sm_handler(xmpp_stanza_t *stanza);
 
         bool conn_handler(event status, int error, xmpp_stream_error_t *stream_error);
 

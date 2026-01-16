@@ -173,6 +173,7 @@ namespace stanza {
 #include "xep-0045.inl"
 #include "xep-0049.inl"
 #include "xep-0115.inl"
+#include "xep-0198.inl"
 #include "xep-0280.inl"
 #include "xep-0319.inl"
 #include "xep-0352.inl"

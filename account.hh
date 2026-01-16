@@ -97,6 +97,14 @@ namespace weechat
         time_t last_activity = 0;
         struct t_hook *idle_timer_hook = nullptr;
 
+        // Stream Management (XEP-0198)
+        bool sm_enabled = false;
+        std::string sm_id;              // session ID for resumption
+        uint32_t sm_h_inbound = 0;      // stanzas we've received and handled
+        uint32_t sm_h_outbound = 0;     // stanzas we've sent
+        uint32_t sm_last_ack = 0;       // last h value acknowledged by server
+        struct t_hook *sm_ack_timer_hook = nullptr;
+
         std::string name;
         weechat::xmpp::pgp pgp;
         weechat::xmpp::omemo omemo;
@@ -134,6 +142,7 @@ namespace weechat
                            const std::string name, bool casesensitive = false);
         static int timer_cb(const void *pointer, void *data, int remaining_calls);
         static int idle_timer_cb(const void *pointer, void *data, int remaining_calls);
+        static int sm_ack_timer_cb(const void *pointer, void *data, int remaining_calls);
         static int activity_cb(const void *pointer, void *data,
                               const char *signal, const char *type_data,
                               void *signal_data);
