@@ -159,6 +159,15 @@
 
     <implements>
       <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0203.html'/>
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>2.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Delayed Delivery - proper timestamps for offline messages and MAM history</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0280.html'/>
         <xmpp:status>complete</xmpp:status>
         <xmpp:version>1.0.1</xmpp:version>

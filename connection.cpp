@@ -1389,6 +1389,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
     }
     delay = xmpp_stanza_get_child_by_name_and_ns(stanza, "delay", "urn:xmpp:delay");
     timestamp = delay ? xmpp_stanza_get_attribute(delay, "stamp") : NULL;
+    const char *delay_from = delay ? xmpp_stanza_get_attribute(delay, "from") : NULL;
     if (timestamp)
     {
         strptime(timestamp, "%FT%T", &time);
@@ -1439,6 +1440,16 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
             weechat_string_dyn_concat(dyn_tags, "PGP", -1);
         else
             weechat_string_dyn_concat(dyn_tags, "encrypted", -1);
+    }
+    // XEP-0203: Tag delayed messages
+    if (delay)
+    {
+        weechat_string_dyn_concat(dyn_tags, ",delayed", -1);
+        if (delay_from)
+        {
+            weechat_string_dyn_concat(dyn_tags, ",delay_from_", -1);
+            weechat_string_dyn_concat(dyn_tags, delay_from, -1);
+        }
     }
 
     if (channel->type == weechat::channel::chat_type::PM)
@@ -1652,6 +1663,7 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash)
     FEATURE("storage:bookmarks+notify");
     FEATURE("urn:xmpp:avatar:metadata+notify");
     FEATURE("urn:xmpp:chat-markers:0");
+    FEATURE("urn:xmpp:delay");  // XEP-0203: Delayed Delivery
     FEATURE("urn:xmpp:hints");  // XEP-0334: Message Processing Hints
     FEATURE("urn:xmpp:idle:1");
   //FEATURE("urn:xmpp:jingle-message:0");
