@@ -99,6 +99,15 @@ void weechat::user::nicklist_add(weechat::account *account,
     struct t_gui_nick_group *ptr_group;
     struct t_gui_buffer *ptr_buffer;
     char *name = channel ? this->profile.display_name : this->id;
+    
+    // For roster contacts (account buffer), strip resource from JID
+    if (!channel)
+    {
+        const char *bare = xmpp_jid_bare(account->context, this->id);
+        if (bare)
+            name = (char*)bare;
+    }
+    
     if (channel && weechat_strcasecmp(xmpp_jid_bare(account->context, name),
                                       channel->id.data()) == 0)
         name = xmpp_jid_resource(account->context, name);
