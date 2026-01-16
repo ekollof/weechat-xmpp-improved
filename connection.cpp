@@ -624,6 +624,18 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
     to_bare = to ? xmpp_jid_bare(account.context, to) : NULL;
     id = xmpp_stanza_get_id(stanza);
     thread = xmpp_stanza_get_attribute(stanza, "thread");
+    
+    // XEP-0359: Unique and Stable Stanza IDs
+    xmpp_stanza_t *stanza_id_elem = xmpp_stanza_get_child_by_name_and_ns(stanza, "stanza-id", "urn:xmpp:sid:0");
+    const char *stanza_id = stanza_id_elem ? xmpp_stanza_get_attribute(stanza_id_elem, "id") : NULL;
+    const char *stanza_id_by = stanza_id_elem ? xmpp_stanza_get_attribute(stanza_id_elem, "by") : NULL;
+    
+    xmpp_stanza_t *origin_id_elem = xmpp_stanza_get_child_by_name_and_ns(stanza, "origin-id", "urn:xmpp:sid:0");
+    const char *origin_id = origin_id_elem ? xmpp_stanza_get_attribute(origin_id_elem, "id") : NULL;
+    
+    // Prefer stanza-id over origin-id over regular id for stable message identification
+    const char *stable_id = stanza_id ? stanza_id : (origin_id ? origin_id : id);
+    
     replace = xmpp_stanza_get_child_by_name_and_ns(stanza, "replace",
                                                    "urn:xmpp:message-correct:0");
     replace_id = replace ? xmpp_stanza_get_id(replace) : NULL;
@@ -1039,10 +1051,25 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
         weechat_string_dyn_concat(dyn_tags, ",host_", -1);
         weechat_string_dyn_concat(dyn_tags, from, -1);
     }
-    if (id)
+    // Store stable ID (XEP-0359) in tags for message tracking
+    if (stable_id)
     {
         weechat_string_dyn_concat(dyn_tags, ",id_", -1);
-        weechat_string_dyn_concat(dyn_tags, id, -1);
+        weechat_string_dyn_concat(dyn_tags, stable_id, -1);
+    }
+    // Also store origin-id if different from stable_id
+    if (origin_id && origin_id != stable_id)
+    {
+        weechat_string_dyn_concat(dyn_tags, ",origin_id_", -1);
+        weechat_string_dyn_concat(dyn_tags, origin_id, -1);
+    }
+    // Store stanza-id metadata if present
+    if (stanza_id && stanza_id_by)
+    {
+        weechat_string_dyn_concat(dyn_tags, ",stanza_id_", -1);
+        weechat_string_dyn_concat(dyn_tags, stanza_id, -1);
+        weechat_string_dyn_concat(dyn_tags, ",stanza_id_by_", -1);
+        weechat_string_dyn_concat(dyn_tags, stanza_id_by, -1);
     }
 
     if (channel->type == weechat::channel::chat_type::PM)
@@ -1185,6 +1212,7 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash)
   //FEATURE("urn:xmpp:jingle:transports:s5b:1");
     FEATURE("urn:xmpp:message-correct:0");
     FEATURE("urn:xmpp:message-retract:1");
+    FEATURE("urn:xmpp:sid:0");  // XEP-0359: Stanza IDs
     FEATURE("urn:xmpp:styling:0");
     FEATURE("urn:xmpp:ping");
     FEATURE("urn:xmpp:receipts");

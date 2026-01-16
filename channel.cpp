@@ -815,6 +815,15 @@ int weechat::channel::send_message(std::string to, std::string body,
 
     char *id = xmpp_uuid_gen(account.context);
     xmpp_stanza_set_id(message, id);
+    
+    // XEP-0359: Add origin-id for stable message identification
+    xmpp_stanza_t *origin_id = xmpp_stanza_new(account.context);
+    xmpp_stanza_set_name(origin_id, "origin-id");
+    xmpp_stanza_set_ns(origin_id, "urn:xmpp:sid:0");
+    xmpp_stanza_set_attribute(origin_id, "id", id);
+    xmpp_stanza_add_child(message, origin_id);
+    xmpp_stanza_release(origin_id);
+    
     xmpp_free(account.context, id);
     xmpp_message_set_body(message, body.data());
 
@@ -890,6 +899,15 @@ int weechat::channel::send_message(const char *to, const char *body)
 
     char *id = xmpp_uuid_gen(account.context);
     xmpp_stanza_set_id(message, id);
+    
+    // XEP-0359: Add origin-id for stable message identification
+    xmpp_stanza_t *origin_id_elem = xmpp_stanza_new(account.context);
+    xmpp_stanza_set_name(origin_id_elem, "origin-id");
+    xmpp_stanza_set_ns(origin_id_elem, "urn:xmpp:sid:0");
+    xmpp_stanza_set_attribute(origin_id_elem, "id", id);
+    xmpp_stanza_add_child(message, origin_id_elem);
+    xmpp_stanza_release(origin_id_elem);
+
     xmpp_free(account.context, id);
 
     if (account.omemo && omemo.enabled)

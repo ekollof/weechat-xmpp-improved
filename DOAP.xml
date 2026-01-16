@@ -231,6 +231,24 @@
 
     <implements>
       <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0352.html'/>
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>1.0.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Client State Indication for mobile optimization</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0359.html'/>
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>0.7.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Unique and Stable Stanza IDs - stable message identification and deduplication</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0393.html'/>
         <xmpp:status>complete</xmpp:status>
         <xmpp:version>1.1.2</xmpp:version>
@@ -260,7 +278,7 @@
       <Version>
         <revision>0.3.0-fork</revision>
         <created>2026-01-16</created>
-        <xmpp:note xml:lang='en'>Fork with bug fixes and enhancements: typing indicators, auto-encryption detection, bookmark management, room discovery, capability caching, Stream Management (XEP-0198), Message Retraction (XEP-0424), Message Styling (XEP-0393)</xmpp:note>
+        <xmpp:note xml:lang='en'>Fork with bug fixes and enhancements: typing indicators, auto-encryption detection, bookmark management, room discovery, capability caching, Stream Management (XEP-0198), Message Retraction (XEP-0424), Message Styling (XEP-0393), Stanza IDs (XEP-0359)</xmpp:note>
       </Version>
     </release>
   </Project>
