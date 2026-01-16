@@ -206,6 +206,23 @@
     *Note:* Can only be used in MUC (room) buffers. The invited user will 
     receive a notification with instructions to join.
 
+*** /selfping
+    Verify MUC membership with self-ping (XEP-0410: MUC Self-Ping)
+
+    *Usage:*
+    #+begin_src
+    /selfping
+    #+end_src
+
+    *Example:*
+    #+begin_src
+    /selfping (in a MUC room buffer)
+    #+end_src
+
+    *Note:* Sends a ping to your own MUC nickname to verify you are still 
+    joined to the room. Useful after network interruptions or to detect 
+    silent kicks/disconnects. Can only be used in MUC (room) buffers.
+
 *** /edit
     Edit the last message sent (XEP-0308: Message Correction)
 

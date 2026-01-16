@@ -1293,6 +1293,73 @@ int command__ping(const void *pointer, void *data,
     return WEECHAT_RC_OK;
 }
 
+int command__selfping(const void *pointer, void *data,
+                     struct t_gui_buffer *buffer, int argc,
+                     char **argv, char **argv_eol)
+{
+    weechat::account *ptr_account = NULL;
+    weechat::channel *ptr_channel = NULL;
+    xmpp_stanza_t *iq;
+
+    (void) pointer;
+    (void) data;
+    (void) argv;
+    (void) argv_eol;
+    (void) argc;
+
+    buffer__get_account_and_channel(buffer, &ptr_account, &ptr_channel);
+
+    if (!ptr_account)
+        return WEECHAT_RC_ERROR;
+
+    if (!ptr_account->connected())
+    {
+        weechat_printf(buffer, "%sxmpp: you are not connected to server",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    if (!ptr_channel)
+    {
+        weechat_printf(buffer, "%s%s: this command must be used in a MUC buffer",
+                      weechat_prefix("error"),
+                      argv[0]);
+        return WEECHAT_RC_OK;
+    }
+
+    // Check if this is a MUC channel
+    const char *buffer_type = weechat_buffer_get_string(ptr_channel->buffer, "localvar_type");
+    if (!buffer_type || strcmp(buffer_type, "channel") != 0)
+    {
+        weechat_printf(buffer, "%s%s: this command must be used in a MUC buffer",
+                      weechat_prefix("error"),
+                      argv[0]);
+        return WEECHAT_RC_OK;
+    }
+
+    // Construct our full MUC JID (room@server/nickname)
+    std::string muc_jid = std::string(ptr_channel->id) + "/" + std::string(ptr_account->nickname());
+
+    // Send self-ping to our own MUC nickname
+    iq = xmpp_iq_new(ptr_account->context, "get", xmpp_uuid_gen(ptr_account->context));
+    xmpp_stanza_set_to(iq, muc_jid.c_str());
+    
+    xmpp_stanza_t *ping = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(ping, "ping");
+    xmpp_stanza_set_ns(ping, "urn:xmpp:ping");
+    
+    xmpp_stanza_add_child(iq, ping);
+    xmpp_stanza_release(ping);
+
+    weechat_printf(buffer, "%sSending MUC self-ping to %s...",
+                   weechat_prefix("network"), muc_jid.c_str());
+
+    ptr_account->connection.send(iq);
+    xmpp_stanza_release(iq);
+
+    return WEECHAT_RC_OK;
+}
+
 int command__whois(const void *pointer, void *data,
                   struct t_gui_buffer *buffer, int argc,
                   char **argv, char **argv_eol)
@@ -2184,6 +2251,15 @@ void command__init()
         NULL, &command__invite, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /invite");
+
+    hook = weechat_hook_command(
+        "selfping",
+        N_("send a self-ping to verify MUC membership (XEP-0410)"),
+        N_(""),
+        N_("Send a ping to your own MUC nickname to verify you are still in the room"),
+        NULL, &command__selfping, NULL, NULL);
+    if (!hook)
+        weechat_printf(NULL, "Failed to setup command /selfping");
 
     hook = weechat_hook_command(
         "mam",
