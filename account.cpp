@@ -307,14 +307,18 @@ void weechat::account::disconnect(int reconnect)
          * channel/private buffer
          */
       //user::free_all(this); // TOFIX
-        weechat_nicklist_remove_all(buffer);
+        if (buffer)
+            weechat_nicklist_remove_all(buffer);
         for (auto& ptr_channel : channels)
         {
-            weechat_nicklist_remove_all(ptr_channel.second.buffer);
-            weechat_printf(
-                ptr_channel.second.buffer,
-                _("%s%s: disconnected from account"),
-                weechat_prefix("network"), WEECHAT_XMPP_PLUGIN_NAME);
+            if (ptr_channel.second.buffer)
+            {
+                weechat_nicklist_remove_all(ptr_channel.second.buffer);
+                weechat_printf(
+                    ptr_channel.second.buffer,
+                    _("%s%s: disconnected from account"),
+                    weechat_prefix("network"), WEECHAT_XMPP_PLUGIN_NAME);
+            }
         }
         /* remove away status on account buffer */
         //weechat_buffer_set(buffer, "localvar_del_away", "");
