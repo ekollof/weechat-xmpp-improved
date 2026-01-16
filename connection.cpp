@@ -2085,21 +2085,117 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 weechat_printf(account.buffer, "%sUpload slot received, uploading file...",
                               weechat_prefix("network"));
                 
-                // TODO: Perform actual HTTP upload using libcurl
-                // For now, just send the GET URL as a placeholder
-                
-                auto channel_it = account.channels.find(req_it->second.channel_id);
-                if (channel_it != account.channels.end())
+                // Verify file exists
+                FILE *file = fopen(req_it->second.filename.c_str(), "rb");
+                if (!file)
                 {
-                    // Send message with URL using XEP-0066 OOB
-                    channel_it->second.send_message(
-                        channel_it->second.id,
-                        get_url,
-                        std::optional<std::string>(get_url)
-                    );
+                    weechat_printf(account.buffer, "%s%s: failed to open file for upload: %s",
+                                  weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
+                                  req_it->second.filename.c_str());
+                    account.upload_requests.erase(req_it);
+                    return 1;
+                }
+                fclose(file);
+                
+                // Set up HTTP PUT upload options
+                struct t_hashtable *options = weechat_hashtable_new(8,
+                    WEECHAT_HASHTABLE_STRING, WEECHAT_HASHTABLE_STRING,
+                    NULL, NULL);
+                if (!options)
+                {
+                    weechat_printf(account.buffer, "%s%s: failed to create upload options",
+                                  weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
+                    account.upload_requests.erase(req_it);
+                    return 1;
+                }
+                
+                // Get Content-Type from filename extension
+                std::string filename = req_it->second.filename;
+                std::string content_type = "application/octet-stream";
+                size_t dot_pos = filename.find_last_of('.');
+                if (dot_pos != std::string::npos)
+                {
+                    std::string ext = filename.substr(dot_pos + 1);
+                    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
                     
-                    weechat_printf(account.buffer, "%sFile URL sent (upload not yet implemented): %s",
-                                  weechat_prefix("network"), get_url);
+                    if (ext == "jpg" || ext == "jpeg") content_type = "image/jpeg";
+                    else if (ext == "png") content_type = "image/png";
+                    else if (ext == "gif") content_type = "image/gif";
+                    else if (ext == "webp") content_type = "image/webp";
+                    else if (ext == "mp4") content_type = "video/mp4";
+                    else if (ext == "webm") content_type = "video/webm";
+                    else if (ext == "pdf") content_type = "application/pdf";
+                    else if (ext == "txt") content_type = "text/plain";
+                }
+                
+                // Configure PUT request with file upload
+                weechat_hashtable_set(options, "file_in", filename.c_str());
+                weechat_hashtable_set(options, "httpheader", 
+                    fmt::format("Content-Type: {}", content_type).c_str());
+                weechat_hashtable_set(options, "customrequest", "PUT");
+                
+                // Create upload task structure
+                struct upload_task {
+                    weechat::account& account;
+                    std::string channel_id;
+                    std::string get_url;
+                    std::string filename;
+                };
+                auto *task = new upload_task { 
+                    account, 
+                    req_it->second.channel_id,
+                    get_url,
+                    req_it->second.filename
+                };
+                
+                // Upload callback
+                auto callback = [](const void *pointer, void *,
+                        const char *, int ret, const char *out, const char *err) -> int {
+                    auto task = static_cast<const upload_task*>(pointer);
+                    if (!task) return WEECHAT_RC_ERROR;
+                    
+                    if (ret == 0 || ret == WEECHAT_HOOK_PROCESS_CHILD)
+                    {
+                        // Upload successful
+                        weechat_printf(task->account.buffer, "%sFile uploaded successfully!",
+                                      weechat_prefix("network"));
+                        
+                        // Send message with URL using XEP-0066 OOB
+                        auto channel_it = task->account.channels.find(task->channel_id);
+                        if (channel_it != task->account.channels.end())
+                        {
+                            channel_it->second.send_message(
+                                channel_it->second.id,
+                                task->get_url.c_str(),
+                                std::optional<std::string>(task->get_url)
+                            );
+                        }
+                    }
+                    else
+                    {
+                        // Upload failed
+                        weechat_printf(task->account.buffer, "%s%s: file upload failed (code: %d): %s",
+                                      weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
+                                      ret, err ? err : "unknown error");
+                    }
+                    
+                    delete task;
+                    return WEECHAT_RC_OK;
+                };
+                
+                const int timeout = 60000; // 60 second timeout for uploads
+                std::string command = fmt::format("url:{}", put_url);
+                
+                struct t_hook *process_hook =
+                    weechat_hook_process_hashtable(command.c_str(), options, timeout,
+                        callback, task, nullptr);
+                weechat_hashtable_free(options);
+                
+                if (!process_hook)
+                {
+                    delete task;
+                    weechat_printf(account.buffer, "%s%s: failed to start upload process",
+                                  weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
                 }
             }
             
