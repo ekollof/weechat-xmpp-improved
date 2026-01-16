@@ -564,6 +564,12 @@ weechat::channel::~channel()
         self_typing_hook_timer = nullptr;
     }
     
+    // Clear MAM cache timestamp for PM channels to prevent auto-recreation on reconnect
+    if (type == chat_type::PM)
+    {
+        account.mam_cache_set_last_timestamp(id, 0);
+    }
+    
     // NOTE: Other cleanup disabled - weechat frees these when closing buffers
     // Attempting to free them here causes memory corruption:
     // - "Unaligned fastbin chunk detected" from freeing members_speaking lists
