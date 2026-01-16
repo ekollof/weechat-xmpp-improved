@@ -1818,6 +1818,16 @@ void command__init()
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /enter");
 
+    // IRC-style alias for /enter
+    hook = weechat_hook_command(
+        "join",
+        N_("join an xmpp multi-user-chat (muc) - IRC alias for /enter"),
+        N_("<jid>"),
+        N_("jid: muc to join"),
+        NULL, &command__enter, NULL, NULL);
+    if (!hook)
+        weechat_printf(NULL, "Failed to setup command /join");
+
     hook = weechat_hook_command(
         "open",
         N_("open a direct xmpp chat"),
@@ -1826,6 +1836,16 @@ void command__init()
         NULL, &command__open, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /open");
+
+    // IRC-style alias for /open
+    hook = weechat_hook_command(
+        "query",
+        N_("open a direct xmpp chat - IRC alias for /open"),
+        N_("<jid> [<message>]"),
+        N_("   jid: jid to target\nmessage: optional initial message"),
+        NULL, &command__open, NULL, NULL);
+    if (!hook)
+        weechat_printf(NULL, "Failed to setup command /query");
 
     hook = weechat_hook_command(
         "msg",
