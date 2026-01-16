@@ -383,9 +383,19 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                 xmpp_free(account.context, intext);
         }
 
+        // XEP-0085: Chat State Notifications - handle all states
         composing = xmpp_stanza_get_child_by_name_and_ns(
             stanza, "composing", "http://jabber.org/protocol/chatstates");
-        if (composing != NULL)
+        xmpp_stanza_t *paused = xmpp_stanza_get_child_by_name_and_ns(
+            stanza, "paused", "http://jabber.org/protocol/chatstates");
+        xmpp_stanza_t *active = xmpp_stanza_get_child_by_name_and_ns(
+            stanza, "active", "http://jabber.org/protocol/chatstates");
+        xmpp_stanza_t *inactive = xmpp_stanza_get_child_by_name_and_ns(
+            stanza, "inactive", "http://jabber.org/protocol/chatstates");
+        xmpp_stanza_t *gone = xmpp_stanza_get_child_by_name_and_ns(
+            stanza, "gone", "http://jabber.org/protocol/chatstates");
+        
+        if (composing || paused || active || inactive || gone)
         {
             from = xmpp_stanza_get_from(stanza);
             if (from == NULL)
@@ -406,14 +416,31 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                                                                     weechat_strcasecmp(from_bare, channel->id.data()) == 0
                                                                     ? nick : from)).first->second;
             }
-            channel->add_typing(user);
+            
             // For PMs, always use bare JID; for MUCs use nick
             const char *display_name = channel->type == weechat::channel::chat_type::MUC 
                 ? nick 
                 : from_bare;
-            weechat_printf(channel->buffer, "...\t%s%s typing",
-                           weechat_color("gray"),
-                           display_name);
+            
+            if (composing)
+            {
+                channel->add_typing(user);
+                weechat_printf(channel->buffer, "...\t%s%s is typing...",
+                               weechat_color("gray"),
+                               display_name);
+            }
+            else if (paused)
+            {
+                channel->add_typing(user);  // Keep in typing list but update state
+                weechat_printf(channel->buffer, "...\t%s%s paused typing",
+                               weechat_color("darkgray"),
+                               display_name);
+            }
+            else if (active || inactive || gone)
+            {
+                // Clear typing state for active/inactive/gone
+                channel->remove_typing(user);
+            }
         }
 
         sent = xmpp_stanza_get_child_by_name_and_ns(

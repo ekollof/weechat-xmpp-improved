@@ -133,6 +133,7 @@ namespace weechat
         static int typing_cb(const void *pointer, void *data, int remaining_calls);
         std::optional<typing*> typing_search(weechat::user *user);
         int add_typing(weechat::user *user);
+        int remove_typing(weechat::user *user);
 
         static int self_typing_cb(const void *pointer, void *data, int remaining_calls);
         std::optional<typing*> self_typing_search(weechat::user *user);

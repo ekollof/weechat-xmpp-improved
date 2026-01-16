@@ -447,6 +447,24 @@ std::optional<weechat::channel::typing*> weechat::channel::typing_search(weechat
     return std::nullopt;
 }
 
+int weechat::channel::remove_typing(weechat::user *user)
+{
+    if (!user)
+        return 0;
+    
+    for (auto ptr_typing = typings.begin(); ptr_typing != typings.end(); ptr_typing++)
+    {
+        if (user == ptr_typing->user)
+        {
+            typings.erase(ptr_typing);
+            typing_cb(this, nullptr, 0);  // Update bar
+            return 1;
+        }
+    }
+    
+    return 0;
+}
+
 int weechat::channel::add_typing(weechat::user *user)
 {
     weechat::channel::typing *the_typing = nullptr;
