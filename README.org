@@ -571,6 +571,7 @@
      * [ ] MUC Invitations (xep-249)
      * [ ] Advanced
        * [ ] User Avatar (xep-084)
+        * [X] Stream Management (xep-198)
        * [ ] User Avatar Compatibility (xep-398 xep-153)
        * [ ] User Blocking (xep-191)
        * [ ] PEP Native Bookmarks (xep-402)

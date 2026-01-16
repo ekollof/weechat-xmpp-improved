@@ -175,11 +175,20 @@
       </xmpp:SupportedXep>
     </implements>
 
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0198.html'/>
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>1.6.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Stream Management for reliable message delivery and session resumption</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
     <release>
       <Version>
         <revision>0.3.0-fork</revision>
         <created>2026-01-16</created>
-        <xmpp:note xml:lang='en'>Fork with bug fixes and enhancements: typing indicators, auto-encryption detection, bookmark management, room discovery, capability caching</xmpp:note>
+        <xmpp:note xml:lang='en'>Fork with bug fixes and enhancements: typing indicators, auto-encryption detection, bookmark management, room discovery, capability caching, Stream Management (XEP-0198)</xmpp:note>
       </Version>
     </release>
   </Project>

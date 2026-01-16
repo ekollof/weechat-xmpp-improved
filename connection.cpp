@@ -1711,9 +1711,6 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
     (void)error;
     (void)stream_error;
 
-    weechat_printf(account.buffer, "%s[DEBUG] conn_handler: status=%d, error=%d",
-                  weechat_prefix("network"), (int)status, error);
-
     if (status == event::connect)
     {
         account.disconnected = 0;
@@ -1956,9 +1953,6 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
     }
     else
     {
-        weechat_printf(account.buffer, "%s[DEBUG] Disconnecting due to status=%d, error=%d",
-                      weechat_prefix("error"), (int)status, error);
-        
         if (stream_error)
         {
             const char *err_text = stream_error->text;
@@ -1988,7 +1982,7 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
                                    stream_error->type == XMPP_SE_XML_NOT_WELL_FORMED ? "xml-not-well-formed" :
                                    "unknown";
             
-            weechat_printf(account.buffer, "%s[DEBUG] Stream error: %s%s%s",
+            weechat_printf(account.buffer, "%sStream error: %s%s%s",
                           weechat_prefix("error"),
                           err_type,
                           err_text ? " - " : "",
