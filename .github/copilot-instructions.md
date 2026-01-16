@@ -191,6 +191,15 @@ Skip autojoin for IRC gateway rooms (causes connection issues):
 - Use `/debug dump` for troubleshooting
 - Check logs: `/set xmpp.look.debug_level 2`
 
+**Testing Approach:**
+- **Pragmatic manual testing** - The codebase uses minimal automated tests due to:
+  - Complex WeeChat plugin API dependencies
+  - XMPP protocol interactions requiring real servers
+  - Encryption libraries (OMEMO, PGP) hard to mock
+- **Test incrementally** - Build and manually verify each feature as implemented
+- **Document test procedures** - Keep notes on how to verify critical features
+- **Focus on regression prevention** - Manually retest previously fixed bugs
+
 ## Development Workflow
 
 1. **Understand the request** - ask clarifying questions if needed
@@ -201,15 +210,40 @@ Skip autojoin for IRC gateway rooms (causes connection issues):
 6. **Commit with clear message** - follow conventions above
 7. **Push to repository** - backup work regularly
 
+## Manual Testing Checklist
+
+After implementing features, manually verify in WeeChat:
+
+**Critical Features to Retest:**
+- [ ] PM buffers don't reappear after `/close`
+- [ ] Typing indicators show nicknames (not room JID) in MUC
+- [ ] Plain text is default for new PMs (not OMEMO)
+- [ ] Auto-encryption enables when receiving encrypted messages
+- [ ] Buffer doesn't auto-switch on plugin load
+- [ ] `/bookmark` command works (add, list, delete, autojoin)
+- [ ] Biboumi/IRC gateway rooms don't autojoin
+- [ ] `/list` discovers public rooms
+- [ ] `/ping` provides feedback
+- [ ] Capability cache persists across restarts
+
+**Basic Smoke Test:**
+1. Load plugin: `/plugin load xmpp.so`
+2. Connect account: `/xmpp connect <account>`
+3. Join MUC: `/join room@conference.server`
+4. Send message: Type and press enter
+5. Verify typing indicators work
+6. Close and verify no recreation: `/close` then reconnect
+
 ## Feature Implementation Checklist
 
 When implementing a new feature:
 
 - [ ] Code implementation in appropriate files
 - [ ] Build succeeds (`make`)
-- [ ] Manual testing in WeeChat
+- [ ] Manual testing in WeeChat (see Manual Testing Checklist)
 - [ ] README.org updated (feature list, commands, TODOs)
 - [ ] DOAP.xml updated (if XEP-related)
+- [ ] Test critical regressions (PM recreation, typing indicators, etc.)
 - [ ] Commit with descriptive message
 - [ ] Push to repository
 
