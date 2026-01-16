@@ -719,3 +719,55 @@ void weechat::account::mam_cache_set_last_timestamp(const std::string& channel_j
         // Silently ignore write errors
     }
 }
+
+void weechat::account::send_bookmarks()
+{
+    // Build bookmark storage stanza
+    xmpp_stanza_t *iq = xmpp_iq_new(context, "set", xmpp_uuid_gen(context));
+    xmpp_stanza_set_to(iq, jid().data());
+    
+    xmpp_stanza_t *query = xmpp_stanza_new(context);
+    xmpp_stanza_set_name(query, "query");
+    xmpp_stanza_set_ns(query, "jabber:iq:private");
+    
+    xmpp_stanza_t *storage = xmpp_stanza_new(context);
+    xmpp_stanza_set_name(storage, "storage");
+    xmpp_stanza_set_ns(storage, "storage:bookmarks");
+    
+    // Add all bookmarks
+    for (const auto& bookmark_pair : bookmarks)
+    {
+        const auto& bookmark = bookmark_pair.second;
+        
+        xmpp_stanza_t *conference = xmpp_stanza_new(context);
+        xmpp_stanza_set_name(conference, "conference");
+        xmpp_stanza_set_attribute(conference, "jid", bookmark.jid.data());
+        xmpp_stanza_set_attribute(conference, "autojoin", bookmark.autojoin ? "true" : "false");
+        
+        if (!bookmark.name.empty())
+            xmpp_stanza_set_attribute(conference, "name", bookmark.name.data());
+        
+        if (!bookmark.nick.empty())
+        {
+            xmpp_stanza_t *nick = xmpp_stanza_new(context);
+            xmpp_stanza_set_name(nick, "nick");
+            xmpp_stanza_t *nick_text = xmpp_stanza_new(context);
+            xmpp_stanza_set_text(nick_text, bookmark.nick.data());
+            xmpp_stanza_add_child(nick, nick_text);
+            xmpp_stanza_release(nick_text);
+            xmpp_stanza_add_child(conference, nick);
+            xmpp_stanza_release(nick);
+        }
+        
+        xmpp_stanza_add_child(storage, conference);
+        xmpp_stanza_release(conference);
+    }
+    
+    xmpp_stanza_add_child(query, storage);
+    xmpp_stanza_release(storage);
+    xmpp_stanza_add_child(iq, query);
+    xmpp_stanza_release(query);
+    
+    connection.send(iq);
+    xmpp_stanza_release(iq);
+}

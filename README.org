@@ -55,6 +55,7 @@
     - PGP key persistence - keys set with /pgp now persist across restarts per JID/MUC
     - Encryption status bar item (xmpp_encryption) - shows current buffer's encryption mode
     - Roster management - /roster command to display, add, and remove contacts
+    - Bookmark management - /bookmark command to add, delete, list, and toggle autojoin for MUC rooms
 
   *Known limitation*: Plugin reload while weechat is running is not supported due to 
   fundamental race conditions with timer hooks. Always restart weechat instead of 
@@ -290,6 +291,31 @@
 
     *Note:* Aliases =delete= and =remove= can be used instead of =del=.
 
+*** /bookmark
+    Manage XMPP bookmarks (XEP-0048: Bookmark Storage)
+
+    *Usage:*
+    #+begin_src
+    /bookmark
+    /bookmark add [jid] [name]
+    /bookmark del <jid>
+    /bookmark autojoin <jid> <on|off>
+    #+end_src
+
+    *Examples:*
+    #+begin_src
+    /bookmark                                      # List all bookmarks
+    /bookmark add                                  # Bookmark current MUC
+    /bookmark add room@conference.example.com      # Bookmark specific MUC
+    /bookmark add room@conference.example.com My Room
+    /bookmark del room@conference.example.com      # Remove bookmark
+    /bookmark autojoin room@conference.example.com on
+    #+end_src
+
+    *Note:* Bookmarks are stored on the server and synchronized across 
+    all clients. Rooms with autojoin enabled will be automatically joined 
+    on connect. Aliases =delete= and =remove= can be used instead of =del=.
+
 ** Network & Debugging
 
 *** /ping
@@ -493,11 +519,13 @@
    * [ ] /whois [user|muc]
      * [ ] [#B] User Avatars
      * [ ] [#B] MUC Icons
-   * [-] Bookmarks / Roster (xep-048)
+   * [X] Bookmarks / Roster (xep-048)
      * [X] Autojoin bookmarks
        * [ ] [#A] Except biboumi rooms
-     * [ ] [#B] Add bookmarks
-     * [ ] [#B] Delete bookmarks
+     * [X] [#B] Add bookmarks
+     * [X] [#B] Delete bookmarks
+     * [X] [#B] List bookmarks  
+     * [X] [#B] Toggle autojoin
      * [X] [#B] Roster
        * [X] Display contacts with /roster
        * [X] Add contacts with /roster add

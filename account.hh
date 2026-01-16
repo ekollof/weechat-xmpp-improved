@@ -59,12 +59,21 @@ namespace weechat
             std::vector<std::string> groups;
         };
 
+        struct bookmark_item
+        {
+            std::string jid;
+            std::string name;
+            std::string nick;
+            bool autojoin;
+        };
+
     public:
         bool disconnected = false;
 
         std::unordered_map<std::uint32_t, device> devices;
         std::unordered_map<std::string, mam_query> mam_queries;
         std::unordered_map<std::string, roster_item> roster;
+        std::unordered_map<std::string, bookmark_item> bookmarks;
 
     private:
         bool is_connected = false;
@@ -136,6 +145,7 @@ namespace weechat
         void mam_cache_clear_messages(const std::string& channel_jid);
         time_t mam_cache_get_last_timestamp(const std::string& channel_jid);
         void mam_cache_set_last_timestamp(const std::string& channel_jid, time_t timestamp);
+        void send_bookmarks();
 
         struct t_gui_buffer* create_buffer();
 

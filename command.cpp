@@ -1417,6 +1417,162 @@ int command__roster(const void *pointer, void *data,
     return WEECHAT_RC_OK;
 }
 
+int command__bookmark(const void *pointer, void *data,
+                     struct t_gui_buffer *buffer, int argc,
+                     char **argv, char **argv_eol)
+{
+    weechat::account *ptr_account = NULL;
+    weechat::channel *ptr_channel = NULL;
+
+    (void) pointer;
+    (void) data;
+    (void) argv_eol;
+
+    buffer__get_account_and_channel(buffer, &ptr_account, &ptr_channel);
+
+    if (!ptr_account)
+        return WEECHAT_RC_ERROR;
+
+    if (!ptr_account->connected())
+    {
+        weechat_printf(buffer,
+                       _("%s%s: you are not connected to server"),
+                       weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
+        return WEECHAT_RC_OK;
+    }
+
+    // /bookmark - list bookmarks
+    if (argc == 1)
+    {
+        if (ptr_account->bookmarks.empty())
+        {
+            weechat_printf(buffer, "%sNo bookmarks", weechat_prefix("network"));
+            return WEECHAT_RC_OK;
+        }
+
+        weechat_printf(buffer, "");
+        weechat_printf(buffer, "%sBookmarks (%zu):", 
+                      weechat_prefix("network"), 
+                      ptr_account->bookmarks.size());
+        
+        for (const auto& [jid, bookmark] : ptr_account->bookmarks)
+        {
+            std::string display = jid;
+            if (!bookmark.name.empty())
+                display = bookmark.name + " <" + jid + ">";
+            
+            std::string nick_str = "";
+            if (!bookmark.nick.empty())
+                nick_str = " (nick: " + bookmark.nick + ")";
+            
+            std::string autojoin_str = bookmark.autojoin ? " [autojoin]" : "";
+            
+            weechat_printf(buffer, "  %s%s%s%s%s",
+                          weechat_color("chat_nick"),
+                          display.c_str(),
+                          weechat_color("reset"),
+                          nick_str.c_str(),
+                          autojoin_str.c_str());
+        }
+        
+        return WEECHAT_RC_OK;
+    }
+
+    // /bookmark add [jid] [name]
+    if (argc >= 2 && weechat_strcasecmp(argv[1], "add") == 0)
+    {
+        const char *jid = NULL;
+        const char *name = NULL;
+        
+        if (argc >= 3)
+        {
+            jid = argv[2];
+            name = (argc >= 4) ? argv_eol[3] : NULL;
+        }
+        else if (ptr_channel && ptr_channel->type == weechat::channel::chat_type::MUC)
+        {
+            jid = ptr_channel->id.data();
+            name = ptr_channel->name.data();
+        }
+        else
+        {
+            weechat_printf(buffer, "%sYou must specify a JID or be in a MUC buffer",
+                          weechat_prefix("error"));
+            return WEECHAT_RC_OK;
+        }
+
+        // Add or update bookmark
+        ptr_account->bookmarks[jid].jid = jid;
+        ptr_account->bookmarks[jid].name = name ? name : "";
+        ptr_account->bookmarks[jid].nick = ptr_account->nickname().data();
+        ptr_account->bookmarks[jid].autojoin = false;
+        
+        ptr_account->send_bookmarks();
+        
+        weechat_printf(buffer, "%sBookmark added: %s", 
+                      weechat_prefix("network"), jid);
+
+        return WEECHAT_RC_OK;
+    }
+
+    // /bookmark del <jid>
+    if (argc >= 3 && (weechat_strcasecmp(argv[1], "del") == 0 || 
+                       weechat_strcasecmp(argv[1], "delete") == 0 ||
+                       weechat_strcasecmp(argv[1], "remove") == 0))
+    {
+        const char *jid = argv[2];
+        
+        if (ptr_account->bookmarks.find(jid) == ptr_account->bookmarks.end())
+        {
+            weechat_printf(buffer, "%sBookmark not found: %s",
+                          weechat_prefix("error"), jid);
+            return WEECHAT_RC_OK;
+        }
+        
+        ptr_account->bookmarks.erase(jid);
+        ptr_account->send_bookmarks();
+        
+        weechat_printf(buffer, "%sBookmark removed: %s", 
+                      weechat_prefix("network"), jid);
+
+        return WEECHAT_RC_OK;
+    }
+
+    // /bookmark autojoin <jid> <on|off>
+    if (argc >= 4 && weechat_strcasecmp(argv[1], "autojoin") == 0)
+    {
+        const char *jid = argv[2];
+        const char *value = argv[3];
+        
+        if (ptr_account->bookmarks.find(jid) == ptr_account->bookmarks.end())
+        {
+            weechat_printf(buffer, "%sBookmark not found: %s",
+                          weechat_prefix("error"), jid);
+            return WEECHAT_RC_OK;
+        }
+        
+        bool autojoin = weechat_strcasecmp(value, "on") == 0 || 
+                       weechat_strcasecmp(value, "true") == 0 ||
+                       weechat_strcasecmp(value, "1") == 0;
+        
+        ptr_account->bookmarks[jid].autojoin = autojoin;
+        ptr_account->send_bookmarks();
+        
+        weechat_printf(buffer, "%sAutojoin %s for %s", 
+                      weechat_prefix("network"),
+                      autojoin ? "enabled" : "disabled",
+                      jid);
+
+        return WEECHAT_RC_OK;
+    }
+
+    weechat_printf(buffer,
+                   _("%s%s: unknown bookmark command (try /help bookmark)"),
+                   weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
+
+    return WEECHAT_RC_OK;
+}
+
 void command__init()
 {
     struct t_hook *hook;
@@ -1584,4 +1740,25 @@ void command__init()
         "add|del|delete|remove", &command__roster, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /roster");
+    
+    hook = weechat_hook_command(
+        "bookmark",
+        N_("manage XMPP bookmarks (XEP-0048)"),
+        N_("|| add [jid] [name] || del <jid> || autojoin <jid> <on|off>"),
+        N_("         : display bookmarks\n"
+           "     add : bookmark current MUC or specified JID\n"
+           "     del : remove bookmark (also: delete, remove)\n"
+           "autojoin : enable/disable autojoin for a bookmark\n"
+           "     jid : Jabber ID of the MUC room\n"
+           "    name : optional display name for the bookmark\n"
+           "\n"
+           "Examples:\n"
+           "  /bookmark                              : list all bookmarks\n"
+           "  /bookmark add                          : bookmark current MUC\n"
+           "  /bookmark add room@conference.example.com My Room\n"
+           "  /bookmark del room@conference.example.com\n"
+           "  /bookmark autojoin room@conference.example.com on"),
+        "add|del|delete|remove|autojoin", &command__bookmark, NULL, NULL);
+    if (!hook)
+        weechat_printf(NULL, "Failed to setup command /bookmark");
 }

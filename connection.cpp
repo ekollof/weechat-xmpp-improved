@@ -1238,6 +1238,9 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza)
                 query, "storage", "storage:bookmarks");
         if (storage)
         {
+            // Clear existing bookmarks
+            account.bookmarks.clear();
+            
             for (conference = xmpp_stanza_get_children(storage);
                  conference; conference = xmpp_stanza_get_next(conference))
             {
@@ -1249,12 +1252,21 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza)
                 const char *autojoin = xmpp_stanza_get_attribute(conference, "autojoin");
                 name = xmpp_stanza_get_attribute(conference, "name");
                 nick = xmpp_stanza_get_child_by_name(conference, "nick");
-                char *intext;
+                char *intext = NULL;
                 if (nick)
                 {
                     text = xmpp_stanza_get_children(nick);
                     intext = xmpp_stanza_get_text(text);
                 }
+                
+                if (!jid)
+                    continue;
+
+                // Store bookmark
+                account.bookmarks[jid].jid = jid;
+                account.bookmarks[jid].name = name ? name : "";
+                account.bookmarks[jid].nick = intext ? intext : "";
+                account.bookmarks[jid].autojoin = autojoin && weechat_strcasecmp(autojoin, "true") == 0;
 
                 account.connection.send(stanza::iq()
                             .from(to)
