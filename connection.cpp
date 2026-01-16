@@ -2254,6 +2254,39 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
         return true;
     }
     
+    // XEP-0030: Service Discovery - disco#items response
+    xmpp_stanza_t *items_query = xmpp_stanza_get_child_by_name_and_ns(
+        stanza, "query", "http://jabber.org/protocol/disco#items");
+    
+    if (items_query && type && weechat_strcasecmp(type, "result") == 0)
+    {
+        // Look for HTTP upload service in items
+        xmpp_stanza_t *item = xmpp_stanza_get_child_by_name(items_query, "item");
+        while (item)
+        {
+            const char *item_jid = xmpp_stanza_get_attribute(item, "jid");
+            if (item_jid)
+            {
+                // Query this item for its features
+                char *disco_info_id = xmpp_uuid_gen(account.context);
+                account.upload_disco_queries[disco_info_id] = item_jid;
+                
+                account.connection.send(stanza::iq()
+                            .from(account.jid())
+                            .to(item_jid)
+                            .type("get")
+                            .id(disco_info_id)
+                            .xep0030()
+                            .query()
+                            .build(account.context)
+                            .get());
+                
+                xmpp_free(account.context, disco_info_id);
+            }
+            item = xmpp_stanza_get_next(item);
+        }
+    }
+    
     query = xmpp_stanza_get_child_by_name_and_ns(
         stanza, "query", "http://jabber.org/protocol/disco#info");
     if (query && type)
@@ -2289,6 +2322,72 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 std::string ver_hash = account.caps_disco_queries[stanza_id];
                 account.caps_cache_save(ver_hash, features);
                 account.caps_disco_queries.erase(stanza_id);
+            }
+            
+            // Check if this is a response to upload service discovery
+            bool upload_disco = stanza_id && account.upload_disco_queries.count(stanza_id);
+            if (upload_disco)
+            {
+                std::string service_jid = account.upload_disco_queries[stanza_id];
+                account.upload_disco_queries.erase(stanza_id);
+                
+                // Check if this service supports HTTP File Upload
+                bool supports_upload = false;
+                size_t max_size = 0;
+                
+                xmpp_stanza_t *feature = xmpp_stanza_get_child_by_name(query, "feature");
+                while (feature)
+                {
+                    const char *var = xmpp_stanza_get_attribute(feature, "var");
+                    if (var && strcmp(var, "urn:xmpp:http:upload:0") == 0)
+                    {
+                        supports_upload = true;
+                    }
+                    feature = xmpp_stanza_get_next(feature);
+                }
+                
+                // Check for max file size in x data form
+                if (supports_upload)
+                {
+                    xmpp_stanza_t *x = xmpp_stanza_get_child_by_name_and_ns(query, "x", "jabber:x:data");
+                    if (x)
+                    {
+                        xmpp_stanza_t *field = xmpp_stanza_get_child_by_name(x, "field");
+                        while (field)
+                        {
+                            const char *var = xmpp_stanza_get_attribute(field, "var");
+                            if (var && strcmp(var, "max-file-size") == 0)
+                            {
+                                xmpp_stanza_t *value = xmpp_stanza_get_child_by_name(field, "value");
+                                if (value)
+                                {
+                                    char *value_text = xmpp_stanza_get_text(value);
+                                    if (value_text)
+                                    {
+                                        max_size = strtoull(value_text, NULL, 10);
+                                        xmpp_free(account.context, value_text);
+                                    }
+                                }
+                            }
+                            field = xmpp_stanza_get_next(field);
+                        }
+                    }
+                    
+                    account.upload_service = service_jid;
+                    account.upload_max_size = max_size;
+                    
+                    if (max_size > 0)
+                    {
+                        weechat_printf(account.buffer, "%sDiscovered upload service: %s (max: %zu MB)",
+                                      weechat_prefix("network"), service_jid.c_str(),
+                                      max_size / (1024 * 1024));
+                    }
+                    else
+                    {
+                        weechat_printf(account.buffer, "%sDiscovered upload service: %s",
+                                      weechat_prefix("network"), service_jid.c_str());
+                    }
+                }
             }
             
             if (user_initiated)
@@ -3047,6 +3146,28 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
             this->send(children[0]);
             xmpp_stanza_release(children[0]);
         }
+
+        // Discover HTTP File Upload service (XEP-0363)
+        weechat_printf(account.buffer, "%sDiscovering upload service...",
+                      weechat_prefix("network"));
+        
+        // Build disco#items query manually
+        char *disco_items_id = xmpp_uuid_gen(account.context);
+        xmpp_stanza_t *items_iq = xmpp_iq_new(account.context, "get", disco_items_id);
+        char *server_domain = xmpp_jid_domain(account.context, account.jid().data());
+        xmpp_stanza_set_to(items_iq, server_domain);
+        xmpp_stanza_set_from(items_iq, account.jid().data());
+        
+        xmpp_stanza_t *items_query = xmpp_stanza_new(account.context);
+        xmpp_stanza_set_name(items_query, "query");
+        xmpp_stanza_set_ns(items_query, "http://jabber.org/protocol/disco#items");
+        xmpp_stanza_add_child(items_iq, items_query);
+        xmpp_stanza_release(items_query);
+        
+        this->send(items_iq);
+        xmpp_stanza_release(items_iq);
+        xmpp_free(account.context, server_domain);
+        xmpp_free(account.context, disco_items_id);
 
         // Query MAM globally to discover recent conversations
         weechat_printf(account.buffer, "%sQuerying MAM for recent conversations...",

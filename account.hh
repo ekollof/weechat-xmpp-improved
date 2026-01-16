@@ -133,6 +133,7 @@ namespace weechat
         std::unordered_set<std::string> user_disco_queries;
         std::unordered_map<std::string, time_t> user_ping_queries;  // ping_id -> start_time
         std::unordered_map<std::string, std::string> caps_disco_queries;  // disco_id -> verification_hash
+        std::unordered_map<std::string, std::string> upload_disco_queries;  // disco_id -> service_jid
         
         // Capability cache (XEP-0115)
         std::unordered_map<std::string, std::vector<std::string>> caps_cache;  // verification_hash -> features
