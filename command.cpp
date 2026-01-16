@@ -1378,6 +1378,152 @@ int command__retract(const void *pointer, void *data,
     return WEECHAT_RC_OK;
 }
 
+int command__react(const void *pointer, void *data,
+                   struct t_gui_buffer *buffer, int argc,
+                   char **argv, char **argv_eol)
+{
+    weechat::account *ptr_account = NULL;
+    weechat::channel *ptr_channel = NULL;
+
+    (void) pointer;
+    (void) data;
+    (void) argv;
+
+    buffer__get_account_and_channel(buffer, &ptr_account, &ptr_channel);
+
+    if (!ptr_account)
+        return WEECHAT_RC_ERROR;
+
+    if (!ptr_channel)
+    {
+        weechat_printf(buffer, "%sxmpp: you must be in a channel to react to messages",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    if (!ptr_account->connected())
+    {
+        weechat_printf(buffer, "%sxmpp: you are not connected to server",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    if (argc < 2)
+    {
+        weechat_printf(buffer, "%sxmpp: missing emoji reaction",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    const char *emoji = argv_eol[1];
+
+    // Find the last message in buffer (not from us)
+    struct t_hdata *hdata_line = weechat_hdata_get("line");
+    struct t_hdata *hdata_line_data = weechat_hdata_get("line_data");
+    struct t_gui_lines *own_lines = (struct t_gui_lines*)weechat_hdata_pointer(
+        weechat_hdata_get("buffer"), buffer, "own_lines");
+    
+    if (!own_lines)
+    {
+        weechat_printf(buffer, "%sxmpp: cannot access buffer lines",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    struct t_gui_line *line = (struct t_gui_line*)weechat_hdata_pointer(
+        hdata_line, own_lines, "last_line");
+    
+    char *target_msg_id = NULL;
+    
+    // Search backwards for last message with an ID (skip our own messages)
+    while (line && !target_msg_id)
+    {
+        struct t_gui_line_data *line_data = (struct t_gui_line_data*)weechat_hdata_pointer(
+            hdata_line, line, "data");
+        
+        if (line_data)
+        {
+            const char *tags = (const char*)weechat_hdata_string(hdata_line_data, line_data, "tags");
+            
+            // Look for messages with ID that aren't from us
+            if (tags && strstr(tags, "id_") && !strstr(tags, "self_msg"))
+            {
+                // Extract the message ID from tags
+                char **tag_array = weechat_string_split(tags, ",", NULL, 0, 0, NULL);
+                if (tag_array)
+                {
+                    for (int i = 0; tag_array[i]; i++)
+                    {
+                        if (strncmp(tag_array[i], "id_", 3) == 0)
+                        {
+                            target_msg_id = strdup(tag_array[i] + 3);
+                            break;
+                        }
+                    }
+                    weechat_string_free_split(tag_array);
+                }
+                break;
+            }
+        }
+        
+        line = (struct t_gui_line*)weechat_hdata_move(hdata_line, line, -1);
+    }
+    
+    if (!target_msg_id)
+    {
+        weechat_printf(buffer, "%sxmpp: no message found to react to",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    // Send reaction (XEP-0444)
+    xmpp_stanza_t *message = xmpp_message_new(ptr_account->context,
+                    ptr_channel->type == weechat::channel::chat_type::MUC
+                    ? "groupchat" : "chat",
+                    ptr_channel->id.data(), NULL);
+
+    char *msg_id = xmpp_uuid_gen(ptr_account->context);
+    xmpp_stanza_set_id(message, msg_id);
+    xmpp_free(ptr_account->context, msg_id);
+
+    // Add reactions element
+    xmpp_stanza_t *reactions = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(reactions, "reactions");
+    xmpp_stanza_set_ns(reactions, "urn:xmpp:reactions:0");
+    xmpp_stanza_set_attribute(reactions, "id", target_msg_id);
+    
+    // Add reaction element with emoji
+    xmpp_stanza_t *reaction = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(reaction, "reaction");
+    xmpp_stanza_t *reaction_text = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_text(reaction_text, emoji);
+    xmpp_stanza_add_child(reaction, reaction_text);
+    xmpp_stanza_release(reaction_text);
+    
+    xmpp_stanza_add_child(reactions, reaction);
+    xmpp_stanza_release(reaction);
+    
+    xmpp_stanza_add_child(message, reactions);
+    xmpp_stanza_release(reactions);
+
+    // Add store hint for MAM
+    xmpp_stanza_t *store_hint = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(store_hint, "store");
+    xmpp_stanza_set_ns(store_hint, "urn:xmpp:hints");
+    xmpp_stanza_add_child(message, store_hint);
+    xmpp_stanza_release(store_hint);
+
+    ptr_account->connection.send(message);
+    xmpp_stanza_release(message);
+    
+    free(target_msg_id);
+
+    weechat_printf(buffer, "%sxmpp: reaction %s sent",
+                  weechat_prefix("network"), emoji);
+
+    return WEECHAT_RC_OK;
+}
+
 int command__ping(const void *pointer, void *data,
                   struct t_gui_buffer *buffer, int argc,
                   char **argv, char **argv_eol)
@@ -2530,6 +2676,20 @@ void command__init()
         NULL, &command__retract, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /retract");
+
+    hook = weechat_hook_command(
+        "react",
+        N_("react to the last message with an emoji (XEP-0444)"),
+        N_("<emoji>"),
+        N_("emoji: emoji reaction (e.g., 👍 😀 ❤️ 🎉)\n\n"
+           "Reacts to the last message (not yours) in the buffer.\n"
+           "Examples:\n"
+           "  /react 👍\n"
+           "  /react ❤️\n"
+           "  /react 😂"),
+        NULL, &command__react, NULL, NULL);
+    if (!hook)
+        weechat_printf(NULL, "Failed to setup command /react");
 
     hook = weechat_hook_command(
         "disco",

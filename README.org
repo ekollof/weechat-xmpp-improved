@@ -61,6 +61,9 @@
     - Message correction (XEP-0308) - /edit command to correct last sent message
     - Message retraction (XEP-0424) - /retract command to delete last sent message with MAM support
     - Message styling (XEP-0393) - automatic rendering of formatted text
+    - Message reactions (XEP-0444) - /react command to send emoji reactions to messages
+    - Unique and stable stanza IDs (XEP-0359) - tracks message IDs for reliable references
+    - Message processing hints (XEP-0334) - optimizes MAM storage for transient messages
     - Complete chat state notifications - active, composing, paused, inactive, gone
     - PGP key persistence - keys set with /pgp now persist across restarts per JID/MUC
     - Encryption status bar item (xmpp_encryption) - shows current buffer's encryption mode
@@ -97,6 +100,7 @@
     - ✅ XEP-0393: Message Styling (automatic text formatting)
     - ✅ XEP-0410: MUC Self-Ping (/selfping for membership verification)
     - ✅ XEP-0424: Message Retraction (/retract command)
+    - ✅ XEP-0444: Message Reactions (/react command)
 
 *** Additional Implemented XEPs
     - ✅ XEP-0048: Bookmark Storage (/bookmark command)
@@ -311,6 +315,25 @@
     be replaced with a tombstone "[Message deleted]" in the buffer. Note that 
     recipients may have already seen the message before retraction. Works in both 
     PM and MUC channels.
+
+*** /react
+    Send an emoji reaction to the last received message (XEP-0444: Message Reactions)
+
+    *Usage:*
+    #+begin_src
+    /react <emoji>
+    #+end_src
+
+    *Examples:*
+    #+begin_src
+    /react 👍
+    /react ❤️
+    /react 😂
+    #+end_src
+
+    *Note:* Reacts to the last message from another user in the current buffer.
+    Reactions are displayed appended to the original message in blue brackets.
+    Works in both PM and MUC channels. The server must support XEP-0444.
 
 *** /whois
     Get vCard information about an XMPP user (XEP-0054: vcard-temp)

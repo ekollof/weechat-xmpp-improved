@@ -1017,6 +1017,106 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
         return 1;
     }
 
+    // XEP-0444: Message Reactions
+    xmpp_stanza_t *reactions = xmpp_stanza_get_child_by_name_and_ns(stanza, "reactions",
+                                                                     "urn:xmpp:reactions:0");
+    const char *reactions_id = reactions ? xmpp_stanza_get_attribute(reactions, "id") : NULL;
+    
+    if (reactions_id)
+    {
+        // Extract emoji from <reaction> elements
+        char **dyn_emojis = weechat_string_dyn_alloc(64);
+        xmpp_stanza_t *reaction_elem = xmpp_stanza_get_children(reactions);
+        bool first = true;
+        while (reaction_elem)
+        {
+            const char *name = xmpp_stanza_get_name(reaction_elem);
+            if (name && weechat_strcasecmp(name, "reaction") == 0)
+            {
+                char *emoji = xmpp_stanza_get_text(reaction_elem);
+                if (emoji)
+                {
+                    if (!first) weechat_string_dyn_concat(dyn_emojis, " ", -1);
+                    weechat_string_dyn_concat(dyn_emojis, emoji, -1);
+                    xmpp_free(account.context, emoji);
+                    first = false;
+                }
+            }
+            reaction_elem = xmpp_stanza_get_next(reaction_elem);
+        }
+        
+        const char *emojis = *dyn_emojis;
+        if (strlen(emojis) > 0)
+        {
+            // Find the message being reacted to and append reaction
+            void *lines = weechat_hdata_pointer(weechat_hdata_get("buffer"),
+                                                channel->buffer, "lines");
+            if (lines)
+            {
+                void *last_line = weechat_hdata_pointer(weechat_hdata_get("lines"),
+                                                        lines, "last_line");
+                while (last_line)
+                {
+                    void *line_data = weechat_hdata_pointer(weechat_hdata_get("line"),
+                                                            last_line, "data");
+                    if (line_data)
+                    {
+                        int tags_count = weechat_hdata_integer(weechat_hdata_get("line_data"),
+                                                               line_data, "tags_count");
+                        char str_tag[24] = {0};
+                        for (int n_tag = 0; n_tag < tags_count; n_tag++)
+                        {
+                            snprintf(str_tag, sizeof(str_tag), "%d|tags_array", n_tag);
+                            const char *tag = weechat_hdata_string(weechat_hdata_get("line_data"),
+                                                                   line_data, str_tag);
+                            if (strlen(tag) > strlen("id_") &&
+                                weechat_strcasecmp(tag+strlen("id_"), reactions_id) == 0)
+                            {
+                                // Found the message - get original text and append reaction
+                                const char *orig_message = weechat_hdata_string(
+                                    weechat_hdata_get("line_data"), line_data, "message");
+                                
+                                char new_message[4096];
+                                snprintf(new_message, sizeof(new_message), 
+                                        "%s %s[%s]%s", 
+                                        orig_message,
+                                        weechat_color("blue"),
+                                        emojis,
+                                        weechat_color("resetcolor"));
+                                
+                                // Update the line with reaction appended
+                                struct t_hashtable *hashtable = weechat_hashtable_new(8,
+                                    WEECHAT_HASHTABLE_STRING,
+                                    WEECHAT_HASHTABLE_STRING,
+                                    NULL, NULL);
+                                weechat_hashtable_set(hashtable, "message", new_message);
+                                weechat_hdata_update(weechat_hdata_get("line_data"), line_data, hashtable);
+                                weechat_hashtable_free(hashtable);
+                                
+                                weechat_string_dyn_free(dyn_emojis, 1);
+                                xmpp_free(account.context, (void*)from_bare);
+                                if (to_bare) xmpp_free(account.context, (void*)to_bare);
+                                if (cleartext) free(cleartext);
+                                if (intext) xmpp_free(account.context, intext);
+                                return 1;
+                            }
+                        }
+                    }
+
+                    last_line = weechat_hdata_pointer(weechat_hdata_get("line"),
+                                                      last_line, "prev_line");
+                }
+            }
+        }
+        
+        weechat_string_dyn_free(dyn_emojis, 1);
+        xmpp_free(account.context, (void*)from_bare);
+        if (to_bare) xmpp_free(account.context, (void*)to_bare);
+        if (cleartext) free(cleartext);
+        if (intext) xmpp_free(account.context, intext);
+        return 1;
+    }
+
     nick = from;
     const char *display_from = from_bare;
     if (weechat_strcasecmp(type, "groupchat") == 0)
@@ -1213,6 +1313,7 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash)
   //FEATURE("urn:xmpp:jingle:transports:s5b:1");
     FEATURE("urn:xmpp:message-correct:0");
     FEATURE("urn:xmpp:message-retract:1");
+    FEATURE("urn:xmpp:reactions:0");  // XEP-0444: Message Reactions
     FEATURE("urn:xmpp:sid:0");  // XEP-0359: Stanza IDs
     FEATURE("urn:xmpp:styling:0");
     FEATURE("urn:xmpp:ping");
