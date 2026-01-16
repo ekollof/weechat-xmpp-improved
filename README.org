@@ -556,7 +556,7 @@
        * [X] Remove contacts with /roster del
    * [ ] [#D] OTR (libotr)
    * [X] [#C] Room Explorer (https://search.jabber.network/docs/api)
-   * [ ] [#C] DOAP
+   * [X] [#C] DOAP
    * [ ] [#C] Link sniffing for oob
 ** TODO [#C] Adhere to CCS2022 (XEP-459) (milestone v0.3)
    * [ ] Core
