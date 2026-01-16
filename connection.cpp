@@ -87,10 +87,8 @@ bool weechat::connection::version_handler(xmpp_stanza_t *stanza)
 
 bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool top_level)
 {
-    // Increment inbound counter for Stream Management (XEP-0198)
-    // Only count top-level stanzas, not nested/forwarded ones
-    if (account.sm_enabled && top_level)
-        account.sm_h_inbound++;
+    // SM counter incremented in libstrophe wrapper, not here
+    // top_level parameter kept for nested/recursive calls
 
     weechat::user *user;
     weechat::channel *channel;
@@ -312,10 +310,8 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool top_level
 
 bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
 {
-    // Increment inbound counter for Stream Management (XEP-0198)
-    // Only count top-level stanzas, not nested/forwarded ones
-    if (account.sm_enabled && top_level)
-        account.sm_h_inbound++;
+    // SM counter incremented in libstrophe wrapper, not here
+    // top_level parameter kept for nested/recursive calls
 
     weechat::channel *channel, *parent_channel;
     xmpp_stanza_t *x, *body, *delay, *topic, *replace, *request, *markable, *composing, *sent, *received, *result, *forwarded, *event, *items, *item, *list, *device, *encrypted;
@@ -459,7 +455,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                     message = xmpp_stanza_copy(message);
                     if (delay != NULL)
                         xmpp_stanza_add_child_ex(message, xmpp_stanza_copy(delay), 0);
-                    int ret = message_handler(message);
+                    int ret = message_handler(message, false);  // Don't double-count MAM forwarded message
                     xmpp_stanza_release(message);
                     return ret;
                 }
@@ -1069,10 +1065,8 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash)
 
 bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
 {
-    // Increment inbound counter for Stream Management (XEP-0198)
-    // Only count top-level stanzas, not nested/forwarded ones
-    if (account.sm_enabled && top_level)
-        account.sm_h_inbound++;
+    // SM counter incremented in libstrophe wrapper, not here
+    // top_level parameter kept for nested/recursive calls
 
     xmpp_stanza_t *reply, *query, *text, *fin;
     xmpp_stanza_t         *pubsub, *items, *item, *list, *bundle, *device;
@@ -1735,19 +1729,47 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
                 "presence", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
                     auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
                     if (connection != conn) throw std::invalid_argument("connection != conn");
-                    return connection.presence_handler(stanza) ? 1 : 0;
+                    
+                    // Increment SM counter for top-level stanzas only (called by libstrophe)
+                    if (connection.account.sm_enabled)
+                    {
+                        connection.account.sm_h_inbound++;
+                        weechat_printf(connection.account.buffer, "%s[DEBUG SM] presence received (top-level), h_inbound=%u",
+                                      weechat_prefix("network"), connection.account.sm_h_inbound);
+                    }
+                    
+                    return connection.presence_handler(stanza, false) ? 1 : 0;  // Pass false since we already counted
                 });
             this->handler_add(
                 "message", /*type*/ nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
                     auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
                     if (connection != conn) throw std::invalid_argument("connection != conn");
-                    return connection.message_handler(stanza) ? 1 : 0;
+                    
+                    // Increment SM counter for top-level stanzas only (called by libstrophe)
+                    if (connection.account.sm_enabled)
+                    {
+                        connection.account.sm_h_inbound++;
+                        weechat_printf(connection.account.buffer, "%s[DEBUG SM] message received (top-level), h_inbound=%u",
+                                      weechat_prefix("network"), connection.account.sm_h_inbound);
+                    }
+                    
+                    return connection.message_handler(stanza, false) ? 1 : 0;  // Pass false since we already counted
                 });
             this->handler_add(
                 "iq", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
                     auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
                     if (connection != conn) throw std::invalid_argument("connection != conn");
-                    return connection.iq_handler(stanza) ? 1 : 0;
+                    
+                    // Increment SM counter for top-level stanzas only (called by libstrophe)
+                    if (connection.account.sm_enabled)
+                    {
+                        const char *id = xmpp_stanza_get_id(stanza);
+                        connection.account.sm_h_inbound++;
+                        weechat_printf(connection.account.buffer, "%s[DEBUG SM] iq received (top-level, id=%s), h_inbound=%u",
+                                      weechat_prefix("network"), id ? id : "none", connection.account.sm_h_inbound);
+                    }
+                    
+                    return connection.iq_handler(stanza, false) ? 1 : 0;  // Pass false since we already counted
                 });
 
             // Stream Management handlers (XEP-0198)
