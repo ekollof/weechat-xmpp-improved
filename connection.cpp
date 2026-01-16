@@ -926,7 +926,11 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
     
     if (retract_id)
     {
-        // Find and tombstone the retracted message
+        // Save retraction to MAM cache
+        const char *channel_id = account.jid() == from_bare ? to_bare : from_bare;
+        account.mam_cache_retract_message(channel_id, retract_id);
+        
+        // Find and tombstone the retracted message in buffer
         void *lines = weechat_hdata_pointer(weechat_hdata_get("buffer"),
                                             channel->buffer, "lines");
         if (lines)

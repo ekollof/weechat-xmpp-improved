@@ -132,6 +132,7 @@ namespace weechat
             lmdb::dbi messages = 0;
             lmdb::dbi timestamps = 0;
             lmdb::dbi capabilities = 0;  // XEP-0115 capability cache
+            lmdb::dbi retractions = 0;   // XEP-0424 retracted message IDs
         } mam_dbi;
         std::string mam_db_path;
 
@@ -173,6 +174,8 @@ namespace weechat
         void mam_cache_cleanup();
         void mam_cache_message(const std::string& channel_jid, const std::string& message_id,
                               const std::string& from, time_t timestamp, const std::string& body);
+        void mam_cache_retract_message(const std::string& channel_jid, const std::string& message_id);
+        bool mam_cache_is_retracted(const std::string& channel_jid, const std::string& message_id);
         void mam_cache_load_messages(const std::string& channel_jid, struct t_gui_buffer *buffer);
         void mam_cache_clear_messages(const std::string& channel_jid);
         time_t mam_cache_get_last_timestamp(const std::string& channel_jid);

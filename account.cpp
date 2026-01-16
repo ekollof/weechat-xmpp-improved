@@ -582,6 +582,7 @@ void weechat::account::mam_cache_init()
         mam_dbi.messages = lmdb::dbi::open(transaction, "messages", MDB_CREATE);
         mam_dbi.timestamps = lmdb::dbi::open(transaction, "timestamps", MDB_CREATE);
         mam_dbi.capabilities = lmdb::dbi::open(transaction, "capabilities", MDB_CREATE);
+        mam_dbi.retractions = lmdb::dbi::open(transaction, "retractions", MDB_CREATE);
 
         transaction.commit();
         
@@ -638,6 +639,54 @@ void weechat::account::mam_cache_message(const std::string& channel_jid,
     }
 }
 
+void weechat::account::mam_cache_retract_message(const std::string& channel_jid, const std::string& message_id)
+{
+    if (!mam_db_env || message_id.empty()) return;
+    
+    try {
+        lmdb::txn parentTransaction{nullptr};
+        lmdb::txn txn = lmdb::txn::begin(mam_db_env, parentTransaction, 0);
+        
+        // Key: channel_jid:message_id
+        std::string key = fmt::format("{}:{}", channel_jid, message_id);
+        
+        // Value: just a marker (timestamp when retracted)
+        time_t now = time(NULL);
+        
+        MDB_val k = {key.size(), (void*)key.data()};
+        MDB_val v = {sizeof(now), &now};
+        
+        mdb_put(txn.handle(), mam_dbi.retractions.handle(), &k, &v, 0);
+        
+        txn.commit();
+    } catch (const lmdb::error& ex) {
+        // Silently ignore cache write errors
+    }
+}
+
+bool weechat::account::mam_cache_is_retracted(const std::string& channel_jid, const std::string& message_id)
+{
+    if (!mam_db_env || message_id.empty()) return false;
+    
+    try {
+        lmdb::txn parentTransaction{nullptr};
+        lmdb::txn txn = lmdb::txn::begin(mam_db_env, parentTransaction, MDB_RDONLY);
+        
+        // Key: channel_jid:message_id
+        std::string key = fmt::format("{}:{}", channel_jid, message_id);
+        
+        MDB_val k = {key.size(), (void*)key.data()};
+        MDB_val v;
+        
+        int rc = mdb_get(txn.handle(), mam_dbi.retractions.handle(), &k, &v);
+        txn.abort();
+        
+        return (rc == 0);  // Message is retracted if key exists
+    } catch (const lmdb::error& ex) {
+        return false;
+    }
+}
+
 void weechat::account::mam_cache_load_messages(const std::string& channel_jid, struct t_gui_buffer *buffer)
 {
     if (!mam_db_env || !buffer) return;
@@ -665,6 +714,13 @@ void weechat::account::mam_cache_load_messages(const std::string& channel_jid, s
             if (key_str.substr(0, prefix.size()) != prefix)
                 break;
             
+            // Parse key: channel_jid:timestamp:message_id
+            size_t colon1 = key_str.find(':', prefix.size());
+            size_t colon2 = key_str.find(':', colon1 + 1);
+            std::string message_id;
+            if (colon2 != std::string::npos)
+                message_id = key_str.substr(colon2 + 1);
+            
             // Parse value: from|timestamp|body
             std::string value_str((char*)value.mv_data, value.mv_size);
             size_t pos1 = value_str.find('|');
@@ -678,12 +734,27 @@ void weechat::account::mam_cache_load_messages(const std::string& channel_jid, s
                 
                 time_t timestamp = std::stoll(timestamp_str);
                 
+                // Check if message is retracted
+                bool is_retracted = !message_id.empty() && mam_cache_is_retracted(channel_jid, message_id);
+                
                 // Display cached message with gray prefix
-                weechat_printf_date_tags(buffer, timestamp, "xmpp_cached,no_highlight",
-                                        "%s%s\t%s",
-                                        weechat_color("darkgray"),
-                                        from.c_str(),
-                                        body.c_str());
+                if (is_retracted)
+                {
+                    weechat_printf_date_tags(buffer, timestamp, "xmpp_cached,xmpp_retracted,no_highlight",
+                                            "%s%s\t%s[Message deleted]%s",
+                                            weechat_color("darkgray"),
+                                            from.c_str(),
+                                            weechat_color("darkgray"),
+                                            weechat_color("resetcolor"));
+                }
+                else
+                {
+                    weechat_printf_date_tags(buffer, timestamp, "xmpp_cached,no_highlight",
+                                            "%s%s\t%s",
+                                            weechat_color("darkgray"),
+                                            from.c_str(),
+                                            body.c_str());
+                }
                 count++;
             }
             
