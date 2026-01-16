@@ -574,6 +574,25 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza)
                                                      "eu.siacs.conversations.axolotl");
     x = xmpp_stanza_get_child_by_name_and_ns(stanza, "x", "jabber:x:encrypted");
     intext = xmpp_stanza_get_text(body);
+    
+    // Auto-enable OMEMO for PM channels when receiving encrypted messages
+    if (encrypted && channel && channel->type == weechat::channel::chat_type::PM && !channel->omemo.enabled)
+    {
+        weechat_printf(channel->buffer, "%sAuto-enabling OMEMO (received encrypted message)",
+                       weechat_prefix("network"));
+        channel->omemo.enabled = 1;
+        channel->set_transport(weechat::channel::transport::OMEMO, 0);
+    }
+    
+    // Auto-enable PGP for PM channels when receiving PGP encrypted messages
+    if (x && channel && channel->type == weechat::channel::chat_type::PM && !channel->pgp.enabled)
+    {
+        weechat_printf(channel->buffer, "%sAuto-enabling PGP (received encrypted message)",
+                       weechat_prefix("network"));
+        channel->pgp.enabled = 1;
+        channel->set_transport(weechat::channel::transport::PGP, 0);
+    }
+    
     if (encrypted && account.omemo)
     {
         cleartext = account.omemo.decode(&account, from_bare, encrypted);
