@@ -120,6 +120,10 @@ int aes_decrypt(const uint8_t *ciphertext, size_t ciphertext_len,
     gcry_cipher_close(cipher);
     return 1;
 cleanup:
+    if (*plaintext) {
+        free(*plaintext);
+        *plaintext = NULL;
+    }
     gcry_cipher_close(cipher);
     return 0;
 }
@@ -2292,7 +2296,7 @@ char *omemo::decode(weechat::account *account, const char *jid,
     if (iv_len != AES_IV_SIZE || key_len != AES_KEY_SIZE) return NULL;
     char *plaintext = NULL; size_t plaintext_len = 0;
     if (aes_decrypt(payload_data, payload_len, key_data, iv_data, tag_data, tag_len,
-                    (uint8_t**)&plaintext, &plaintext_len) || plaintext)
+                    (uint8_t**)&plaintext, &plaintext_len))
     {
         plaintext[plaintext_len] = '\0';
         return plaintext;
