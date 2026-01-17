@@ -15,6 +15,7 @@
 #include <weechat/weechat-plugin.h>
 
 #include "plugin.hh"
+#include "xmpp/stanza.hh"
 #include "account.hh"
 #include "user.hh"
 #include "channel.hh"
@@ -883,6 +884,65 @@ int command__omemo(const void *pointer, void *data,
     // Handle subcommands
     if (argc > 1)
     {
+        if (weechat_strcasecmp(argv[1], "check") == 0)
+        {
+            if (!ptr_account->omemo)
+            {
+                weechat_printf(ptr_account->buffer,
+                               _("%s%s: OMEMO not initialized for this account"),
+                               weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
+                return WEECHAT_RC_OK;
+            }
+
+            weechat_printf(ptr_account->buffer,
+                           _("%sQuerying server for OMEMO devicelist and bundle..."),
+                           weechat_prefix("network"));
+            weechat_printf(ptr_account->buffer,
+                           _("%sYour device ID: %u"),
+                           weechat_prefix("network"), ptr_account->omemo.device_id);
+
+            // Query devicelist from server
+            auto children = std::make_unique<xmpp_stanza_t*[]>(2);
+            children[0] = stanza__iq_pubsub_items(ptr_account->context, NULL,
+                                            strdup("eu.siacs.conversations.axolotl.devicelist"));
+            children[0] = stanza__iq_pubsub(ptr_account->context, NULL, children.get(),
+                                      with_noop("http://jabber.org/protocol/pubsub"));
+            char *uuid = xmpp_uuid_gen(ptr_account->context);
+            children[0] = stanza__iq(ptr_account->context, NULL, children.get(), NULL, uuid,
+                               strdup(ptr_account->jid().data()), strdup(ptr_account->jid().data()),
+                               strdup("get"));
+            xmpp_free(ptr_account->context, uuid);
+
+            ptr_account->connection.send(children[0]);
+            xmpp_stanza_release(children[0]);
+
+            // Query bundle from server
+            char bundle_node[128] = {0};
+            snprintf(bundle_node, sizeof(bundle_node),
+                        "eu.siacs.conversations.axolotl.bundles:%u",
+                        ptr_account->omemo.device_id);
+
+            children[1] = NULL;
+            children[0] = stanza__iq_pubsub_items(ptr_account->context, NULL,
+                                            strdup(bundle_node));
+            children[0] = stanza__iq_pubsub(ptr_account->context, NULL, children.get(),
+                                      with_noop("http://jabber.org/protocol/pubsub"));
+            uuid = xmpp_uuid_gen(ptr_account->context);
+            children[0] = stanza__iq(ptr_account->context, NULL, children.get(), NULL, uuid,
+                               strdup(ptr_account->jid().data()), strdup(ptr_account->jid().data()),
+                               strdup("get"));
+            xmpp_free(ptr_account->context, uuid);
+
+            ptr_account->connection.send(children[0]);
+            xmpp_stanza_release(children[0]);
+
+            weechat_printf(ptr_account->buffer,
+                           _("%sCheck the account buffer for results (devicelist and bundle responses)"),
+                           weechat_prefix("network"));
+
+            return WEECHAT_RC_OK;
+        }
+
         if (weechat_strcasecmp(argv[1], "republish") == 0)
         {
             if (!ptr_account->omemo)
@@ -3585,16 +3645,19 @@ void command__init()
     hook = weechat_hook_command(
         "omemo",
         N_("manage omemo encryption for current buffer or account"),
-        N_("[republish]"),
-        N_("republish: republish OMEMO devicelist and bundle to server (use on account buffer)\n"
+        N_("[check|republish]"),
+        N_("    check: query server for published OMEMO devicelist and bundle\n"
+           "republish: republish OMEMO devicelist and bundle to server\n"
            "\n"
            "Without arguments on a channel buffer: enable OMEMO encryption\n"
-           "With 'republish' on account buffer: force re-publish devicelist and bundle\n"
+           "Use subcommands on account buffer to manage OMEMO keys\n"
            "\n"
            "Examples:\n"
            "  /omemo            : enable OMEMO for current channel\n"
+           "  /omemo check      : verify bundle is published on server\n"
            "  /omemo republish  : republish bundle (fixes missing device keys)"),
-        "republish", &command__omemo, NULL, NULL);
+        "check"
+        " || republish", &command__omemo, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /omemo");
 

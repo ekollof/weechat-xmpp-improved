@@ -77,6 +77,7 @@
     - Bookmark management - /bookmark command to add, delete, list, and toggle autojoin for MUC rooms
     - Room explorer - /list command to search public MUC rooms via search.jabber.network
     - Entity capability caching (XEP-0115) - caches disco#info results to reduce network queries
+    - OMEMO key management - /omemo republish to force re-publication of device bundle
 
   See the *XMPP Compliance* section below for a comprehensive list of implemented XEPs.
 

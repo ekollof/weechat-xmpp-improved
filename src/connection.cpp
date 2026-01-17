@@ -929,19 +929,6 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
     encrypted = xmpp_stanza_get_child_by_name_and_ns(stanza, "encrypted",
                                                      "eu.siacs.conversations.axolotl");
     
-    // Print to both core buffer AND current buffer for visibility
-    weechat_printf(NULL, "%sMESSAGE DEBUG: from=%s, encrypted=%p, body=%p",
-                   weechat_prefix("network"), from ? from : "NULL", encrypted, body);
-    weechat_printf(account.buffer, "%sMESSAGE DEBUG: from=%s, encrypted=%p, body=%p",
-                   weechat_prefix("network"), from ? from : "NULL", encrypted, body);
-    
-    if (encrypted) {
-        weechat_printf(NULL, "%sMESSAGE: OMEMO encrypted stanza FOUND! account.omemo=%d",
-                       weechat_prefix("error"), account.omemo ? 1 : 0);
-        weechat_printf(account.buffer, "%sMESSAGE: OMEMO encrypted stanza FOUND! account.omemo=%d",
-                       weechat_prefix("error"), account.omemo ? 1 : 0);
-    }
-    
     x = xmpp_stanza_get_child_by_name_and_ns(stanza, "x", "jabber:x:encrypted");
     
     // XEP-0380: Explicit Message Encryption
@@ -972,8 +959,6 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
     
     if (encrypted && account.omemo)
     {
-        weechat_printf(NULL, "%sOMEMO: encrypted message detected, calling decode (jid=%s)",
-                       weechat_prefix("network"), from_bare);
         cleartext = account.omemo.decode(&account, from_bare, encrypted);
         if (!cleartext)
         {
@@ -981,8 +966,6 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
                                      weechat_prefix("error"), "OMEMO Decryption Error", from);
             return 1;
         }
-        weechat_printf(NULL, "%sOMEMO: decode succeeded",
-                       weechat_prefix("network"));
     }
     else
     {
