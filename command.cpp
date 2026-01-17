@@ -3313,7 +3313,7 @@ int command__upload(const void *pointer, void *data,
         ? filename.substr(last_slash + 1) 
         : filename;
     
-    // Sanitize filename: only keep alphanumeric, dots, and dashes
+    // Sanitize filename: allow alphanumeric, dots, dashes, and underscores
     // Some servers are very strict about filenames (XEP-0363 doesn't specify allowed chars)
     std::string sanitized_basename;
     for (char c : basename)
@@ -3321,7 +3321,7 @@ int command__upload(const void *pointer, void *data,
         if ((c >= 'a' && c <= 'z') || 
             (c >= 'A' && c <= 'Z') || 
             (c >= '0' && c <= '9') || 
-            c == '.' || c == '-')
+            c == '.' || c == '-' || c == '_')
         {
             sanitized_basename += c;
         }
@@ -3347,10 +3347,31 @@ int command__upload(const void *pointer, void *data,
     weechat_printf(buffer, "%sUsing sanitized filename: %s",
                   weechat_prefix("network"), sanitized_basename.c_str());
     
-    // Store upload request
-    ptr_account->upload_requests[id] = {id, filename, ptr_channel->id};
+    // Store upload request with both original path and sanitized filename
+    ptr_account->upload_requests[id] = {id, filename, sanitized_basename, ptr_channel->id};
     
-    // Build upload slot request
+    // Determine content-type from file extension
+    std::string content_type = "application/octet-stream";
+    size_t dot_pos = sanitized_basename.find_last_of('.');
+    if (dot_pos != std::string::npos)
+    {
+        std::string ext = sanitized_basename.substr(dot_pos + 1);
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        
+        if (ext == "jpg" || ext == "jpeg") content_type = "image/jpeg";
+        else if (ext == "png") content_type = "image/png";
+        else if (ext == "gif") content_type = "image/gif";
+        else if (ext == "webp") content_type = "image/webp";
+        else if (ext == "mp4") content_type = "video/mp4";
+        else if (ext == "webm") content_type = "video/webm";
+        else if (ext == "pdf") content_type = "application/pdf";
+        else if (ext == "txt") content_type = "text/plain";
+        else if (ext == "zip") content_type = "application/zip";
+        else if (ext == "tar") content_type = "application/x-tar";
+        else if (ext == "gz") content_type = "application/gzip";
+    }
+    
+    // Build upload slot request (XEP-0363 v0.3.0+)
     xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "get", id);
     xmpp_stanza_set_to(iq, ptr_account->upload_service.c_str());
     
@@ -3358,25 +3379,18 @@ int command__upload(const void *pointer, void *data,
     xmpp_stanza_set_name(request, "request");
     xmpp_stanza_set_ns(request, "urn:xmpp:http:upload:0");
     
-    xmpp_stanza_t *filename_elem = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(filename_elem, "filename");
-    xmpp_stanza_t *filename_text = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_text(filename_text, sanitized_basename.c_str());
-    xmpp_stanza_add_child(filename_elem, filename_text);
-    xmpp_stanza_release(filename_text);
-    xmpp_stanza_add_child(request, filename_elem);
-    xmpp_stanza_release(filename_elem);
+    // In XEP-0363 v0.3.0+, filename and size are attributes, not child elements
+    xmpp_stanza_set_attribute(request, "filename", sanitized_basename.c_str());
     
-    xmpp_stanza_t *size_elem = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(size_elem, "size");
-    xmpp_stanza_t *size_text = xmpp_stanza_new(ptr_account->context);
     char size_str[32];
     snprintf(size_str, sizeof(size_str), "%ld", filesize);
-    xmpp_stanza_set_text(size_text, size_str);
-    xmpp_stanza_add_child(size_elem, size_text);
-    xmpp_stanza_release(size_text);
-    xmpp_stanza_add_child(request, size_elem);
-    xmpp_stanza_release(size_elem);
+    xmpp_stanza_set_attribute(request, "size", size_str);
+    
+    // Add content-type attribute if applicable
+    if (!content_type.empty())
+    {
+        xmpp_stanza_set_attribute(request, "content-type", content_type.c_str());
+    }
     
     xmpp_stanza_add_child(iq, request);
     xmpp_stanza_release(request);

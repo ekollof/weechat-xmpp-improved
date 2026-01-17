@@ -71,7 +71,8 @@ namespace weechat
         struct upload_request
         {
             std::string id;
-            std::string filename;
+            std::string filepath;         // Full path for opening the file
+            std::string filename;         // Sanitized filename for the server
             std::string channel_id;
         };
 

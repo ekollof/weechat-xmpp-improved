@@ -50,6 +50,7 @@ LDFLAGS+=$(DBGLDFLAGS) \
 	 $(DBGCFLAGS)
 LDLIBS=-lstrophe \
 	   -lpthread \
+	   -lcurl \
 	   $(shell xml2-config --libs) \
 	   $(shell pkg-config --libs gpgme) \
 	   $(shell pkg-config --libs libsignal-protocol-c) \
