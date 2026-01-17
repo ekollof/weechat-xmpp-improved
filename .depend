@@ -253,7 +253,7 @@ src/xmpp/xep-0319.inl:
 src/xmpp/xep-0352.inl:
 src/xmpp/rfc-6121.inl:
 obj/command.o: src/command.cpp src/plugin.hh src/strophe.hh \
- src/account.hh src/pgp.hh src/omemo.hh \
+ src/xmpp/stanza.hh src/account.hh src/pgp.hh src/omemo.hh \
  /usr/include/signal/signal_protocol.h /usr/include/signal/ratchet.h \
  /usr/include/signal/signal_protocol_types.h /usr/include/signal/curve.h \
  /usr/include/signal/session_record.h \
@@ -269,6 +269,7 @@ obj/command.o: src/command.cpp src/plugin.hh src/strophe.hh \
  sexp/scanner.hh sexp/parser.tab.hh sexp/location.hh
 src/plugin.hh:
 src/strophe.hh:
+src/xmpp/stanza.hh:
 src/account.hh:
 src/pgp.hh:
 src/omemo.hh:

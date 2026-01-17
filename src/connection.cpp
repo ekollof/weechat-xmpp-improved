@@ -2828,6 +2828,14 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                             dev.label = "weechat";
                             account.devices.emplace(dev.id, dev);
 
+                            weechat_printf(account.buffer, 
+                                           "%sServer devicelist for %s:",
+                                           weechat_prefix("network"), from);
+                            weechat_printf(account.buffer,
+                                           "%s  Device %u (weechat - this device)",
+                                           weechat_prefix("network"), dev.id);
+
+                            int device_count = 1;
                             for (device = xmpp_stanza_get_children(list);
                                  device; device = xmpp_stanza_get_next(device))
                             {
@@ -2841,7 +2849,19 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                                 dev.name = device_id;
                                 dev.label = "";
                                 account.devices.emplace(dev.id, dev);
+                                
+                                if (dev.id != account.omemo.device_id)
+                                {
+                                    weechat_printf(account.buffer,
+                                                   "%s  Device %u",
+                                                   weechat_prefix("network"), dev.id);
+                                    device_count++;
+                                }
                             }
+
+                            weechat_printf(account.buffer,
+                                           "%sTotal devices in devicelist: %d",
+                                           weechat_prefix("network"), device_count);
 
                             reply = account.get_devicelist();
                             char *uuid = xmpp_uuid_gen(account.context);
@@ -2871,11 +2891,42 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                             strlen("eu.siacs.conversations.axolotl.bundles:");
                         if (account.omemo && strlen(items_node) > node_prefix)
                         {
+                            uint32_t bundle_device_id = strtol(items_node+node_prefix, NULL, 10);
+                            
+                            // If this is our own device's bundle, print confirmation
+                            if (from && account.jid() == from && 
+                                bundle_device_id == account.omemo.device_id)
+                            {
+                                weechat_printf(account.buffer,
+                                               "%sBundle found for device %u:",
+                                               weechat_prefix("network"), bundle_device_id);
+                                
+                                // Count prekeys
+                                xmpp_stanza_t *prekeys = xmpp_stanza_get_child_by_name(bundle, "prekeys");
+                                int prekey_count = 0;
+                                if (prekeys)
+                                {
+                                    for (xmpp_stanza_t *pk = xmpp_stanza_get_children(prekeys);
+                                         pk; pk = xmpp_stanza_get_next(pk))
+                                    {
+                                        const char *name = xmpp_stanza_get_name(pk);
+                                        if (weechat_strcasecmp(name, "preKeyPublic") == 0)
+                                            prekey_count++;
+                                    }
+                                }
+                                
+                                weechat_printf(account.buffer,
+                                               "%s  %d prekeys available",
+                                               weechat_prefix("network"), prekey_count);
+                                weechat_printf(account.buffer,
+                                               "%s  ✓ Bundle is published and available for contacts",
+                                               weechat_prefix("network"));
+                            }
+                            
                             account.omemo.handle_bundle(
                                 from ? from : account.jid().data(),
-                                                 strtol(items_node+node_prefix,
-                                                        NULL, 10),
-                                                 items);
+                                bundle_device_id,
+                                items);
                         }
                     }
                 }
