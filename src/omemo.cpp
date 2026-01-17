@@ -2165,14 +2165,27 @@ void omemo::handle_bundle(const char *jid, uint32_t device_id,
 char *omemo::decode(weechat::account *account, const char *jid,
                     xmpp_stanza_t *encrypted)
 {
+    weechat_printf(NULL, "========================================");
+    weechat_printf(NULL, "%sOMEMO DECODE CALLED: jid=%s",
+                   weechat_prefix("error"), jid);
+    weechat_printf(NULL, "========================================");
+    
     auto omemo = &account->omemo;
     uint8_t *key_data = NULL, *tag_data = NULL, *iv_data = NULL, *payload_data = NULL;
     size_t key_len = 0, tag_len = 0, iv_len = 0, payload_len = 0;
 
     xmpp_stanza_t *header = xmpp_stanza_get_child_by_name(encrypted, "header");
-    if (!header) return NULL;
+    if (!header) {
+        weechat_printf(NULL, "%sOMEMO: no header element found",
+                       weechat_prefix("error"));
+        return NULL;
+    }
     xmpp_stanza_t *iv = xmpp_stanza_get_child_by_name(header, "iv");
-    if (!iv) return NULL;
+    if (!iv) {
+        weechat_printf(NULL, "%sOMEMO: no iv element found",
+                       weechat_prefix("error"));
+        return NULL;
+    }
     const char *iv__text = xmpp_stanza_get_text(iv);
     if (!iv__text) return NULL;
     iv_len = base64_decode(iv__text, strlen(iv__text), &iv_data);

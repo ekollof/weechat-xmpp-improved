@@ -958,6 +958,8 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
     
     if (encrypted && account.omemo)
     {
+        weechat_printf(NULL, "%sOMEMO: encrypted message detected, calling decode (jid=%s)",
+                       weechat_prefix("network"), from_bare);
         cleartext = account.omemo.decode(&account, from_bare, encrypted);
         if (!cleartext)
         {
@@ -965,6 +967,14 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
                                      weechat_prefix("error"), "OMEMO Decryption Error", from);
             return 1;
         }
+        weechat_printf(NULL, "%sOMEMO: decode succeeded",
+                       weechat_prefix("network"));
+    }
+    else
+    {
+        if (encrypted)
+            weechat_printf(NULL, "%sOMEMO: encrypted message but account.omemo is NULL/false",
+                           weechat_prefix("error"));
     }
     if (x)
     {
