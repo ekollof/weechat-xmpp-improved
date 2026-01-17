@@ -928,6 +928,15 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
 
     encrypted = xmpp_stanza_get_child_by_name_and_ns(stanza, "encrypted",
                                                      "eu.siacs.conversations.axolotl");
+    
+    weechat_printf(NULL, "%sMESSAGE DEBUG: from=%s, encrypted=%p, body=%p",
+                   weechat_prefix("network"), from ? from : "NULL", encrypted, body);
+    
+    if (encrypted) {
+        weechat_printf(NULL, "%sMESSAGE: OMEMO encrypted stanza FOUND! account.omemo=%d",
+                       weechat_prefix("error"), account.omemo ? 1 : 0);
+    }
+    
     x = xmpp_stanza_get_child_by_name_and_ns(stanza, "x", "jabber:x:encrypted");
     
     // XEP-0380: Explicit Message Encryption
