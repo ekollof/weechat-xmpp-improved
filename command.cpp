@@ -11,6 +11,7 @@
 #include <iostream>
 #include <sstream>
 #include <utility>
+#include <algorithm>
 #include <weechat/weechat-plugin.h>
 
 #include "plugin.hh"
@@ -1080,10 +1081,11 @@ int command__trap(const void *pointer, void *data,
 
     weechat::account *account = NULL;
     weechat::channel *channel = NULL;
-    weechat::user *user = NULL;
 
     buffer__get_account_and_channel(buffer, &account, &channel);
     weechat::user::search(account, account->jid_device().data());
+
+    (void) channel; // trap is for debugging only
 
     __asm("int3");
 
@@ -2932,6 +2934,143 @@ int command__bookmark(const void *pointer, void *data,
     return WEECHAT_RC_OK;
 }
 
+// Non-capturing callback used for async room search
+static int list_search_callback(const void *pointer, void *data, const char *command,
+                               int return_code, const char *out, const char *err)
+{
+    (void) data;
+    (void) command;
+    (void) err;
+    struct t_gui_buffer *buffer = (struct t_gui_buffer *)pointer;
+
+    if (return_code != WEECHAT_HOOK_PROCESS_CHILD)
+    {
+        if (return_code < 0)
+        {
+            weechat_printf(buffer, "%sRoom search failed: network error",
+                          weechat_prefix("error"));
+            return WEECHAT_RC_OK;
+        }
+
+        if (!out || strlen(out) == 0)
+        {
+            weechat_printf(buffer, "%sNo results from room search",
+                          weechat_prefix("error"));
+            return WEECHAT_RC_OK;
+        }
+
+        // Parse JSON response (simple parsing since we can't rely on external libs)
+        std::string response(out);
+
+        // Look for "items": [ ... ]
+        size_t items_pos = response.find("\"items\":");
+        if (items_pos == std::string::npos)
+        {
+            weechat_printf(buffer, "%sNo rooms found",
+                          weechat_prefix("network"));
+            return WEECHAT_RC_OK;
+        }
+
+        // Simple parsing - look for room objects
+        weechat_printf(buffer, "");
+        weechat_printf(buffer, "%sMUC Rooms:", weechat_prefix("network"));
+        weechat_printf(buffer, "");
+
+        size_t pos = items_pos;
+        int count = 0;
+        while ((pos = response.find("\"address\":", pos)) != std::string::npos && count < 20)
+        {
+            pos += 11; // skip "address":"
+            size_t end_pos = response.find("\"", pos);
+            if (end_pos == std::string::npos) break;
+
+            std::string address = response.substr(pos, end_pos - pos);
+
+            // Find name
+            std::string name = "";
+            size_t name_pos = response.find("\"name\":", pos);
+            if (name_pos != std::string::npos && name_pos < pos + 500)
+            {
+                name_pos += 8;
+                if (response[name_pos - 1] == '"')
+                {
+                    size_t name_end = response.find("\"", name_pos);
+                    if (name_end != std::string::npos)
+                        name = response.substr(name_pos, name_end - name_pos);
+                }
+            }
+
+            // Find nusers
+            std::string nusers = "";
+            size_t nusers_pos = response.find("\"nusers\":", pos);
+            if (nusers_pos != std::string::npos && nusers_pos < pos + 500)
+            {
+                nusers_pos += 9;
+                size_t nusers_end = response.find_first_of(",}", nusers_pos);
+                if (nusers_end != std::string::npos)
+                {
+                    std::string nusers_str = response.substr(nusers_pos, nusers_end - nusers_pos);
+                    if (nusers_str != "null")
+                        nusers = nusers_str + " users";
+                }
+            }
+
+            // Find description
+            std::string description = "";
+            size_t desc_pos = response.find("\"description\":", pos);
+            if (desc_pos != std::string::npos && desc_pos < pos + 500)
+            {
+                desc_pos += 15;
+                if (response[desc_pos - 1] == '"')
+                {
+                    size_t desc_end = response.find("\"", desc_pos);
+                    if (desc_end != std::string::npos)
+                    {
+                        description = response.substr(desc_pos, desc_end - desc_pos);
+                        if (description.length() > 60)
+                            description = description.substr(0, 57) + "...";
+                    }
+                }
+            }
+
+            // Print room info
+            std::string display = address;
+            if (!name.empty() && name != "null")
+                display = name + " <" + address + ">";
+
+            std::string info = "";
+            if (!nusers.empty())
+                info = " (" + nusers + ")";
+
+            weechat_printf(buffer, "  %s%s%s%s",
+                          weechat_color("chat_nick"),
+                          display.c_str(),
+                          weechat_color("reset"),
+                          info.c_str());
+
+            if (!description.empty() && description != "null")
+                weechat_printf(buffer, "    %s", description.c_str());
+
+            count++;
+            pos = end_pos;
+        }
+
+        if (count == 0)
+        {
+            weechat_printf(buffer, "%sNo rooms found",
+                          weechat_prefix("network"));
+        }
+        else
+        {
+            weechat_printf(buffer, "");
+            weechat_printf(buffer, "%sUse /enter <address> to join a room",
+                          weechat_prefix("network"));
+        }
+    }
+
+    return WEECHAT_RC_OK;
+}
+
 int command__list(const void *pointer, void *data,
                   struct t_gui_buffer *buffer, int argc,
                   char **argv, char **argv_eol)
@@ -2941,6 +3080,7 @@ int command__list(const void *pointer, void *data,
 
     (void) pointer;
     (void) data;
+    (void) argv;
 
     buffer__get_account_and_channel(buffer, &ptr_account, &ptr_channel);
 
@@ -2983,151 +3123,16 @@ int command__list(const void *pointer, void *data,
     weechat_hashtable_set(options, "postfields", json_payload.data());
     
     // Use a hook for async URL fetch
-    char *url = strdup("https://search.jabber.network/api/1.0/search");
-    
-    struct t_hook *hook = weechat_hook_process_hashtable(
-        fmt::format("url:{}", url).data(),
+    std::string url = "https://search.jabber.network/api/1.0/search";
+
+    struct t_hook *hook = (struct t_hook *)weechat_hook_process_hashtable(
+        fmt::format("url:{}", url).c_str(),
         options,
-        30000, // 30 second timeout
-        [](const void *pointer, void *data, const char *command,
-           int return_code, const char *out, const char *err) -> int
-        {
-            (void) data;
-            (void) command;
-            (void) err;
-            
-            struct t_gui_buffer *buffer = (struct t_gui_buffer *)pointer;
-            
-            if (return_code != WEECHAT_HOOK_PROCESS_CHILD)
-            {
-                if (return_code < 0)
-                {
-                    weechat_printf(buffer, "%sRoom search failed: network error",
-                                  weechat_prefix("error"));
-                    return WEECHAT_RC_OK;
-                }
-                
-                if (!out || strlen(out) == 0)
-                {
-                    weechat_printf(buffer, "%sNo results from room search",
-                                  weechat_prefix("error"));
-                    return WEECHAT_RC_OK;
-                }
-                
-                // Parse JSON response (simple parsing since we can't rely on external libs)
-                std::string response(out);
-                
-                // Look for "items": [ ... ]
-                size_t items_pos = response.find("\"items\":");
-                if (items_pos == std::string::npos)
-                {
-                    weechat_printf(buffer, "%sNo rooms found",
-                                  weechat_prefix("network"));
-                    return WEECHAT_RC_OK;
-                }
-                
-                // Simple parsing - look for room objects
-                weechat_printf(buffer, "");
-                weechat_printf(buffer, "%sMUC Rooms:", weechat_prefix("network"));
-                weechat_printf(buffer, "");
-                
-                size_t pos = items_pos;
-                int count = 0;
-                while ((pos = response.find("\"address\":", pos)) != std::string::npos && count < 20)
-                {
-                    pos += 11; // skip "address":"
-                    size_t end_pos = response.find("\"", pos);
-                    if (end_pos == std::string::npos) break;
-                    
-                    std::string address = response.substr(pos, end_pos - pos);
-                    
-                    // Find name
-                    std::string name = "";
-                    size_t name_pos = response.find("\"name\":", pos);
-                    if (name_pos != std::string::npos && name_pos < pos + 500)
-                    {
-                        name_pos += 8;
-                        if (response[name_pos - 1] == '"')
-                        {
-                            size_t name_end = response.find("\"", name_pos);
-                            if (name_end != std::string::npos)
-                                name = response.substr(name_pos, name_end - name_pos);
-                        }
-                    }
-                    
-                    // Find nusers
-                    std::string nusers = "";
-                    size_t nusers_pos = response.find("\"nusers\":", pos);
-                    if (nusers_pos != std::string::npos && nusers_pos < pos + 500)
-                    {
-                        nusers_pos += 9;
-                        size_t nusers_end = response.find_first_of(",}", nusers_pos);
-                        if (nusers_end != std::string::npos)
-                        {
-                            std::string nusers_str = response.substr(nusers_pos, nusers_end - nusers_pos);
-                            if (nusers_str != "null")
-                                nusers = nusers_str + " users";
-                        }
-                    }
-                    
-                    // Find description  
-                    std::string description = "";
-                    size_t desc_pos = response.find("\"description\":", pos);
-                    if (desc_pos != std::string::npos && desc_pos < pos + 500)
-                    {
-                        desc_pos += 15;
-                        if (response[desc_pos - 1] == '"')
-                        {
-                            size_t desc_end = response.find("\"", desc_pos);
-                            if (desc_end != std::string::npos)
-                            {
-                                description = response.substr(desc_pos, desc_end - desc_pos);
-                                if (description.length() > 60)
-                                    description = description.substr(0, 57) + "...";
-                            }
-                        }
-                    }
-                    
-                    // Print room info
-                    std::string display = address;
-                    if (!name.empty() && name != "null")
-                        display = name + " <" + address + ">";
-                    
-                    std::string info = "";
-                    if (!nusers.empty())
-                        info = " (" + nusers + ")";
-                    
-                    weechat_printf(buffer, "  %s%s%s%s",
-                                  weechat_color("chat_nick"),
-                                  display.c_str(),
-                                  weechat_color("reset"),
-                                  info.c_str());
-                    
-                    if (!description.empty() && description != "null")
-                        weechat_printf(buffer, "    %s", description.c_str());
-                    
-                    count++;
-                    pos = end_pos;
-                }
-                
-                if (count == 0)
-                {
-                    weechat_printf(buffer, "%sNo rooms found",
-                                  weechat_prefix("network"));
-                }
-                else
-                {
-                    weechat_printf(buffer, "");
-                    weechat_printf(buffer, "%sUse /enter <address> to join a room",
-                                  weechat_prefix("network"));
-                }
-            }
-            
-            return WEECHAT_RC_OK;
-        },
-        buffer, NULL);
+        30000,
+        list_search_callback,
+        buffer,
+        NULL);
     
-    free(url);
     weechat_hashtable_free(options);
     
     if (!hook)
@@ -3423,9 +3428,7 @@ int command__upload(const void *pointer, void *data,
 
 void command__init()
 {
-    struct t_hook *hook;
-
-    hook = weechat_hook_command(
+    auto *hook = weechat_hook_command(
         "account",
         N_("handle xmpp accounts"),
         N_("list"

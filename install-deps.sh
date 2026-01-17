@@ -5,9 +5,9 @@ set -e
 
 # Detect OS and distro
 if [ -f /etc/os-release ]; then
+    # shellcheck source=/dev/null
     . /etc/os-release
     OS=$ID
-    VERSION=$VERSION_ID
 else
     echo "Cannot detect OS - /etc/os-release not found"
     exit 1

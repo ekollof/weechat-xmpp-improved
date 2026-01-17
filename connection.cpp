@@ -169,11 +169,11 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool top_level
             char *disco_id = xmpp_uuid_gen(account.context);
             account.caps_disco_queries[disco_id] = ver;  // Track this query for caching
             
+            std::string to_jid = binding.from ? binding.from->full : std::string();
+
             account.connection.send(stanza::iq()
                         .from(binding.to ? binding.to->full : "")
-                        .to(binding.from
-                            .transform([](auto& x) { return x.full; })
-                            .value_or(std::string()))
+                        .to(to_jid)
                         .type("get")
                         .id(disco_id)
                         .xep0030()
@@ -2902,9 +2902,12 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
             {
                 if (set__last__text)
                 {
+                    time_t *start_ptr = mam_query.start ? &*mam_query.start : nullptr;
+                    time_t *end_ptr   = mam_query.end   ? &*mam_query.end   : nullptr;
+
                     channel->second.fetch_mam(id,
-                                       mam_query.start.transform([](time_t& t) { return &t; }).value_or(nullptr),
-                                       mam_query.end.transform([](time_t& t) { return &t; }).value_or(nullptr),
+                                       start_ptr,
+                                       end_ptr,
                                        set__last__text);
                 }
                 else
@@ -2982,8 +2985,8 @@ bool weechat::connection::sm_handler(xmpp_stanza_t *stanza)
         }
 
         // Set up periodic ack timer (every 30 seconds)
-        account.sm_ack_timer_hook = weechat_hook_timer(30 * 1000, 0, 0,
-                                                       &account::sm_ack_timer_cb, &account, nullptr);
+        account.sm_ack_timer_hook = (struct t_hook *)weechat_hook_timer(30 * 1000, 0, 0,
+                                   &account::sm_ack_timer_cb, &account, nullptr);
     }
     else if (element_name == "resumed")
     {
@@ -3430,13 +3433,13 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
                    .get());
         
         // Hook user activity signals to detect when user becomes active
-        account.csi_activity_hooks[0] = weechat_hook_signal("input_text_changed", &account::activity_cb, &account, nullptr);
-        account.csi_activity_hooks[1] = weechat_hook_signal("buffer_switch", &account::activity_cb, &account, nullptr);
-        account.csi_activity_hooks[2] = weechat_hook_signal("key_pressed", &account::activity_cb, &account, nullptr);
+        account.csi_activity_hooks[0] = (struct t_hook *)weechat_hook_signal("input_text_changed", &account::activity_cb, &account, nullptr);
+        account.csi_activity_hooks[1] = (struct t_hook *)weechat_hook_signal("buffer_switch", &account::activity_cb, &account, nullptr);
+        account.csi_activity_hooks[2] = (struct t_hook *)weechat_hook_signal("key_pressed", &account::activity_cb, &account, nullptr);
         
         // Set up idle timer (check every 60 seconds)
-        account.idle_timer_hook = weechat_hook_timer(60 * 1000, 0, 0,
-                                                     &account::idle_timer_cb, &account, nullptr);
+        account.idle_timer_hook = (struct t_hook *)weechat_hook_timer(60 * 1000, 0, 0,
+                                 &account::idle_timer_cb, &account, nullptr);
 
         // Enable/Resume Stream Management (XEP-0198) if available
         // Note: libstrophe's built-in SM is disabled via XMPP_CONN_FLAG_DISABLE_SM
