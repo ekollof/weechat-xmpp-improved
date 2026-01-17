@@ -22,4 +22,4 @@ coverage: tests/run
 
 .PHONY: check
 check:
-	clang-check --analyze *.c *.cc *.cpp
+	clang-check --analyze src/*.c src/*.cc src/*.cpp

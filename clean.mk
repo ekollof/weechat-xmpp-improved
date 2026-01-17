@@ -3,9 +3,7 @@
 
 .PHONY: tidy
 tidy:
-	$(FIND) . -name "*.o" -delete
-	$(FIND) . -name "*.gcno" -delete
-	$(FIND) . -name "*.gcda" -delete
+	$(RM) -rf obj
 
 .PHONY: clean
 clean: tidy

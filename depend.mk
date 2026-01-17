@@ -8,15 +8,17 @@ depend: $(DEPS) $(SRCS) $(HDRS)
 		dir="$$(dirname $$src)"; \
 		src="$$(basename $$src)"; \
 		if [[ $$src == *.cpp ]]; then \
+			objdir="$${dir/src/obj}"; \
 			echo "$(CXX) $(CPPFLAGS) -MM -MMD -MP -MF - \
-				-MT $$dir/.$${src/.cpp/.o} $$dir/$$src >> ./.depend"; \
+				-MT $$objdir/$${src/.cpp/.o} $$dir/$$src >> ./.depend"; \
 			$(CXX) $(CPPFLAGS) -MM -MMD -MP -MF - \
-				-MT $$dir/.$${src/.cpp/.o} $$dir/$$src >> ./.depend || true ; \
+				-MT $$objdir/$${src/.cpp/.o} $$dir/$$src >> ./.depend || true ; \
 		elif [[ $$src == *.c ]]; then \
+			objdir="$${dir/src/obj}"; \
 			echo "$(CC) $(CFLAGS) -MM -MMD -MP -MF - \
-				-MT $$dir/.$${src/.c/.o} $$dir/$$src >> ./.depend"; \
+				-MT $$objdir/$${src/.c/.o} $$dir/$$src >> ./.depend"; \
 			$(CC) $(CFLAGS) -MM -MMD -MP -MF - \
-				-MT $$dir/.$${src/.c/.o} $$dir/$$src >> ./.depend || true ; \
+				-MT $$objdir/$${src/.c/.o} $$dir/$$src >> ./.depend || true ; \
 		else continue; \
 		fi; \
 	done

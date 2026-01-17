@@ -9,6 +9,9 @@ cscope*
 *.gcda
 *.json.gz
 
+# Build artifacts directory
+obj/
+
 # Object files
 *.o
 *.ko

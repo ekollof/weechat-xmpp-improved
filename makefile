@@ -12,7 +12,7 @@ SHELL = bash
 RM ?= rm -f
 FIND ?= find
 
-INCLUDES=-Ilibstrophe -Ideps -I/usr/include/omemo/ \
+INCLUDES=-Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ \
 	 $(shell xml2-config --cflags) \
 	 $(shell pkg-config --cflags gpgme) \
 	 $(shell pkg-config --cflags libsignal-protocol-c)
@@ -61,63 +61,63 @@ LDLIBS=-lstrophe \
 PREFIX ?= /usr/local
 LIBDIR ?= $(PREFIX)/lib
 
-HDRS=plugin.hh \
-	 account.hh \
-	 buffer.hh \
-	 channel.hh \
-	 color.hh \
-	 command.hh \
-	 completion.hh \
-	 config.hh \
-	 connection.hh \
-	 input.hh \
-	 message.hh \
-	 omemo.hh \
-	 pgp.hh \
-	 user.hh \
-	 util.hh \
-	 config/breadcrumb.hh \
-	 config/file.hh \
-	 config/section.hh \
-	 config/account.hh \
-	 config/option.hh \
-	 data/omemo.hh \
-	 data/capability.hh \
-	 xmpp/stanza.hh \
-	 xmpp/ns.hh \
-	 xmpp/node.hh \
+HDRS=src/plugin.hh \
+	 src/account.hh \
+	 src/buffer.hh \
+	 src/channel.hh \
+	 src/color.hh \
+	 src/command.hh \
+	 src/completion.hh \
+	 src/config.hh \
+	 src/connection.hh \
+	 src/input.hh \
+	 src/message.hh \
+	 src/omemo.hh \
+	 src/pgp.hh \
+	 src/user.hh \
+	 src/util.hh \
+	 src/config/breadcrumb.hh \
+	 src/config/file.hh \
+	 src/config/section.hh \
+	 src/config/account.hh \
+	 src/config/option.hh \
+	 src/data/omemo.hh \
+	 src/data/capability.hh \
+	 src/xmpp/stanza.hh \
+	 src/xmpp/ns.hh \
+	 src/xmpp/node.hh \
 
-SRCS=plugin.cpp \
-	 account.cpp \
-	 buffer.cpp \
-	 color.cpp \
-	 channel.cpp \
-	 command.cpp \
-	 completion.cpp \
-	 config.cpp \
-	 connection.cpp \
-	 input.cpp \
-	 message.cpp \
-	 omemo.cpp \
-	 pgp.cpp \
-	 user.cpp \
-	 util.cpp \
-	 config/breadcrumb.cpp \
-	 config/file.cpp \
-	 config/section.cpp \
-	 config/account.cpp \
-	 config/option.cpp \
-	 data/omemo.cpp \
-	 data/capability.cpp \
-	 xmpp/presence.cpp \
-	 xmpp/iq.cpp \
-	 xmpp/node.cpp \
+SRCS=src/plugin.cpp \
+	 src/account.cpp \
+	 src/buffer.cpp \
+	 src/color.cpp \
+	 src/channel.cpp \
+	 src/command.cpp \
+	 src/completion.cpp \
+	 src/config.cpp \
+	 src/connection.cpp \
+	 src/input.cpp \
+	 src/message.cpp \
+	 src/omemo.cpp \
+	 src/pgp.cpp \
+	 src/user.cpp \
+	 src/util.cpp \
+	 src/config/breadcrumb.cpp \
+	 src/config/file.cpp \
+	 src/config/section.cpp \
+	 src/config/account.cpp \
+	 src/config/option.cpp \
+	 src/data/omemo.cpp \
+	 src/data/capability.cpp \
+	 src/xmpp/presence.cpp \
+	 src/xmpp/iq.cpp \
+	 src/xmpp/node.cpp \
 
 DEPS=deps/diff/libdiff.a \
 	 sexp/sexp.a \
 
-OBJS=$(patsubst %.cpp,.%.o,$(patsubst %.c,.%.o,$(patsubst config/%.cpp,config/.%.o,$(patsubst data/%.cpp,data/.%.o,$(patsubst xmpp/%.cpp,xmpp/.%.o,$(SRCS))))))
-COVS=$(patsubst %.cpp,.%.cov.o,$(patsubst config/%.cpp,config/.%.cov.o,$(patsubst data/%.cpp,data/.%.cov.o,$(patsubst xmpp/%.cpp,xmpp/.%.cov.o,$(SRCS)))))
+OBJS=$(patsubst src/%.cpp,obj/%.o,$(patsubst src/%.c,obj/%.o,$(SRCS)))
+COVS=$(patsubst src/%.cpp,obj/%.cov.o,$(SRCS))
 
 SUFFIX=$(shell date +%s)
 
@@ -155,31 +155,16 @@ sexp/lexer.o: sexp/lexer.l
 sexp/driver.o: sexp/driver.cpp
 	$(CXX) $(CPPFLAGS) -fvisibility=default -c $< -o $@
 
-.%.o: %.c
+obj/%.o: src/%.c
+	@mkdir -p $(dir $@)
 	$(CC) -DGIT_COMMIT=$(GIT_REF) $(CFLAGS) -c $< -o $@
 
-.%.o: %.cpp
+obj/%.o: src/%.cpp
+	@mkdir -p $(dir $@)
 	$(CXX) -DGIT_COMMIT=$(GIT_REF) $(CPPFLAGS) -c $< -o $@
 
-.%.cov.o: %.cpp
-	@$(CXX) --coverage $(CPPFLAGS) -c $< -o $@
-
-config/.%.o: config/%.cpp
-	$(CXX) $(CPPFLAGS) -c $< -o $@
-
-config/.%.cov.o: config/%.cpp
-	@$(CXX) --coverage $(CPPFLAGS) -c $< -o $@
-
-data/.%.o: data/%.cpp
-	$(CXX) $(CPPFLAGS) -c $< -o $@
-
-data/.%.cov.o: data/%.cpp
-	@$(CXX) --coverage $(CPPFLAGS) -c $< -o $@
-
-xmpp/.%.o: xmpp/%.cpp
-	$(CXX) $(CPPFLAGS) -c $< -o $@
-
-xmpp/.%.cov.o: xmpp/%.cpp
+obj/%.cov.o: src/%.cpp
+	@mkdir -p $(dir $@)
 	@$(CXX) --coverage $(CPPFLAGS) -c $< -o $@
 
 .PHONY: diff

@@ -1,0 +1,78 @@
+git submodule update --init --recursive deps/diff
+cd deps/diff && env -u MAKEFLAGS ./configure
+config.log: writing...
+configure.local: no (fully automatic configuration)
+arc4random: yes
+capsicum: no
+err: yes
+explicit_bzero: yes
+getprogname: no
+INFTIM: no
+md5: no
+memmem: yes
+memrchr: yes
+memset_s: no
+PATH_MAX: yes
+pledge: no
+program_invocation_short_name: yes
+reallocarray: yes
+recallocarray: no
+sandbox_init: no
+seccomp-filter: yes
+SOCK_NONBLOCK: yes
+strlcat: yes
+strlcpy: yes
+strndup: yes
+strnlen: yes
+strtonum: no
+systrace: no
+zlib: yes
+__progname: yes
+config.h: written
+Makefile.configure: written
+make -C deps/diff CFLAGS=-fPIC
+make[1]: Entering directory '/home/ekollof/devel/weechat-xmpp-fixed/deps/diff'
+cc -fPIC   -c -o diff.o diff.c
+cc -fPIC   -c -o compats.o compats.c
+ar rs libdiff.a diff.o compats.o
+ar: creating libdiff.a
+cc -fPIC   -c -o diffchars.o diffchars.c
+cc -o diffchars diff.o diffchars.o compats.o
+cc -fPIC   -c -o diffwords.o diffwords.c
+cc -o diffwords diff.o diffwords.o compats.o
+make[1]: Leaving directory '/home/ekollof/devel/weechat-xmpp-fixed/deps/diff'
+cd sexp && bison -t -d -v parser.yy
+parser.yy: warning: 7 shift/reduce conflicts [-Wconflicts-sr]
+parser.yy: note: rerun with option '-Wcounterexamples' to generate conflict counterexamples
+g++  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -fvisibility=default -c sexp/parser.tab.cc -o sexp/parser.o
+cd sexp && flex -d --outfile=lexer.yy.cc lexer.l
+g++  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -fvisibility=default -c sexp/lexer.yy.cc -o sexp/lexer.o
+ar -r sexp/sexp.a sexp/parser.o sexp/lexer.o sexp/driver.o
+ar: creating sexp/sexp.a
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/plugin.cpp -o obj/plugin.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/account.cpp -o obj/account.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/buffer.cpp -o obj/buffer.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/color.cpp -o obj/color.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/channel.cpp -o obj/channel.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/command.cpp -o obj/command.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/completion.cpp -o obj/completion.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/config.cpp -o obj/config.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/connection.cpp -o obj/connection.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/input.cpp -o obj/input.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/message.cpp -o obj/message.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/omemo.cpp -o obj/omemo.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/pgp.cpp -o obj/pgp.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/user.cpp -o obj/user.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/util.cpp -o obj/util.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/config/breadcrumb.cpp -o obj/config/breadcrumb.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/config/file.cpp -o obj/config/file.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/config/section.cpp -o obj/config/section.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/config/account.cpp -o obj/config/account.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/config/option.cpp -o obj/config/option.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/data/omemo.cpp -o obj/data/omemo.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/data/capability.cpp -o obj/data/capability.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/xmpp/presence.cpp -o obj/xmpp/presence.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/xmpp/iq.cpp -o obj/xmpp/iq.o
+g++ -DGIT_COMMIT=008031-dirty  -fno-omit-frame-pointer -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -std=c++23 -gdwarf-4 -Wall -Wextra -pedantic -Wno-missing-field-initializers -Ilibstrophe -Ideps -Isrc -I. -I/usr/include/omemo/ -I/usr/include/libxml2 -DWITH_GZFILEOP  -I/usr/include/signal -c src/xmpp/node.cpp -o obj/xmpp/node.o
+g++ -shared  -std=c++23 -gdwarf-4  -o xmpp.so -Wl,--as-needed obj/plugin.o obj/account.o obj/buffer.o obj/color.o obj/channel.o obj/command.o obj/completion.o obj/config.o obj/connection.o obj/input.o obj/message.o obj/omemo.o obj/pgp.o obj/user.o obj/util.o obj/config/breadcrumb.o obj/config/file.o obj/config/section.o obj/config/account.o obj/config/option.o obj/data/omemo.o obj/data/capability.o obj/xmpp/presence.o obj/xmpp/iq.o obj/xmpp/node.o deps/diff/libdiff.a sexp/sexp.a  -lstrophe -lpthread -lcurl -lcrypto -lxml2 -lm -pthread -lz -licuuc -licudata -lpthread -lm -lgpgme -lsignal-protocol-c -lgcrypt -llmdb -lfmt
+git ls-files | xargs ls -d | xargs tar cz | objcopy --add-section .source=/dev/stdin xmpp.so
