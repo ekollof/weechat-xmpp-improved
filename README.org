@@ -459,25 +459,30 @@
 
     *Usage:*
     #+begin_src
-    /omemo [republish]
+    /omemo [check|republish]
     #+end_src
 
     *Subcommands:*
     - (no argument) :: Enable OMEMO encryption for current channel buffer
+    - =check= :: Query server for published devicelist and bundle (use on account buffer)
     - =republish= :: Republish OMEMO devicelist and bundle (use on account buffer)
 
     *Examples:*
     #+begin_src
     /omemo              # Enable OMEMO for current PM/MUC
+    /omemo check        # Verify keys are published on server
     /omemo republish    # Force republish keys (on account buffer)
     #+end_src
 
     *Note:* OMEMO provides end-to-end encryption. Keys are automatically
     generated and managed by the plugin.
 
-    *Troubleshooting:* If contacts report they can't decrypt your messages or
-    you're not receiving encrypted replies, use =/omemo republish= on your
-    account buffer to force re-publication of your device keys to the server.
+    *Troubleshooting:* 
+    1. If contacts report they can't decrypt your messages, first verify your
+       bundle is published with =/omemo check=
+    2. If the server doesn't have your devicelist/bundle, use =/omemo republish=
+       to force re-publication
+    3. Ask contacts to restart their XMPP client to fetch your updated keys
 
 *** /pgp
     Enable PGP encryption for the current buffer
