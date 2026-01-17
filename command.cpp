@@ -3313,21 +3313,22 @@ int command__upload(const void *pointer, void *data,
         ? filename.substr(last_slash + 1) 
         : filename;
     
-    // Sanitize filename: replace problematic characters with safe alternatives
-    // Some servers reject filenames with spaces, underscores, or special chars
-    std::string sanitized_basename = basename;
-    for (char& c : sanitized_basename)
+    // Sanitize filename: only keep alphanumeric, dots, and dashes
+    // Some servers are very strict about filenames (XEP-0363 doesn't specify allowed chars)
+    std::string sanitized_basename;
+    for (char c : basename)
     {
-        if (c == ' ' || c == '_')
-            c = '-';  // Replace spaces and underscores with dashes
-        else if (c == '(' || c == ')' || c == '[' || c == ']' || 
-                 c == '{' || c == '}' || c == '&' || c == '!' ||
-                 c == '@' || c == '#' || c == '$' || c == '%' ||
-                 c == '^' || c == '*' || c == '+' || c == '=' ||
-                 c == ',' || c == ';' || c == ':' || c == '\'' ||
-                 c == '"' || c == '?' || c == '<' || c == '>' ||
-                 c == '|' || c == '\\' || c == '`' || c == '~')
-            c = '-';  // Replace special chars with dashes
+        if ((c >= 'a' && c <= 'z') || 
+            (c >= 'A' && c <= 'Z') || 
+            (c >= '0' && c <= '9') || 
+            c == '.' || c == '-')
+        {
+            sanitized_basename += c;
+        }
+        else
+        {
+            sanitized_basename += '-';  // Replace any other char with dash
+        }
     }
     
     // Remove consecutive dashes
@@ -3336,6 +3337,12 @@ int command__upload(const void *pointer, void *data,
     {
         sanitized_basename.erase(pos, 1);
     }
+    
+    // Remove leading/trailing dashes
+    while (!sanitized_basename.empty() && sanitized_basename[0] == '-')
+        sanitized_basename.erase(0, 1);
+    while (!sanitized_basename.empty() && sanitized_basename.back() == '-')
+        sanitized_basename.pop_back();
     
     weechat_printf(buffer, "%sUsing sanitized filename: %s",
                   weechat_prefix("network"), sanitized_basename.c_str());
