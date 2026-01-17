@@ -5,7 +5,7 @@ set -e
 
 # Detect OS and distro
 if [ -f /etc/os-release ]; then
-    # shellcheck source=/dev/null
+    # shellcheck disable=SC1091
     . /etc/os-release
     OS=$ID
 else
