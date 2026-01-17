@@ -2070,15 +2070,25 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
     
     if (slot && id && type && weechat_strcasecmp(type, "result") == 0)
     {
+        weechat_printf(account.buffer, "%s[DEBUG] Upload slot response received (id: %s)",
+                      weechat_prefix("network"), id);
+        
         auto req_it = account.upload_requests.find(id);
         if (req_it != account.upload_requests.end())
         {
+            weechat_printf(account.buffer, "%s[DEBUG] Found matching upload request",
+                          weechat_prefix("network"));
             // Extract PUT and GET URLs
             xmpp_stanza_t *put_elem = xmpp_stanza_get_child_by_name(slot, "put");
             xmpp_stanza_t *get_elem = xmpp_stanza_get_child_by_name(slot, "get");
             
             const char *put_url = put_elem ? xmpp_stanza_get_attribute(put_elem, "url") : NULL;
             const char *get_url = get_elem ? xmpp_stanza_get_attribute(get_elem, "url") : NULL;
+            
+            weechat_printf(account.buffer, "%s[DEBUG] PUT URL: %s",
+                          weechat_prefix("network"), put_url ? put_url : "(null)");
+            weechat_printf(account.buffer, "%s[DEBUG] GET URL: %s",
+                          weechat_prefix("network"), get_url ? get_url : "(null)");
             
             if (put_url && get_url)
             {
@@ -2198,6 +2208,64 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                                   weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
                 }
             }
+            
+            account.upload_requests.erase(req_it);
+        }
+        else
+        {
+            weechat_printf(account.buffer, "%s[DEBUG] Upload request ID not found: %s",
+                          weechat_prefix("error"), id);
+        }
+    }
+    else if (id && account.upload_requests.count(id))
+    {
+        weechat_printf(account.buffer, "%s[DEBUG] Slot response but no slot element or wrong type (type: %s)",
+                      weechat_prefix("error"), type ? type : "(null)");
+    }
+    
+    // XEP-0363: HTTP File Upload - handle upload slot errors
+    if (id && type && weechat_strcasecmp(type, "error") == 0)
+    {
+        auto req_it = account.upload_requests.find(id);
+        if (req_it != account.upload_requests.end())
+        {
+            xmpp_stanza_t *error_elem = xmpp_stanza_get_child_by_name(stanza, "error");
+            const char *error_type = error_elem ? xmpp_stanza_get_attribute(error_elem, "type") : NULL;
+            
+            // Try to get error text
+            std::string error_msg = "Upload slot request failed";
+            if (error_elem)
+            {
+                xmpp_stanza_t *text_elem = xmpp_stanza_get_child_by_name(error_elem, "text");
+                if (text_elem)
+                {
+                    char *text = xmpp_stanza_get_text(text_elem);
+                    if (text)
+                    {
+                        error_msg = fmt::format("Upload slot request failed: {}", text);
+                        xmpp_free(account.context, text);
+                    }
+                }
+                else
+                {
+                    // Try to get error condition
+                    xmpp_stanza_t *child = xmpp_stanza_get_children(error_elem);
+                    while (child)
+                    {
+                        const char *name = xmpp_stanza_get_name(child);
+                        if (name && strcmp(name, "text") != 0)
+                        {
+                            error_msg = fmt::format("Upload slot request failed: {}", name);
+                            break;
+                        }
+                        child = xmpp_stanza_get_next(child);
+                    }
+                }
+            }
+            
+            weechat_printf(account.buffer, "%s%s: %s (type: %s)",
+                          weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
+                          error_msg.c_str(), error_type ? error_type : "unknown");
             
             account.upload_requests.erase(req_it);
         }
