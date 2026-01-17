@@ -3313,6 +3313,33 @@ int command__upload(const void *pointer, void *data,
         ? filename.substr(last_slash + 1) 
         : filename;
     
+    // Sanitize filename: replace problematic characters with safe alternatives
+    // Some servers reject filenames with spaces, underscores, or special chars
+    std::string sanitized_basename = basename;
+    for (char& c : sanitized_basename)
+    {
+        if (c == ' ' || c == '_')
+            c = '-';  // Replace spaces and underscores with dashes
+        else if (c == '(' || c == ')' || c == '[' || c == ']' || 
+                 c == '{' || c == '}' || c == '&' || c == '!' ||
+                 c == '@' || c == '#' || c == '$' || c == '%' ||
+                 c == '^' || c == '*' || c == '+' || c == '=' ||
+                 c == ',' || c == ';' || c == ':' || c == '\'' ||
+                 c == '"' || c == '?' || c == '<' || c == '>' ||
+                 c == '|' || c == '\\' || c == '`' || c == '~')
+            c = '-';  // Replace special chars with dashes
+    }
+    
+    // Remove consecutive dashes
+    size_t pos = 0;
+    while ((pos = sanitized_basename.find("--", pos)) != std::string::npos)
+    {
+        sanitized_basename.erase(pos, 1);
+    }
+    
+    weechat_printf(buffer, "%sUsing sanitized filename: %s",
+                  weechat_prefix("network"), sanitized_basename.c_str());
+    
     // Store upload request
     ptr_account->upload_requests[id] = {id, filename, ptr_channel->id};
     
@@ -3327,7 +3354,7 @@ int command__upload(const void *pointer, void *data,
     xmpp_stanza_t *filename_elem = xmpp_stanza_new(ptr_account->context);
     xmpp_stanza_set_name(filename_elem, "filename");
     xmpp_stanza_t *filename_text = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_text(filename_text, basename.c_str());
+    xmpp_stanza_set_text(filename_text, sanitized_basename.c_str());
     xmpp_stanza_add_child(filename_elem, filename_text);
     xmpp_stanza_release(filename_text);
     xmpp_stanza_add_child(request, filename_elem);
