@@ -2180,6 +2180,7 @@ char *omemo::decode(weechat::account *account, const char *jid,
 
     char **format = weechat_string_dyn_alloc(256);
     weechat_string_dyn_concat(format, "omemo msg %s:\n%s..IV: %s", -1);
+    int keys_found = 0, keys_for_this_device = 0;
     for (xmpp_stanza_t *key = xmpp_stanza_get_children(header);
          key; key = xmpp_stanza_get_next(key))
     {
@@ -2187,12 +2188,17 @@ char *omemo::decode(weechat::account *account, const char *jid,
         if (weechat_strcasecmp(name, "key") != 0)
             continue;
 
+        keys_found++;
         const char *key_prekey = xmpp_stanza_get_attribute(key, "prekey");
         const char *key_id = xmpp_stanza_get_attribute(key, "rid");
         if (!key_id)
             continue;
-        if (strtol(key_id, NULL, 10) != omemo->device_id)
+        if (strtol(key_id, NULL, 10) != omemo->device_id) {
+            weechat_printf(NULL, "%somemo decode: skipping key for device %s (our device: %u)",
+                           weechat_prefix("network"), key_id, omemo->device_id);
             continue;
+        }
+        keys_for_this_device++;
         xmpp_stanza_t *key_text = xmpp_stanza_get_children(key);
         const char *data = key_text ? xmpp_stanza_get_text(key_text) : NULL;
         if (!data)
@@ -2279,6 +2285,9 @@ char *omemo::decode(weechat::account *account, const char *jid,
             weechat_string_dyn_concat(format, ")", -1);
         }
     }
+    
+    weechat_printf(NULL, "%somemo decode: found %d keys total, %d for our device %u",
+                   weechat_prefix("network"), keys_found, keys_for_this_device, omemo->device_id);
 
     xmpp_stanza_t *payload = xmpp_stanza_get_child_by_name(encrypted, "payload");
     if (payload && (payload = xmpp_stanza_get_children(payload)))
@@ -2289,18 +2298,34 @@ char *omemo::decode(weechat::account *account, const char *jid,
         weechat_string_dyn_concat(format, "\n%2$s..PL: ", -1);
         weechat_string_dyn_concat(format, payload_text, -1);
     }
-  //weechat_printf(NULL, *format, jid, weechat_color("red"), iv__text);
-    weechat_string_dyn_free(format, 1);
-
-    if (!(payload_data && iv_data && key_data)) return NULL;
-    if (iv_len != AES_IV_SIZE || key_len != AES_KEY_SIZE) return NULL;
+    weechat_printf(NULL, "%somemo decode: iv_len=%zu key_len=%zu payload_len=%zu device_id=%u",
+                   weechat_prefix("network"), iv_len, key_len, payload_len, omemo->device_id);
+    
+    if (!(payload_data && iv_data && key_data)) {
+        weechat_printf(NULL, "%somemo decode failed: missing data (payload=%p iv=%p key=%p)",
+                       weechat_prefix("error"), payload_data, iv_data, key_data);
+        weechat_string_dyn_free(format, 1);
+        return NULL;
+    }
+    if (iv_len != AES_IV_SIZE || key_len != AES_KEY_SIZE) {
+        weechat_printf(NULL, "%somemo decode failed: wrong size (iv_len=%zu expected=%d, key_len=%zu expected=%d)",
+                       weechat_prefix("error"), iv_len, AES_IV_SIZE, key_len, AES_KEY_SIZE);
+        weechat_string_dyn_free(format, 1);
+        return NULL;
+    }
     char *plaintext = NULL; size_t plaintext_len = 0;
     if (aes_decrypt(payload_data, payload_len, key_data, iv_data, tag_data, tag_len,
                     (uint8_t**)&plaintext, &plaintext_len))
     {
+        weechat_printf(NULL, "%somemo decode: success (plaintext_len=%zu)",
+                       weechat_prefix("network"), plaintext_len);
         plaintext[plaintext_len] = '\0';
+        weechat_string_dyn_free(format, 1);
         return plaintext;
     }
+    weechat_printf(NULL, "%somemo decode failed: aes_decrypt failed (auth tag check or decrypt error)",
+                   weechat_prefix("error"));
+    weechat_string_dyn_free(format, 1);
     return NULL;
 }
 
