@@ -4,9 +4,9 @@
 
 // Suppress IntelliSense false positives for WeeChat opaque types
 // The compiler (GCC) correctly resolves these, but IntelliSense may not
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunknown-pragmas"
-#pragma clang diagnostic ignored "-Wincompatible-pointer-types-discards-qualifiers"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wincompatible-pointer-types"
+#pragma clang diagnostic ignored "-Wunqualified-std-cast-removal"
 
 #include <algorithm>
 #include <cstdlib>
@@ -189,5 +189,5 @@ weechat::plugin::~plugin()
     // This destructor should be empty anyway
 }
 
-#pragma GCC diagnostic pop
+#pragma clang diagnostic pop
 
