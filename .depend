@@ -699,7 +699,7 @@ obj/user.o: src/user.cpp src/plugin.hh src/strophe.hh src/account.hh \
  /usr/include/signal/curve.h src/config.hh src/config/file.hh \
  src/config/breadcrumb.hh src/config/section.hh src/config/account.hh \
  src/config/option.hh src/channel.hh src/connection.hh src/xmpp/ns.hh \
- src/user.hh src/color.hh
+ src/user.hh src/color.hh src/avatar.hh
 src/plugin.hh:
 src/strophe.hh:
 src/account.hh:
@@ -730,6 +730,7 @@ src/connection.hh:
 src/xmpp/ns.hh:
 src/user.hh:
 src/color.hh:
+src/avatar.hh:
 obj/util.o: src/util.cpp src/plugin.hh src/strophe.hh src/util.hh
 src/plugin.hh:
 src/strophe.hh:

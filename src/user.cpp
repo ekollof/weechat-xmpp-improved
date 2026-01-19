@@ -14,6 +14,7 @@
 #include "user.hh"
 #include "channel.hh"
 #include "color.hh"
+#include "avatar.hh"
 
 std::string weechat::user::get_colour()
 {
@@ -49,7 +50,15 @@ std::string weechat::user::get_colour_for_nicklist(const char *name)
 
 std::string weechat::user::as_prefix_raw()
 {
-    return weechat::user::as_prefix_raw(this->profile.display_name);
+    std::string avatar_prefix = "";
+    
+    // Add avatar if available and rendered
+    if (!this->profile.avatar_rendered.empty())
+    {
+        avatar_prefix = this->profile.avatar_rendered + " ";
+    }
+    
+    return avatar_prefix + weechat::user::as_prefix_raw(this->profile.display_name);
 }
 
 std::string weechat::user::as_prefix_raw(const char *name)
@@ -65,7 +74,15 @@ std::string weechat::user::as_prefix_raw(const char *name)
 
 std::string weechat::user::as_prefix()
 {
-    return weechat::user::as_prefix(this->profile.display_name);
+    std::string avatar_prefix = "";
+    
+    // Add avatar if available and rendered
+    if (!this->profile.avatar_rendered.empty())
+    {
+        avatar_prefix = this->profile.avatar_rendered + " ";
+    }
+    
+    return avatar_prefix + weechat::user::as_prefix(this->profile.display_name);
 }
 
 std::string weechat::user::as_prefix(const char *name)
@@ -190,6 +207,9 @@ weechat::user::user(weechat::account *account, weechat::channel *channel,
 
     this->profile.display_name = display_name ?
         strdup(display_name) : strdup("");
+
+    // Try to load cached avatar if available
+    weechat::avatar::load_for_user(*account, *this);
 
     // Add to nicklist:
     // - For MUC users: add to channel nicklist

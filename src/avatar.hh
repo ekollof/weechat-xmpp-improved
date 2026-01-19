@@ -56,5 +56,8 @@ namespace weechat
         // Request avatar from remote JID
         static void request_metadata(account& acc, const char *jid);
         static void request_data(account& acc, const char *jid, const std::string& hash);
+        
+        // Load avatar for user from cache (called on user creation/presence)
+        static void load_for_user(account& acc, class user& user);
     };
 }

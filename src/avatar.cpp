@@ -113,35 +113,60 @@ std::string weechat::avatar::render_unicode_blocks(
     int target_width,
     int target_height)
 {
-    // Simple Unicode block rendering without image library
-    // For now, just return a placeholder - full image decoding would need
-    // libpng/libjpeg which aren't dependencies yet
+    (void)mime_type;  // Unused for now - would need image decoder
     
-    // Unicode block characters for different intensities
-    const char* blocks[] = {
-        " ",   // 0% (empty)
-        "░",   // 25%
-        "▒",   // 50%
-        "▓",   // 75%
-        "█"    // 100% (full)
-    };
+    // Without image decoding library, create a simple deterministic avatar
+    // based on the hash of the image data
     
-    // For this initial implementation, create a simple colored square
-    // In a full implementation, we'd decode the image and downsample
+    if (image_data.empty())
+        return "";
     
-    std::string result;
-    for (int y = 0; y < target_height; y++) {
-        for (int x = 0; x < target_width; x++) {
-            // Use hash of image data to deterministically pick a block
-            int idx = (image_data.size() > 0) ? 
-                      ((image_data[0] + x + y) % 5) : 0;
-            result += blocks[idx];
-        }
-        if (y < target_height - 1)
-            result += "\n";
+    // Calculate a hash value from the image data
+    uint32_t hash = 0;
+    for (size_t i = 0; i < std::min(image_data.size(), size_t(64)); i++)
+    {
+        hash = ((hash << 5) + hash) + image_data[i];
     }
     
-    return result;
+    // Unicode geometric shapes and symbols for avatars
+    const char* avatar_chars[] = {
+        "●", // Circle
+        "■", // Square
+        "▲", // Triangle
+        "◆", // Diamond
+        "★", // Star
+        "♦", // Diamond (card)
+        "◉", // Large circle
+        "◈", // Pattern
+        "⬢", // Hexagon
+        "⬟", // Pentagon
+    };
+    
+    // WeeChat color codes (16-255 for extended colors)
+    // Use bright, distinguishable colors
+    const int colors[] = {
+        196, // Red
+        202, // Orange  
+        226, // Yellow
+        046, // Green
+        051, // Cyan
+        021, // Blue
+        93,  // Purple
+        201, // Magenta
+        208, // Orange-red
+        118, // Light green
+    };
+    
+    // Pick character and color based on hash
+    int char_idx = hash % (sizeof(avatar_chars) / sizeof(avatar_chars[0]));
+    int color_idx = (hash >> 8) % (sizeof(colors) / sizeof(colors[0]));
+    
+    // Format: <color><char><reset>
+    char result[128];
+    snprintf(result, sizeof(result), "\x19%03d%s", 
+             colors[color_idx], avatar_chars[char_idx]);
+    
+    return std::string(result);
 }
 
 void weechat::avatar::request_metadata(account& acc, const char *jid)
@@ -163,4 +188,30 @@ void weechat::avatar::request_data(account& acc, const char *jid,
     acc.connection.send(iq);
     xmpp_stanza_release(iq);
     xmpp_free(acc.context, id.release());
+}
+
+void weechat::avatar::load_for_user(account& acc, user& user)
+{
+    // If user has an avatar hash, try to load it from cache
+    if (!user.profile.avatar_hash)
+        return;
+    
+    std::string hash(user.profile.avatar_hash);
+    auto cached = load_from_cache(acc, hash);
+    
+    if (cached)
+    {
+        // Load successful - update user profile
+        user.profile.avatar_data = cached->image_data;
+        user.profile.avatar_rendered = render_unicode_blocks(
+            cached->image_data, 
+            cached->meta.type
+        );
+        
+        weechat_printf_date_tags(acc.buffer, 0, "xmpp_avatar",
+                                "%sLoaded cached avatar for %s (hash: %.8s...)",
+                                weechat_prefix("network"),
+                                user.id,
+                                hash.c_str());
+    }
 }
