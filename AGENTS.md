@@ -1,0 +1,17 @@
+# Agent Instructions
+
+All coding agents working in this repository **must** read and follow the rules in:
+
+- [`.github/copilot-instructions.md`](.github/copilot-instructions.md)
+
+That file is the authoritative source for:
+
+- Build and test commands
+- Code style (C++23, clang-format, naming conventions)
+- Memory management rules (RAII mandatory, `malloc`/`free`/`new`/`delete` forbidden)
+- XMPP/Strophe patterns
+- LMDB usage
+- Architecture overview
+- Git commit conventions
+
+Before making any changes, read `.github/copilot-instructions.md` in full.
