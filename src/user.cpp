@@ -129,16 +129,25 @@ void weechat::user::nicklist_add(weechat::account *account,
     const char *name = channel ? this->profile.display_name.c_str() : this->id.c_str();
     
     // For roster contacts (account buffer), strip resource from JID
+    std::string bare_buf, resource_buf;
     if (!channel)
     {
-        const char *bare = xmpp_jid_bare(account->context, this->id.c_str());
-        if (bare)
-            name = bare;
+        xmpp_string_guard bare_g(account->context,
+            xmpp_jid_bare(account->context, this->id.c_str()));
+        if (bare_g) { bare_buf = bare_g.str(); name = bare_buf.c_str(); }
     }
-    
-    if (channel && weechat_strcasecmp(xmpp_jid_bare(account->context, name),
-                                      channel->id.data()) == 0)
-        name = xmpp_jid_resource(account->context, name);
+
+    {
+        xmpp_string_guard jid_bare_g(account->context,
+            channel ? xmpp_jid_bare(account->context, name) : nullptr);
+        if (channel && jid_bare_g &&
+            weechat_strcasecmp(jid_bare_g.c_str(), channel->id.data()) == 0)
+        {
+            xmpp_string_guard resource_g(account->context,
+                xmpp_jid_resource(account->context, name));
+            if (resource_g) { resource_buf = resource_g.str(); name = resource_buf.c_str(); }
+        }
+    }
 
     ptr_buffer = channel ? channel->buffer : account->buffer;
 
@@ -174,9 +183,18 @@ void weechat::user::nicklist_remove(weechat::account *account,
     struct t_gui_nick *ptr_nick;
     struct t_gui_buffer *ptr_buffer;
     const char *name = this->profile.display_name.c_str();
-    if (channel && weechat_strcasecmp(xmpp_jid_bare(account->context, name),
-                                      channel->id.data()) == 0)
-        name = xmpp_jid_resource(account->context, name);
+    std::string resource_buf;
+    {
+        xmpp_string_guard bare_g(account->context,
+            channel ? xmpp_jid_bare(account->context, name) : nullptr);
+        if (channel && bare_g &&
+            weechat_strcasecmp(bare_g.c_str(), channel->id.data()) == 0)
+        {
+            xmpp_string_guard resource_g(account->context,
+                xmpp_jid_resource(account->context, name));
+            if (resource_g) { resource_buf = resource_g.str(); name = resource_buf.c_str(); }
+        }
+    }
 
     ptr_buffer = channel ? channel->buffer : account->buffer;
 
