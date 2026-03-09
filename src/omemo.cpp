@@ -2168,7 +2168,7 @@ void omemo::init(struct t_gui_buffer *buffer, const char *account_name)
 
     omemo->store_context.set_sender_key_store(&sender_key_store);
 
-    struct signal_buffer *public_data, *private_data;
+    struct signal_buffer *public_data = nullptr, *private_data = nullptr;
     iks_get_local_registration_id(omemo, &omemo->device_id);
     if (!iks_get_identity_key_pair(&public_data, &private_data, omemo))
     {
@@ -2177,6 +2177,8 @@ void omemo::init(struct t_gui_buffer *buffer, const char *account_name)
         libsignal::private_key private_key(signal_buffer_data(private_data),
                 signal_buffer_len(private_data), omemo->context);
         omemo->identity.create(public_key, private_key);
+        signal_buffer_free(public_data);
+        signal_buffer_free(private_data);
     }
     weechat_printf(buffer, "%somemo: device = %d",
                    weechat_prefix("info"), omemo->device_id);
