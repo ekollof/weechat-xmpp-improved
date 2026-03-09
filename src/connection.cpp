@@ -897,10 +897,9 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
     xmpp_stanza_t *x, *body, *delay, *topic, *replace, *request, *markable, *composing, *sent, *received, *result, *forwarded, *event, *items, *item, *list, *device, *encrypted;
     const char *type, *from, *nick, *from_bare, *to, *to_bare, *id, *thread, *replace_id, *timestamp;
     const char *text = nullptr;
-    struct xmpp_guard { xmpp_ctx_t *ctx; char *ptr; ~xmpp_guard() { if (ptr) xmpp_free(ctx, ptr); } };
-    struct free_guard { char *ptr; ~free_guard() { if (ptr) ::free(ptr); } };
-    xmpp_guard intext_g { account.context, nullptr };
+    xmpp_string_guard intext_g { account.context, nullptr };
     char *&intext = intext_g.ptr;
+    struct free_guard { char *ptr; ~free_guard() { if (ptr) ::free(ptr); } };
     free_guard cleartext_g { nullptr };
     char *&cleartext = cleartext_g.ptr;
     free_guard difftext_g { nullptr };
@@ -922,8 +921,10 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
             from = xmpp_stanza_get_from(stanza);
             if (from == NULL)
                 return 1;
-            from_bare = xmpp_jid_bare(account.context, from);
-            from = xmpp_jid_resource(account.context, from);
+            xmpp_string_guard from_bare_g { account.context, xmpp_jid_bare(account.context, from) };
+            xmpp_string_guard from_resource_g { account.context, xmpp_jid_resource(account.context, from) };
+            from_bare = from_bare_g.ptr;
+            from = from_resource_g.ptr;
             channel = account.channels.contains(from_bare)
                 ? &account.channels.find(from_bare)->second : nullptr;
             if (!channel)
@@ -964,8 +965,10 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
             from = xmpp_stanza_get_from(stanza);
             if (from == NULL)
                 return 1;
-            from_bare = xmpp_jid_bare(account.context, from);
-            nick = xmpp_jid_resource(account.context, from);
+            xmpp_string_guard cs_from_bare_g { account.context, xmpp_jid_bare(account.context, from) };
+            xmpp_string_guard cs_nick_g { account.context, xmpp_jid_resource(account.context, from) };
+            from_bare = cs_from_bare_g.ptr;
+            nick = cs_nick_g.ptr;
             channel = account.channels.contains(from_bare)
                 ? &account.channels.find(from_bare)->second : nullptr;
             if (!channel)
@@ -1674,10 +1677,12 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
     if (from == NULL)
         return 1;
     from_bare = xmpp_jid_bare(account.context, from);
+    xmpp_string_guard from_bare_main_g { account.context, const_cast<char*>(from_bare) };
     to = xmpp_stanza_get_to(stanza);
     if (to == NULL)
         to = account.jid().data();
     to_bare = to ? xmpp_jid_bare(account.context, to) : NULL;
+    xmpp_string_guard to_bare_main_g { account.context, const_cast<char*>(to_bare) };
     id = xmpp_stanza_get_id(stanza);
     thread = xmpp_stanza_get_attribute(stanza, "thread");
     
@@ -1788,7 +1793,9 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
         if (room_jid)
         {
             from = xmpp_stanza_get_from(stanza);
-            from_bare = from ? xmpp_jid_bare(account.context, from) : "unknown";
+            xmpp_string_guard invite_from_bare_g { account.context,
+                from ? xmpp_jid_bare(account.context, from) : nullptr };
+            from_bare = invite_from_bare_g.ptr ? invite_from_bare_g.ptr : "unknown";
             
             weechat_printf(account.buffer,
                           _("%s%s invited you to %s%s%s"),
@@ -2156,10 +2163,6 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
                                 
                                 if (moderate_reason)
                                     xmpp_free(account.context, (void*)moderate_reason);
-                                xmpp_free(account.context, (void*)from_bare);
-                                if (to_bare) xmpp_free(account.context, (void*)to_bare);
-                                if (cleartext) free(cleartext);
-                                if (intext) xmpp_free(account.context, intext);
                                 return 1;
                             }
                         }
@@ -2184,8 +2187,6 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
             
             if (moderate_reason)
                 xmpp_free(account.context, (void*)moderate_reason);
-                                 xmpp_free(account.context, (void*)from_bare);
-                                 if (to_bare) xmpp_free(account.context, (void*)to_bare);
                                  return 1;
         }
     }
@@ -2249,8 +2250,6 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
                                 weechat_prefix("network"),
                                 from_bare);
                             
-                            xmpp_free(account.context, (void*)from_bare);
-                            if (to_bare) xmpp_free(account.context, (void*)to_bare);
                             return 1;
                         }
                     }
@@ -2267,10 +2266,9 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
             weechat_prefix("network"),
             from_bare);
         
-        xmpp_free(account.context, (void*)from_bare);
-        if (to_bare) xmpp_free(account.context, (void*)to_bare);
         return 1;
     }
+
 
     // XEP-0444: Message Reactions
     xmpp_stanza_t *reactions = xmpp_stanza_get_child_by_name_and_ns(stanza, "reactions",
@@ -2349,8 +2347,6 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
                                 weechat_hashtable_free(hashtable);
                                 
                                 weechat_string_dyn_free(dyn_emojis, 1);
-                                xmpp_free(account.context, (void*)from_bare);
-                                if (to_bare) xmpp_free(account.context, (void*)to_bare);
                                 return 1;
                             }
                         }
@@ -2363,8 +2359,6 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
         }
         
         weechat_string_dyn_free(dyn_emojis, 1);
-        xmpp_free(account.context, (void*)from_bare);
-        if (to_bare) xmpp_free(account.context, (void*)to_bare);
         return 1;
     }
 
@@ -2372,15 +2366,18 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
     const char *display_from = from_bare;
     if (weechat_strcasecmp(type, "groupchat") == 0)
     {
-        nick = channel->name == xmpp_jid_bare(account.context, from)
-            ? xmpp_jid_resource(account.context, from)
+        xmpp_string_guard gc_bare_g { account.context, xmpp_jid_bare(account.context, from) };
+        xmpp_string_guard gc_resource_g { account.context, xmpp_jid_resource(account.context, from) };
+        nick = channel->name == gc_bare_g.ptr
+            ? gc_resource_g.ptr
             : from;
         display_from = from;
     }
     else if (parent_channel && parent_channel->type == weechat::channel::chat_type::MUC)
     {
+        xmpp_string_guard muc_resource_g { account.context, xmpp_jid_resource(account.context, from) };
         nick = channel->name == from
-            ? xmpp_jid_resource(account.context, from)
+            ? muc_resource_g.ptr
             : from;
         display_from = from;
     }
@@ -3451,10 +3448,12 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
         if (moved_elem)
         {
             const char *new_jid = xmpp_stanza_get_attribute(moved_elem, "new-jid");
+            xmpp_string_guard new_jid_text_g { account.context, nullptr };
             if (!new_jid)
             {
                 // Some implementations put the new JID as text content
-                new_jid = xmpp_stanza_get_text(moved_elem);
+                new_jid_text_g.ptr = xmpp_stanza_get_text(moved_elem);
+                new_jid = new_jid_text_g.ptr;
             }
             const char *old_jid_full = binding.from ? binding.from->full.data() : "unknown";
             char *old_jid_bare = binding.from
@@ -4809,7 +4808,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                 }
 
                 if (nick)
-                    free(intext);
+                    xmpp_free(account.context, intext);
             }
         }
     }
@@ -4994,7 +4993,8 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
     if (fin)
     {
         xmpp_stanza_t *set, *set__last;
-        char *set__last__text;
+        xmpp_string_guard set__last__text_g { account.context, nullptr };
+        char *&set__last__text = set__last__text_g.ptr;
         weechat::account::mam_query mam_query;
 
         set = xmpp_stanza_get_child_by_name_and_ns(
@@ -5801,10 +5801,15 @@ int weechat::connection::connect(std::string jid, std::string password, weechat:
         account.resource(ident);
         resource = account.resource().data();
     }
-    m_conn.set_jid(xmpp_jid_new(account.context,
-                                xmpp_jid_node(account.context, jid.data()),
-                                xmpp_jid_domain(account.context, jid.data()),
-                                resource));
+    {
+        char *jid_node = xmpp_jid_node(account.context, jid.data());
+        char *jid_domain = xmpp_jid_domain(account.context, jid.data());
+        char *full_jid = xmpp_jid_new(account.context, jid_node, jid_domain, resource);
+        m_conn.set_jid(full_jid);
+        xmpp_free(account.context, full_jid);
+        xmpp_free(account.context, jid_domain);
+        xmpp_free(account.context, jid_node);
+    }
     m_conn.set_pass(weechat_string_eval_expression(password.data(),
                     NULL, NULL, NULL));
 
