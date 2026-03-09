@@ -5537,9 +5537,9 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
 
         if (account.omemo)
         {
+            std::string jid_str(account.jid());
             children[0] =
-            account.omemo.get_bundle(account.context,
-                                      strdup(account.jid().data()), NULL);
+            account.omemo.get_bundle(account.context, jid_str.data(), NULL);
             this->send(children[0]);
             xmpp_stanza_release(children[0]);
         }

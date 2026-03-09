@@ -4210,8 +4210,8 @@ int command__kick(const void *pointer, void *data,
     const char *reason = argc > 2 ? argv_eol[2] : NULL;
 
     /* IQ set to room: <query xmlns='…muc#admin'><item nick='NICK' role='none'/></query> */
-    xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "set",
-                                     xmpp_uuid_gen(ptr_account->context));
+    xmpp_string_guard kick_id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "set", kick_id_g.c_str());
     xmpp_stanza_set_to(iq, ptr_channel->id.data());
 
     xmpp_stanza_t *query = xmpp_stanza_new(ptr_account->context);
@@ -4295,8 +4295,8 @@ int command__ban(const void *pointer, void *data,
     const char *reason = argc > 2 ? argv_eol[2] : NULL;
 
     /* IQ set to room: <query xmlns='…muc#admin'><item jid='JID' affiliation='outcast'/></query> */
-    xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "set",
-                                     xmpp_uuid_gen(ptr_account->context));
+    xmpp_string_guard ban_id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "set", ban_id_g.c_str());
     xmpp_stanza_set_to(iq, ptr_channel->id.data());
 
     xmpp_stanza_t *query = xmpp_stanza_new(ptr_account->context);

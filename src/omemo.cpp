@@ -60,6 +60,11 @@ namespace weechat_compat {
 using namespace weechat::xmpp;
 using t_omemo = omemo;
 
+// RAII owner for weechat_string_dyn_alloc / weechat_string_dyn_free buffers.
+// Owns a char** handle; frees it (and the inner string) on destruction.
+struct dyn_string_deleter { void operator()(char **p) const { weechat_string_dyn_free(p, 1); } };
+using dyn_string_ptr = std::unique_ptr<char*, dyn_string_deleter>;
+
 #define mdb_val_str(s) { \
     .mv_size = strlen(s), .mv_data = (char*)s \
 }
@@ -2155,7 +2160,8 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
     iv_data_buf.reset(iv_data);
     if (iv_len != AES_IV_SIZE) return NULL;
 
-    char **format = weechat_string_dyn_alloc(256);
+    dyn_string_ptr format_g(weechat_string_dyn_alloc(256));
+    char **format = format_g.get();
     weechat_string_dyn_concat(format, "omemo msg %s:\n%s..IV: %s", -1);
     int keys_found = 0, keys_for_this_device = 0;
     bool decrypted_ok = false;
@@ -2206,7 +2212,6 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
                 key_data, key_len, omemo->context))) {
                 weechat_printf(buffer, "%somemo: failed to deserialize pre-key message from %s device %s (ret=%d)",
                                weechat_prefix("error"), jid, source_id, ret);
-                weechat_string_dyn_free(format, 1);
                 return NULL;
             }
             ec_public_key *identity_key = pre_key_signal_message_get_identity_key(pre_key_message);
@@ -2220,7 +2225,6 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
                 weechat_printf(buffer, "%somemo: failed to serialize identity key from %s device %s (ret=%d)",
                                weechat_prefix("error"), jid, source_id, ret);
                 SIGNAL_UNREF(pre_key_message);
-                weechat_string_dyn_free(format, 1);
                 return NULL;
             }
             if ((ret = iks_save_identity(&address, signal_buffer_data(identity_buf),
@@ -2229,7 +2233,6 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
                                weechat_prefix("error"), jid, source_id, ret);
                 signal_buffer_free(identity_buf);
                 SIGNAL_UNREF(pre_key_message);
-                weechat_string_dyn_free(format, 1);
                 return NULL;
             }
             signal_buffer_free(identity_buf);
@@ -2240,7 +2243,6 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
                 weechat_printf(buffer, "%somemo: failed to create cipher for %s device %s (ret=%d)",
                                weechat_prefix("error"), jid, source_id, ret);
                 SIGNAL_UNREF(pre_key_message);
-                weechat_string_dyn_free(format, 1);
                 return NULL;
             }
             if ((ret = session_cipher_decrypt_pre_key_signal_message(cipher,
@@ -2250,7 +2252,6 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
                                weechat_prefix("error"), jid, source_id, ret);
                 session_cipher_free(cipher);
                 SIGNAL_UNREF(pre_key_message);
-                weechat_string_dyn_free(format, 1);
                 return NULL;
             }
             session_cipher_free(cipher);
@@ -2262,7 +2263,6 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
                 key_data, key_len, omemo->context))) {
                 weechat_printf(buffer, "%somemo: failed to deserialize message from %s device %s (ret=%d)",
                                weechat_prefix("error"), jid, source_id, ret);
-                weechat_string_dyn_free(format, 1);
                 return NULL;
             }
             struct session_cipher *cipher;
@@ -2271,7 +2271,6 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
                 weechat_printf(buffer, "%somemo: failed to create cipher for %s device %s (ret=%d)",
                                weechat_prefix("error"), jid, source_id, ret);
                 SIGNAL_UNREF(key_message);
-                weechat_string_dyn_free(format, 1);
                 return NULL;
             }
             if ((ret = session_cipher_decrypt_signal_message(cipher, key_message,
@@ -2280,7 +2279,6 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
                                weechat_prefix("error"), jid, source_id, ret);
                 session_cipher_free(cipher);
                 SIGNAL_UNREF(key_message);
-                weechat_string_dyn_free(format, 1);
                 return NULL;
             }
             session_cipher_free(cipher);
@@ -2329,7 +2327,6 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
         if (keys_for_this_device == 0)
             weechat_printf(buffer, "%somemo: message from %s not encrypted for our device %u (%d keys total)",
                            weechat_prefix("error"), jid, omemo->device_id, keys_found);
-        weechat_string_dyn_free(format, 1);
         return NULL;
     }
 
@@ -2339,7 +2336,6 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
         xmpp_string_guard payload_text_g(xmpp_stanza_get_context(payload), xmpp_stanza_get_text(payload));
         const char *payload_text = payload_text_g.c_str();
         if (!payload_text) {
-            weechat_string_dyn_free(format, 1);
             return NULL;
         }
         payload_len = base64_decode(payload_text, strlen(payload_text), &payload_data);
@@ -2354,13 +2350,11 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
                        payload_data ? "" : "payload ",
                        iv_data ? "" : "iv ",
                        key_data ? "" : "key");
-        weechat_string_dyn_free(format, 1);
         return NULL;
     }
     if (iv_len != AES_IV_SIZE || key_len != AES_KEY_SIZE) {
         weechat_printf(buffer, "%somemo: bad key/iv size from %s (iv=%zu want %d, key=%zu want %d)",
                        weechat_prefix("error"), jid, iv_len, AES_IV_SIZE, key_len, AES_KEY_SIZE);
-        weechat_string_dyn_free(format, 1);
         return NULL;
     }
     char *plaintext = NULL; size_t plaintext_len = 0;
@@ -2380,9 +2374,8 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
 
             if (needs_repub)
             {
-                char *from_dup = strdup(account->jid().data());
-                xmpp_stanza_t *bundle_stanza = omemo->get_bundle(account->context, from_dup, NULL);
-                free(from_dup);
+                std::string from_str(account->jid());
+                xmpp_stanza_t *bundle_stanza = omemo->get_bundle(account->context, from_str.data(), NULL);
                 if (bundle_stanza)
                 {
                     account->connection.send(bundle_stanza);
@@ -2397,12 +2390,10 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
             }
         }
 
-        weechat_string_dyn_free(format, 1);
         return plaintext;
     }
     weechat_printf(buffer, "%somemo: AES-GCM decryption failed for message from %s (auth tag mismatch?)",
                    weechat_prefix("error"), jid);
-    weechat_string_dyn_free(format, 1);
     return NULL;
 }
 
