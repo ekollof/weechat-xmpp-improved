@@ -260,7 +260,42 @@ void weechat::account::disconnect(int reconnect)
     // Safety check: if plugin is destroyed, don't call weechat functions
     if (!weechat::plugin::instance || !weechat::plugin::instance->ptr())
         return;
-        
+
+    // Clean up any in-flight XEP-0363 upload threads BEFORE unhooking fd hooks.
+    // std::thread::~thread() calls std::terminate() if the thread is still joinable,
+    // so we must join every pending thread here. We close the write-end of the pipe
+    // first so curl_easy_perform will encounter a broken connection sooner, then
+    // we drain the read-end and join. The thread always writes one byte before
+    // exiting, so join() will return quickly once the upload finishes or errors.
+    if (!pending_uploads.empty())
+    {
+        for (auto& [read_fd, ctx] : pending_uploads)
+        {
+            // Close the write end to cause curl's transfer to fail/abort sooner
+            if (ctx->pipe_write_fd >= 0)
+            {
+                close(ctx->pipe_write_fd);
+                ctx->pipe_write_fd = -1;
+            }
+
+            // Join the worker thread (it will exit after its current curl call)
+            if (ctx->worker.joinable())
+                ctx->worker.join();
+
+            // Unhook the fd watcher and close the read end
+            if (ctx->hook)
+            {
+                weechat_unhook(ctx->hook);
+                ctx->hook = nullptr;
+            }
+            // Drain the pipe so we don't leave stale data
+            char sig[1];
+            (void)::read(read_fd, sig, sizeof(sig));
+            close(read_fd);
+        }
+        pending_uploads.clear();
+    }
+
     // Clean up Client State Indication hooks
     if (idle_timer_hook)
     {
