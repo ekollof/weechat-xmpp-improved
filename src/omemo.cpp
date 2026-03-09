@@ -152,6 +152,10 @@ int aes_encrypt(const uint8_t *plaintext, size_t plaintext_len,
     return 1;
 cleanup:
     gcry_cipher_close(cipher);
+    if (*tag)        { free(*tag);        *tag = nullptr; }
+    if (*iv)         { gcry_free(*iv);    *iv = nullptr; }
+    if (*key)        { gcry_free(*key);   *key = nullptr; }
+    if (*ciphertext) { free(*ciphertext); *ciphertext = nullptr; }
     return 0;
 }
 
@@ -2134,6 +2138,7 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
                      xmpp_stanza_t *encrypted)
 {
     auto omemo = &account->omemo;
+    heap_buf iv_data_buf{nullptr, free};
     uint8_t *key_data = NULL, *tag_data = NULL, *iv_data = NULL, *payload_data = NULL;
     size_t key_len = 0, tag_len = 0, iv_len = 0, payload_len = 0;
 
@@ -2147,6 +2152,7 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
     const char *iv__text = iv__text_g.c_str();
     if (!iv__text) return NULL;
     iv_len = base64_decode(iv__text, strlen(iv__text), &iv_data);
+    iv_data_buf.reset(iv_data);
     if (iv_len != AES_IV_SIZE) return NULL;
 
     char **format = weechat_string_dyn_alloc(256);
@@ -2174,6 +2180,7 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
         const char *data = data_g.c_str();
         if (!data)
             continue;
+        free(key_data); key_data = NULL;
         key_len = base64_decode(data, strlen(data), &key_data);
 
         weechat_string_dyn_concat(format, "\n%2$s..K ", -1);
@@ -2282,6 +2289,7 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
         decrypted_ok = true;
 
         if (!aes_key) return NULL;
+        free(key_data); key_data = NULL;  // Release calloc'd buffer; aes_key owns the data now
         key_data = signal_buffer_data(aes_key);
         key_len = signal_buffer_len(aes_key);
         if (key_len >= AES_KEY_SIZE) {
@@ -2303,6 +2311,7 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
             snprintf(aes_key64, strlen(aes_key64), "%lu", key_len);
             weechat_string_dyn_concat(format, aes_key64, -1);
             weechat_string_dyn_concat(format, ")", -1);
+            free(aes_key64); aes_key64 = NULL;
         }
         if (tag_len && base64_encode(tag_data, tag_len, &aes_key64) && aes_key64)
         {
@@ -2312,6 +2321,7 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
             snprintf(aes_key64, strlen(aes_key64), "%lu", tag_len);
             weechat_string_dyn_concat(format, aes_key64, -1);
             weechat_string_dyn_concat(format, ")", -1);
+            free(aes_key64); aes_key64 = NULL;
         }
     }
 
@@ -2333,6 +2343,7 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
             return NULL;
         }
         payload_len = base64_decode(payload_text, strlen(payload_text), &payload_data);
+        heap_buf payload_data_buf = make_heap_buf(payload_data);
         weechat_string_dyn_concat(format, "\n%2$s..PL: ", -1);
         weechat_string_dyn_concat(format, payload_text, -1);
     }
@@ -2411,14 +2422,18 @@ xmpp_stanza_t *omemo::encode(weechat::account *account, struct t_gui_buffer *buf
     free(key);
     memcpy(key_and_tag+AES_KEY_SIZE, tag, tag_len);
     free(tag);
+    std::unique_ptr<uint8_t[], decltype(&free)> key_and_tag_buf(key_and_tag, free);
     char *key64 = NULL;
     base64_encode(key_and_tag, AES_KEY_SIZE+tag_len, &key64);
+    std::unique_ptr<char, decltype(&free)> key64_buf(key64, free);
     char *iv64 = NULL;
     base64_encode(iv, AES_IV_SIZE, &iv64);
     free(iv);
+    std::unique_ptr<char, decltype(&free)> iv64_buf(iv64, free);
     char *ciphertext64 = NULL;
     base64_encode(ciphertext, ciphertext_len, &ciphertext64);
     free(ciphertext);
+    std::unique_ptr<char, decltype(&free)> ciphertext64_buf(ciphertext64, free);
 
     xmpp_stanza_t *encrypted = xmpp_stanza_new(account->context);
     xmpp_stanza_set_name(encrypted, "encrypted");
@@ -2496,7 +2511,7 @@ xmpp_stanza_t *omemo::encode(weechat::account *account, struct t_gui_buffer *buf
         signal_int_list_free(devicelist);
         target = account->jid().data();
     }
-    free(key_and_tag);
+    // key_and_tag_buf releases key_and_tag here automatically
 
     if (keycount == 0) {
         weechat_printf(NULL, "omemo: no keys for %s", jid);
@@ -2516,9 +2531,7 @@ xmpp_stanza_t *omemo::encode(weechat::account *account, struct t_gui_buffer *buf
     xmpp_stanza_add_child(encrypted, encrypted__payload);
     xmpp_stanza_release(encrypted__payload);
 
-    free(iv64);
-    free(key64);
-    free(ciphertext64);
+    // iv64_buf, key64_buf, ciphertext64_buf auto-free on return
     return encrypted;
 }
 

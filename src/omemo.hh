@@ -6,6 +6,10 @@
 
 #include <memory>
 #include <functional>
+
+// RAII owner for malloc()/calloc()-allocated byte buffers.
+using heap_buf = std::unique_ptr<uint8_t[], decltype(&free)>;
+inline heap_buf make_heap_buf(uint8_t *p) { return {p, free}; }
 #include <cstdint>
 #include <string>
 #include <strophe.h>
