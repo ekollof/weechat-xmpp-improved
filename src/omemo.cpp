@@ -18,6 +18,7 @@
 #include <ranges>
 #include <filesystem>
 #include <strophe.h>
+#include "strophe.hh"
 #include <weechat/weechat-plugin.h>
 
 #include "plugin.hh"
@@ -2217,17 +2218,20 @@ void omemo::handle_bundle(const char *jid, uint32_t device_id,
     if (!bundle) return;
     xmpp_stanza_t *signedprekey = xmpp_stanza_get_child_by_name(bundle, "signedPreKeyPublic");
     if (!signedprekey) return;
-    const char *signed_pre_key = xmpp_stanza_get_text(signedprekey);
+    xmpp_string_guard signed_pre_key_g(xmpp_stanza_get_context(signedprekey), xmpp_stanza_get_text(signedprekey));
+    const char *signed_pre_key = signed_pre_key_g.ptr;
     if (!signed_pre_key) return;
     const char *signed_pre_key_id = xmpp_stanza_get_attribute(signedprekey, "signedPreKeyId");
     if (!signed_pre_key_id) return;
     xmpp_stanza_t *signature = xmpp_stanza_get_child_by_name(bundle, "signedPreKeySignature");
     if (!signature) return;
-    const char *key_signature = xmpp_stanza_get_text(signature);
+    xmpp_string_guard key_signature_g(xmpp_stanza_get_context(signature), xmpp_stanza_get_text(signature));
+    const char *key_signature = key_signature_g.ptr;
     if (!key_signature) return;
     xmpp_stanza_t *identitykey = xmpp_stanza_get_child_by_name(bundle, "identityKey");
     if (!identitykey) return;
-    const char *identity_key = xmpp_stanza_get_text(identitykey);
+    xmpp_string_guard identity_key_g(xmpp_stanza_get_context(identitykey), xmpp_stanza_get_text(identitykey));
+    const char *identity_key = identity_key_g.ptr;
     if (!identity_key) return;
     xmpp_stanza_t *prekeys = xmpp_stanza_get_child_by_name(bundle, "prekeys");
     if (!prekeys) return;
@@ -2241,6 +2245,7 @@ void omemo::handle_bundle(const char *jid, uint32_t device_id,
     num_prekeys = -1;
     char **format = weechat_string_dyn_alloc(256);
     weechat_string_dyn_concat(format, "omemo bundle %s/%u:\n%s..SPK %u: %s\n%3$s..SKS: %s\n%3$s..IK: %s", -1);
+    std::vector<xmpp_string_guard> pre_key_guards;
     for (xmpp_stanza_t *prekey = xmpp_stanza_get_children(prekeys);
          prekey; prekey = xmpp_stanza_get_next(prekey))
     {
@@ -2251,9 +2256,13 @@ void omemo::handle_bundle(const char *jid, uint32_t device_id,
         const char *pre_key_id = xmpp_stanza_get_attribute(prekey, "preKeyId");
         if (!pre_key_id)
             continue;
-        const char *pre_key = xmpp_stanza_get_text(prekey);
+        pre_key_guards.emplace_back(xmpp_stanza_get_context(prekey), xmpp_stanza_get_text(prekey));
+        const char *pre_key = pre_key_guards.back().ptr;
         if (!pre_key)
+        {
+            pre_key_guards.pop_back();
             continue;
+        }
 
         pre_keys[++num_prekeys] = (struct t_pre_key*)malloc(sizeof(struct t_pre_key));
         pre_keys[num_prekeys]->id = pre_key_id;
@@ -2301,7 +2310,8 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
     xmpp_stanza_t *iv = xmpp_stanza_get_child_by_name(header, "iv");
     if (!iv)
         return NULL;
-    const char *iv__text = xmpp_stanza_get_text(iv);
+    xmpp_string_guard iv__text_g(xmpp_stanza_get_context(iv), xmpp_stanza_get_text(iv));
+    const char *iv__text = iv__text_g.c_str();
     if (!iv__text) return NULL;
     iv_len = base64_decode(iv__text, strlen(iv__text), &iv_data);
     if (iv_len != AES_IV_SIZE) return NULL;
@@ -2327,7 +2337,8 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
             continue;
         keys_for_this_device++;
         xmpp_stanza_t *key_text = xmpp_stanza_get_children(key);
-        const char *data = key_text ? xmpp_stanza_get_text(key_text) : NULL;
+        xmpp_string_guard data_g(xmpp_stanza_get_context(key), key_text ? xmpp_stanza_get_text(key_text) : nullptr);
+        const char *data = data_g.c_str();
         if (!data)
             continue;
         key_len = base64_decode(data, strlen(data), &key_data);
@@ -2468,7 +2479,8 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
     xmpp_stanza_t *payload = xmpp_stanza_get_child_by_name(encrypted, "payload");
     if (payload && (payload = xmpp_stanza_get_children(payload)))
     {
-        const char *payload_text = xmpp_stanza_get_text(payload);
+        xmpp_string_guard payload_text_g(xmpp_stanza_get_context(payload), xmpp_stanza_get_text(payload));
+        const char *payload_text = payload_text_g.c_str();
         if (!payload_text) {
             weechat_string_dyn_free(format, 1);
             return NULL;
