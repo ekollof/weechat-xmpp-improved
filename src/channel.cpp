@@ -1100,7 +1100,7 @@ int weechat::channel::send_message(const char *to, const char *body)
             };
             auto *task = new message_task { *this, to, body, url };
             auto callback = [](const void *pointer, void *,
-                    const char *, int ret, const char *out, const char *err) {
+                    const char *, int ret, const char *out, const char * /*err*/) {
                 auto task = static_cast<const message_task*>(pointer);
                 if (!task) return WEECHAT_RC_ERROR;
 
@@ -1127,14 +1127,23 @@ int weechat::channel::send_message(const char *to, const char *body)
                     else
                     {
                         weechat_printf_date_tags(task->channel.buffer, 0,
-                                "notify_none,no_log", "[curl]\t%s%s",
-                                weechat_color("red"), err);
-                        task->channel.send_message(task->to.data(), task->body.data());
+                                "notify_none,no_log", "[oob]\t%s%s",
+                                weechat_color("gray"), mime.data());
+                        // Use std::string overload to avoid re-triggering the OOB probe
+                        task->channel.send_message(task->to, task->body, std::nullopt);
                     }
                 }
                 else
                 {
-                    task->channel.send_message(task->to.data(), task->body.data());
+                    // curl failed — send plain message via std::string overload
+                    // to avoid re-triggering the OOB probe
+                    task->channel.send_message(task->to, task->body, std::nullopt);
+                }
+                // XEP-0511: send link preview now that the message stanza is sent
+                if (weechat::config::instance
+                        && weechat::config::instance->look.outgoing_link_preview.boolean())
+                {
+                    task->channel.send_link_preview(task->to, task->url);
                 }
 
                 delete task;
