@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fstream>
+#include <string>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
 #include <openssl/bio.h>
@@ -13,6 +14,7 @@
 
 #include "avatar.hh"
 #include "account.hh"
+#include "user.hh"
 #include "plugin.hh"
 #include "xmpp/stanza.hh"
 #include "xmpp/xep-0084.inl"
@@ -217,4 +219,151 @@ void weechat::avatar::load_for_user(account& acc, user& user)
                                 user.id.c_str(),
                                 hash.c_str());
     }
+}
+
+bool weechat::avatar::publish(account& acc, const std::string& filepath)
+{
+    // Read file bytes
+    std::ifstream file(filepath, std::ios::binary | std::ios::ate);
+    if (!file)
+    {
+        weechat_printf(acc.buffer, "%sxmpp: /setavatar: cannot open file: %s",
+                       weechat_prefix("error"), filepath.c_str());
+        return false;
+    }
+
+    std::streamsize file_size = file.tellg();
+    if (file_size <= 0 || file_size > 8 * 1024 * 1024)  // 8 MB sanity limit
+    {
+        weechat_printf(acc.buffer, "%sxmpp: /setavatar: file too large or empty: %s",
+                       weechat_prefix("error"), filepath.c_str());
+        return false;
+    }
+    file.seekg(0, std::ios::beg);
+
+    std::vector<uint8_t> image_bytes(static_cast<size_t>(file_size));
+    if (!file.read(reinterpret_cast<char*>(image_bytes.data()), file_size))
+    {
+        weechat_printf(acc.buffer, "%sxmpp: /setavatar: failed to read file: %s",
+                       weechat_prefix("error"), filepath.c_str());
+        return false;
+    }
+
+    // Detect MIME type from file extension
+    std::string mime_type = "image/png";
+    {
+        auto dot = filepath.rfind('.');
+        if (dot != std::string::npos)
+        {
+            std::string ext = filepath.substr(dot + 1);
+            for (auto& c : ext) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+            if (ext == "jpg" || ext == "jpeg")
+                mime_type = "image/jpeg";
+            else if (ext == "gif")
+                mime_type = "image/gif";
+            else if (ext == "webp")
+                mime_type = "image/webp";
+        }
+    }
+
+    // SHA-1 hash (hex) of raw bytes — used as PEP item id
+    std::string hash = calculate_hash(image_bytes);
+
+    // Read image dimensions from header bytes
+    uint32_t img_width = 0, img_height = 0;
+    if (mime_type == "image/png" && image_bytes.size() >= 24)
+    {
+        // PNG: width at offset 16, height at 20 (big-endian uint32)
+        img_width  = (uint32_t(image_bytes[16]) << 24) | (uint32_t(image_bytes[17]) << 16)
+                   | (uint32_t(image_bytes[18]) <<  8) |  uint32_t(image_bytes[19]);
+        img_height = (uint32_t(image_bytes[20]) << 24) | (uint32_t(image_bytes[21]) << 16)
+                   | (uint32_t(image_bytes[22]) <<  8) |  uint32_t(image_bytes[23]);
+    }
+    else if ((mime_type == "image/jpeg") && image_bytes.size() > 4)
+    {
+        // JPEG: scan for SOF0/SOF2 marker (0xFF 0xC0 / 0xFF 0xC2)
+        for (size_t i = 2; i + 8 < image_bytes.size(); )
+        {
+            if (image_bytes[i] != 0xFF) { i++; continue; }
+            uint8_t marker = image_bytes[i + 1];
+            if (marker == 0xC0 || marker == 0xC2)
+            {
+                img_height = (uint32_t(image_bytes[i + 5]) << 8) | image_bytes[i + 6];
+                img_width  = (uint32_t(image_bytes[i + 7]) << 8) | image_bytes[i + 8];
+                break;
+            }
+            // Skip segment: length is big-endian uint16 at i+2
+            if (i + 3 >= image_bytes.size()) break;
+            uint16_t seg_len = (uint16_t(image_bytes[i + 2]) << 8) | image_bytes[i + 3];
+            i += 2 + seg_len;
+        }
+    }
+
+    // Base64-encode via OpenSSL BIO (no newlines)
+    std::string b64;
+    {
+        BIO *bio_b64 = BIO_new(BIO_f_base64());
+        BIO_set_flags(bio_b64, BIO_FLAGS_BASE64_NO_NL);
+        BIO *bio_mem = BIO_new(BIO_s_mem());
+        bio_b64 = BIO_push(bio_b64, bio_mem);
+        BIO_write(bio_b64, image_bytes.data(), static_cast<int>(image_bytes.size()));
+        BIO_flush(bio_b64);
+        BUF_MEM *bptr = nullptr;
+        BIO_get_mem_ptr(bio_b64, &bptr);
+        if (bptr && bptr->length > 0)
+            b64.assign(bptr->data, bptr->length);
+        BIO_free_all(bio_b64);
+    }
+
+    if (b64.empty())
+    {
+        weechat_printf(acc.buffer, "%sxmpp: /setavatar: base64 encoding failed",
+                       weechat_prefix("error"));
+        return false;
+    }
+
+    // Publish data node
+    {
+        xmpp_stanza_t *iq = weechat::xep0084::publish_avatar_data(
+            acc.context, b64.c_str(), hash.c_str());
+        acc.connection.send(iq);
+        xmpp_stanza_release(iq);
+    }
+
+    // Publish metadata node
+    {
+        xmpp_stanza_t *iq = weechat::xep0084::publish_avatar_metadata(
+            acc.context, hash.c_str(), mime_type.c_str(),
+            image_bytes.size(), img_width, img_height);
+        acc.connection.send(iq);
+        xmpp_stanza_release(iq);
+    }
+
+    // Save to local cache so we don't re-fetch what we just published
+    {
+        data avatar_data;
+        avatar_data.image_data = image_bytes;
+        avatar_data.meta.id     = hash;
+        avatar_data.meta.type   = mime_type;
+        avatar_data.meta.bytes  = static_cast<uint32_t>(image_bytes.size());
+        avatar_data.meta.width  = img_width;
+        avatar_data.meta.height = img_height;
+        save_to_cache(acc, hash, avatar_data);
+    }
+
+    // Update own user profile so subsequent XEP-0153 presences carry the hash
+    weechat::user *self = weechat::user::search(&acc, acc.jid().data());
+    if (self)
+    {
+        self->profile.avatar_hash     = hash;
+        self->profile.avatar_data     = image_bytes;
+        self->profile.avatar_rendered = render_unicode_blocks(image_bytes, mime_type);
+    }
+
+    weechat_printf(acc.buffer,
+                   "%sAvatar published: %s (%zu bytes, %ux%u, hash %.8s...)",
+                   weechat_prefix("network"),
+                   mime_type.c_str(), image_bytes.size(),
+                   img_width, img_height, hash.c_str());
+    return true;
 }

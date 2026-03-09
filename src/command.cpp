@@ -20,6 +20,7 @@
 #include "xmpp/xep-0292.inl"
 #include "account.hh"
 #include "user.hh"
+#include "avatar.hh"
 #include "channel.hh"
 #include "buffer.hh"
 #include "message.hh"
@@ -2734,6 +2735,47 @@ int command__setvcard(const void *pointer, void *data,
     return WEECHAT_RC_OK;
 }
 
+// /setavatar <filepath>
+// Publish a local image file as own avatar via XEP-0084 (User Avatar).
+// Supported formats: PNG, JPEG, GIF, WEBP (detected from extension).
+int command__setavatar(const void *pointer, void *data,
+                       struct t_gui_buffer *buffer, int argc,
+                       char **argv, char **argv_eol)
+{
+    weechat::account *ptr_account = NULL;
+    weechat::channel *ptr_channel = NULL;
+
+    (void) pointer;
+    (void) data;
+    (void) argv;
+
+    buffer__get_account_and_channel(buffer, &ptr_account, &ptr_channel);
+
+    if (!ptr_account)
+        return WEECHAT_RC_ERROR;
+
+    if (!ptr_account->connected())
+    {
+        weechat_printf(buffer, "%sxmpp: you are not connected to server",
+                       weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    if (argc < 2)
+    {
+        weechat_printf(buffer,
+                       "%s%s: usage: /setavatar <filepath>\n"
+                       "  filepath: path to a PNG, JPEG, GIF, or WEBP image file",
+                       weechat_prefix("error"), argv[0]);
+        return WEECHAT_RC_OK;
+    }
+
+    std::string filepath(argv_eol[1]);
+    weechat::avatar::publish(*ptr_account, filepath);
+
+    return WEECHAT_RC_OK;
+}
+
 int command__block(const void *pointer, void *data,
                   struct t_gui_buffer *buffer, int argc,
                   char **argv, char **argv_eol)
@@ -4776,6 +4818,21 @@ void command__init()
         "fn|nickname|email|url|desc|org|title|tel|bday|note", &command__setvcard, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /setvcard");
+
+    hook = weechat_hook_command(
+        "setavatar",
+        N_("publish a local image file as your own avatar (XEP-0084)"),
+        N_("<filepath>"),
+        N_("filepath: path to a PNG, JPEG, GIF, or WEBP image file\n\n"
+           "Reads the file, base64-encodes it, and publishes it to your\n"
+           "urn:xmpp:avatar:data and urn:xmpp:avatar:metadata PEP nodes.\n"
+           "Also updates the <photo> element in subsequent presences (XEP-0153).\n\n"
+           "Example:\n"
+           "  /setavatar /home/alice/photo.png\n"
+           "  /setavatar ~/pictures/avatar.jpg"),
+        NULL, &command__setavatar, NULL, NULL);
+    if (!hook)
+        weechat_printf(NULL, "Failed to setup command /setavatar");
 
     hook = weechat_hook_command(
         "buzz",

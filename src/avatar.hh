@@ -60,5 +60,12 @@ namespace weechat
         
         // Load avatar for user from cache (called on user creation/presence)
         static void load_for_user(account& acc, class user& user);
+
+        // Publish a local image file as own avatar via XEP-0084 PEP.
+        // Reads the file, base64-encodes it, publishes data + metadata nodes,
+        // and updates the self user's avatar_hash so XEP-0153 presences carry
+        // the correct <photo> element.
+        // Returns true on success (IQs sent), false on error.
+        static bool publish(account& acc, const std::string& filepath);
     };
 }
