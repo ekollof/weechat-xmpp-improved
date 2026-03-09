@@ -284,6 +284,9 @@ struct urn {
         struct xdata {
             struct dynamic : public xmlns { dynamic() : xmlns("urn:xmpp:xdata:dynamic") {} };
         };
+        struct channel_search {
+            struct _0 : public xmlns { _0() : xmlns("urn:xmpp:channel-search:0:search") {} };
+        };
     };
 };
 struct vcard_temp_filter : public xmlns { vcard_temp_filter() : xmlns("vcard-temp-filter") {} };

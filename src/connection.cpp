@@ -2838,6 +2838,7 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash)
     FEATURE("http://jabber.org/protocol/commands");  // XEP-0050: Ad-Hoc Commands
     FEATURE("urn:xmpp:mds:displayed:0");             // XEP-0490: Message Displayed Synchronization
     FEATURE("urn:xmpp:mds:displayed:0+notify");      // Subscribe to MDS events
+    FEATURE("urn:xmpp:channel-search:0:search");     // XEP-0433: Extended Channel Search (searcher)
 #undef FEATURE
 
     xmpp_stanza_t *x = xmpp_stanza_new(account.context);
@@ -3826,6 +3827,132 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
 
         if (is_adhoc_query)
             account.adhoc_queries.erase(iq_id);
+    }
+
+    // XEP-0433: Extended Channel Search — handle <result> or <search> IQ responses
+    {
+        const char *cs_id = xmpp_stanza_get_id(stanza);
+        bool is_cs_query = cs_id && account.channel_search_queries.count(cs_id);
+
+        if (is_cs_query && type)
+        {
+            auto &cs_info = account.channel_search_queries[cs_id];
+            struct t_gui_buffer *cs_buf = cs_info.buffer ? cs_info.buffer : account.buffer;
+
+            if (weechat_strcasecmp(type, "error") == 0)
+            {
+                // Try to extract a human-readable error
+                xmpp_stanza_t *error_el = xmpp_stanza_get_child_by_name(stanza, "error");
+                const char *err_text = NULL;
+                if (error_el)
+                {
+                    xmpp_stanza_t *text_el = xmpp_stanza_get_child_by_name(error_el, "text");
+                    if (text_el)
+                        err_text = xmpp_stanza_get_text_ptr(text_el);
+                }
+                weechat_printf_date_tags(cs_buf, 0, "xmpp_channel_search,notify_none",
+                                         "%s[search] Error from %s: %s",
+                                         weechat_prefix("error"),
+                                         cs_info.service_jid.c_str(),
+                                         err_text ? err_text : "unknown error");
+                account.channel_search_queries.erase(cs_id);
+            }
+            else if (weechat_strcasecmp(type, "result") == 0)
+            {
+                // Response wraps results in <result xmlns='urn:xmpp:channel-search:0:search'>
+                xmpp_stanza_t *result_el = xmpp_stanza_get_child_by_name_and_ns(
+                    stanza, "result", "urn:xmpp:channel-search:0:search");
+                // Some services may reply with <search> instead of <result>
+                if (!result_el)
+                    result_el = xmpp_stanza_get_child_by_name_and_ns(
+                        stanza, "search", "urn:xmpp:channel-search:0:search");
+
+                if (result_el)
+                {
+                    int count = 0;
+                    xmpp_stanza_t *item = xmpp_stanza_get_child_by_name(result_el, "item");
+                    while (item)
+                    {
+                        if (count == 0)
+                        {
+                            weechat_printf_date_tags(cs_buf, 0, "xmpp_channel_search,notify_none",
+                                                     "%sMUC Rooms (via %s):",
+                                                     weechat_prefix("network"),
+                                                     cs_info.service_jid.c_str());
+                        }
+
+                        const char *address = xmpp_stanza_get_attribute(item, "address");
+                        if (!address)
+                        {
+                            item = xmpp_stanza_get_next(item);
+                            continue;
+                        }
+
+                        // Child elements: <name>, <nusers>, <description>, <is-open>, <language>
+                        xmpp_stanza_t *name_el  = xmpp_stanza_get_child_by_name(item, "name");
+                        xmpp_stanza_t *nusers_el = xmpp_stanza_get_child_by_name(item, "nusers");
+                        xmpp_stanza_t *desc_el  = xmpp_stanza_get_child_by_name(item, "description");
+                        xmpp_stanza_t *open_el  = xmpp_stanza_get_child_by_name(item, "is-open");
+
+                        const char *name_raw    = name_el  ? xmpp_stanza_get_text_ptr(name_el)   : NULL;
+                        const char *nusers_raw  = nusers_el ? xmpp_stanza_get_text_ptr(nusers_el) : NULL;
+                        const char *desc_raw    = desc_el  ? xmpp_stanza_get_text_ptr(desc_el)   : NULL;
+
+                        std::string display = address;
+                        if (name_raw && name_raw[0])
+                            display = std::string(name_raw) + " <" + address + ">";
+
+                        std::string info_str;
+                        if (nusers_raw && nusers_raw[0])
+                            info_str = std::string(" (") + nusers_raw + " users)";
+                        if (open_el)
+                            info_str += " [open]";
+
+                        weechat_printf_date_tags(cs_buf, 0, "xmpp_channel_search,notify_none",
+                                                 "  %s%s%s%s",
+                                                 weechat_color("chat_nick"),
+                                                 display.c_str(),
+                                                 weechat_color("reset"),
+                                                 info_str.c_str());
+
+                        // Truncate long descriptions
+                        if (desc_raw && desc_raw[0])
+                        {
+                            std::string desc(desc_raw);
+                            if (desc.length() > 120)
+                                desc = desc.substr(0, 117) + "...";
+                            weechat_printf_date_tags(cs_buf, 0, "xmpp_channel_search,notify_none",
+                                                     "    %s", desc.c_str());
+                        }
+
+                        count++;
+                        item = xmpp_stanza_get_next(item);
+                    }
+
+                    if (count == 0)
+                    {
+                        weechat_printf_date_tags(cs_buf, 0, "xmpp_channel_search,notify_none",
+                                                 "%sNo rooms found matching your query",
+                                                 weechat_prefix("network"));
+                    }
+                    else
+                    {
+                        weechat_printf_date_tags(cs_buf, 0, "xmpp_channel_search,notify_none",
+                                                 "%sUse /enter <address> to join a room",
+                                                 weechat_prefix("network"));
+                    }
+                }
+                else
+                {
+                    weechat_printf_date_tags(cs_buf, 0, "xmpp_channel_search,notify_none",
+                                             "%s[search] Unexpected response from %s (missing <result>)",
+                                             weechat_prefix("error"),
+                                             cs_info.service_jid.c_str());
+                }
+
+                account.channel_search_queries.erase(cs_id);
+            }
+        }
     }
 
     query = xmpp_stanza_get_child_by_name_and_ns(

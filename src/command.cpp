@@ -3197,141 +3197,106 @@ int command__bookmark(const void *pointer, void *data,
     return WEECHAT_RC_OK;
 }
 
-// Non-capturing callback used for async room search
-static int list_search_callback(const void *pointer, void *data, const char *command,
-                               int return_code, const char *out, const char *err)
+// XEP-0433: Extended Channel Search
+// Send a search IQ to the given service JID with optional keywords.
+// Two steps: first request the form (type=get <search/>), then submit it.
+// Here we go straight to submitting a minimal form (the form request step
+// is optional per the spec and search.jabber.network accepts direct submits).
+static void xep0433_send_search(weechat::account *account,
+                                struct t_gui_buffer *buffer,
+                                const char *service_jid,
+                                const char *keywords)
 {
-    (void) data;
-    (void) command;
-    (void) err;
-    struct t_gui_buffer *buffer = (struct t_gui_buffer *)pointer;
+    char *search_id = xmpp_uuid_gen(account->context);
 
-    if (return_code != WEECHAT_HOOK_PROCESS_CHILD)
+    weechat::account::channel_search_query_info info;
+    info.service_jid = service_jid;
+    info.keywords    = keywords ? keywords : "";
+    info.buffer      = buffer;
+    info.form_requested = false;
+    account->channel_search_queries[search_id] = info;
+
+    // Build: <iq type='get' to='service' id='...'><search xmlns='urn:xmpp:channel-search:0:search'>
+    //          <x xmlns='jabber:x:data' type='submit'>
+    //            <field type='hidden' var='FORM_TYPE'><value>urn:xmpp:channel-search:0:search-params</value></field>
+    //            [<field var='q'><value>keywords</value></field>]
+    //            <field var='key' type='list-single'><value>{urn:xmpp:channel-search:0:order}nusers</value></field>
+    //          </x>
+    //        </search></iq>
+    xmpp_stanza_t *iq = xmpp_iq_new(account->context, "get", search_id);
+    xmpp_stanza_set_to(iq, service_jid);
+
+    xmpp_stanza_t *search_el = xmpp_stanza_new(account->context);
+    xmpp_stanza_set_name(search_el, "search");
+    xmpp_stanza_set_ns(search_el, "urn:xmpp:channel-search:0:search");
+
+    xmpp_stanza_t *x_form = xmpp_stanza_new(account->context);
+    xmpp_stanza_set_name(x_form, "x");
+    xmpp_stanza_set_ns(x_form, "jabber:x:data");
+    xmpp_stanza_set_attribute(x_form, "type", "submit");
+
+    // FORM_TYPE field
     {
-        if (return_code < 0)
-        {
-            weechat_printf(buffer, "%sRoom search failed: network error",
-                          weechat_prefix("error"));
-            return WEECHAT_RC_OK;
-        }
-
-        if (!out || strlen(out) == 0)
-        {
-            weechat_printf(buffer, "%sNo results from room search",
-                          weechat_prefix("error"));
-            return WEECHAT_RC_OK;
-        }
-
-        // Parse JSON response (simple parsing since we can't rely on external libs)
-        std::string response(out);
-
-        // Look for "items": [ ... ]
-        size_t items_pos = response.find("\"items\":");
-        if (items_pos == std::string::npos)
-        {
-            weechat_printf(buffer, "%sNo rooms found",
-                          weechat_prefix("network"));
-            return WEECHAT_RC_OK;
-        }
-
-        // Simple parsing - look for room objects
-        weechat_printf(buffer, "");
-        weechat_printf(buffer, "%sMUC Rooms:", weechat_prefix("network"));
-        weechat_printf(buffer, "");
-
-        size_t pos = items_pos;
-        int count = 0;
-        while ((pos = response.find("\"address\":", pos)) != std::string::npos && count < 20)
-        {
-            pos += 11; // skip "address":"
-            size_t end_pos = response.find("\"", pos);
-            if (end_pos == std::string::npos) break;
-
-            std::string address = response.substr(pos, end_pos - pos);
-
-            // Find name
-            std::string name = "";
-            size_t name_pos = response.find("\"name\":", pos);
-            if (name_pos != std::string::npos && name_pos < pos + 500)
-            {
-                name_pos += 8;
-                if (response[name_pos - 1] == '"')
-                {
-                    size_t name_end = response.find("\"", name_pos);
-                    if (name_end != std::string::npos)
-                        name = response.substr(name_pos, name_end - name_pos);
-                }
-            }
-
-            // Find nusers
-            std::string nusers = "";
-            size_t nusers_pos = response.find("\"nusers\":", pos);
-            if (nusers_pos != std::string::npos && nusers_pos < pos + 500)
-            {
-                nusers_pos += 9;
-                size_t nusers_end = response.find_first_of(",}", nusers_pos);
-                if (nusers_end != std::string::npos)
-                {
-                    std::string nusers_str = response.substr(nusers_pos, nusers_end - nusers_pos);
-                    if (nusers_str != "null")
-                        nusers = nusers_str + " users";
-                }
-            }
-
-            // Find description
-            std::string description = "";
-            size_t desc_pos = response.find("\"description\":", pos);
-            if (desc_pos != std::string::npos && desc_pos < pos + 500)
-            {
-                desc_pos += 15;
-                if (response[desc_pos - 1] == '"')
-                {
-                    size_t desc_end = response.find("\"", desc_pos);
-                    if (desc_end != std::string::npos)
-                    {
-                        description = response.substr(desc_pos, desc_end - desc_pos);
-                        if (description.length() > 60)
-                            description = description.substr(0, 57) + "...";
-                    }
-                }
-            }
-
-            // Print room info
-            std::string display = address;
-            if (!name.empty() && name != "null")
-                display = name + " <" + address + ">";
-
-            std::string info = "";
-            if (!nusers.empty())
-                info = " (" + nusers + ")";
-
-            weechat_printf(buffer, "  %s%s%s%s",
-                          weechat_color("chat_nick"),
-                          display.c_str(),
-                          weechat_color("reset"),
-                          info.c_str());
-
-            if (!description.empty() && description != "null")
-                weechat_printf(buffer, "    %s", description.c_str());
-
-            count++;
-            pos = end_pos;
-        }
-
-        if (count == 0)
-        {
-            weechat_printf(buffer, "%sNo rooms found",
-                          weechat_prefix("network"));
-        }
-        else
-        {
-            weechat_printf(buffer, "");
-            weechat_printf(buffer, "%sUse /enter <address> to join a room",
-                          weechat_prefix("network"));
-        }
+        xmpp_stanza_t *field = xmpp_stanza_new(account->context);
+        xmpp_stanza_set_name(field, "field");
+        xmpp_stanza_set_attribute(field, "type", "hidden");
+        xmpp_stanza_set_attribute(field, "var", "FORM_TYPE");
+        xmpp_stanza_t *value = xmpp_stanza_new(account->context);
+        xmpp_stanza_set_name(value, "value");
+        xmpp_stanza_t *text = xmpp_stanza_new(account->context);
+        xmpp_stanza_set_text(text, "urn:xmpp:channel-search:0:search-params");
+        xmpp_stanza_add_child(value, text);
+        xmpp_stanza_release(text);
+        xmpp_stanza_add_child(field, value);
+        xmpp_stanza_release(value);
+        xmpp_stanza_add_child(x_form, field);
+        xmpp_stanza_release(field);
     }
 
-    return WEECHAT_RC_OK;
+    // Optional keyword search field
+    if (keywords && keywords[0])
+    {
+        xmpp_stanza_t *field = xmpp_stanza_new(account->context);
+        xmpp_stanza_set_name(field, "field");
+        xmpp_stanza_set_attribute(field, "var", "q");
+        xmpp_stanza_t *value = xmpp_stanza_new(account->context);
+        xmpp_stanza_set_name(value, "value");
+        xmpp_stanza_t *text = xmpp_stanza_new(account->context);
+        xmpp_stanza_set_text(text, keywords);
+        xmpp_stanza_add_child(value, text);
+        xmpp_stanza_release(text);
+        xmpp_stanza_add_child(field, value);
+        xmpp_stanza_release(value);
+        xmpp_stanza_add_child(x_form, field);
+        xmpp_stanza_release(field);
+    }
+
+    // Sort key field — order by number of users descending
+    {
+        xmpp_stanza_t *field = xmpp_stanza_new(account->context);
+        xmpp_stanza_set_name(field, "field");
+        xmpp_stanza_set_attribute(field, "var", "key");
+        xmpp_stanza_set_attribute(field, "type", "list-single");
+        xmpp_stanza_t *value = xmpp_stanza_new(account->context);
+        xmpp_stanza_set_name(value, "value");
+        xmpp_stanza_t *text = xmpp_stanza_new(account->context);
+        xmpp_stanza_set_text(text, "{urn:xmpp:channel-search:0:order}nusers");
+        xmpp_stanza_add_child(value, text);
+        xmpp_stanza_release(text);
+        xmpp_stanza_add_child(field, value);
+        xmpp_stanza_release(value);
+        xmpp_stanza_add_child(x_form, field);
+        xmpp_stanza_release(field);
+    }
+
+    xmpp_stanza_add_child(search_el, x_form);
+    xmpp_stanza_release(x_form);
+    xmpp_stanza_add_child(iq, search_el);
+    xmpp_stanza_release(search_el);
+
+    account->connection.send(iq);
+    xmpp_stanza_release(iq);
+    xmpp_free(account->context, search_id);
 }
 
 int command__list(const void *pointer, void *data,
@@ -3343,7 +3308,7 @@ int command__list(const void *pointer, void *data,
 
     (void) pointer;
     (void) data;
-    (void) argv;
+    (void) argv_eol;
 
     buffer__get_account_and_channel(buffer, &ptr_account, &ptr_channel);
 
@@ -3358,51 +3323,37 @@ int command__list(const void *pointer, void *data,
         return WEECHAT_RC_OK;
     }
 
-    // Build search query
-    const char *keywords = (argc >= 2) ? argv_eol[1] : "";
-    
-    // Build JSON payload
-    std::string json_payload = "{\"keywords\":[";
-    if (strlen(keywords) > 0)
-    {
-        json_payload += "\"" + std::string(keywords) + "\"";
-    }
-    json_payload += "],\"min_users\":1}";
-    
-    weechat_printf(buffer, "");
-    if (strlen(keywords) > 0)
-        weechat_printf(buffer, "%sSearching for MUC rooms matching: %s",
-                      weechat_prefix("network"), keywords);
-    else
-        weechat_printf(buffer, "%sSearching for popular MUC rooms...",
-                      weechat_prefix("network"));
-    
-    // Execute search using WeeChat's url_transfer
-    struct t_hashtable *options = weechat_hashtable_new(8,
-        WEECHAT_HASHTABLE_STRING, WEECHAT_HASHTABLE_STRING,
-        NULL, NULL);
-    
-    weechat_hashtable_set(options, "httpheader", "Content-Type: application/json");
-    weechat_hashtable_set(options, "postfields", json_payload.data());
-    
-    // Use a hook for async URL fetch
-    std::string url = "https://search.jabber.network/api/1.0/search";
+    // Determine service JID and keywords.
+    // If argv[1] contains a dot (looks like a domain/JID), treat it as the service.
+    // Otherwise treat all args as keywords and use the default public directory.
+    const char *service_jid = "search.jabber.network";
+    const char *keywords = "";
 
-    struct t_hook *hook = (struct t_hook *)weechat_hook_process_hashtable(
-        fmt::format("url:{}", url).c_str(),
-        options,
-        30000,
-        list_search_callback,
-        buffer,
-        NULL);
-    
-    weechat_hashtable_free(options);
-    
-    if (!hook)
+    if (argc >= 2)
     {
-        weechat_printf(buffer, "%sFailed to start room search",
-                      weechat_prefix("error"));
+        // Heuristic: if the first arg contains a dot but no spaces, it's a JID/domain
+        bool first_arg_is_jid = (strchr(argv[1], '.') != NULL)
+                                 && (strchr(argv[1], ' ') == NULL);
+        if (first_arg_is_jid)
+        {
+            service_jid = argv[1];
+            keywords = (argc >= 3) ? argv_eol[2] : "";
+        }
+        else
+        {
+            keywords = argv_eol[1];
+        }
     }
+
+    weechat_printf(buffer, "");
+    if (keywords[0])
+        weechat_printf(buffer, "%sSearching for MUC rooms matching \"%s\" via %s (XEP-0433)…",
+                      weechat_prefix("network"), keywords, service_jid);
+    else
+        weechat_printf(buffer, "%sSearching for popular MUC rooms via %s (XEP-0433)…",
+                      weechat_prefix("network"), service_jid);
+
+    xep0433_send_search(ptr_account, buffer, service_jid, keywords[0] ? keywords : NULL);
 
     return WEECHAT_RC_OK;
 }
@@ -4407,17 +4358,19 @@ void command__init()
     
     hook = weechat_hook_command(
         "list",
-        N_("search for public MUC rooms"),
-        N_("[keywords]"),
-        N_("keywords : search keywords (optional)\n"
+        N_("search for public MUC rooms (XEP-0433)"),
+        N_("[[<service>] [keywords]]"),
+        N_("service  : search service JID (default: search.jabber.network)\n"
+           "keywords : search keywords (optional)\n"
            "\n"
-           "Search for public MUC rooms using the search.jabber.network directory.\n"
-           "Without keywords, shows popular rooms.\n"
+           "Search for public MUC rooms using XEP-0433 Extended Channel Search.\n"
+           "Without keywords, shows popular rooms sorted by number of users.\n"
            "\n"
            "Examples:\n"
-           "  /list                 : list popular rooms\n"
-           "  /list xmpp            : search for rooms about XMPP\n"
-           "  /list linux gaming    : search for linux gaming rooms"),
+           "  /list                            : list popular rooms\n"
+           "  /list xmpp                       : search for rooms about XMPP\n"
+           "  /list linux gaming               : search for linux gaming rooms\n"
+           "  /list search.jabber.network xmpp : use specific search service"),
         NULL, &command__list, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /list");

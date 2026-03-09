@@ -148,6 +148,15 @@ namespace weechat
             std::string session_id;   // session id (for multi-step forms)
         };
         std::unordered_map<std::string, adhoc_query_info> adhoc_queries;  // iq_id -> info
+
+        // XEP-0433: Extended Channel Search query tracking
+        struct channel_search_query_info {
+            std::string service_jid;        // search service JID
+            std::string keywords;           // search keywords
+            struct t_gui_buffer *buffer;    // buffer to print results into
+            bool form_requested;            // true = waiting for form, false = waiting for results
+        };
+        std::unordered_map<std::string, channel_search_query_info> channel_search_queries;  // iq_id -> info
         
         // Capability cache (XEP-0115)
         std::unordered_map<std::string, std::vector<std::string>> caps_cache;  // verification_hash -> features
