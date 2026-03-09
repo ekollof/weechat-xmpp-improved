@@ -490,10 +490,15 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool /* top_le
     }
 
     // XEP-0153: vCard-Based Avatars — parse photo hash from presence <x>
+    // Only fetch vCards for roster contacts (non-MUC presences).
+    // MUC occupant presences come from room@conference.example/nick — the bare
+    // JID is the room itself, not a real user, so vcard-temp requests there
+    // are meaningless and would spam the server.
     {
         xmpp_stanza_t *vcard_x = xmpp_stanza_get_child_by_name_and_ns(
             stanza, "x", "vcard-temp:x:update");
-        if (vcard_x && user)
+        bool is_muc_presence = channel && channel->type == weechat::channel::chat_type::MUC;
+        if (vcard_x && user && !is_muc_presence)
         {
             xmpp_stanza_t *photo = xmpp_stanza_get_child_by_name(vcard_x, "photo");
             if (photo)
