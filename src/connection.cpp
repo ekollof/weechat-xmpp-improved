@@ -74,7 +74,7 @@ void weechat::connection::send(xmpp_stanza_t *stanza)
 bool weechat::connection::version_handler(xmpp_stanza_t *stanza)
 {
     const char *weechat_name = "weechat";
-    std::unique_ptr<char> weechat_version(weechat_info_get("version", NULL));
+    std::unique_ptr<char, decltype(&free)> weechat_version(weechat_info_get("version", NULL), free);
 
     weechat_printf(NULL, "Received version request from %s", xmpp_stanza_get_from(stanza));
 
@@ -1939,7 +1939,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
 
     if (replace)
     {
-        const char *orig = NULL;
+        char *orig = NULL;
         void *lines = weechat_hdata_pointer(weechat_hdata_get("buffer"),
                                             channel->buffer, "lines");
         if (lines)
@@ -2009,7 +2009,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
                                                           (const char*)weechat_arraylist_get(orig_lines, i),
                                                           -1);
                             orig = *orig_message;
-                            weechat_string_dyn_free(orig_message, 0);
+                            weechat_string_dyn_free(orig_message, 1); // transfers ownership of *orig_message to orig
                             break;
                         }
                     }
@@ -2073,6 +2073,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
                 weechat_string_dyn_free(visual, 1);
             }
         }
+        free(orig);
     }
 
     // XEP-0425: Message Moderation (extends XEP-0424)

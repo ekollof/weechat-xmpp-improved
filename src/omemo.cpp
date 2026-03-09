@@ -342,7 +342,7 @@ int cp_sha512_digest_final(void *digest_context, struct signal_buffer **output, 
     gcry_md_reset(*ctx);
 
     struct signal_buffer *output_buffer = signal_buffer_create(md, len);
-    free(md);
+    // Note: md is an internal gcrypt pointer from gcry_md_read() - must NOT be free()'d
     if (!output_buffer) return SG_ERR_NOMEM;
 
     *output = output_buffer;

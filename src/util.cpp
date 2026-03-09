@@ -40,7 +40,7 @@ char *exec(const char *command)
     }
 
     pclose(pipe);
-    weechat_string_dyn_free(result, 0);
+    weechat_string_dyn_free(result, 1); // transfers ownership of *result to caller
     return *result;
 }
 
