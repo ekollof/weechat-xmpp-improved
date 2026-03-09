@@ -993,10 +993,9 @@ int command__omemo(const void *pointer, void *data,
             }
 
             // Publish bundle
-            char *from = strdup(ptr_account->jid().data());
+            std::string from_s(ptr_account->jid());
             xmpp_stanza_t *bundle_stanza = ptr_account->omemo.get_bundle(
-                ptr_account->context, from, NULL);
-            free(from);
+                ptr_account->context, from_s.data(), NULL);
             if (bundle_stanza)
             {
                 ptr_account->connection.send(bundle_stanza);
@@ -1464,10 +1463,10 @@ int command__edit(const void *pointer, void *data,
     struct t_gui_line *line = (struct t_gui_line*)weechat_hdata_pointer(
         hdata_line, own_lines, "last_line");
     
-    char *last_msg_id = NULL;
+    std::string last_msg_id;
     
     // Search backwards for our last sent message
-    while (line && !last_msg_id)
+    while (line && last_msg_id.empty())
     {
         struct t_gui_line_data *line_data = (struct t_gui_line_data*)weechat_hdata_pointer(
             hdata_line, line, "data");
@@ -1487,7 +1486,7 @@ int command__edit(const void *pointer, void *data,
                     {
                         if (strncmp(tag_array[i], "id_", 3) == 0)
                         {
-                            last_msg_id = strdup(tag_array[i] + 3);
+                            last_msg_id = tag_array[i] + 3;
                             break;
                         }
                     }
@@ -1500,7 +1499,7 @@ int command__edit(const void *pointer, void *data,
         line = (struct t_gui_line*)weechat_hdata_move(hdata_line, line, -1);
     }
     
-    if (!last_msg_id)
+    if (last_msg_id.empty())
     {
         weechat_printf(buffer, "%sxmpp: no message found to edit",
                       weechat_prefix("error"));
@@ -1523,7 +1522,7 @@ int command__edit(const void *pointer, void *data,
     xmpp_stanza_t *replace = xmpp_stanza_new(ptr_account->context);
     xmpp_stanza_set_name(replace, "replace");
     xmpp_stanza_set_ns(replace, "urn:xmpp:message-correct:0");
-    xmpp_stanza_set_id(replace, last_msg_id);
+    xmpp_stanza_set_id(replace, last_msg_id.c_str());
     xmpp_stanza_add_child(message, replace);
     xmpp_stanza_release(replace);
 
@@ -1535,8 +1534,7 @@ int command__edit(const void *pointer, void *data,
 
     ptr_account->connection.send( message);
     xmpp_stanza_release(message);
-    
-    free(last_msg_id);
+    // last_msg_id freed by std::string destructor
 
     weechat_printf(buffer, "%sxmpp: message edit sent",
                   weechat_prefix("network"));
@@ -1598,10 +1596,10 @@ int command__retract(const void *pointer, void *data,
     struct t_gui_line *line = (struct t_gui_line*)weechat_hdata_pointer(
         hdata_line, own_lines, "last_line");
     
-    char *last_msg_id = NULL;
+    std::string last_msg_id;
     
     // Search backwards for our last sent message
-    while (line && !last_msg_id)
+    while (line && last_msg_id.empty())
     {
         struct t_gui_line_data *line_data = (struct t_gui_line_data*)weechat_hdata_pointer(
             hdata_line, line, "data");
@@ -1621,7 +1619,7 @@ int command__retract(const void *pointer, void *data,
                     {
                         if (strncmp(tag_array[i], "id_", 3) == 0)
                         {
-                            last_msg_id = strdup(tag_array[i] + 3);
+                            last_msg_id = tag_array[i] + 3;
                             break;
                         }
                     }
@@ -1634,7 +1632,7 @@ int command__retract(const void *pointer, void *data,
         line = (struct t_gui_line*)weechat_hdata_move(hdata_line, line, -1);
     }
     
-    if (!last_msg_id)
+    if (last_msg_id.empty())
     {
         weechat_printf(buffer, "%sxmpp: no message found to retract",
                       weechat_prefix("error"));
@@ -1656,7 +1654,7 @@ int command__retract(const void *pointer, void *data,
     xmpp_stanza_t *retract = xmpp_stanza_new(ptr_account->context);
     xmpp_stanza_set_name(retract, "retract");
     xmpp_stanza_set_ns(retract, "urn:xmpp:message-retract:1");
-    xmpp_stanza_set_attribute(retract, "id", last_msg_id);
+    xmpp_stanza_set_attribute(retract, "id", last_msg_id.c_str());
     xmpp_stanza_add_child(message, retract);
     xmpp_stanza_release(retract);
 
@@ -1687,8 +1685,7 @@ int command__retract(const void *pointer, void *data,
 
     ptr_account->connection.send(message);
     xmpp_stanza_release(message);
-    
-    free(last_msg_id);
+    // last_msg_id freed by std::string destructor
 
     weechat_printf(buffer, "%sxmpp: message retraction sent",
                   weechat_prefix("network"));
@@ -1751,10 +1748,10 @@ int command__react(const void *pointer, void *data,
     struct t_gui_line *line = (struct t_gui_line*)weechat_hdata_pointer(
         hdata_line, own_lines, "last_line");
     
-    char *target_msg_id = NULL;
+    std::string target_msg_id;
     
     // Search backwards for last message with an ID (skip our own messages)
-    while (line && !target_msg_id)
+    while (line && target_msg_id.empty())
     {
         struct t_gui_line_data *line_data = (struct t_gui_line_data*)weechat_hdata_pointer(
             hdata_line, line, "data");
@@ -1774,7 +1771,7 @@ int command__react(const void *pointer, void *data,
                     {
                         if (strncmp(tag_array[i], "id_", 3) == 0)
                         {
-                            target_msg_id = strdup(tag_array[i] + 3);
+                            target_msg_id = tag_array[i] + 3;
                             break;
                         }
                     }
@@ -1787,7 +1784,7 @@ int command__react(const void *pointer, void *data,
         line = (struct t_gui_line*)weechat_hdata_move(hdata_line, line, -1);
     }
     
-    if (!target_msg_id)
+    if (target_msg_id.empty())
     {
         weechat_printf(buffer, "%sxmpp: no message found to react to",
                       weechat_prefix("error"));
@@ -1809,7 +1806,7 @@ int command__react(const void *pointer, void *data,
     xmpp_stanza_t *reactions = xmpp_stanza_new(ptr_account->context);
     xmpp_stanza_set_name(reactions, "reactions");
     xmpp_stanza_set_ns(reactions, "urn:xmpp:reactions:0");
-    xmpp_stanza_set_attribute(reactions, "id", target_msg_id);
+    xmpp_stanza_set_attribute(reactions, "id", target_msg_id.c_str());
     
     // Add reaction element with emoji
     xmpp_stanza_t *reaction = xmpp_stanza_new(ptr_account->context);
@@ -1834,8 +1831,7 @@ int command__react(const void *pointer, void *data,
 
     ptr_account->connection.send(message);
     xmpp_stanza_release(message);
-    
-    free(target_msg_id);
+    // target_msg_id freed by std::string destructor
 
     weechat_printf(buffer, "%sxmpp: reaction %s sent",
                   weechat_prefix("network"), emoji);
@@ -2438,30 +2434,29 @@ int command__activity(const void *pointer, void *data,
         "working", NULL
     };
 
-    const char *category = NULL;
+    std::string category_s;
+    std::string specific_s;
     const char *specific = NULL;
     const char *text = NULL;
 
     if (argc >= 2)
     {
         // Parse "category" or "category/specific"
-        char *activity_str = strdup(argv[1]);
-        char *slash = strchr(activity_str, '/');
+        category_s = argv[1];
+        std::string::size_type slash_pos = category_s.find('/');
         
-        if (slash)
+        if (slash_pos != std::string::npos)
         {
-            *slash = '\0';
-            category = activity_str;
-            specific = slash + 1;
-        }
-        else
-        {
-            category = activity_str;
+            specific_s = category_s.substr(slash_pos + 1);
+            category_s.resize(slash_pos);
+            specific = specific_s.c_str();
         }
         
         if (argc >= 3)
             text = argv_eol[2];
     }
+
+    const char *category = category_s.empty() ? NULL : category_s.c_str();
 
     // Build PEP activity publish stanza
     // <iq type='set'>
@@ -2519,7 +2514,7 @@ int command__activity(const void *pointer, void *data,
             weechat_printf(buffer, "%sValid categories: working, relaxing, eating, drinking, traveling, etc.",
                           weechat_prefix("error"));
             
-            free((void*)category);
+            // category_s freed by std::string destructor
             xmpp_stanza_release(activity_elem);
             xmpp_stanza_release(item);
             xmpp_stanza_release(publish);
@@ -2557,7 +2552,7 @@ int command__activity(const void *pointer, void *data,
             xmpp_stanza_release(text_elem);
         }
 
-        free((void*)category);
+        // category_s freed by std::string destructor
     }
     // If no activity specified, publish empty <activity/> to clear
 
