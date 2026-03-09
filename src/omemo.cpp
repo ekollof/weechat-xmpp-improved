@@ -532,11 +532,17 @@ int iks_get_identity_key_pair(struct signal_buffer **public_data, signal_buffer 
     {
         auto identity = libsignal::identity_key_pair::generate(omemo->context);
 
-        auto private_key = identity.get_private();
-        auto public_key = identity.get_public();
-
-        ec_private_key_serialize(private_data, private_key);
-        ec_public_key_serialize(public_data, public_key);
+        // Use raw pointers directly — do NOT wrap in RAII types here.
+        // get_private()/get_public() return borrowed pointers owned by the
+        // identity pair (refcount NOT incremented).  Wrapping them in a
+        // libsignal::private_key / public_key RAII object would call
+        // ec_*_destroy (SIGNAL_UNREF) on destruction, dropping the refcount
+        // to 0 and freeing the structs while the identity pair still holds
+        // dangling pointers — causing SIGSEGV in ~omemo().
+        ec_private_key_serialize(private_data,
+                ratchet_identity_key_pair_get_private(identity));
+        ec_public_key_serialize(public_data,
+                ratchet_identity_key_pair_get_public(identity));
 
         v_local_private_key.mv_data = signal_buffer_data(*private_data);
         v_local_private_key.mv_size = signal_buffer_len(*private_data);
