@@ -35,11 +35,22 @@
   - *WeeChat 4.3.0+ compatibility*: Updated base64 API calls for compatibility with
     newer WeeChat versions while maintaining backwards compatibility
   - *MAM (Message Archive Management) fixes*:
-    - Fixed incorrect JID handling in MAM queries
-    - Fixed pagination to properly retrieve all archived messages
-    - Fixed time range calculation
+    - Fixed MAM IQ routing: PM queries were sent to the contact's JID instead
+      of the local server domain, so the server discarded them
+    - Fixed UTC timestamp parsing: =strptime= fills a UTC =struct tm= but
+      =mktime= was interpreting it as local time (CET = UTC+1), shifting all
+      timestamps one hour into the future
+    - Fixed multi-page MAM results: the global discovery query stalled after
+      the first RSM page and never fetched newer messages; it now pages forward
+      until the archive is exhausted
+    - Fixed single-page / empty =<fin>= handling: when a server sends
+      =<fin complete='true'/>= with no =<set>= child the query was never
+      cleaned up and the fetch timestamp was never updated
+    - Fixed channel re-open suppression: a =-1= sentinel in LMDB that
+      prevented auto-recreation of closed buffers was not cleared on re-open,
+      so MAM never ran for those channels
     - Enabled automatic MAM retrieval on connect (7 days history for PM channels)
-    - Full message caching with LMDB - instant message display from cache, then fetch new ones
+    - Full message caching with LMDB — instant display from cache, then fetch new ones
   - *Display improvements*:
     - Messages now show sender's JID instead of client resource ID (e.g., "user@domain.org"
       instead of "Conversations.xxxx")
@@ -48,7 +59,7 @@
     - Message styling (XEP-0393) - renders *bold*, _italic_, `code`, ~strikethrough~, quotes
   - *Reduced logging noise*: Disabled debug-level logging for cleaner output
   - *Channel type detection*: Fixed PM vs MUC detection for proper message handling
-  - *New features implemented*:
+   - *New features implemented*:
     - Stream Management (XEP-0198) - reliable message delivery and session resumption
     - Blocking Command (XEP-0191) - /block, /unblock, /blocklist for privacy
     - MUC Self-Ping (XEP-0410) - /selfping to verify room membership
@@ -78,6 +89,12 @@
     - Room explorer - /list command to search public MUC rooms via search.jabber.network
     - Entity capability caching (XEP-0115) - caches disco#info results to reduce network queries
     - User Avatar (XEP-0084) - automatic avatar fetching, caching, and display as colored Unicode symbols
+    - MUC status code handling (XEP-0045) - displays kick/ban/nick-change/affiliation events
+    - Ad-hoc Commands (XEP-0050) - execute server-side commands from WeeChat
+    - XHTML-IM rendering (XEP-0071) - strips HTML markup and renders plain text from rich messages
+    - Message Displayed Synchronization (XEP-0490 / XEP-0283) - syncs read state across devices
+    - References (XEP-0372) - renders @mentions and URI references inline
+    - Message status glyphs - sent messages show ⌛ (pending), ✓ (delivered), ✓✓ (read) inline
 
   See the *XMPP Compliance* section below for a comprehensive list of implemented XEPs.
 
@@ -114,28 +131,33 @@
 *** Additional Implemented XEPs
     - ✅ XEP-0048: Bookmark Storage (Private XML, deprecated)
     - ✅ XEP-0049: Private XML Storage
+    - ✅ XEP-0050: Ad-Hoc Commands (execute server-side commands)
     - ✅ XEP-0066: Out of Band Data (URL sharing in messages)
+    - ✅ XEP-0071: XHTML-IM (strips HTML, renders plain text from rich messages)
     - ✅ XEP-0085: Chat State Notifications (enhanced with all 5 states)
     - ✅ XEP-0092: Software Version (responds to version queries)
     - ✅ XEP-0107: User Mood (/mood command for PEP mood publishing)
     - ✅ XEP-0108: User Activity (/activity command for PEP activity publishing)
     - ✅ XEP-0172: User Nickname (subscribes to nickname updates via PEP)
-    - ✅ XEP-0184: Message Delivery Receipts
+    - ✅ XEP-0184: Message Delivery Receipts (inline ✓ glyph on delivery)
     - ✅ XEP-0199: XMPP Ping (/ping command)
     - ✅ XEP-0202: Entity Time (responds to time queries)
     - ✅ XEP-0203: Delayed Delivery (proper timestamps for offline/MAM messages)
     - ✅ XEP-0223: Persistent Storage of Private Data via PubSub
     - ✅ XEP-0280: Message Carbons
+    - ✅ XEP-0283: Moved (Message Displayed Synchronization support)
     - ✅ XEP-0313: Message Archive Management (MAM) with LMDB caching
     - ✅ XEP-0319: Last User Interaction in Presence
-    - ✅ XEP-0333: Chat Markers (displayed, acknowledged)
+    - ✅ XEP-0333: Chat Markers (inline ✓✓ glyph on read)
     - ✅ XEP-0334: Message Processing Hints (bandwidth optimization)
     - ✅ XEP-0352: Client State Indication
     - ✅ XEP-0359: Unique and Stable Stanza IDs (message deduplication)
+    - ✅ XEP-0372: References (@mentions and URI references inline)
     - ✅ XEP-0380: Explicit Message Encryption (encryption method tagging)
     - ✅ XEP-0384: OMEMO Encryption (complete implementation)
     - ✅ XEP-0385: Stateless Inline Media Sharing (rich media with metadata and hashing)
     - ✅ XEP-0402: PEP Native Bookmarks (modern PEP-based bookmark storage)
+    - ✅ XEP-0490: Message Displayed Synchronization (read state sync across devices)
 
 *** Planned for Future Releases
     - ⏳ XEP-0153: vCard-Based Avatars (presence integration)
@@ -173,9 +195,56 @@
 
    Or simply add =xmpp_encryption= to your existing status bar items configuration.
 
-** Roster Management
+** Typing Indicator
 
-   The plugin supports XMPP roster (contact list) management:
+   The plugin sends and receives XEP-0085 chat state notifications (typing
+   indicators). To display them you need to configure both WeeChat and your
+   status bar.
+
+*** 1. Enable typing in WeeChat
+
+   #+begin_src
+   /set typing.look.enabled_nicks on
+   /set typing.look.enabled_self on
+   /save typing
+   #+end_src
+
+   - =enabled_nicks= — display when contacts are typing
+   - =enabled_self= — send typing notifications when you type
+   - =input_min_chars= (default 4) — how many characters you must type before
+     WeeChat considers you "composing"; lower it if you want more responsive
+     outgoing notifications:
+     #+begin_src
+     /set typing.look.input_min_chars 2
+     #+end_src
+
+*** 2. Add the typing bar item
+
+   WeeChat ships a dedicated =typing= bar by default. Its item must be set to
+   the built-in =typing= item name (not =xmpp_typing=):
+
+   #+begin_src
+   /set weechat.bar.typing.items "typing"
+   /save
+   #+end_src
+
+   The bar already has =conditions = "${typing}"= so it only appears when
+   someone is actually typing — no permanent screen real estate is used.
+
+** Message Status Glyphs
+
+   Sent messages show an inline delivery/read status glyph that updates
+   automatically:
+
+   | Glyph | Meaning                                   |
+   |-------|-------------------------------------------|
+   | ⌛    | Pending — message sent, no receipt yet    |
+   | ✓     | Delivered — recipient's client received it (XEP-0184) |
+   | ✓✓   | Read — recipient has marked it displayed (XEP-0333)   |
+
+   No configuration required; glyphs appear automatically on outgoing messages.
+
+
    - =/roster= - Display your contact list with names, subscriptions, and groups
    - =/roster add <jid> [name]= - Add a contact to your roster and send subscription request
    - =/roster del <jid>= - Remove a contact from your roster
