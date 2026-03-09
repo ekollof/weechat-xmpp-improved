@@ -130,23 +130,29 @@
     - ✅ XEP-0461: Message Replies (/reply command)
 
 *** Additional Implemented XEPs
+    - ✅ XEP-0004: Data Forms (rendered in-buffer for Ad-Hoc Commands)
     - ✅ XEP-0048: Bookmark Storage (Private XML, deprecated)
     - ✅ XEP-0049: Private XML Storage
     - ✅ XEP-0050: Ad-Hoc Commands (execute server-side commands)
+    - ✅ XEP-0059: Result Set Management (MAM paging)
     - ✅ XEP-0066: Out of Band Data (URL sharing in messages)
     - ✅ XEP-0071: XHTML-IM (full WeeChat color/attribute rendering: bold, italic, underline, code, blockquotes, links, CSS color spans)
     - ✅ XEP-0085: Chat State Notifications (enhanced with all 5 states)
     - ✅ XEP-0092: Software Version (responds to version queries)
     - ✅ XEP-0107: User Mood (/mood command for PEP mood publishing)
     - ✅ XEP-0108: User Activity (/activity command for PEP activity publishing)
+    - ✅ XEP-0153: vCard-Based Avatars (receive photo hash from presence; publishing own avatar not yet implemented)
     - ✅ XEP-0172: User Nickname (subscribes to nickname updates via PEP)
     - ✅ XEP-0184: Message Delivery Receipts (inline ✓ glyph on delivery)
     - ✅ XEP-0199: XMPP Ping (/ping command)
     - ✅ XEP-0202: Entity Time (responds to time queries)
     - ✅ XEP-0203: Delayed Delivery (proper timestamps for offline/MAM messages)
     - ✅ XEP-0223: Persistent Storage of Private Data via PubSub
+    - ✅ XEP-0224: Attention (opens PM buffer on attention request; advertised in caps)
     - ✅ XEP-0280: Message Carbons
-    - ✅ XEP-0283: Moved (Message Displayed Synchronization support)
+    - ✅ XEP-0283: Moved (displays account migration notices)
+    - ✅ XEP-0297: Forwarded Messages (used by Carbons and MAM)
+    - ✅ XEP-0300: Cryptographic Hash Functions (SHA-256 in SIMS file metadata)
     - ✅ XEP-0313: Message Archive Management (MAM) with LMDB caching
     - ✅ XEP-0319: Last User Interaction in Presence
     - ✅ XEP-0333: Chat Markers (inline ✓✓ glyph on read)
@@ -155,14 +161,18 @@
     - ✅ XEP-0359: Unique and Stable Stanza IDs (message deduplication)
     - ✅ XEP-0372: References (@mentions and URI references inline)
     - ✅ XEP-0380: Explicit Message Encryption (encryption method tagging)
+    - ✅ XEP-0382: Spoiler Messages (displays spoiler warning prefix on receive)
     - ✅ XEP-0384: OMEMO Encryption (complete implementation)
     - ✅ XEP-0385: Stateless Inline Media Sharing (rich media with metadata and hashing)
+    - ✅ XEP-0392: Consistent Color Generation (SHA-1 → hue → 256-color palette for nicks)
     - ✅ XEP-0402: PEP Native Bookmarks (modern PEP-based bookmark storage)
+    - ✅ XEP-0422: Message Fastening (used by moderation)
+    - ✅ XEP-0428: Fallback Indication (sent with retractions; parsed on receive)
     - ✅ XEP-0490: Message Displayed Synchronization (read state sync across devices)
-    - ✅ XEP-0511: Link Metadata (inline link previews from OpenGraph metadata: title, description, URL)
+    - ✅ XEP-0511: Link Metadata (sends OpenGraph previews for outgoing URLs; renders incoming =<rdf:Description>= previews with title, description, URL, and image indicator)
 
 *** Planned for Future Releases
-    - ⏳ XEP-0153: vCard-Based Avatars (presence integration)
+    - ⏳ XEP-0153: vCard-Based Avatars (publishing own avatar not yet implemented)
     - ⏳ XEP-0398: Avatar Conversion (compatibility layer)
 
 * Description
@@ -1165,16 +1175,16 @@
        * [ ] Direct File Transfer - Jingle (xep-234 xep-261)
      * [X] Extras (from CCS2022)
        * [X] The /me Command (xep-245)
-   * [ ] Additional Features (beyond CCS2022)
-     * [X] Stateless Inline Media Sharing (xep-385)
-     * [ ] Consistent Color Generation (xep-392)
-     * [ ] Message Styling (xep-393)
-     * [ ] Extended Channel Search (xep-433)
-     * [X] Message Retraction (xep-424)
-     * [X] Message Moderation (xep-425)
+    * [X] Additional Features (beyond CCS2022)
+      * [X] Stateless Inline Media Sharing (xep-385)
+      * [X] Consistent Color Generation (xep-392)
+      * [X] Message Styling (xep-393)
+      * [ ] Extended Channel Search (xep-433)
+      * [X] Message Retraction (xep-424)
+      * [X] Message Moderation (xep-425)
 
-   **Progress**: 13 of 13 CCS2022 Advanced IM features implemented!
-   Remaining: Jingle file transfer (XEP-234, 0261) and optional vCard-based avatar compatibility (XEP-0153, 0398).
+   **Progress**: All CCS2022 features implemented plus significant extras (XEP-0392, XEP-0393, XEP-0511, and more).
+   Remaining optional: Jingle file transfer (XEP-234, 0261), vCard-based avatar publishing (XEP-0153 receive done), avatar compatibility layer (XEP-0398).
 ** TODO [#D] Close all issues (milestone v1.0)
 
 * Contributing

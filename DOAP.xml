@@ -520,13 +520,175 @@
       </xmpp:SupportedXep>
     </implements>
 
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0004.html' />
+        <xmpp:status>partial</xmpp:status>
+        <xmpp:version>2.10.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Data Forms - rendered in the buffer for Ad-Hoc Commands</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0050.html' />
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>1.3.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Ad-Hoc Commands - /adhoc command executes server-side commands with data-form rendering</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0059.html' />
+        <xmpp:status>partial</xmpp:status>
+        <xmpp:version>1.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Result Set Management - used internally for MAM paging</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0071.html' />
+        <xmpp:status>partial</xmpp:status>
+        <xmpp:version>1.5.4</xmpp:version>
+        <xmpp:note xml:lang='en'>XHTML-IM - receives and renders rich text: bold, italic, underline, code, blockquotes, links, CSS color spans</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0153.html' />
+        <xmpp:status>partial</xmpp:status>
+        <xmpp:version>1.1.0</xmpp:version>
+        <xmpp:note xml:lang='en'>vCard-Based Avatars - receives photo hash from presence and advertises in caps; publishing own avatar not implemented</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0224.html' />
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>1.0.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Attention - receives attention requests and opens a PM buffer; advertised in caps</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0283.html' />
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>0.3.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Moved - displays account migration notices when a contact has moved to a new JID</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0297.html' />
+        <xmpp:status>partial</xmpp:status>
+        <xmpp:version>1.0.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Forwarded Messages - used as wrapper for Message Carbons and MAM results</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0300.html' />
+        <xmpp:status>partial</xmpp:status>
+        <xmpp:version>0.6.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Cryptographic Hash Functions - SHA-256 used in SIMS (XEP-0385) file metadata</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0334.html' />
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>0.4.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Message Processing Hints - store/no-store/no-copy applied to transient stanzas (typing, reactions, link previews)</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0372.html' />
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>0.5.0</xmpp:version>
+        <xmpp:note xml:lang='en'>References - sends and renders @mention and URI references inline in messages</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0382.html' />
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>0.4.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Spoiler Messages - displays spoiler warning prefix when a message contains a spoiler hint</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0424.html' />
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>0.4.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Message Retraction - /retract command with tombstone display and MAM cache update</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0428.html' />
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>0.2.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Fallback Indication - sent alongside retraction stanzas; parsed on receive</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0444.html' />
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>0.3.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Message Reactions - /react command; reactions appended to original message line</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0461.html' />
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>0.2.1</xmpp:version>
+        <xmpp:note xml:lang='en'>Message Replies - /reply command with quoted excerpt displayed on receive</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0490.html' />
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>0.3.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Message Displayed Synchronization - subscribes to MDS PubSub node; syncs read state across devices</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0511.html' />
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>0.1.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Link Metadata - fetches and sends OpenGraph previews for outgoing URLs; renders incoming rdf:Description previews with title, description, URL, and image indicator</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
     <release>
       <Version>
-        <revision>0.3.0-fork</revision>
-        <created>2026-01-16</created>
+        <revision>0.4.0-fork</revision>
+        <created>2026-03-09</created>
         <xmpp:note
                     xml:lang='en'
-                >Fork with bug fixes and enhancements: typing indicators, auto-encryption detection, bookmark management, room discovery, capability caching, Stream Management (XEP-0198), Message Retraction (XEP-0424), Message Moderation (XEP-0425), Message Styling (XEP-0393), Stanza IDs (XEP-0359), Message Hints (XEP-0334), Message Reactions (XEP-0444), Message Replies (XEP-0461), Message Fastening (XEP-0422), Chat State Notifications (XEP-0085), User Mood (XEP-0107), User Activity (XEP-0108)</xmpp:note>
+                >Outgoing link previews (XEP-0511 send), Ad-Hoc Commands (XEP-0050), Data Forms (XEP-0004), XHTML-IM (XEP-0071), References (XEP-0372), Message Displayed Synchronization (XEP-0490), Message Fastening (XEP-0422), Fallback Indication (XEP-0428), Spoiler Messages (XEP-0382), Attention (XEP-0224), Moved (XEP-0283), Consistent Color Generation (XEP-0392), and further bug fixes</xmpp:note>
       </Version>
     </release>
   </Project>
