@@ -1894,8 +1894,8 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
         stanza, "fallback", "urn:xmpp:fallback:0");
     if (fallback_elem && text && !replace)
     {
-        // Only suppress if there's a meaningful stanza type alongside the body
-        // (reactions, retract, reply, etc. already set their own display)
+        // Suppress if there's a meaningful stanza type alongside the body:
+        // reactions, retract, reply, or apply-to (moderation / fastening)
         xmpp_stanza_t *reactions = xmpp_stanza_get_child_by_name_and_ns(
             stanza, "reactions", "urn:xmpp:reactions:0");
         xmpp_stanza_t *retract = xmpp_stanza_get_child_by_name_and_ns(
@@ -1903,7 +1903,11 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
         if (!retract)
             retract = xmpp_stanza_get_child_by_name_and_ns(
                 stanza, "retract", "urn:xmpp:message-retract:0");
-        if (reactions || retract)
+        xmpp_stanza_t *reply = xmpp_stanza_get_child_by_name_and_ns(
+            stanza, "reply", "urn:xmpp:reply:0");
+        xmpp_stanza_t *apply_to = xmpp_stanza_get_child_by_name_and_ns(
+            stanza, "apply-to", "urn:xmpp:fasten:0");
+        if (reactions || retract || reply || apply_to)
             text = nullptr;  // suppress fallback body; the handler above will print
     }
 
@@ -3878,6 +3882,55 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                       weechat_prefix("network"));
         return true;
     }
+
+    // XEP-0191: server-pushed block/unblock IQ sets (§8.4, §8.5)
+    if (block && type && weechat_strcasecmp(type, "set") == 0)
+    {
+        xmpp_stanza_t *item = xmpp_stanza_get_child_by_name(block, "item");
+        while (item)
+        {
+            const char *jid = xmpp_stanza_get_attribute(item, "jid");
+            if (jid)
+                weechat_printf(account.buffer, "%s%s was blocked",
+                               weechat_prefix("network"), jid);
+            item = xmpp_stanza_get_next(item);
+        }
+        // Acknowledge the server push
+        xmpp_stanza_t *ack = xmpp_iq_new(account.context, "result", id);
+        if (from) xmpp_stanza_set_to(ack, from);
+        if (to)   xmpp_stanza_set_from(ack, to);
+        account.connection.send(ack);
+        xmpp_stanza_release(ack);
+        return true;
+    }
+
+    if (unblock && type && weechat_strcasecmp(type, "set") == 0)
+    {
+        xmpp_stanza_t *item = xmpp_stanza_get_child_by_name(unblock, "item");
+        if (item)
+        {
+            while (item)
+            {
+                const char *jid = xmpp_stanza_get_attribute(item, "jid");
+                if (jid)
+                    weechat_printf(account.buffer, "%s%s was unblocked",
+                                   weechat_prefix("network"), jid);
+                item = xmpp_stanza_get_next(item);
+            }
+        }
+        else
+        {
+            weechat_printf(account.buffer, "%sAll JIDs unblocked",
+                           weechat_prefix("network"));
+        }
+        // Acknowledge the server push
+        xmpp_stanza_t *ack = xmpp_iq_new(account.context, "result", id);
+        if (from) xmpp_stanza_set_to(ack, from);
+        if (to)   xmpp_stanza_set_from(ack, to);
+        account.connection.send(ack);
+        xmpp_stanza_release(ack);
+        return true;
+    }
     
     // XEP-0030: Service Discovery - disco#items response
     xmpp_stanza_t *items_query = xmpp_stanza_get_child_by_name_and_ns(
@@ -4305,7 +4358,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                     if (ptr_channel != account.channels.end())
                         ptr_channel->second.update_name(name.data());
                 }
-                else if (category == "conference")
+                else if (category == "client")
                 {
                     xmpp_stanza_t *children[2] = {NULL};
                     children[0] = stanza__iq_pubsub_items(account.context, NULL,
@@ -5055,7 +5108,7 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         children[1] = pres__status;
         children[2] = NULL;
 
-        if (true)//account.pgp)
+        if (!account.pgp_keyid().empty())
         {
             pres__x = xmpp_stanza_new(account.context);
             xmpp_stanza_set_name(pres__x, "x");
