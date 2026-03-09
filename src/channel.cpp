@@ -718,7 +718,7 @@ std::optional<weechat::channel::member*> weechat::channel::add_member(const char
 
     if (user)
         user->nicklist_add(&account, this);
-    else return member; // TODO: !!
+    else return member; // no user object yet; member was created above, return it without printing a join line
 
     char *jid_bare = xmpp_jid_bare(account.context, user->id.c_str());
     char *jid_resource = xmpp_jid_resource(account.context, user->id.c_str());
