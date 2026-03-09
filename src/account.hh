@@ -8,8 +8,10 @@
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
 #include <optional>
 #include <utility>
@@ -88,6 +90,27 @@ namespace weechat
         std::unordered_map<std::string, roster_item> roster;
         std::unordered_map<std::string, bookmark_item> bookmarks;
         std::unordered_map<std::string, upload_request> upload_requests;
+
+        // XEP-0363 async upload: pending completions waiting for main-thread callback.
+        // Keyed by the read-end fd of a self-pipe; value is a shared struct filled by the
+        // upload thread once the HTTP PUT completes.
+        struct upload_completion
+        {
+            bool success = false;
+            std::string get_url;        // Download URL to share in the message
+            std::string channel_id;
+            std::string filename;
+            std::string content_type;
+            size_t file_size = 0;
+            std::string sha256_hash;
+            long http_code = 0;
+            std::string curl_error;
+            int pipe_write_fd = -1;     // write end (closed by thread after writing)
+            struct t_hook *hook = nullptr; // weechat_hook_fd (filled after thread starts)
+            std::thread worker;         // owns the background thread
+        };
+        // fd (read end) -> completion context
+        std::unordered_map<int, std::shared_ptr<upload_completion>> pending_uploads;
         
         std::string upload_service;  // JID of upload service (discovered via disco)
         size_t upload_max_size = 0;  // Max file size in bytes
@@ -201,6 +224,7 @@ namespace weechat
         static int timer_cb(const void *pointer, void *data, int remaining_calls);
         static int idle_timer_cb(const void *pointer, void *data, int remaining_calls);
         static int sm_ack_timer_cb(const void *pointer, void *data, int remaining_calls);
+        static int upload_fd_cb(const void *pointer, void *data, int fd);
         static int activity_cb(const void *pointer, void *data,
                               const char *signal, const char *type_data,
                               void *signal_data);

@@ -4,11 +4,13 @@
 
 #include <stdexcept>
 #include <optional>
+#include <thread>
 #include <time.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
 #include <curl/curl.h>
@@ -3711,128 +3713,149 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                     else if (ext == "txt") content_type = "text/plain";
                 }
                 
-                // Use libcurl for HTTP PUT upload
-                // Open file for reading
-                FILE *upload_file = fopen(req_it->second.filepath.c_str(), "rb");
-                if (!upload_file)
+                // Async HTTP PUT upload via pipe + worker thread.
+                // The worker thread does all blocking I/O (file read, SHA-256,
+                // curl PUT) and writes 1 byte to the pipe write-end when done.
+                // weechat_hook_fd fires on the read-end in the main thread,
+                // which processes the result and sends the XMPP message.
+
+                int pipe_fds[2];
+                if (pipe(pipe_fds) != 0)
                 {
-                    weechat_printf(account.buffer, "%s%s: failed to open file for upload",
+                    weechat_printf(account.buffer, "%s%s: failed to create pipe for upload",
                                   weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
                     account.upload_requests.erase(req_it);
                     return 1;
                 }
-                
-                // Get file size
-                fseek(upload_file, 0, SEEK_END);
-                long file_size = ftell(upload_file);
-                fseek(upload_file, 0, SEEK_SET);
-                
-                // Calculate SHA-256 hash for SIMS using modern EVP API
-                unsigned char hash[EVP_MAX_MD_SIZE];
-                unsigned int hash_len = 0;
-                EVP_MD_CTX *sha256_ctx = EVP_MD_CTX_new();
-                EVP_DigestInit_ex(sha256_ctx, EVP_sha256(), nullptr);
-                
-                unsigned char buffer[8192];
-                size_t bytes_read;
-                while ((bytes_read = fread(buffer, 1, sizeof(buffer), upload_file)) > 0)
-                {
-                    EVP_DigestUpdate(sha256_ctx, buffer, bytes_read);
-                }
-                EVP_DigestFinal_ex(sha256_ctx, hash, &hash_len);
-                EVP_MD_CTX_free(sha256_ctx);
-                
-                // Base64 encode the hash using OpenSSL
-                BIO *bio = BIO_new(BIO_s_mem());
-                BIO *b64 = BIO_new(BIO_f_base64());
-                BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
-                bio = BIO_push(b64, bio);
-                BIO_write(bio, hash, hash_len);
-                BIO_flush(bio);
-                
-                BUF_MEM *buffer_ptr;
-                BIO_get_mem_ptr(bio, &buffer_ptr);
-                std::string sha256_b64(buffer_ptr->data, buffer_ptr->length);
-                BIO_free_all(bio);
-                
-                // Store hash in upload request for later use
-                req_it->second.sha256_hash = sha256_b64;
-                
-                // Reset file position for upload
-                fseek(upload_file, 0, SEEK_SET);
-                
-                // Initialize curl
-                CURL *curl = curl_easy_init();
-                if (!curl)
-                {
-                    fclose(upload_file);
-                    weechat_printf(account.buffer, "%s%s: failed to initialize curl",
-                                  weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
-                    account.upload_requests.erase(req_it);
-                    return 1;
-                }
-                
-                // Set up curl options
-                curl_easy_setopt(curl, CURLOPT_URL, put_url);
-                curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
-                curl_easy_setopt(curl, CURLOPT_READDATA, upload_file);
-                curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, (curl_off_t)file_size);
-                
-                // Build header list
-                struct curl_slist *headers = NULL;
-                headers = curl_slist_append(headers, fmt::format("Content-Type: {}", content_type).c_str());
-                for (const auto& header : put_headers)
-                {
-                    headers = curl_slist_append(headers, header.c_str());
-                }
-                curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-                
-                weechat_printf(account.buffer, "%s[DEBUG] Uploading %ld bytes with libcurl",
-                              weechat_prefix("network"), file_size);
-                
-                // Perform the upload
-                CURLcode res = curl_easy_perform(curl);
-                
-                long http_code = 0;
-                curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-                
-                // Cleanup
-                curl_slist_free_all(headers);
-                curl_easy_cleanup(curl);
-                fclose(upload_file);
-                
-                if (res != CURLE_OK || http_code != 201)
-                {
-                    weechat_printf(account.buffer, "%s%s: file upload failed (HTTP %ld): %s",
-                                  weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
-                                  http_code, curl_easy_strerror(res));
-                }
-                else
-                {
-                    weechat_printf(account.buffer, "%sFile uploaded successfully!",
-                                  weechat_prefix("network"));
-                    
-                    // Send message with SIMS metadata
-                    auto channel_it = account.channels.find(req_it->second.channel_id);
-                    if (channel_it != account.channels.end())
-                    {
-                        // Build file metadata for SIMS
-                        weechat::channel::file_metadata file_meta;
-                        file_meta.filename = req_it->second.filename;
-                        file_meta.content_type = req_it->second.content_type;
-                        file_meta.size = req_it->second.file_size;
-                        file_meta.sha256_hash = req_it->second.sha256_hash;
-                        
-                        channel_it->second.send_message(
-                            channel_it->second.id,
-                            get_url,
-                            std::optional<std::string>(get_url),
-                            std::optional<weechat::channel::file_metadata>(file_meta)
-                        );
-                    }
-                }
-                
+
+                // Build the completion context (everything the callback needs)
+                auto ctx = std::make_shared<weechat::account::upload_completion>();
+                ctx->channel_id    = req_it->second.channel_id;
+                ctx->filename      = req_it->second.filename;
+                ctx->content_type  = content_type;
+                ctx->pipe_write_fd = pipe_fds[1];
+
+                // Copy strings that will be used by the worker thread (the
+                // upload_requests entry will be erased below, so we must copy
+                // before erasing).
+                std::string filepath_copy  = req_it->second.filepath;
+                std::string put_url_copy   = put_url;
+                std::string get_url_copy   = get_url;
+
+                // Erase the upload_requests entry now (before thread starts)
                 account.upload_requests.erase(req_it);
+
+                // Register WeeChat hook on the read-end fd
+                ctx->hook = weechat_hook_fd(pipe_fds[0], 1, 0, 0,
+                                            &weechat::account::upload_fd_cb,
+                                            &account, nullptr);
+
+                // Store in pending_uploads keyed by read-end fd
+                account.pending_uploads[pipe_fds[0]] = ctx;
+
+                // Capture everything needed for the thread by value
+                std::shared_ptr<weechat::account::upload_completion> ctx_copy = ctx;
+                std::vector<std::string> put_headers_copy = put_headers;
+                std::string content_type_copy = content_type;
+
+                ctx->worker = std::thread([ctx_copy, filepath_copy,
+                                           put_url_copy, get_url_copy,
+                                           put_headers_copy, content_type_copy]()
+                {
+                    auto &c = *ctx_copy;
+
+                    // Open file
+                    FILE *upload_file = fopen(filepath_copy.c_str(), "rb");
+                    if (!upload_file)
+                    {
+                        c.success   = false;
+                        c.curl_error = "failed to open file";
+                        ::write(c.pipe_write_fd, "x", 1);
+                        return;
+                    }
+
+                    // Get file size
+                    fseek(upload_file, 0, SEEK_END);
+                    long file_size = ftell(upload_file);
+                    fseek(upload_file, 0, SEEK_SET);
+                    c.file_size = static_cast<size_t>(file_size);
+
+                    // Calculate SHA-256 hash for SIMS using EVP API
+                    unsigned char hash[EVP_MAX_MD_SIZE];
+                    unsigned int  hash_len = 0;
+                    EVP_MD_CTX *sha256_ctx = EVP_MD_CTX_new();
+                    EVP_DigestInit_ex(sha256_ctx, EVP_sha256(), nullptr);
+                    unsigned char buf[8192];
+                    size_t bytes_read;
+                    while ((bytes_read = fread(buf, 1, sizeof(buf), upload_file)) > 0)
+                        EVP_DigestUpdate(sha256_ctx, buf, bytes_read);
+                    EVP_DigestFinal_ex(sha256_ctx, hash, &hash_len);
+                    EVP_MD_CTX_free(sha256_ctx);
+
+                    // Base64-encode the hash
+                    BIO *bio = BIO_new(BIO_s_mem());
+                    BIO *b64 = BIO_new(BIO_f_base64());
+                    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+                    bio = BIO_push(b64, bio);
+                    BIO_write(bio, hash, static_cast<int>(hash_len));
+                    BIO_flush(bio);
+                    BUF_MEM *bptr;
+                    BIO_get_mem_ptr(bio, &bptr);
+                    c.sha256_hash = std::string(bptr->data, bptr->length);
+                    BIO_free_all(bio);
+
+                    // Reset file position for upload
+                    fseek(upload_file, 0, SEEK_SET);
+
+                    // Initialize curl
+                    CURL *curl = curl_easy_init();
+                    if (!curl)
+                    {
+                        fclose(upload_file);
+                        c.success    = false;
+                        c.curl_error = "failed to initialize curl";
+                        ::write(c.pipe_write_fd, "x", 1);
+                        return;
+                    }
+
+                    curl_easy_setopt(curl, CURLOPT_URL, put_url_copy.c_str());
+                    curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+                    curl_easy_setopt(curl, CURLOPT_READDATA, upload_file);
+                    curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE,
+                                     static_cast<curl_off_t>(file_size));
+
+                    struct curl_slist *headers = nullptr;
+                    headers = curl_slist_append(
+                        headers,
+                        fmt::format("Content-Type: {}", content_type_copy).c_str());
+                    for (const auto &hdr : put_headers_copy)
+                        headers = curl_slist_append(headers, hdr.c_str());
+                    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+                    CURLcode res = curl_easy_perform(curl);
+
+                    long http_code = 0;
+                    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+                    curl_slist_free_all(headers);
+                    curl_easy_cleanup(curl);
+                    fclose(upload_file);
+
+                    c.http_code = http_code;
+                    c.get_url   = get_url_copy;
+                    if (res != CURLE_OK || http_code != 201)
+                    {
+                        c.success    = false;
+                        c.curl_error = curl_easy_strerror(res);
+                    }
+                    else
+                    {
+                        c.success = true;
+                    }
+
+                    // Signal the main thread
+                    ::write(c.pipe_write_fd, "x", 1);
+                });
             }
             else
             {

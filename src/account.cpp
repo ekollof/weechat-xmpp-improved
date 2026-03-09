@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include <unistd.h>
 #include <fmt/core.h>
 #include <libxml/xmlwriter.h>
 #include <libxml/xmlerror.h>
@@ -1196,6 +1197,76 @@ int weechat::account::sm_ack_timer_cb(const void *pointer, void *data, int remai
     account->connection.send(stanza::xep0198::request()
                             .build(account->context)
                             .get());
+
+    return WEECHAT_RC_OK;
+}
+
+int weechat::account::upload_fd_cb(const void *pointer, void *data, int fd)
+{
+    (void) data;
+
+    if (weechat::g_plugin_unloading || !weechat::plugin::instance)
+        return WEECHAT_RC_OK;
+
+    account *ptr_account = (account *)pointer;
+    if (!ptr_account)
+        return WEECHAT_RC_ERROR;
+
+    // Find the completion context for this fd
+    auto it = ptr_account->pending_uploads.find(fd);
+    if (it == ptr_account->pending_uploads.end())
+        return WEECHAT_RC_ERROR;
+
+    auto ctx = it->second;
+
+    // Drain the pipe (1 byte signal)
+    char sig[1];
+    (void)::read(fd, sig, sizeof(sig));
+
+    // Join the worker thread
+    if (ctx->worker.joinable())
+        ctx->worker.join();
+
+    // Unhook and close fds
+    if (ctx->hook)
+        weechat_unhook(ctx->hook);
+    close(fd);
+    if (ctx->pipe_write_fd >= 0)
+        close(ctx->pipe_write_fd);
+
+    // Remove from map
+    ptr_account->pending_uploads.erase(it);
+
+    // Process result
+    if (!ctx->success)
+    {
+        weechat_printf(ptr_account->buffer,
+                        "%s%s: file upload failed (HTTP %ld): %s",
+                        weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
+                        ctx->http_code,
+                        ctx->curl_error.empty() ? "unknown error" : ctx->curl_error.c_str());
+        return WEECHAT_RC_OK;
+    }
+
+    weechat_printf(ptr_account->buffer, "%sFile uploaded! Sharing link…",
+                  weechat_prefix("network"));
+
+    auto channel_it = ptr_account->channels.find(ctx->channel_id);
+    if (channel_it != ptr_account->channels.end())
+    {
+        weechat::channel::file_metadata meta;
+        meta.filename     = ctx->filename;
+        meta.content_type = ctx->content_type;
+        meta.size         = ctx->file_size;
+        meta.sha256_hash  = ctx->sha256_hash;
+
+        channel_it->second.send_message(
+            channel_it->second.id,
+            ctx->get_url,
+            std::optional<std::string>(ctx->get_url),
+            std::optional<weechat::channel::file_metadata>(meta)
+        );
+    }
 
     return WEECHAT_RC_OK;
 }
