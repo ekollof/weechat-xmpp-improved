@@ -225,7 +225,7 @@ int command__connect_account(weechat::account *account)
 
 int command__account_connect(struct t_gui_buffer *buffer, int argc, char **argv)
 {
-    int i, nb_connect, connect_ok;
+    int i, connect_ok;
     weechat::account *ptr_account = nullptr;
 
     (void) buffer;
@@ -234,10 +234,8 @@ int command__account_connect(struct t_gui_buffer *buffer, int argc, char **argv)
 
     connect_ok = 1;
 
-    nb_connect = 0;
     for (i = 2; i < argc; i++)
     {
-        nb_connect++;
         if (weechat::account::search(ptr_account, argv[i]))
         {
             if (!command__connect_account(ptr_account))
@@ -280,7 +278,7 @@ int command__disconnect_account(weechat::account *account)
 
 int command__account_disconnect(struct t_gui_buffer *buffer, int argc, char **argv)
 {
-    int i, nb_disconnect, disconnect_ok;
+    int i, disconnect_ok;
     weechat::account *ptr_account;
 
     (void) argc;
@@ -288,7 +286,6 @@ int command__account_disconnect(struct t_gui_buffer *buffer, int argc, char **ar
 
     disconnect_ok = 1;
 
-    nb_disconnect = 0;
     if (argc < 2)
     {
         weechat::channel *ptr_channel;
@@ -305,7 +302,6 @@ int command__account_disconnect(struct t_gui_buffer *buffer, int argc, char **ar
     }
     for (i = 2; i < argc; i++)
     {
-        nb_disconnect++;
         if (weechat::account::search(ptr_account, argv[i]))
         {
             if (!command__disconnect_account(ptr_account))

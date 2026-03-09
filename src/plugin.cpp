@@ -7,7 +7,6 @@
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wincompatible-pointer-types"
-#pragma clang diagnostic ignored "-Wunqualified-std-cast-removal"
 #endif
 
 #include <algorithm>

@@ -49,8 +49,6 @@ namespace weechat
     private:
         std::string name;
 
-        bool updated = false;
-
     public:
         std::string id;
         bool is_away = false;

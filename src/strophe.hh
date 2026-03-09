@@ -60,14 +60,28 @@ namespace libstrophe {
         template<typename Fun, Fun &func, int success = 0, typename... Args,
             typename = std::enable_if_t<std::is_same_v<void, std::invoke_result_t<Fun, pointer_type, std::decay_t<Args>...>>>>
         inline void call(Args&&... args) {
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
             func(*this, std::forward<Args>(args)...);
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
         }
 
         template<typename Fun, Fun &func, typename... Args,
             typename = std::enable_if_t<!std::is_same_v<void, std::invoke_result_t<Fun, pointer_type, std::decay_t<std::decay_t<Args>>...>>>>
         inline typename std::invoke_result_t<Fun, pointer_type, std::decay_t<std::decay_t<Args>>...>
         call(Args&&... args) {
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
             return func(*this, std::forward<Args>(args)...);
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
         }
 
     public:
@@ -145,10 +159,20 @@ namespace libstrophe {
         }
 
         inline auto set_keepalive(auto &&...args) {
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#else
+#pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
             return call<decltype(xmpp_conn_set_keepalive),
                         xmpp_conn_set_keepalive>(args...);
+#ifdef __clang__
+#pragma clang diagnostic pop
+#else
 #pragma GCC diagnostic pop
+#endif
         }
 
         inline auto set_jid(auto &&...args) {

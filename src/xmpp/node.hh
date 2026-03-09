@@ -54,6 +54,8 @@ namespace xml {
         explicit node();
 
     public:
+        virtual ~node() = default;
+
         inline node(xmpp_ctx_t *context, xmpp_stanza_t *stanza) : context(context) {
             bind(context, stanza);
         }

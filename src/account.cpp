@@ -1150,7 +1150,7 @@ int weechat::account::idle_timer_cb(const void *pointer, void *data, int remaini
     if (weechat::g_plugin_unloading || !weechat::plugin::instance)
         return WEECHAT_RC_OK;
 
-    account *account = (struct account *)pointer;
+    account *account = (weechat::account *)pointer;
     if (!account || !account->connection || !xmpp_conn_is_connected(account->connection))
         return WEECHAT_RC_OK;
 
@@ -1184,7 +1184,7 @@ int weechat::account::activity_cb(const void *pointer, void *data,
     if (weechat::g_plugin_unloading || !weechat::plugin::instance)
         return WEECHAT_RC_OK;
 
-    account *account = (struct account *)pointer;
+    account *account = (weechat::account *)pointer;
     if (!account || !account->connection || !xmpp_conn_is_connected(account->connection))
         return WEECHAT_RC_OK;
 
@@ -1214,7 +1214,7 @@ int weechat::account::sm_ack_timer_cb(const void *pointer, void *data, int remai
     if (weechat::g_plugin_unloading || !weechat::plugin::instance)
         return WEECHAT_RC_OK;
 
-    account *account = (struct account *)pointer;
+    account *account = (weechat::account *)pointer;
     if (!account || !account->connection || !xmpp_conn_is_connected(account->connection))
         return WEECHAT_RC_OK;
 
