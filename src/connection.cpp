@@ -1213,28 +1213,34 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
                                 const char *info_type = xmpp_stanza_get_attribute(info, "type");
                                 const char *info_bytes = xmpp_stanza_get_attribute(info, "bytes");
                                 
-                                if (info_id)
-                                {
-                                    const char *from_jid = from ? from : account.jid().data();
-                                    
-                                    // Update user's avatar hash
-                                    weechat::user *user = weechat::user::search(&account, from_jid);
-                                    if (user)
-                                    {
-                                        user->profile.avatar_hash = info_id;
-                                    }
-                                    
-                                    weechat_printf_date_tags(account.buffer, 0, "xmpp_avatar",
-                                                            "%sAvatar update from %s (hash: %.8s..., type: %s, bytes: %s)",
-                                                            weechat_prefix("network"),
-                                                            from_jid,
-                                                            info_id,
-                                                            info_type ? info_type : "unknown",
-                                                            info_bytes ? info_bytes : "unknown");
-                                    
-                                    // Request avatar data
-                                    weechat::avatar::request_data(account, from_jid, info_id);
-                                }
+                                 if (info_id)
+                                 {
+                                     const char *from_jid = from ? from : account.jid().data();
+
+                                     // Update user's avatar hash
+                                     weechat::user *user = weechat::user::search(&account, from_jid);
+                                     bool hash_changed = true;
+                                     if (user)
+                                     {
+                                         hash_changed = (user->profile.avatar_hash != info_id);
+                                         user->profile.avatar_hash = info_id;
+                                     }
+
+                                     // Only fetch/load data when hash is new or user was unknown
+                                     if (hash_changed || (user && user->profile.avatar_data.empty()))
+                                     {
+                                         weechat_printf_date_tags(account.buffer, 0, "xmpp_avatar",
+                                                                 "%sAvatar update from %s (hash: %.8s..., type: %s, bytes: %s)",
+                                                                 weechat_prefix("network"),
+                                                                 from_jid,
+                                                                 info_id,
+                                                                 info_type ? info_type : "unknown",
+                                                                 info_bytes ? info_bytes : "unknown");
+
+                                         // request_data() checks cache before sending IQ
+                                         weechat::avatar::request_data(account, from_jid, info_id);
+                                     }
+                                 }
                             }
                         }
                     }

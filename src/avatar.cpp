@@ -183,16 +183,31 @@ void weechat::avatar::request_metadata(account& /*acc*/, const char * /*jid*/)
 }
 
 void weechat::avatar::request_data(account& acc, const char *jid,
-                                    const std::string& /*hash*/)
+                                    const std::string& hash)
 {
-    // Generate unique IQ ID
-    std::unique_ptr<char> id(xmpp_uuid_gen(acc.context));
-    
-    xmpp_stanza_t *iq = weechat::xep0084::request_avatar_data(acc.context, jid, id.get());
-    
+    // If we already have this hash cached, load it directly — no network needed.
+    if (!hash.empty())
+    {
+        auto cached = load_from_cache(acc, hash);
+        if (cached)
+        {
+            weechat::user *user = weechat::user::search(&acc, jid);
+            if (user)
+            {
+                user->profile.avatar_data     = cached->image_data;
+                user->profile.avatar_rendered = render_unicode_blocks(
+                    cached->image_data, cached->meta.type);
+            }
+            return;  // Cache hit — no IQ needed
+        }
+    }
+
+    // Cache miss — fetch from server
+    char *raw_id = xmpp_uuid_gen(acc.context);
+    xmpp_stanza_t *iq = weechat::xep0084::request_avatar_data(acc.context, jid, raw_id);
+    xmpp_free(acc.context, raw_id);
     acc.connection.send(iq);
     xmpp_stanza_release(iq);
-    xmpp_free(acc.context, id.release());
 }
 
 void weechat::avatar::load_for_user(account& acc, user& user)
