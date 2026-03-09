@@ -996,6 +996,73 @@ int weechat::channel::send_message(std::string to, std::string body,
     xmpp_stanza_add_child(message, message__store);
     xmpp_stanza_release(message__store);
 
+    // XEP-0372: References — add <reference type="mention"> for each @nick in body
+    {
+        // Scan body for @word tokens and resolve them to JIDs
+        // Member keys for MUC are "room@service/nick"; for PM they are bare JIDs.
+        static const std::regex at_re("@([\\w.\\-]+)", std::regex::ECMAScript);
+        auto begin_it = std::sregex_iterator(body.begin(), body.end(), at_re);
+        auto end_it   = std::sregex_iterator();
+        for (auto it = begin_it; it != end_it; ++it)
+        {
+            const std::smatch& m = *it;
+            std::string nick = m[1].str();
+            std::string mention_jid;
+
+            // Look up nick in members map
+            for (auto& [member_id, mem] : members)
+            {
+                (void)mem;
+                if (type == weechat::channel::chat_type::MUC)
+                {
+                    // member_id is "room@service/nick"; resource == nick
+                    auto slash = member_id.rfind('/');
+                    if (slash != std::string::npos)
+                    {
+                        std::string resource = member_id.substr(slash + 1);
+                        if (weechat_strcasecmp(resource.c_str(), nick.c_str()) == 0)
+                        {
+                            mention_jid = member_id;  // room@service/nick
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    // member_id is a bare JID; match the node part vs nick
+                    auto at_pos = member_id.find('@');
+                    std::string node = (at_pos != std::string::npos)
+                                       ? member_id.substr(0, at_pos) : member_id;
+                    if (weechat_strcasecmp(node.c_str(), nick.c_str()) == 0)
+                    {
+                        mention_jid = member_id;
+                        break;
+                    }
+                }
+            }
+
+            if (mention_jid.empty())
+                continue;
+
+            // Byte offsets in body string: begin = position of '@', end = after nick
+            std::string uri = "xmpp:" + mention_jid;
+            size_t ref_begin = static_cast<size_t>(m.position(0));   // '@' position
+            size_t ref_end   = ref_begin + static_cast<size_t>(m.length(0)); // exclusive end
+
+            xmpp_stanza_t *ref = xmpp_stanza_new(account.context);
+            xmpp_stanza_set_name(ref, "reference");
+            xmpp_stanza_set_ns(ref, "urn:xmpp:reference:0");
+            xmpp_stanza_set_attribute(ref, "type", "mention");
+            xmpp_stanza_set_attribute(ref, "uri", uri.c_str());
+            xmpp_stanza_set_attribute(ref, "begin",
+                std::to_string(ref_begin).c_str());
+            xmpp_stanza_set_attribute(ref, "end",
+                std::to_string(ref_end).c_str());
+            xmpp_stanza_add_child(message, ref);
+            xmpp_stanza_release(ref);
+        }
+    }
+
     account.connection.send( message);
     xmpp_stanza_release(message);
     if (type != weechat::channel::chat_type::MUC)
