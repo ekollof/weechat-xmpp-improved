@@ -2020,7 +2020,9 @@ xmpp_stanza_t *omemo::get_bundle(xmpp_ctx_t *context, char *from, char *to)
             context, NULL, NULL);
     stanza__set_text(context, children[1], with_free(signed_pre_key_signature));
 
-    iks_get_identity_key_pair(&record, (signal_buffer**)&signed_pre_key, omemo);
+    struct signal_buffer *private_key_buf = NULL;
+    iks_get_identity_key_pair(&record, (signal_buffer**)&private_key_buf, omemo);
+    signal_buffer_free(private_key_buf);
     char *identity_key = NULL;
     base64_encode(signal_buffer_data(record), signal_buffer_len(record),
             &identity_key);
@@ -2379,6 +2381,7 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
             if ((ret = ec_public_key_serialize(&identity_buf, identity_key))) {
                 weechat_printf(buffer, "%somemo: failed to serialize identity key from %s device %s (ret=%d)",
                                weechat_prefix("error"), jid, source_id, ret);
+                SIGNAL_UNREF(pre_key_message);
                 weechat_string_dyn_free(format, 1);
                 return NULL;
             }
@@ -2386,15 +2389,19 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
                                     signal_buffer_len(identity_buf), omemo))) {
                 weechat_printf(buffer, "%somemo: failed to save identity from %s device %s (ret=%d)",
                                weechat_prefix("error"), jid, source_id, ret);
+                signal_buffer_free(identity_buf);
+                SIGNAL_UNREF(pre_key_message);
                 weechat_string_dyn_free(format, 1);
                 return NULL;
             }
+            signal_buffer_free(identity_buf);
 
             struct session_cipher *cipher;
             if ((ret = session_cipher_create(&cipher, omemo->store_context,
                                         &address, omemo->context))) {
                 weechat_printf(buffer, "%somemo: failed to create cipher for %s device %s (ret=%d)",
                                weechat_prefix("error"), jid, source_id, ret);
+                SIGNAL_UNREF(pre_key_message);
                 weechat_string_dyn_free(format, 1);
                 return NULL;
             }
@@ -2403,9 +2410,13 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
                                                                 0, &aes_key))) {
                 weechat_printf(buffer, "%somemo: pre-key decryption failed from %s device %s (ret=%d)",
                                weechat_prefix("error"), jid, source_id, ret);
+                session_cipher_free(cipher);
+                SIGNAL_UNREF(pre_key_message);
                 weechat_string_dyn_free(format, 1);
                 return NULL;
             }
+            session_cipher_free(cipher);
+            SIGNAL_UNREF(pre_key_message);
             weechat_printf(buffer, "%somemo: new session established with %s device %s",
                            weechat_prefix("network"), jid, source_id);
         } else {
@@ -2421,6 +2432,7 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
                                         &address, omemo->context))) {
                 weechat_printf(buffer, "%somemo: failed to create cipher for %s device %s (ret=%d)",
                                weechat_prefix("error"), jid, source_id, ret);
+                SIGNAL_UNREF(key_message);
                 weechat_string_dyn_free(format, 1);
                 return NULL;
             }
@@ -2428,9 +2440,13 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
                                                         0, &aes_key))) {
                 weechat_printf(buffer, "%somemo: decryption failed from %s device %s (ret=%d)",
                                weechat_prefix("error"), jid, source_id, ret);
+                session_cipher_free(cipher);
+                SIGNAL_UNREF(key_message);
                 weechat_string_dyn_free(format, 1);
                 return NULL;
             }
+            session_cipher_free(cipher);
+            SIGNAL_UNREF(key_message);
         }
         decrypted_ok = true;
 
@@ -2643,8 +2659,7 @@ xmpp_stanza_t *omemo::encode(weechat::account *account, struct t_gui_buffer *buf
             if (target == jid)
                 keycount++;
 
-            signal_buffer_free(record);
-          //SIGNAL_UNREF(signal_message);
+            SIGNAL_UNREF(signal_message);
             session_cipher_free(cipher);
         }
         signal_int_list_free(devicelist);
