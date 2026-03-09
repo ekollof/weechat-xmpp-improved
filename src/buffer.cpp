@@ -170,6 +170,9 @@ int buffer__switch_cb(const void *pointer, void *data,
             auto *self_user = weechat::user::search(prev_account,
                                                     prev_account->jid_device().data());
             prev_channel->send_inactive(self_user);
+            // XEP-0490: flush unread markers when leaving the buffer so that
+            // other devices know we have read all pending messages here.
+            prev_channel->send_reads();
         }
     }
 
