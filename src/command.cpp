@@ -910,9 +910,10 @@ int command__mam(const void *pointer, void *data,
     end = time(NULL);
     start = end - (days * 24 * 60 * 60);
     
-    char *mam_uuid = xmpp_uuid_gen(ptr_account->context);
+    xmpp_string_guard mam_uuid_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    const char *mam_uuid = mam_uuid_g.ptr;
     ptr_channel->fetch_mam(mam_uuid, &start, &end, NULL);
-    xmpp_free(ptr_account->context, mam_uuid);
+    // freed by mam_uuid_g
 
     return WEECHAT_RC_OK;
 }
@@ -1512,9 +1513,10 @@ int command__edit(const void *pointer, void *data,
                     ? "groupchat" : "chat",
                     ptr_channel->id.data(), NULL);
 
-    char *id = xmpp_uuid_gen(ptr_account->context);
+    xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    const char *id = id_g.ptr;
     xmpp_stanza_set_id(message, id);
-    xmpp_free(ptr_account->context, id);
+    // freed by id_g
     xmpp_message_set_body(message, text);
 
     // Add replace element with original message ID
@@ -1645,9 +1647,10 @@ int command__retract(const void *pointer, void *data,
                     ? "groupchat" : "chat",
                     ptr_channel->id.data(), NULL);
 
-    char *id = xmpp_uuid_gen(ptr_account->context);
+    xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    const char *id = id_g.ptr;
     xmpp_stanza_set_id(message, id);
-    xmpp_free(ptr_account->context, id);
+    // freed by id_g
 
     // Add retract element with original message ID
     xmpp_stanza_t *retract = xmpp_stanza_new(ptr_account->context);
@@ -1797,9 +1800,10 @@ int command__react(const void *pointer, void *data,
                     ? "groupchat" : "chat",
                     ptr_channel->id.data(), NULL);
 
-    char *msg_id = xmpp_uuid_gen(ptr_account->context);
+    xmpp_string_guard msg_id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    const char *msg_id = msg_id_g.ptr;
     xmpp_stanza_set_id(message, msg_id);
-    xmpp_free(ptr_account->context, msg_id);
+    // freed by msg_id_g
 
     // Add reactions element
     xmpp_stanza_t *reactions = xmpp_stanza_new(ptr_account->context);
@@ -1963,9 +1967,10 @@ int command__reply(const void *pointer, void *data,
                         ? "groupchat" : "chat";
 
     xmpp_stanza_t *message = xmpp_message_new(ptr_account->context, type, to, NULL);
-    char *uuid = xmpp_uuid_gen(ptr_account->context);
+    xmpp_string_guard uuid_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    const char *uuid = uuid_g.ptr;
     xmpp_stanza_set_id(message, uuid);
-    xmpp_free(ptr_account->context, uuid);
+    // freed by uuid_g
 
     // Add <body> with reply text
     xmpp_stanza_t *body = xmpp_stanza_new(ptr_account->context);
@@ -1993,9 +1998,10 @@ int command__reply(const void *pointer, void *data,
     xmpp_stanza_t *origin_id = xmpp_stanza_new(ptr_account->context);
     xmpp_stanza_set_name(origin_id, "origin-id");
     xmpp_stanza_set_ns(origin_id, "urn:xmpp:sid:0");
-    char *origin_uuid = xmpp_uuid_gen(ptr_account->context);
+    xmpp_string_guard origin_uuid_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    const char *origin_uuid = origin_uuid_g.ptr;
     xmpp_stanza_set_attribute(origin_id, "id", origin_uuid);
-    xmpp_free(ptr_account->context, origin_uuid);
+    // freed by origin_uuid_g
     xmpp_stanza_add_child(message, origin_id);
 
     ptr_account->connection.send(message);
@@ -2199,7 +2205,8 @@ int command__ping(const void *pointer, void *data,
         target = NULL;  // Ping the server
 
     // Create ping IQ
-    char *id = xmpp_uuid_gen(ptr_account->context);
+    xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    const char *id = id_g.ptr;
     iq = xmpp_iq_new(ptr_account->context, "get", id);
     
     // Track ping time for response measurement
@@ -2226,7 +2233,7 @@ int command__ping(const void *pointer, void *data,
     
     ptr_account->connection.send( iq);
     xmpp_stanza_release(iq);
-    xmpp_free(ptr_account->context, id);
+    // freed by id_g
 
     return WEECHAT_RC_OK;
 }
@@ -2296,9 +2303,10 @@ int command__mood(const void *pointer, void *data,
     //   </pubsub>
     // </iq>
 
-    char *id = xmpp_uuid_gen(ptr_account->context);
+    xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    const char *id = id_g.ptr;
     xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "set", id);
-    xmpp_free(ptr_account->context, id);
+    // freed by id_g
 
     // <pubsub xmlns='http://jabber.org/protocol/pubsub'>
     xmpp_stanza_t *pubsub = xmpp_stanza_new(ptr_account->context);
@@ -2471,9 +2479,10 @@ int command__activity(const void *pointer, void *data,
     //   </pubsub>
     // </iq>
 
-    char *id = xmpp_uuid_gen(ptr_account->context);
+    xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    const char *id = id_g.ptr;
     xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "set", id);
-    xmpp_free(ptr_account->context, id);
+    // freed by id_g
 
     xmpp_stanza_t *pubsub = xmpp_stanza_new(ptr_account->context);
     xmpp_stanza_set_name(pubsub, "pubsub");
@@ -2637,7 +2646,8 @@ int command__selfping(const void *pointer, void *data,
     std::string muc_jid = std::string(ptr_channel->id) + "/" + std::string(ptr_account->nickname());
 
     // Send self-ping to our own MUC nickname
-    iq = xmpp_iq_new(ptr_account->context, "get", xmpp_uuid_gen(ptr_account->context));
+    xmpp_string_guard iq_id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    iq = xmpp_iq_new(ptr_account->context, "get", iq_id_g.ptr);
     xmpp_stanza_set_to(iq, muc_jid.c_str());
     
     xmpp_stanza_t *ping = xmpp_stanza_new(ptr_account->context);
@@ -2859,7 +2869,8 @@ int command__block(const void *pointer, void *data,
     const char **jids = (const char **)&argv[1];
     int count = argc - 1;
     
-    iq = xmpp_iq_new(ptr_account->context, "set", xmpp_uuid_gen(ptr_account->context));
+    xmpp_string_guard iq_id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    iq = xmpp_iq_new(ptr_account->context, "set", iq_id_g.ptr);
     
     xmpp_stanza_t *block = xmpp_stanza_new(ptr_account->context);
     xmpp_stanza_set_name(block, "block");
@@ -2910,7 +2921,10 @@ int command__unblock(const void *pointer, void *data,
         return WEECHAT_RC_OK;
     }
 
-    iq = xmpp_iq_new(ptr_account->context, "set", xmpp_uuid_gen(ptr_account->context));
+    {
+    xmpp_string_guard iq_id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    iq = xmpp_iq_new(ptr_account->context, "set", iq_id_g.ptr);
+    }
     
     xmpp_stanza_t *unblock = xmpp_stanza_new(ptr_account->context);
     xmpp_stanza_set_name(unblock, "unblock");
@@ -2977,7 +2991,8 @@ int command__blocklist(const void *pointer, void *data,
     }
 
     // Request block list
-    iq = xmpp_iq_new(ptr_account->context, "get", xmpp_uuid_gen(ptr_account->context));
+    xmpp_string_guard iq_id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    iq = xmpp_iq_new(ptr_account->context, "get", iq_id_g.ptr);
     
     xmpp_stanza_t *blocklist = xmpp_stanza_new(ptr_account->context);
     xmpp_stanza_set_name(blocklist, "blocklist");
@@ -3025,7 +3040,8 @@ int command__disco(const void *pointer, void *data,
     else
         target = xmpp_jid_domain(ptr_account->context, ptr_account->jid().data());
 
-    char *id = xmpp_uuid_gen(ptr_account->context);
+    xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    const char *id = id_g.ptr;
     ptr_account->user_disco_queries.insert(id);
     
     xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "get", id);
@@ -3040,7 +3056,7 @@ int command__disco(const void *pointer, void *data,
     
     ptr_account->connection.send( iq);
     xmpp_stanza_release(iq);
-    xmpp_free(ptr_account->context, id);
+    // freed by id_g
 
     weechat_printf(buffer, "Querying service discovery for %s...", target);
 
@@ -3120,9 +3136,10 @@ int command__roster(const void *pointer, void *data,
         const char *jid = argv[2];
         const char *name = (argc >= 4) ? argv_eol[3] : NULL;
 
-        char *id = xmpp_uuid_gen(ptr_account->context);
+        xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+        const char *id = id_g.ptr;
         xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "set", id);
-        xmpp_free(ptr_account->context, id);
+        // freed by id_g
         
         xmpp_stanza_t *query = xmpp_stanza_new(ptr_account->context);
         xmpp_stanza_set_name(query, "query");
@@ -3163,9 +3180,10 @@ int command__roster(const void *pointer, void *data,
     {
         const char *jid = argv[2];
 
-        char *id = xmpp_uuid_gen(ptr_account->context);
+        xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+        const char *id = id_g.ptr;
         xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "set", id);
-        xmpp_free(ptr_account->context, id);
+        // freed by id_g
         
         xmpp_stanza_t *query = xmpp_stanza_new(ptr_account->context);
         xmpp_stanza_set_name(query, "query");
@@ -3364,7 +3382,8 @@ static void xep0433_send_search(weechat::account *account,
                                 const char *service_jid,
                                 const char *keywords)
 {
-    char *search_id = xmpp_uuid_gen(account->context);
+    xmpp_string_guard search_id_g(account->context, xmpp_uuid_gen(account->context));
+    const char *search_id = search_id_g.ptr;
 
     weechat::account::channel_search_query_info info;
     info.service_jid = service_jid;
@@ -3453,7 +3472,7 @@ static void xep0433_send_search(weechat::account *account,
 
     account->connection.send(iq);
     xmpp_stanza_release(iq);
-    xmpp_free(account->context, search_id);
+    // freed by search_id_g
 }
 
 int command__list(const void *pointer, void *data,
@@ -3681,7 +3700,8 @@ int command__upload(const void *pointer, void *data,
                   weechat_prefix("network"), filename.c_str(), filesize);
     
     // Generate request ID
-    char *id = xmpp_uuid_gen(ptr_account->context);
+    xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    const char *id = id_g.ptr;
     
     // Extract just the filename (no path)
     size_t last_slash = filename.find_last_of("/\\");
@@ -3792,7 +3812,7 @@ int command__upload(const void *pointer, void *data,
     
     ptr_account->connection.send(iq);
     xmpp_stanza_release(iq);
-    xmpp_free(ptr_account->context, id);
+    // freed by id_g
 
     return WEECHAT_RC_OK;
 }
@@ -3841,9 +3861,10 @@ int command__buzz(const void *pointer, void *data,
     xmpp_stanza_t *message = xmpp_message_new(ptr_account->context, "chat",
                                                ptr_channel->id.data(), NULL);
 
-    char *id = xmpp_uuid_gen(ptr_account->context);
+    xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    const char *id = id_g.ptr;
     xmpp_stanza_set_id(message, id);
-    xmpp_free(ptr_account->context, id);
+    // freed by id_g
 
     xmpp_stanza_t *attention = xmpp_stanza_new(ptr_account->context);
     xmpp_stanza_set_name(attention, "attention");
@@ -3916,9 +3937,10 @@ int command__spoiler(const void *pointer, void *data,
                         ? "groupchat" : "chat",
                         ptr_channel->id.data(), NULL);
 
-        char *id = xmpp_uuid_gen(ptr_account->context);
+        xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+        const char *id = id_g.ptr;
         xmpp_stanza_set_id(message, id);
-        xmpp_free(ptr_account->context, id);
+        // freed by id_g
 
         xmpp_message_set_body(message, text);
 
@@ -3950,9 +3972,10 @@ int command__spoiler(const void *pointer, void *data,
                         ? "groupchat" : "chat",
                         ptr_channel->id.data(), NULL);
 
-        char *id = xmpp_uuid_gen(ptr_account->context);
+        xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+        const char *id = id_g.ptr;
         xmpp_stanza_set_id(message, id);
-        xmpp_free(ptr_account->context, id);
+        // freed by id_g
 
         xmpp_message_set_body(message, text);
 
@@ -4020,7 +4043,8 @@ int command__adhoc(const void *pointer, void *data,
     if (argc == 2)
     {
         // List available commands via disco#items with commands node
-        char *query_id = xmpp_uuid_gen(ptr_account->context);
+        xmpp_string_guard query_id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+        const char *query_id = query_id_g.ptr;
 
         weechat::account::adhoc_query_info info;
         info.target_jid = target_jid;
@@ -4039,7 +4063,7 @@ int command__adhoc(const void *pointer, void *data,
         xmpp_stanza_release(query_stanza);
         ptr_account->connection.send(iq);
         xmpp_stanza_release(iq);
-        xmpp_free(ptr_account->context, query_id);
+        // freed by query_id_g
 
         weechat_printf(buffer, "%sxmpp: querying commands on %s…",
                       weechat_prefix("network"), target_jid);
@@ -4051,7 +4075,8 @@ int command__adhoc(const void *pointer, void *data,
     if (argc == 3)
     {
         // Execute a command (first step)
-        char *exec_id = xmpp_uuid_gen(ptr_account->context);
+        xmpp_string_guard exec_id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+        const char *exec_id = exec_id_g.ptr;
 
         weechat::account::adhoc_query_info info;
         info.target_jid = target_jid;
@@ -4071,7 +4096,7 @@ int command__adhoc(const void *pointer, void *data,
         xmpp_stanza_release(command);
         ptr_account->connection.send(iq);
         xmpp_stanza_release(iq);
-        xmpp_free(ptr_account->context, exec_id);
+        // freed by exec_id_g
 
         weechat_printf(buffer, "%sxmpp: executing command %s on %s…",
                       weechat_prefix("network"), node, target_jid);
@@ -4081,7 +4106,8 @@ int command__adhoc(const void *pointer, void *data,
     // argc >= 4: submit a form step
     // argv[3] = sessionid, argv[4..] = field=value pairs
     const char *session_id = argv[3];
-    char *submit_id = xmpp_uuid_gen(ptr_account->context);
+    xmpp_string_guard submit_id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    const char *submit_id = submit_id_g.ptr;
 
     weechat::account::adhoc_query_info info;
     info.target_jid = target_jid;
@@ -4135,7 +4161,7 @@ int command__adhoc(const void *pointer, void *data,
     xmpp_stanza_release(command);
     ptr_account->connection.send(iq);
     xmpp_stanza_release(iq);
-    xmpp_free(ptr_account->context, submit_id);
+    // freed by submit_id_g
 
     weechat_printf(buffer, "%sxmpp: submitting form for command %s (session %s)…",
                   weechat_prefix("network"), node, session_id);

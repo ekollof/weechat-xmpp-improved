@@ -178,7 +178,8 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool /* top_le
         else
         {
             // Not cached, send disco query and mark for caching
-            char *disco_id = xmpp_uuid_gen(account.context);
+            xmpp_string_guard disco_id_g(account.context, xmpp_uuid_gen(account.context));
+            const char *disco_id = disco_id_g.ptr;
             account.caps_disco_queries[disco_id] = ver;  // Track this query for caching
             
             std::string to_jid = binding.from ? binding.from->full : std::string();
@@ -193,7 +194,7 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool /* top_le
                         .build(account.context)
                         .get());
             
-            xmpp_free(account.context, disco_id);
+            // freed by disco_id_g
         }
     }
 
@@ -420,7 +421,8 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool /* top_le
         {
             // Status 201: new room was created — send empty config submit to unlock it
             char *room_jid = xmpp_jid_bare(account.context, binding.from->full.data());
-            char *owner_id = xmpp_uuid_gen(account.context);
+            xmpp_string_guard owner_id_g(account.context, xmpp_uuid_gen(account.context));
+            const char *owner_id = owner_id_g.ptr;
             xmpp_stanza_t *iq = xmpp_iq_new(account.context, "set", owner_id);
             xmpp_stanza_set_to(iq, room_jid);
             xmpp_stanza_t *query = xmpp_stanza_new(account.context);
@@ -436,7 +438,7 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool /* top_le
             xmpp_stanza_release(query);
             xmpp_send(account.connection, iq);
             xmpp_stanza_release(iq);
-            xmpp_free(account.context, owner_id);
+            // freed by owner_id_g
             xmpp_free(account.context, room_jid);
         }
     }
@@ -1184,11 +1186,12 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
                                 children[0] =
                                 stanza__iq_pubsub(account.context, NULL, children.get(),
                                                   with_noop("http://jabber.org/protocol/pubsub"));
-                                char *uuid = xmpp_uuid_gen(account.context);
+                                xmpp_string_guard uuid_g(account.context, xmpp_uuid_gen(account.context));
+                                const char *uuid = uuid_g.ptr;
                                 children[0] =
                                 stanza__iq(account.context, NULL, children.get(), NULL, uuid,
                                             to, from, "get");
-                                xmpp_free(account.context, uuid);
+                                // freed by uuid_g
 
                                 account.connection.send(children[0]);
                                 xmpp_stanza_release(children[0]);
@@ -4165,7 +4168,8 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
             if (item_jid)
             {
                 // Query this item for its features
-                char *disco_info_id = xmpp_uuid_gen(account.context);
+                xmpp_string_guard disco_info_id_g(account.context, xmpp_uuid_gen(account.context));
+                const char *disco_info_id = disco_info_id_g.ptr;
                 account.upload_disco_queries[disco_info_id] = item_jid;
                 
                 account.connection.send(stanza::iq()
@@ -4178,7 +4182,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                             .build(account.context)
                             .get());
                 
-                xmpp_free(account.context, disco_info_id);
+                // freed by disco_info_id_g
             }
             item = xmpp_stanza_get_next(item);
         }
@@ -4860,11 +4864,12 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                             children[0] =
                             stanza__iq_pubsub(account.context, NULL, children,
                                                 with_noop("http://jabber.org/protocol/pubsub"));
-                            char *uuid = xmpp_uuid_gen(account.context);
+                            xmpp_string_guard uuid_g(account.context, xmpp_uuid_gen(account.context));
+                            const char *uuid = uuid_g.ptr;
                             children[0] =
                             stanza__iq(account.context, NULL, children, NULL, uuid,
                                 to, from, "get");
-                            xmpp_free(account.context, uuid);
+                            // freed by uuid_g
 
                             account.connection.send(children[0]);
                             xmpp_stanza_release(children[0]);
@@ -4919,9 +4924,10 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                                            weechat_prefix("network"), device_count);
 
                             reply = account.get_devicelist();
-                            char *uuid = xmpp_uuid_gen(account.context);
+                            xmpp_string_guard uuid_g(account.context, xmpp_uuid_gen(account.context));
+                            const char *uuid = uuid_g.ptr;
                             xmpp_stanza_set_id(reply, uuid);
-                            xmpp_free(account.context, uuid);
+                            // freed by uuid_g
                             xmpp_stanza_set_attribute(reply, "to", from);
                             xmpp_stanza_set_attribute(reply, "from", to);
                             account.connection.send(reply);
@@ -5038,7 +5044,8 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                     // More pages — issue next page of global MAM query with <after> token
                     account.mam_query_remove(mam_query.id);
 
-                    char *next_id = xmpp_uuid_gen(account.context);
+                    xmpp_string_guard next_id_g(account.context, xmpp_uuid_gen(account.context));
+                    const char *next_id = next_id_g.ptr;
                     account.add_mam_query(next_id, "",
                                           mam_query.start, mam_query.end);
 
@@ -5109,7 +5116,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
 
                     this->send(next_iq);
                     xmpp_stanza_release(next_iq);
-                    xmpp_free(account.context, next_id);
+                    // freed by next_id_g
                 }
                 else
                 {
@@ -5515,12 +5522,13 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         children[0] =
         stanza__iq_pubsub(account.context, NULL, children.get(),
                           with_noop("http://jabber.org/protocol/pubsub"));
-        char *uuid = xmpp_uuid_gen(account.context);
+        xmpp_string_guard uuid_g(account.context, xmpp_uuid_gen(account.context));
+        const char *uuid = uuid_g.ptr;
         children[0] =
         stanza__iq(account.context, NULL, children.get(), NULL, uuid,
                    account.jid().data(), account.jid().data(),
                    "get");
-        xmpp_free(account.context, uuid);
+        // freed by uuid_g
 
         this->send(children[0]);
         xmpp_stanza_release(children[0]);
@@ -5541,7 +5549,8 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
                       weechat_prefix("network"));
         
         // Build disco#items query manually
-        char *disco_items_id = xmpp_uuid_gen(account.context);
+        xmpp_string_guard disco_items_id_g(account.context, xmpp_uuid_gen(account.context));
+        const char *disco_items_id = disco_items_id_g.ptr;
         xmpp_stanza_t *items_iq = xmpp_iq_new(account.context, "get", disco_items_id);
         char *server_domain = xmpp_jid_domain(account.context, account.jid().data());
         xmpp_stanza_set_to(items_iq, server_domain);
@@ -5556,12 +5565,13 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         this->send(items_iq);
         xmpp_stanza_release(items_iq);
         xmpp_free(account.context, server_domain);
-        xmpp_free(account.context, disco_items_id);
+        // freed by disco_items_id_g
 
         // Query MAM globally to discover recent conversations
         time_t now = time(NULL);
         time_t start = now - (7 * 86400);  // Last 7 days
-        char *global_mam_id = xmpp_uuid_gen(account.context);
+        xmpp_string_guard global_mam_id_g(account.context, xmpp_uuid_gen(account.context));
+        const char *global_mam_id = global_mam_id_g.ptr;
         account.add_mam_query(global_mam_id, "",  // Empty 'with' means global query
                              std::optional<time_t>(start), std::optional<time_t>(now));
         
@@ -5631,7 +5641,7 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         
         this->send(iq);
         xmpp_stanza_release(iq);
-        xmpp_free(account.context, global_mam_id);
+        // freed by global_mam_id_g
 
         // Restore existing PM buffers from previous session
         struct t_hdata *hdata_buffer = weechat_hdata_get("buffer");
