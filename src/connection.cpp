@@ -2452,6 +2452,18 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
         }
     }
 
+    // XEP-0334: Message Processing Hints — if the sender marks the message
+    // as <no-store> or <no-permanent-store>, add the WeeChat no_log tag so
+    // it is not written to the buffer log file.
+    {
+        bool no_store = xmpp_stanza_get_child_by_name_and_ns(
+                            stanza, "no-store", "urn:xmpp:hints") != nullptr
+                     || xmpp_stanza_get_child_by_name_and_ns(
+                            stanza, "no-permanent-store", "urn:xmpp:hints") != nullptr;
+        if (no_store)
+            weechat_string_dyn_concat(dyn_tags, ",no_log", -1);
+    }
+
     if (channel->type == weechat::channel::chat_type::PM)
         weechat_string_dyn_concat(dyn_tags, ",private", -1);
     if (weechat_string_match(text, "/me *", 0))
