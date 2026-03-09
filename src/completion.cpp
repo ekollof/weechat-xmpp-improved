@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <string>
 #include <stdio.h>
 #include <strophe.h>
 #include <weechat/weechat-plugin.h>
@@ -141,11 +142,10 @@ void completion__init()
         size_t length = snprintf(NULL, 0, "%s|%s",
                                 default_template,
                                 "%(xmpp_account)") + 1;
-        char *new_template = new char[length];
-        snprintf(new_template, length, "%s|%s",
+        std::string new_template(length - 1, '\0');
+        snprintf(new_template.data(), length, "%s|%s",
                  default_template,
                  "%(xmpp_account)");
-        weechat_config_option_set(option, new_template, 1);
-        delete[] new_template;
+        weechat_config_option_set(option, new_template.c_str(), 1);
     }
 }

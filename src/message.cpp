@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <regex.h>
+#include <string>
 #include <weechat/weechat-plugin.h>
 
 #include "plugin.hh"
@@ -19,87 +20,90 @@
 static const char format_regex[] = "<([^>]*?)>";
 static const size_t max_groups = 2;
 
-char *message__translate_code(weechat::account *account,
+static std::string message__translate_code(weechat::account *account,
                                    const char *code)
 {
     decltype(account->channels)::iterator channel;
     weechat::user *user;
-    size_t resultlen;
-    char *identifier, *alttext, *result, *symbol, *prefix;
+    std::string identifier(code);
+    std::string alttext;
+    std::string symbol;
+    const char *prefix;
 
-    identifier = strdup(code);
-    alttext = strchr(identifier, '|');
-    if (alttext)
-        *alttext++ = '\0';
+    auto pipe_pos = identifier.find('|');
+    if (pipe_pos != std::string::npos)
+    {
+        alttext = identifier.substr(pipe_pos + 1);
+        identifier.resize(pipe_pos);
+    }
 
     switch (identifier[0])
     {
         case '#': /* channel */
-            if (alttext)
+            if (!alttext.empty())
             {
-                prefix = (char*)"#";
-                symbol = strdup(alttext);
+                prefix = "#";
+                symbol = alttext;
             }
             else
             {
-                channel = account->channels.find(identifier+1);
+                channel = account->channels.find(identifier.c_str()+1);
                 if (channel != account->channels.end())
                 {
-                    prefix = (char*)"#";
-                    symbol = strdup(channel->second.name.data());
+                    prefix = "#";
+                    symbol = channel->second.name;
                 }
                 else
                 {
-                    prefix = (char*)"Channel:";
-                    symbol = strdup(identifier+1);
+                    prefix = "Channel:";
+                    symbol = identifier.substr(1);
                 }
             }
             break;
         case '@': /* user */
-            if (alttext)
+            if (!alttext.empty())
             {
-                prefix = (char*)"@";
-                symbol = strdup(alttext);
+                prefix = "@";
+                symbol = alttext;
             }
             else
             {
-                user = weechat::user::search(account, identifier+1);
+                user = weechat::user::search(account, identifier.c_str()+1);
                 if (user)
                 {
-                    prefix = (char*)"@";
-                    symbol = strdup(user->profile.display_name.c_str());
+                    prefix = "@";
+                    symbol = user->profile.display_name;
                 }
                 else
                 {
-                    prefix = (char*)"User:";
-                    symbol = strdup(identifier+1);
+                    prefix = "@";
+                    symbol = identifier.substr(1);
                 }
             }
             break;
         case '!': /* special */
-            if (alttext)
+            if (!alttext.empty())
             {
-                prefix = (char*)"@";
-                symbol = strdup(alttext);
+                prefix = "@";
+                symbol = alttext;
             }
             else
             {
-                prefix = (char*)"@";
-                symbol = strdup(identifier+1);
+                prefix = "@";
+                symbol = identifier.substr(1);
             }
             break;
         default: /* url */
-            prefix = (char*)"";
-            symbol = strdup(code);
+            prefix = "";
+            symbol = code;
             break;
     }
 
-    free(identifier);
-    resultlen = snprintf(NULL, 0, "%s%s%s%s", weechat_color("chat_nick"), prefix, symbol, weechat_color("reset")) + 1;
-    result = new char[resultlen];
-    snprintf(result, resultlen, "%s%s%s%s", weechat_color("chat_nick"), prefix, symbol, weechat_color("reset"));
-    free(symbol);
-
+    std::string result;
+    result += weechat_color("chat_nick");
+    result += prefix;
+    result += symbol;
+    result += weechat_color("reset");
     return result;
 }
 
@@ -148,14 +152,13 @@ void message__htmldecode(char *dest, const char *src, size_t n)
     return;
 }
 
-char *message__decode(weechat::account *account,
+std::string message__decode(weechat::account *account,
                            const char *text)
 {
     int rc;
     regex_t reg;
     regmatch_t groups[max_groups];
     char msgbuf[100];
-    char *decoded_text;
     const char *cursor;
     size_t offset;
 
@@ -167,84 +170,32 @@ char *message__decode(weechat::account *account,
             _("%s%s: error compiling message formatting regex: %s"),
             weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
             msgbuf);
-        return strdup(text);
+        return text;
     }
 
-    decoded_text = new char[MESSAGE_MAX_LENGTH];
-    if (!decoded_text)
-    {
-        regfree(&reg);
-        weechat_printf(
-            account->buffer,
-            _("%s%s: error allocating space for message"),
-            weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
-        return strdup(text);
-    }
-    decoded_text[0] = '\0';
+    std::string decoded_text;
+    decoded_text.reserve(MESSAGE_MAX_LENGTH);
 
     for (cursor = text; regexec(&reg, cursor, max_groups, groups, 0) == 0; cursor += offset)
     {
         offset = groups[0].rm_eo;
 
-        char *copy = strdup(cursor);
-        if (!copy)
-        {
-            regfree(&reg);
-            delete[] decoded_text;
-            weechat_printf(
-                account->buffer,
-                _("%s%s: error allocating space for message"),
-                weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
-            return strdup(text);
-        }
-        copy[groups[1].rm_eo] = '\0';
+        // Text before the match (up to groups[0].rm_so)
+        decoded_text.append(cursor, groups[0].rm_so);
 
-        char *match = strdup(copy + groups[1].rm_so);
-        if (!match)
-        {
-            free(copy);
-            regfree(&reg);
-            delete[] decoded_text;
-            weechat_printf(
-                account->buffer,
-                _("%s%s: error allocating space for message"),
-                weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
-            return strdup(text);
-        }
-        copy[groups[0].rm_so] = '\0';
+        // The matched group content (groups[1].rm_so .. groups[1].rm_eo)
+        std::string match(cursor + groups[1].rm_so,
+                          groups[1].rm_eo - groups[1].rm_so);
 
-        char *prematch = strdup(copy);
-        if (!prematch)
-        {
-            free(match);
-            free(copy);
-            regfree(&reg);
-            delete[] decoded_text;
-            weechat_printf(
-                account->buffer,
-                _("%s%s: error allocating space for message"),
-                weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
-            return strdup(text);
-        }
-        free(copy);
-
-        strncat(decoded_text, prematch,
-                MESSAGE_MAX_LENGTH - strlen(decoded_text) - 1);
-        free(prematch);
-
-        char *replacement = message__translate_code(account, match);
-        free(match);
-
-        strncat(decoded_text, replacement,
-                MESSAGE_MAX_LENGTH - strlen(decoded_text) - 1);
-        delete[] replacement;
+        decoded_text += message__translate_code(account, match.c_str());
     }
-    strncat(decoded_text, cursor,
-            MESSAGE_MAX_LENGTH - strlen(decoded_text) - 1);
+    decoded_text += cursor;
 
-    message__htmldecode(decoded_text, decoded_text,
-                             MESSAGE_MAX_LENGTH);
+    // htmldecode in-place
+    std::string htmldec(decoded_text.size(), '\0');
+    message__htmldecode(htmldec.data(), decoded_text.c_str(), decoded_text.size() + 1);
+    htmldec.resize(strlen(htmldec.c_str()));
 
     regfree(&reg);
-    return decoded_text;
+    return htmldec;
 }

@@ -4,7 +4,11 @@
 
 #pragma once
 
+#include <string>
+
 #define MESSAGE_MAX_LENGTH 40000
 
-char *message__decode(weechat::account *account,
-                      const char *text);
+namespace weechat { class account; }
+
+std::string message__decode(weechat::account *account,
+                            const char *text);
