@@ -69,7 +69,9 @@ namespace libsignal {
         }
 
         type(const type &other) = delete; /* no copy construction */
-        type(type &&other) = default;
+        inline type(type &&other) noexcept : _ptr(other._ptr) {
+            other._ptr = nullptr; /* transfer ownership, leave source empty */
+        }
 
         template<typename... Args>
         inline void create(Args&&... args) {
@@ -80,7 +82,15 @@ namespace libsignal {
         }
 
         type& operator =(const type &other) = delete; /* no copy assignment */
-        type& operator =(type &&other) = default;
+        inline type& operator =(type &&other) noexcept {
+            if (this != &other) {
+                if (_ptr)
+                    f_destroy(reinterpret_cast<Base*>(_ptr));
+                _ptr = other._ptr;
+                other._ptr = nullptr;
+            }
+            return *this;
+        }
 
         inline operator bool() const { return _ptr; }
 
