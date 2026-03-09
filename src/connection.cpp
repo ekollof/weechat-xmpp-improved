@@ -251,6 +251,9 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool /* top_le
                 case 104: // : [message | Configuration change]: Inform occupants that a non-privacy-related room configuration change has occurred
                     break;
                 case 110: // Self-Presence: [presence | Any room presence]: Inform user that presence refers to one of its own room occupants
+                    // Status 110 is sent last in the initial presence flood — clear joining flag
+                    if (channel)
+                        channel->joining = false;
                     break;
                 case 170: // Logging Active: room logging enabled — privacy notice
                     if (channel)
@@ -364,7 +367,11 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool /* top_le
                         // Status 303: nick change — print rename notice instead of "left"
                         const char *old_nick = binding.from->resource.size()
                             ? binding.from->resource.data() : binding.from->full.data();
-                        weechat_printf_date_tags(channel->buffer, 0, "xmpp_presence,nick,log4",
+                        // Smart filter: suppress nick-change for users who haven't spoken recently
+                        const char *nick_tags = channel->smart_filter_nick(old_nick)
+                            ? "xmpp_presence,nick,log4,xmpp_smart_filter"
+                            : "xmpp_presence,nick,log4";
+                        weechat_printf_date_tags(channel->buffer, 0, nick_tags,
                                                  "%s%s%s%s is now known as %s%s",
                                                  weechat_prefix("network"),
                                                  weechat_color("irc.color.nick_change"),
@@ -2742,6 +2749,17 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
         weechat_printf_date_tags(channel->buffer, date, *dyn_tags, "%s%s\t%s",
                                  edit, display_prefix.data(),
                                  display_text ? display_text : "");
+
+    // Smart filter: record that this nick spoke, so future presence lines are shown.
+    // Only for live (non-delayed) messages not sent by self.
+    if (!date && nick && channel
+        && weechat_strcasecmp(from_bare, account.jid().data()) != 0)
+    {
+        // For MUC, nick is the resource (occupant nick); that is what we track.
+        channel->record_speak(nick);
+        // After the user speaks, clear the joining flag so we don't keep suppressing
+        channel->joining = false;
+    }
 
     weechat_string_dyn_free(dyn_tags, 1);
 

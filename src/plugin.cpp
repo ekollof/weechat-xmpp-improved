@@ -139,6 +139,13 @@ void weechat::plugin::init(int argc, char *argv[])
     m_input_text_changed_hook = weechat_hook_signal("input_text_changed",
                                                       &input__text_changed_cb, // TODO: port
                                                       nullptr, nullptr);
+
+    // Smart filter: auto-register a WeeChat filter to hide join/leave/nick-change
+    // lines tagged with xmpp_smart_filter.  Users can toggle it with
+    //   /filter enable|disable xmpp_smart_filter_default
+    // or remove it with /filter del xmpp_smart_filter_default
+    weechat_command(NULL,
+                    "/filter add xmpp_smart_filter_default * xmpp_smart_filter *");
 }
 
 void weechat::plugin::end() {

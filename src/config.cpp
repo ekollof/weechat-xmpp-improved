@@ -148,6 +148,18 @@ weechat::config::config()
                 "fetch and send OpenGraph link preview metadata for URLs in outgoing messages (XEP-0511)",
                 nullptr, 0, 0,
                 "on", nullptr, false,
+                {}, {}, {}},
+            .smart_filter{file, section_look, "smart_filter", "boolean",
+                "hide join/leave/nick-change messages for users who have not spoken recently "
+                "(suppress initial MUC presence flood); see also look.smart_filter_delay",
+                nullptr, 0, 0,
+                "on", nullptr, false,
+                {}, {}, {}},
+            .smart_filter_delay{file, section_look, "smart_filter_delay", "integer",
+                "number of minutes a user must have been silent before their join/leave/nick "
+                "messages are tagged for hiding (0 = always tag)",
+                nullptr, 0, 10080,
+                "5", nullptr, false,
                 {}, {}, {}}}
 {
 }

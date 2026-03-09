@@ -118,6 +118,12 @@ namespace weechat
         
         time_t last_mam_fetch = 0;
 
+        // Smart filter: last time each nick spoke (key = resource nick in MUC)
+        std::unordered_map<std::string, time_t> last_speak;
+        // Set to true while the initial MUC join presence flood is in progress
+        // (between receiving status 110 and the first non-presence stanza / explicit reset)
+        bool joining = false;
+
     public:
         struct t_gui_buffer *buffer;
 
@@ -162,6 +168,10 @@ namespace weechat
         std::optional<member*> add_member(const char *id, const char *client);
         std::optional<member*> member_search(const char *id);
         std::optional<member*> remove_member(const char *id, const char *reason);
+
+        // Smart filter helpers
+        void record_speak(const char *nick);
+        bool smart_filter_nick(const char *nick) const;
 
         int send_message(std::string to, std::string body,
                          std::optional<std::string> oob = {},
