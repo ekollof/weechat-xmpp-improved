@@ -2172,13 +2172,40 @@ void omemo::init(struct t_gui_buffer *buffer, const char *account_name)
     iks_get_local_registration_id(omemo, &omemo->device_id);
     if (!iks_get_identity_key_pair(&public_data, &private_data, omemo))
     {
-        libsignal::public_key public_key(signal_buffer_data(public_data),
-                signal_buffer_len(public_data), omemo->context);
-        libsignal::private_key private_key(signal_buffer_data(private_data),
-                signal_buffer_len(private_data), omemo->context);
-        omemo->identity.create(public_key, private_key);
+        // Decode raw key pointers (refcount=1 each after decode).
+        // ratchet_identity_key_pair_create() calls SIGNAL_REF on both,
+        // bringing them to refcount=2.  We then SIGNAL_UNREF them back to 1
+        // so that only the identity pair owns them.  Do NOT wrap them in
+        // libsignal::public_key / private_key RAII here: those destructors
+        // call ec_*_destroy = free() directly, bypassing the refcount, which
+        // would free the keys while the pair still holds live pointers,
+        // causing a SIGABRT in ratchet_identity_key_pair_destroy later.
+        ec_public_key *pub_key = nullptr;
+        ec_private_key *priv_key = nullptr;
+        curve_decode_point(&pub_key,
+                signal_buffer_data(public_data) + 1,
+                signal_buffer_len(public_data) - 1,
+                omemo->context);
+        curve_decode_private_point(&priv_key,
+                signal_buffer_data(private_data),
+                signal_buffer_len(private_data),
+                omemo->context);
         signal_buffer_free(public_data);
         signal_buffer_free(private_data);
+        if (pub_key && priv_key)
+        {
+            omemo->identity.create(pub_key, priv_key);
+            // SIGNAL_UNREF: pair now owns both (refcount 2→1 each)
+            SIGNAL_UNREF(pub_key);
+            SIGNAL_UNREF(priv_key);
+        }
+        else
+        {
+            if (pub_key) SIGNAL_UNREF(pub_key);
+            if (priv_key) SIGNAL_UNREF(priv_key);
+            weechat_printf(buffer, "%somemo: failed to decode identity keys",
+                           weechat_prefix("error"));
+        }
     }
     weechat_printf(buffer, "%somemo: device = %d",
                    weechat_prefix("info"), omemo->device_id);
