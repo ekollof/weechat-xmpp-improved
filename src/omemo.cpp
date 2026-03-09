@@ -655,18 +655,9 @@ int iks_save_identity(const struct signal_protocol_address *address, uint8_t *ke
 {
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
     MDB_txn *transaction = NULL;
-    MDB_val k_identity_key = {
-        .mv_size = strlen("identity_key_") + address->name_len
-            + 1 + 10,
-        .mv_data = NULL,
-    };
+    std::string k_str = fmt::format("identity_key_{}_{}", address->name, address->device_id);
+    MDB_val k_identity_key = { .mv_size = k_str.size(), .mv_data = k_str.data() };
     MDB_val v_identity_key = {.mv_size = key_len, .mv_data = key_data};
-
-    k_identity_key.mv_data = malloc(sizeof(char) * (
-                                           k_identity_key.mv_size + 1));
-    k_identity_key.mv_size =
-    snprintf((char*)k_identity_key.mv_data, k_identity_key.mv_size + 1,
-             "identity_key_%s_%u", address->name, address->device_id);
 
     if (mdb_txn_begin(omemo->db_env, NULL, 0, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
@@ -697,20 +688,14 @@ int iks_is_trusted_identity(const struct signal_protocol_address *address, uint8
 {
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
     MDB_txn *transaction = NULL;
-    size_t k_size = strlen("identity_key_") + address->name_len + 1 + 10;
-    MDB_val k_identity_key = { .mv_size = k_size, .mv_data = NULL };
+    std::string k_str = fmt::format("identity_key_{}_{}", address->name, address->device_id);
+    MDB_val k_identity_key = { .mv_size = k_str.size(), .mv_data = k_str.data() };
     MDB_val v_stored = { .mv_size = 0, .mv_data = NULL };
-
-    k_identity_key.mv_data = malloc(sizeof(char) * (k_size + 1));
-    k_identity_key.mv_size =
-    snprintf((char*)k_identity_key.mv_data, k_size + 1,
-             "identity_key_%s_%u", address->name, address->device_id);
 
     // Read-only pass: check if we already have a key stored
     if (mdb_txn_begin(omemo->db_env, NULL, MDB_RDONLY, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
                        weechat_prefix("error"));
-        free(k_identity_key.mv_data);
         return -1;
     }
 
@@ -724,23 +709,19 @@ int iks_is_trusted_identity(const struct signal_protocol_address *address, uint8
         if (mdb_txn_begin(omemo->db_env, NULL, 0, &transaction)) {
             weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
                            weechat_prefix("error"));
-            free(k_identity_key.mv_data);
             return -1;
         }
         if (mdb_put(transaction, omemo->dbi.omemo, &k_identity_key, &v_new, MDB_NOOVERWRITE)) {
             weechat_printf(NULL, "%sxmpp: failed to write lmdb value",
                            weechat_prefix("error"));
             mdb_txn_abort(transaction);
-            free(k_identity_key.mv_data);
             return -1;
         }
         if (mdb_txn_commit(transaction)) {
             weechat_printf(NULL, "%sxmpp: failed to commit lmdb transaction",
                            weechat_prefix("error"));
-            free(k_identity_key.mv_data);
             return -1;
         }
-        free(k_identity_key.mv_data);
         return 1; // trusted (first-use)
     }
 
@@ -748,14 +729,12 @@ int iks_is_trusted_identity(const struct signal_protocol_address *address, uint8
         // Unexpected LMDB error
         weechat_printf(NULL, "%sxmpp: failed to read lmdb value (rc=%d)",
                        weechat_prefix("error"), rc);
-        free(k_identity_key.mv_data);
         return -1;
     }
 
     // Key found — check if it matches
     if (v_stored.mv_size == key_len &&
         memcmp(v_stored.mv_data, key_data, key_len) == 0) {
-        free(k_identity_key.mv_data);
         return 1; // trusted
     }
 
@@ -764,7 +743,6 @@ int iks_is_trusted_identity(const struct signal_protocol_address *address, uint8
         "%somemo: identity key CHANGED for %s device %u — possible key rotation or attack! "
         "Use /omemo trust %s to accept the new key.",
         weechat_prefix("error"), address->name, address->device_id, address->name);
-    free(k_identity_key.mv_data);
     return 0; // untrusted
 }
 
@@ -779,17 +757,9 @@ int pks_store_pre_key(uint32_t pre_key_id, uint8_t *record, size_t record_len, v
 {
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
     MDB_txn *transaction = NULL;
-    MDB_val k_pre_key = {
-        .mv_size = strlen("pre_key_") + 10, // strlen(UINT32_MAX)
-        .mv_data = NULL,
-    };
+    std::string k_str = fmt::format("pre_key_{:<10}", pre_key_id);
+    MDB_val k_pre_key = { .mv_size = k_str.size(), .mv_data = k_str.data() };
     MDB_val v_pre_key = {.mv_size = record_len, .mv_data = record};
-
-    k_pre_key.mv_data = malloc(sizeof(char) * (
-                                           k_pre_key.mv_size + 1));
-    k_pre_key.mv_size =
-    snprintf((char*)k_pre_key.mv_data, k_pre_key.mv_size + 1,
-             "pre_key_%-10u", pre_key_id);
 
     if (mdb_txn_begin(omemo->db_env, NULL, 0, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
@@ -820,17 +790,9 @@ int pks_contains_pre_key(uint32_t pre_key_id, void *user_data)
 {
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
     MDB_txn *transaction = NULL;
-    MDB_val k_pre_key = {
-        .mv_size = strlen("pre_key_") + 10, // strlen(UINT32_MAX)
-        .mv_data = NULL,
-    };
+    std::string k_str = fmt::format("pre_key_{:<10}", pre_key_id);
+    MDB_val k_pre_key = { .mv_size = k_str.size(), .mv_data = k_str.data() };
     MDB_val v_pre_key;
-
-    k_pre_key.mv_data = malloc(sizeof(char) * (
-                                           k_pre_key.mv_size + 1));
-    k_pre_key.mv_size =
-    snprintf((char*)k_pre_key.mv_data, k_pre_key.mv_size + 1,
-             "pre_key_%-10u", pre_key_id);
 
     if (mdb_txn_begin(omemo->db_env, NULL, MDB_RDONLY, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
@@ -898,17 +860,9 @@ int pks_load_pre_key(struct signal_buffer **record, uint32_t pre_key_id, void *u
 {
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
     MDB_txn *transaction = NULL;
-    MDB_val k_pre_key = {
-        .mv_size = strlen("pre_key_") + 10, // strlen(UINT32_MAX)
-        .mv_data = NULL,
-    };
+    std::string k_str = fmt::format("pre_key_{:<10}", pre_key_id);
+    MDB_val k_pre_key = { .mv_size = k_str.size(), .mv_data = k_str.data() };
     MDB_val v_pre_key;
-
-    k_pre_key.mv_data = malloc(sizeof(char) * (
-                                           k_pre_key.mv_size + 1));
-    k_pre_key.mv_size =
-    snprintf((char*)k_pre_key.mv_data, k_pre_key.mv_size + 1,
-             "pre_key_%-10u", pre_key_id);
 
     if (mdb_txn_begin(omemo->db_env, NULL, 0, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
@@ -958,17 +912,9 @@ int pks_remove_pre_key(uint32_t pre_key_id, void *user_data)
 {
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
     MDB_txn *transaction = NULL;
-    MDB_val k_pre_key = {
-        .mv_size = strlen("pre_key_") + 10, // strlen(UINT32_MAX)
-        .mv_data = NULL,
-    };
+    std::string k_str = fmt::format("pre_key_{:<10}", pre_key_id);
+    MDB_val k_pre_key = { .mv_size = k_str.size(), .mv_data = k_str.data() };
     MDB_val v_pre_key;
-
-    k_pre_key.mv_data = malloc(sizeof(char) * (
-                                           k_pre_key.mv_size + 1));
-    k_pre_key.mv_size =
-    snprintf((char*)k_pre_key.mv_data, k_pre_key.mv_size + 1,
-             "pre_key_%-10u", pre_key_id);
 
     if (mdb_txn_begin(omemo->db_env, NULL, 0, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
@@ -1017,17 +963,9 @@ int spks_load_signed_pre_key(struct signal_buffer **record, uint32_t signed_pre_
 {
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
     MDB_txn *transaction = NULL;
-    MDB_val k_signed_pre_key = {
-        .mv_size = strlen("signed_pre_key_") + 10, // strlen(UINT32_MAX)
-        .mv_data = NULL,
-    };
+    std::string k_str = fmt::format("signed_pre_key_{:<10}", signed_pre_key_id);
+    MDB_val k_signed_pre_key = { .mv_size = k_str.size(), .mv_data = k_str.data() };
     MDB_val v_signed_pre_key;
-
-    k_signed_pre_key.mv_data = malloc(sizeof(char) * (
-                                           k_signed_pre_key.mv_size + 1));
-    k_signed_pre_key.mv_size =
-    snprintf((char*)k_signed_pre_key.mv_data, k_signed_pre_key.mv_size + 1,
-             "signed_pre_key_%-10u", signed_pre_key_id);
 
     if (mdb_txn_begin(omemo->db_env, NULL, 0, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
@@ -1084,17 +1022,9 @@ int spks_store_signed_pre_key(uint32_t signed_pre_key_id, uint8_t *record, size_
 {
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
     MDB_txn *transaction = NULL;
-    MDB_val k_signed_pre_key = {
-        .mv_size = strlen("signed_pre_key_") + 10, // strlen(UINT32_MAX)
-        .mv_data = NULL,
-    };
+    std::string k_str = fmt::format("signed_pre_key_{:<10}", signed_pre_key_id);
+    MDB_val k_signed_pre_key = { .mv_size = k_str.size(), .mv_data = k_str.data() };
     MDB_val v_signed_pre_key = {.mv_size = record_len, .mv_data = record};
-
-    k_signed_pre_key.mv_data = malloc(sizeof(char) * (
-                                           k_signed_pre_key.mv_size + 1));
-    k_signed_pre_key.mv_size =
-    snprintf((char*)k_signed_pre_key.mv_data, k_signed_pre_key.mv_size + 1,
-             "signed_pre_key_%-10u", signed_pre_key_id);
 
     if (mdb_txn_begin(omemo->db_env, NULL, 0, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
@@ -1125,17 +1055,9 @@ int spks_contains_signed_pre_key(uint32_t signed_pre_key_id, void *user_data)
 {
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
     MDB_txn *transaction = NULL;
-    MDB_val k_signed_pre_key = {
-        .mv_size = strlen("signed_pre_key_") + 10, // strlen(UINT32_MAX)
-        .mv_data = NULL,
-    };
+    std::string k_str = fmt::format("signed_pre_key_{:<10}", signed_pre_key_id);
+    MDB_val k_signed_pre_key = { .mv_size = k_str.size(), .mv_data = k_str.data() };
     MDB_val v_signed_pre_key;
-
-    k_signed_pre_key.mv_data = malloc(sizeof(char) * (
-                                           k_signed_pre_key.mv_size + 1));
-    k_signed_pre_key.mv_size =
-    snprintf((char*)k_signed_pre_key.mv_data, k_signed_pre_key.mv_size + 1,
-             "signed_pre_key_%-10u", signed_pre_key_id);
 
     if (mdb_txn_begin(omemo->db_env, NULL, MDB_RDONLY, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
@@ -1161,17 +1083,9 @@ int spks_remove_signed_pre_key(uint32_t signed_pre_key_id, void *user_data)
 {
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
     MDB_txn *transaction = NULL;
-    MDB_val k_signed_pre_key = {
-        .mv_size = strlen("signed_pre_key_") + 10, // strlen(UINT32_MAX)
-        .mv_data = NULL,
-    };
+    std::string k_str = fmt::format("signed_pre_key_{:<10}", signed_pre_key_id);
+    MDB_val k_signed_pre_key = { .mv_size = k_str.size(), .mv_data = k_str.data() };
     MDB_val v_signed_pre_key;
-
-    k_signed_pre_key.mv_data = malloc(sizeof(char) * (
-                                           k_signed_pre_key.mv_size + 1));
-    k_signed_pre_key.mv_size =
-    snprintf((char*)k_signed_pre_key.mv_data, k_signed_pre_key.mv_size + 1,
-             "signed_pre_key_%-10u", signed_pre_key_id);
 
     if (mdb_txn_begin(omemo->db_env, NULL, 0, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
@@ -1209,27 +1123,10 @@ int ss_load_session_func(struct signal_buffer **record, signal_buffer **user_rec
 {
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
     MDB_txn *transaction = NULL;
-    MDB_val k_session = {
-        .mv_size = strlen("session_") + 10 + //strlen(address->device_id) +
-             1 + strlen(address->name),
-        .mv_data = NULL,
-    };
+    (void) user_record;
+    std::string k_session_str = fmt::format("session_{}_{}", address->device_id, address->name);
+    MDB_val k_session = { .mv_size = k_session_str.size(), .mv_data = k_session_str.data() };
     MDB_val v_session;
-    MDB_val k_user = {
-        .mv_size = strlen("user_") + 10 + //strlen(address->device_id) +
-             1 + strlen(address->name),
-        .mv_data = NULL,
-    };
-    MDB_val v_user; (void) v_user; (void) user_record;
-
-    k_session.mv_data = malloc(sizeof(char) * (k_session.mv_size + 1));
-    k_session.mv_size =
-    snprintf((char*)k_session.mv_data, k_session.mv_size + 1,
-             "session_%u_%s", address->device_id, address->name);
-    k_user.mv_data = malloc(sizeof(char) * (k_user.mv_size + 1));
-    k_user.mv_size =
-    snprintf((char*)k_user.mv_data, k_user.mv_size + 1,
-             "user_%u_%s", address->device_id, address->name);
 
     if (mdb_txn_begin(omemo->db_env, NULL, MDB_RDONLY, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
@@ -1264,17 +1161,11 @@ cleanup:
 int ss_get_sub_device_sessions_func(signal_int_list **sessions, const char *name, size_t name_len, void *user_data)
 {
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
+    (void) name_len;
     MDB_txn *transaction = NULL;
-    MDB_val k_device_ids = {
-        .mv_size = strlen("device_ids_") + name_len,
-        .mv_data = NULL,
-    };
+    std::string k_device_ids_str = fmt::format("device_ids_{}", name);
+    MDB_val k_device_ids = { .mv_size = k_device_ids_str.size(), .mv_data = k_device_ids_str.data() };
     MDB_val v_device_ids;
-
-    k_device_ids.mv_data = malloc(sizeof(char) * (
-                                           k_device_ids.mv_size + 1));
-    snprintf((char*)k_device_ids.mv_data, k_device_ids.mv_size + 1,
-             "device_ids_%s", name);
 
     if (mdb_txn_begin(omemo->db_env, NULL, MDB_RDONLY, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
@@ -1326,29 +1217,10 @@ int ss_store_session_func(const struct signal_protocol_address *address, uint8_t
 {
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
     MDB_txn *transaction = NULL;
-    MDB_val k_session = {
-        .mv_size = strlen("session_") + 10 + //strlen(address->device_id) +
-             1 + strlen(address->name),
-        .mv_data = NULL,
-    };
+    std::string k_session_str = fmt::format("session_{}_{}", address->device_id, address->name);
+    MDB_val k_session = { .mv_size = k_session_str.size(), .mv_data = k_session_str.data() };
     MDB_val v_session = {.mv_size = record_len, .mv_data = record};
-    MDB_val k_user = {
-        .mv_size = strlen("user_") + 10 + //strlen(address->device_id) +
-             1 + strlen(address->name),
-        .mv_data = NULL,
-    };
-    MDB_val v_user = {.mv_size = user_record_len, .mv_data = user_record}; (void) v_user;
-
-    k_session.mv_data = malloc(sizeof(char) * (
-                                           k_session.mv_size + 1));
-    k_session.mv_size =
-    snprintf((char*)k_session.mv_data, k_session.mv_size + 1,
-             "session_%u_%s", address->device_id, address->name);
-    k_user.mv_data = malloc(sizeof(char) * (
-                                           k_user.mv_size + 1));
-    k_user.mv_size =
-    snprintf((char*)k_user.mv_data, k_user.mv_size + 1,
-             "user_%u_%s", address->device_id, address->name);
+    (void) user_record; (void) user_record_len;
 
     if (mdb_txn_begin(omemo->db_env, NULL, 0, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
@@ -1381,18 +1253,9 @@ int ss_contains_session_func(const struct signal_protocol_address *address, void
 {
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
     MDB_txn *transaction = NULL;
-    MDB_val k_session = {
-        .mv_size = strlen("session_") + 10 + //strlen(address->device_id) +
-             1 + strlen(address->name),
-        .mv_data = NULL,
-    };
+    std::string k_session_str = fmt::format("session_{}_{}", address->device_id, address->name);
+    MDB_val k_session = { .mv_size = k_session_str.size(), .mv_data = k_session_str.data() };
     MDB_val v_session;
-
-    k_session.mv_data = malloc(sizeof(char) * (
-                                           k_session.mv_size + 1));
-    k_session.mv_size =
-        snprintf((char*)k_session.mv_data, k_session.mv_size + 1,
-                 "session_%u_%s", address->device_id, address->name);
 
     if (mdb_txn_begin(omemo->db_env, NULL, MDB_RDONLY, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
@@ -1413,18 +1276,9 @@ int ss_delete_session_func(const struct signal_protocol_address *address, void *
 {
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
     MDB_txn *transaction = NULL;
-    MDB_val k_session = {
-        .mv_size = strlen("session_") + 10 + //strlen(address->device_id) +
-             1 + strlen(address->name),
-        .mv_data = NULL,
-    };
+    std::string k_session_str = fmt::format("session_{}_{}", address->device_id, address->name);
+    MDB_val k_session = { .mv_size = k_session_str.size(), .mv_data = k_session_str.data() };
     MDB_val v_session;
-
-    k_session.mv_data = malloc(sizeof(char) * (
-                                           k_session.mv_size + 1));
-    k_session.mv_size =
-        snprintf((char*)k_session.mv_data, k_session.mv_size + 1,
-                 "session_%u_%s", address->device_id, address->name);
 
     if (mdb_txn_begin(omemo->db_env, NULL, 0, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
@@ -1478,44 +1332,15 @@ int sks_store_sender_key(const signal_protocol_sender_key_name *sender_key_name,
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
     char *device_list = NULL;
     MDB_txn *transaction = NULL;
-    MDB_val k_sender_key = {
-        .mv_size = strlen("sender_key_") + strlen(sender_key_name->group_id) +
-             1 + 10 + //strlen(sender_key_name->sender.device_id) +
-             1 + strlen(sender_key_name->sender.name),
-        .mv_data = NULL,
-    };
+    std::string k_sender_key_str = fmt::format("sender_key_{}_{}_{}", sender_key_name->group_id,
+                                               sender_key_name->sender.device_id,
+                                               sender_key_name->sender.name);
+    MDB_val k_sender_key = { .mv_size = k_sender_key_str.size(), .mv_data = k_sender_key_str.data() };
     MDB_val v_sender_key = {.mv_size = record_len, .mv_data = record};
-    MDB_val k_user = {
-        .mv_size = strlen("user_") + strlen(sender_key_name->group_id) +
-             1 + 10 + //strlen(sender_key_name->sender.device_id) +
-             1 + strlen(sender_key_name->sender.name),
-        .mv_data = NULL,
-    };
-    MDB_val v_user = {.mv_size = user_record_len, .mv_data = user_record}; (void) v_user;
-    MDB_val k_device_ids = {
-        .mv_size = strlen("device_ids_") + strlen(sender_key_name->sender.name),
-        .mv_data = NULL,
-    };
+    (void) user_record; (void) user_record_len;
+    std::string k_device_ids_str = fmt::format("device_ids_{}", sender_key_name->sender.name);
+    MDB_val k_device_ids = { .mv_size = k_device_ids_str.size(), .mv_data = k_device_ids_str.data() };
     MDB_val v_device_ids;
-
-    k_sender_key.mv_data = malloc(sizeof(char) * (
-                                           k_sender_key.mv_size + 1));
-    k_sender_key.mv_size =
-    snprintf((char*)k_sender_key.mv_data, k_sender_key.mv_size + 1,
-             "sender_key_%s_%u_%s", sender_key_name->group_id,
-             sender_key_name->sender.device_id,
-             sender_key_name->sender.name);
-    k_user.mv_data = malloc(sizeof(char) * (
-                                           k_user.mv_size + 1));
-    k_user.mv_size =
-    snprintf((char*)k_user.mv_data, k_user.mv_size + 1,
-             "user_%s_%u_%s", sender_key_name->group_id,
-             sender_key_name->sender.device_id,
-             sender_key_name->sender.name);
-    k_device_ids.mv_data = malloc(sizeof(char) * (
-                                           k_device_ids.mv_size + 1));
-    snprintf((char*)k_device_ids.mv_data, k_device_ids.mv_size + 1,
-             "device_ids_%s", sender_key_name->sender.name);
 
     if (mdb_txn_begin(omemo->db_env, NULL, 0, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
@@ -1585,35 +1410,12 @@ int sks_load_sender_key(struct signal_buffer **record, signal_buffer **user_reco
 {
     auto omemo = reinterpret_cast<t_omemo*>(user_data);
     MDB_txn *transaction = NULL;
-    MDB_val k_sender_key = {
-        .mv_size = strlen("sender_key_") + strlen(sender_key_name->group_id) +
-             1 + 10 + //strlen(sender_key_name->sender.device_id) +
-             1 + strlen(sender_key_name->sender.name),
-        .mv_data = NULL,
-    };
+    std::string k_sender_key_str = fmt::format("sender_key_{}_{}_{}", sender_key_name->group_id,
+                                               sender_key_name->sender.device_id,
+                                               sender_key_name->sender.name);
+    MDB_val k_sender_key = { .mv_size = k_sender_key_str.size(), .mv_data = k_sender_key_str.data() };
     MDB_val v_sender_key;
-    MDB_val k_user = {
-        .mv_size = strlen("user_") + strlen(sender_key_name->group_id) +
-             1 + 10 + //strlen(sender_key_name->sender.device_id) +
-             1 + strlen(sender_key_name->sender.name),
-        .mv_data = NULL,
-    };
-    MDB_val v_user; (void) v_user; (void) user_record;
-
-    k_sender_key.mv_data = malloc(sizeof(char) * (
-                                           k_sender_key.mv_size + 1));
-    k_sender_key.mv_size =
-    snprintf((char*)k_sender_key.mv_data, k_sender_key.mv_size + 1,
-             "sender_key_%s_%u_%s", sender_key_name->group_id,
-             sender_key_name->sender.device_id,
-             sender_key_name->sender.name);
-    k_user.mv_data = malloc(sizeof(char) * (
-                                           k_user.mv_size + 1));
-    k_user.mv_size =
-    snprintf((char*)k_user.mv_data, k_user.mv_size + 1,
-             "user_%s_%u_%s", sender_key_name->group_id,
-             sender_key_name->sender.device_id,
-             sender_key_name->sender.name);
+    (void) user_record;
 
     if (mdb_txn_begin(omemo->db_env, NULL, 0, &transaction)) {
         weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
