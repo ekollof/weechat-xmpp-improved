@@ -1882,7 +1882,7 @@ xmpp_stanza_t *omemo::get_bundle(xmpp_ctx_t *context, char *from, char *to)
     children[0] = stanza__iq_pubsub_publish(
             context, NULL, children, with_noop(bundle_node_s.c_str()));
 
-    omemo->handle_bundle(from, omemo->device_id, children[0]);
+    omemo->handle_bundle(nullptr, nullptr, from, omemo->device_id, children[0]);
 
     children[0] = stanza__iq_pubsub(
             context, NULL, children, with_noop("http://jabber.org/protocol/pubsub"));
@@ -2122,10 +2122,16 @@ void omemo::handle_devicelist(const char *jid, xmpp_stanza_t *items)
     signal_int_list_free(devicelist);
 }
 
-void omemo::handle_bundle(const char *jid, uint32_t device_id,
-                          xmpp_stanza_t *items)
-{
-    auto omemo = this;
+// Forward declaration — defined after handle_bundle.
+static void send_key_transport(weechat::account *account, struct t_gui_buffer *buffer,
+                                const char *to_jid, uint32_t to_device_id);
+
+ void omemo::handle_bundle(weechat::account *account,
+                           struct t_gui_buffer *buffer,
+                           const char *jid, uint32_t device_id,
+                           xmpp_stanza_t *items)
+ {
+     auto omemo = this;
     xmpp_stanza_t *item = xmpp_stanza_get_child_by_name(items, "item");
     if (!item) return;
     xmpp_stanza_t *bundle = xmpp_stanza_get_child_by_name(item, "bundle");
@@ -2211,7 +2217,17 @@ void omemo::handle_bundle(const char *jid, uint32_t device_id,
     }
     bks_store_bundle(&address, pre_keys, signed_pre_keys,
         key_signature, identity_key, omemo);
-}
+
+    // Drain any pending KeyTransport requests for this jid+device_id.
+    // These were enqueued in decode() when we received a message not encrypted
+    // for our device — now that we have their bundle we can build a session
+    // and send the KeyTransportElement.
+    if (account) {
+        auto key = std::make_pair(std::string(jid), device_id);
+        if (omemo->pending_key_transport.erase(key) > 0)
+            send_key_transport(account, buffer, jid, device_id);
+    }
+ }
 
 // Build and send a KeyTransportElement to `to_jid` targeting device `to_device_id`.
 // Per XEP-0384 §5 Business Rules: sent in response to a broken/invalid PreKey session
@@ -2551,10 +2567,27 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
                 account->connection.send(dl_stanza);
                 xmpp_stanza_release(dl_stanza);
             }
-            // Per XEP-0384 §5 Business Rules: send a KeyTransportElement to the
-            // sender's device so it can build a fresh session with us.
-            if (sender_device_id)
-                send_key_transport(account, buffer, jid, sender_device_id);
+            // Per XEP-0384 §5 Business Rules: we must send a KeyTransportElement
+            // to the sender's device so it can build a fresh session with us.
+            // We may not have their bundle yet, so:
+            //   1. Enqueue the pending KeyTransport request.
+            //   2. Fetch their bundle via PubSub IQ — handle_bundle() will
+            //      drain the queue and send the KT once the bundle arrives.
+            if (sender_device_id) {
+                omemo->pending_key_transport.emplace(jid, sender_device_id);
+                std::string bundle_node = fmt::format(
+                    "eu.siacs.conversations.axolotl.bundles:{}", sender_device_id);
+                xmpp_stanza_t *children[2] = {nullptr, nullptr};
+                children[0] = stanza__iq_pubsub_items(account->context, nullptr,
+                                                       bundle_node.c_str());
+                children[0] = stanza__iq_pubsub(account->context, nullptr, children,
+                                                 with_noop("http://jabber.org/protocol/pubsub"));
+                xmpp_string_guard uuid_g(account->context, xmpp_uuid_gen(account->context));
+                children[0] = stanza__iq(account->context, nullptr, children, nullptr,
+                                         uuid_g.ptr, jid, account->jid().data(), "get");
+                account->connection.send(children[0]);
+                xmpp_stanza_release(children[0]);
+            }
         }
         return NULL;
     }

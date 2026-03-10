@@ -5059,6 +5059,8 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                             }
                             
                             account.omemo.handle_bundle(
+                                &account,
+                                account.buffer,
                                 from ? from : account.jid().data(),
                                 bundle_device_id,
                                 items);

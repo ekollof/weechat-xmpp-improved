@@ -6,6 +6,8 @@
 
 #include <memory>
 #include <functional>
+#include <set>
+#include <utility>
 
 // RAII owner for malloc()/calloc()-allocated byte buffers.
 using heap_buf = std::unique_ptr<uint8_t[], decltype(&free)>;
@@ -48,6 +50,12 @@ namespace weechat {
 
             std::uint32_t device_id;
 
+            // Devices for which we need to send a KeyTransportElement once
+            // their bundle has been fetched and the session built.
+            // Populated in decode() when keys_for_this_device==0;
+            // drained in handle_bundle() after bks_store_bundle().
+            std::set<std::pair<std::string, std::uint32_t>> pending_key_transport;
+
             class bundle_request
             {
             public:
@@ -75,7 +83,9 @@ namespace weechat {
 
             void handle_devicelist(const char *jid, xmpp_stanza_t *items);
 
-            void handle_bundle(const char *jid, std::uint32_t device_id,
+            void handle_bundle(weechat::account *account,
+                               struct t_gui_buffer *buffer,
+                               const char *jid, std::uint32_t device_id,
                                xmpp_stanza_t *items);
 
             char *decode(weechat::account *account, struct t_gui_buffer *buffer,
