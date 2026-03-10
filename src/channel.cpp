@@ -1310,10 +1310,13 @@ int weechat::channel::send_message(const char *to, const char *body)
         auto *self_user = user::search(&account, account.jid().data());
         auto prefix = self_user ? std::string(self_user->as_prefix_raw()) : std::string(account.jid());
         std::string tag = "xmpp_message,message,private,notify_none,self_msg,log1,id_" + saved_id;
+        bool encrypted = (transport == weechat::channel::transport::OMEMO ||
+                          transport == weechat::channel::transport::PGP);
         weechat_printf_date_tags(buffer, 0,
                                  tag.c_str(),
-                                 "%s\t%s ⌛",
+                                 "%s\t%s%s ⌛",
                                  prefix.data(),
+                                 encrypted ? "🔒 " : "",
                                  body);
     }
 
