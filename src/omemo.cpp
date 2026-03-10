@@ -2124,7 +2124,7 @@ void omemo::handle_devicelist(const char *jid, xmpp_stanza_t *items)
 
 // Forward declaration — defined after handle_bundle.
 static void send_key_transport(weechat::account *account, struct t_gui_buffer *buffer,
-                                const char *to_jid, uint32_t to_device_id);
+                                std::string_view to_jid, uint32_t to_device_id);
 
  void omemo::handle_bundle(weechat::account *account,
                            struct t_gui_buffer *buffer,
@@ -2235,29 +2235,29 @@ static void send_key_transport(weechat::account *account, struct t_gui_buffer *b
 // The element is an <encrypted> with a <header> (keys) but no <payload>.
 // 32 zero-bytes are encrypted for the target device via the Signal session.
 static void send_key_transport(weechat::account *account, struct t_gui_buffer *buffer,
-                                const char *to_jid, uint32_t to_device_id)
+                                std::string_view to_jid, uint32_t to_device_id)
 {
-    if (!to_jid || !to_device_id) return;
+    if (to_jid.empty() || !to_device_id) return;
     auto *omemo = &account->omemo;
 
     struct signal_protocol_address address = {
-        .name = to_jid, .name_len = strlen(to_jid),
+        .name = to_jid.data(), .name_len = to_jid.size(),
         .device_id = (int32_t)to_device_id };
 
     // Ensure we have a session — build one from the stored bundle if needed.
     if (ss_contains_session_func(&address, omemo) <= 0) {
         auto bundle = bks_load_bundle(&address, omemo);
         if (!bundle) {
-            weechat_printf(buffer, "%somemo: no bundle for %s device %u, cannot send KeyTransport",
-                           weechat_prefix("error"), to_jid, to_device_id);
+            weechat_printf(buffer, "%somemo: no bundle for %.*s device %u, cannot send KeyTransport",
+                           weechat_prefix("error"), (int)to_jid.size(), to_jid.data(), to_device_id);
             return;
         }
         try {
             libsignal::session_builder builder(omemo->store_context, &address, omemo->context);
             builder.process_pre_key_bundle(*bundle);
         } catch (const std::exception& ex) {
-            weechat_printf(buffer, "%somemo: cannot build session with %s device %u for KeyTransport: %s",
-                           weechat_prefix("error"), to_jid, to_device_id, ex.what());
+            weechat_printf(buffer, "%somemo: cannot build session with %.*s device %u for KeyTransport: %s",
+                           weechat_prefix("error"), (int)to_jid.size(), to_jid.data(), to_device_id, ex.what());
             return;
         }
     }
@@ -2266,8 +2266,8 @@ static void send_key_transport(weechat::account *account, struct t_gui_buffer *b
     static const uint8_t zero32[32] = {0};
     session_cipher *raw_cipher = nullptr;
     if (session_cipher_create(&raw_cipher, omemo->store_context, &address, omemo->context)) {
-        weechat_printf(buffer, "%somemo: session_cipher_create failed for KeyTransport to %s device %u",
-                       weechat_prefix("error"), to_jid, to_device_id);
+        weechat_printf(buffer, "%somemo: session_cipher_create failed for KeyTransport to %.*s device %u",
+                       weechat_prefix("error"), (int)to_jid.size(), to_jid.data(), to_device_id);
         return;
     }
     libsignal::unique_session_cipher cipher(raw_cipher);
@@ -2296,16 +2296,14 @@ static void send_key_transport(weechat::account *account, struct t_gui_buffer *b
 
     xmpp_stanza_t *hdr = xmpp_stanza_new(ctx);
     xmpp_stanza_set_name(hdr, "header");
-    char sid_str[12] = {0};
-    snprintf(sid_str, sizeof(sid_str), "%u", omemo->device_id);
-    xmpp_stanza_set_attribute(hdr, "sid", sid_str);
+    std::string sid_str = fmt::format("{}", omemo->device_id);
+    xmpp_stanza_set_attribute(hdr, "sid", sid_str.c_str());
 
     // <key rid='to_device_id' [prekey='true']>...</key>
     xmpp_stanza_t *key_elem = xmpp_stanza_new(ctx);
     xmpp_stanza_set_name(key_elem, "key");
-    char rid_str[12] = {0};
-    snprintf(rid_str, sizeof(rid_str), "%u", to_device_id);
-    xmpp_stanza_set_attribute(key_elem, "rid", rid_str);
+    std::string rid_str = fmt::format("{}", to_device_id);
+    xmpp_stanza_set_attribute(key_elem, "rid", rid_str.c_str());
     if (prekey) xmpp_stanza_set_attribute(key_elem, "prekey", "true");
     stanza__set_text(ctx, key_elem, with_noop(key_payload));
     xmpp_stanza_add_child(hdr, key_elem);
@@ -2326,7 +2324,8 @@ static void send_key_transport(weechat::account *account, struct t_gui_buffer *b
     xmpp_stanza_release(hdr);
 
     // Wrap in <message type='chat' to='to_jid'>
-    xmpp_stanza_t *msg = xmpp_message_new(ctx, "chat", to_jid, NULL);
+    std::string to_jid_s(to_jid);
+    xmpp_stanza_t *msg = xmpp_message_new(ctx, "chat", to_jid_s.c_str(), NULL);
     xmpp_stanza_add_child(msg, encrypted);
     xmpp_stanza_release(encrypted);
 
@@ -2340,8 +2339,8 @@ static void send_key_transport(weechat::account *account, struct t_gui_buffer *b
     account->connection.send(msg);
     xmpp_stanza_release(msg);
 
-    weechat_printf(buffer, "%somemo: sent KeyTransportElement to %s device %u",
-                   weechat_prefix("network"), to_jid, to_device_id);
+    weechat_printf(buffer, "%somemo: sent KeyTransportElement to %.*s device %u",
+                   weechat_prefix("network"), (int)to_jid.size(), to_jid.data(), to_device_id);
 }
 
 char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
