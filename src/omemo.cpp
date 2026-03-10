@@ -1688,12 +1688,6 @@ std::optional<libsignal::pre_key_bundle> bks_load_bundle(struct signal_protocol_
 
     auto transaction = lmdb::txn::begin(omemo->db_env);
 
-    uint32_t pre_key_id = 0;
-    uint32_t signed_pre_key_id = 0;
-    uint8_t *sig_raw = nullptr; size_t sig_len;
-    struct signal_buffer *signature;
-    uint8_t *key_raw = nullptr; size_t key_len;
-
     {
         lmdb::val k{k_bundle_pk}, v{};
         if (omemo->dbi.omemo.get(transaction, k, v)) v_bundle_pk.assign(v.data(), v.size());
@@ -1711,63 +1705,68 @@ std::optional<libsignal::pre_key_bundle> bks_load_bundle(struct signal_protocol_
         if (omemo->dbi.omemo.get(transaction, k, v)) v_bundle_ik.assign(v.data(), v.size());
     }
 
+    // --- pre-key ---
     auto r_bundle_pks = v_bundle_pk
         | std::ranges::views::split(';')
         | std::ranges::views::transform([](auto&& str) {
             return std::string_view(&*str.begin(), std::ranges::distance(str));
         });
     auto bundle_pks = std::vector<std::string>{r_bundle_pks.begin(), r_bundle_pks.end()};
-    heap_buf pre_key_raw_buf{nullptr, free};
-    if (bundle_pks.size() > 0)
-    {
+    if (bundle_pks.empty()) return {};
+    uint32_t pre_key_id = 0;
+    libsignal::public_key pre_key = [&]() {
         std::istringstream iss(bundle_pks[rand() % bundle_pks.size()]);
         iss >> pre_key_id;
-        char delim;
-        iss.get(delim);
-        if (delim != ',') throw std::runtime_error("Bundle parse failure");
-        std::string key_data;
-        iss >> key_data;
-        key_len = base64_decode(key_data.data(), key_data.size(), &key_raw);
-        pre_key_raw_buf = make_heap_buf(key_raw);
-    }
-    else
-        return {};
-    libsignal::public_key pre_key(key_raw, key_len, omemo->context);
+        char delim; iss.get(delim);
+        if (delim != ',') throw std::runtime_error("Bundle parse failure (pk)");
+        std::string key_data; iss >> key_data;
+        uint8_t *raw = nullptr;
+        size_t len = base64_decode(key_data.data(), key_data.size(), &raw);
+        heap_buf buf = make_heap_buf(raw);
+        return libsignal::public_key(raw, len, omemo->context);
+    }();
 
+    // --- signed pre-key ---
     auto r_bundle_sks = v_bundle_sk
         | std::ranges::views::split(';')
         | std::ranges::views::transform([](auto&& str) {
             return std::string_view(&*str.begin(), std::ranges::distance(str));
         });
     auto bundle_sks = std::vector<std::string>{r_bundle_sks.begin(), r_bundle_sks.end()};
-    heap_buf signed_key_raw_buf{nullptr, free};
-    if (bundle_sks.size() > 0)
-    {
+    if (bundle_sks.empty()) return {};
+    uint32_t signed_pre_key_id = 0;
+    libsignal::public_key signed_pre_key = [&]() {
         std::istringstream iss(bundle_sks[rand() % bundle_sks.size()]);
         iss >> signed_pre_key_id;
-        char delim;
-        iss.get(delim);
-        if (delim != ',') throw std::runtime_error("Bundle parse failure");
-        std::string key_data;
-        iss >> key_data;
-        key_len = base64_decode(key_data.data(), key_data.size(), &key_raw);
-        signed_key_raw_buf = make_heap_buf(key_raw);
-    }
-    else
-        return {};
-    libsignal::public_key signed_pre_key(key_raw, key_len, omemo->context);
+        char delim; iss.get(delim);
+        if (delim != ',') throw std::runtime_error("Bundle parse failure (sk)");
+        std::string key_data; iss >> key_data;
+        uint8_t *raw = nullptr;
+        size_t len = base64_decode(key_data.data(), key_data.size(), &raw);
+        heap_buf buf = make_heap_buf(raw);
+        return libsignal::public_key(raw, len, omemo->context);
+    }();
 
-    sig_len = base64_decode(v_bundle_sg.data(), v_bundle_sg.size(), &sig_raw);
+    // --- signature (signal_buffer — freed via unique_ptr) ---
+    uint8_t *sig_raw = nullptr;
+    size_t sig_len = base64_decode(v_bundle_sg.data(), v_bundle_sg.size(), &sig_raw);
     heap_buf sig_raw_buf = make_heap_buf(sig_raw);
-    signature = signal_buffer_create(sig_raw, sig_len);
-    key_len = base64_decode(v_bundle_ik.data(), v_bundle_ik.size(), &key_raw);
-    heap_buf ik_raw_buf = make_heap_buf(key_raw);
-    libsignal::public_key identity_key(key_raw, key_len, omemo->context);
+    std::unique_ptr<signal_buffer, decltype(&signal_buffer_free)>
+        signature(signal_buffer_create(sig_raw, sig_len), signal_buffer_free);
 
-    libsignal::pre_key_bundle bundle((uint32_t)address->device_id, (int)address->device_id,
-                                     (uint32_t)pre_key_id, *pre_key, (uint32_t)signed_pre_key_id, *signed_pre_key,
-                                     (const uint8_t*)signal_buffer_data(signature), (size_t)signal_buffer_len(signature),
-                                     *identity_key);
+    // --- identity key ---
+    uint8_t *ik_raw = nullptr;
+    size_t ik_len = base64_decode(v_bundle_ik.data(), v_bundle_ik.size(), &ik_raw);
+    heap_buf ik_raw_buf = make_heap_buf(ik_raw);
+    libsignal::public_key identity_key(ik_raw, ik_len, omemo->context);
+
+    libsignal::pre_key_bundle bundle(
+        (uint32_t)address->device_id, (int)address->device_id,
+        (uint32_t)pre_key_id,        *pre_key,
+        (uint32_t)signed_pre_key_id, *signed_pre_key,
+        (const uint8_t*)signal_buffer_data(signature.get()),
+        (size_t)signal_buffer_len(signature.get()),
+        *identity_key);
 
     transaction.commit();
 
