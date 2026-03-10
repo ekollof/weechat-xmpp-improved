@@ -2332,8 +2332,12 @@ static void send_key_transport(weechat::account *account, struct t_gui_buffer *b
         // Proactively send a KeyTransportElement for any non-self contact
         // device — this establishes the Signal session so Conversations
         // will include our device in subsequent encrypted messages.
+        // Skip only our exact own device (same JID + same device_id).
+        // We DO send to other devices sharing our JID (e.g. Conversations
+        // running on the same account) so they can establish a session.
         std::string_view own_jid = account->jid();
-        if (std::string_view(jid) != own_jid)
+        bool is_own_device = (std::string_view(jid) == own_jid && device_id == omemo->device_id);
+        if (!is_own_device)
             send_key_transport(account, buffer, jid, device_id);
     }
 }
