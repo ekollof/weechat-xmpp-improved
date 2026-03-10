@@ -81,3 +81,9 @@ deps/diff/diffwords
 
 # Package build output
 packaging/build/
+
+# Stray source tarballs / extracted packages in repo root
+libstrophe*/
+libstrophe_*
+weechat-[0-9]*/
+weechat_[0-9]*

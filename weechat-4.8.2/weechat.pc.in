@@ -1,9 +1,0 @@
-prefix=@prefix@
-exec_prefix=@exec_prefix@
-libdir=@libdir@
-includedir=@includedir@
-
-Name: weechat
-Description: WeeChat plugins headers
-Version: @VERSION@
-Cflags: -I${includedir}/@PACKAGE@
