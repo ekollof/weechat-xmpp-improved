@@ -4943,6 +4943,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                                     continue;
 
                                 device_id = xmpp_stanza_get_id(device);
+                                if (!device_id) continue;
 
                                 dev.id = atoi(device_id);
                                 dev.name = device_id;
@@ -4982,6 +4983,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                                     continue;
 
                                 const char *device_id = xmpp_stanza_get_id(device);
+                                if (!device_id) continue;
 
                                 char bundle_node[128] = {0};
                                 snprintf(bundle_node, sizeof(bundle_node),
@@ -5616,8 +5618,11 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
             // always have fresh pre-keys for our device.
             children[0] =
             account.omemo.get_bundle(account.context, jid_str.data(), NULL);
-            this->send(children[0]);
-            xmpp_stanza_release(children[0]);
+            if (children[0])
+            {
+                this->send(children[0]);
+                xmpp_stanza_release(children[0]);
+            }
 
             // Publish our devicelist with our device_id included.  This runs
             // before we receive the server's existing list, so account.devices
