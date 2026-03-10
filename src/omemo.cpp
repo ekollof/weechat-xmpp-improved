@@ -1596,8 +1596,14 @@ int bks_store_bundle(struct signal_protocol_address *address,
         [](const std::string& a, const std::string& b) { return a.empty() ? b : a + ";" + b; });
     auto transaction = lmdb::txn::begin(omemo->db_env);
 
-    omemo->dbi.omemo.put(transaction, lmdb::val{k_bundle_pk}, lmdb::val{v_bundle_pk});
-    omemo->dbi.omemo.put(transaction, lmdb::val{k_bundle_sk}, lmdb::val{v_bundle_sk});
+    {
+        lmdb::val k{k_bundle_pk}, v{v_bundle_pk};
+        omemo->dbi.omemo.put(transaction, k, v);
+    }
+    {
+        lmdb::val k{k_bundle_sk}, v{v_bundle_sk};
+        omemo->dbi.omemo.put(transaction, k, v);
+    }
     {
         lmdb::val k{k_bundle_sg}, v{signature, std::strlen(signature)};
         omemo->dbi.omemo.put(transaction, k, v);
