@@ -1870,6 +1870,50 @@ xmpp_stanza_t *omemo::get_bundle(xmpp_ctx_t *context, char *from, char *to)
     children[0] = stanza__iq_pubsub(
             context, NULL, children, with_noop("http://jabber.org/protocol/pubsub"));
 
+    // Add publish-options: access_model=open + persist_items=true so servers
+    // deliver PubSub notifications to contacts and allow them to fetch our bundle.
+    {
+        xmpp_stanza_t *pubsub = children[0];
+
+        auto make_field = [&](const char *var, const char *val, const char *type = nullptr) {
+            xmpp_stanza_t *field = xmpp_stanza_new(context);
+            xmpp_stanza_set_name(field, "field");
+            xmpp_stanza_set_attribute(field, "var", var);
+            if (type) xmpp_stanza_set_attribute(field, "type", type);
+            xmpp_stanza_t *value = xmpp_stanza_new(context);
+            xmpp_stanza_set_name(value, "value");
+            xmpp_stanza_t *text = xmpp_stanza_new(context);
+            xmpp_stanza_set_text(text, val);
+            xmpp_stanza_add_child(value, text);
+            xmpp_stanza_release(text);
+            xmpp_stanza_add_child(field, value);
+            xmpp_stanza_release(value);
+            return field;
+        };
+
+        xmpp_stanza_t *x = xmpp_stanza_new(context);
+        xmpp_stanza_set_name(x, "x");
+        xmpp_stanza_set_ns(x, "jabber:x:data");
+        xmpp_stanza_set_attribute(x, "type", "submit");
+
+        xmpp_stanza_t *f1 = make_field("FORM_TYPE",
+            "http://jabber.org/protocol/pubsub#publish-options", "hidden");
+        xmpp_stanza_t *f2 = make_field("pubsub#persist_items", "true");
+        xmpp_stanza_t *f3 = make_field("pubsub#access_model", "open");
+
+        xmpp_stanza_add_child(x, f1); xmpp_stanza_release(f1);
+        xmpp_stanza_add_child(x, f2); xmpp_stanza_release(f2);
+        xmpp_stanza_add_child(x, f3); xmpp_stanza_release(f3);
+
+        xmpp_stanza_t *publish_options = xmpp_stanza_new(context);
+        xmpp_stanza_set_name(publish_options, "publish-options");
+        xmpp_stanza_add_child(publish_options, x);
+        xmpp_stanza_release(x);
+
+        xmpp_stanza_add_child(pubsub, publish_options);
+        xmpp_stanza_release(publish_options);
+    }
+
     parent = stanza__iq(
         context, NULL, children, NULL, "announce2", from, to, "set");
     // children_buf auto-frees here
