@@ -7,6 +7,7 @@
 #include <memory>
 #include <functional>
 #include <set>
+#include <unordered_map>
 #include <utility>
 
 // RAII owner for malloc()/calloc()-allocated byte buffers.
@@ -55,6 +56,11 @@ namespace weechat {
             // Populated in decode() when keys_for_this_device==0;
             // drained in handle_bundle() after bks_store_bundle().
             std::set<std::pair<std::string, std::uint32_t>> pending_key_transport;
+
+            // Maps outgoing IQ id → target JID for bundle/devicelist PubSub
+            // fetches directed at a contact. Used in the IQ result handler to
+            // recover the correct JID even when `from` is the server domain.
+            std::unordered_map<std::string, std::string> pending_iq_jid;
 
             class bundle_request
             {

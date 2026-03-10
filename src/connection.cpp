@@ -1187,9 +1187,16 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
                                                   with_noop("http://jabber.org/protocol/pubsub"));
                                 xmpp_string_guard uuid_g(account.context, xmpp_uuid_gen(account.context));
                                 const char *uuid = uuid_g.ptr;
+                                // PEP event: from=contact_jid, to=our_jid.
+                                // Bundle IQ must go to the contact (from), not ourselves.
+                                const char *bundle_target = from ? from : account.jid().data();
                                 children[0] =
                                 stanza__iq(account.context, NULL, children.get(), NULL, uuid,
-                                            to, from, "get");
+                                            bundle_target, account.jid().data(), "get");
+                                // Register IQ id → target JID so the result handler
+                                // can recover the correct JID even if `from` is server domain.
+                                if (uuid && account.omemo)
+                                    account.omemo.pending_iq_jid[uuid] = bundle_target;
                                 // freed by uuid_g
 
                                 account.connection.send(children[0]);
@@ -4882,13 +4889,26 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                         item, "list", "eu.siacs.conversations.axolotl");
                     if (list && account.omemo)
                     {
-                        // For PubSub IQ results, `from` is the server domain,
-                        // not the node owner.  Determine the node owner from `to`
-                        // (the bare JID the original request was sent from).
-                        xmpp_string_guard to_bare_g(account.context,
-                            to ? xmpp_jid_bare(account.context, to) : nullptr);
-                        const char *node_owner = (to_bare_g.ptr && *to_bare_g.ptr)
-                            ? to_bare_g.ptr : (from ? from : account.jid().data());
+                        // For PubSub IQ results, `from` may be the server domain,
+                        // not the node owner.  Recover the correct JID by:
+                        //   1. Checking the pending_iq_jid map (keyed by IQ id).
+                        //   2. Falling back to bare `to` (works for our own JID fetches).
+                        //   3. Finally using `from` if all else fails.
+                        std::string node_owner_str;
+                        if (id) {
+                            auto it = account.omemo.pending_iq_jid.find(id);
+                            if (it != account.omemo.pending_iq_jid.end()) {
+                                node_owner_str = it->second;
+                                account.omemo.pending_iq_jid.erase(it);
+                            }
+                        }
+                        if (node_owner_str.empty()) {
+                            xmpp_string_guard to_bare_g(account.context,
+                                to ? xmpp_jid_bare(account.context, to) : nullptr);
+                            node_owner_str = (to_bare_g.ptr && *to_bare_g.ptr)
+                                ? to_bare_g.ptr : (from ? from : account.jid().data());
+                        }
+                        const char *node_owner = node_owner_str.c_str();
                         bool is_own_devicelist = (account.jid() == node_owner);
 
                         account.omemo.handle_devicelist(node_owner, items);
@@ -4992,15 +5012,20 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                                 children[1] = NULL;
                                 children[0] =
                                 stanza__iq_pubsub_items(account.context, NULL,
-                                                        bundle_node);
+                                                         bundle_node);
                                 children[0] =
                                 stanza__iq_pubsub(account.context, NULL, children,
                                                     with_noop("http://jabber.org/protocol/pubsub"));
                                 xmpp_string_guard uuid_g(account.context, xmpp_uuid_gen(account.context));
                                 const char *uuid = uuid_g.ptr;
+                                // Fetch from the node owner (contact), not from ourselves.
                                 children[0] =
                                 stanza__iq(account.context, NULL, children, NULL, uuid,
-                                    to, from, "get");
+                                    node_owner, account.jid().data(), "get");
+                                // Register IQ id → target JID so the result handler
+                                // can recover the correct JID even if `from` is server domain.
+                                if (uuid && account.omemo)
+                                    account.omemo.pending_iq_jid[uuid] = node_owner;
                                 // freed by uuid_g
 
                                 account.connection.send(children[0]);
@@ -5028,8 +5053,23 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                         {
                             uint32_t bundle_device_id = strtol(items_node+node_prefix, NULL, 10);
                             
+                            // Recover the target JID: prefer the pending_iq_jid map
+                            // (keyed by IQ id), fall back to `from` in the stanza.
+                            // `from` may be the server domain when the server answers
+                            // a PubSub IQ on behalf of the node owner.
+                            std::string bundle_jid;
+                            if (id) {
+                                auto it = account.omemo.pending_iq_jid.find(id);
+                                if (it != account.omemo.pending_iq_jid.end()) {
+                                    bundle_jid = it->second;
+                                    account.omemo.pending_iq_jid.erase(it);
+                                }
+                            }
+                            if (bundle_jid.empty())
+                                bundle_jid = from ? from : account.jid().data();
+
                             // If this is our own device's bundle, print confirmation
-                            if (from && account.jid() == from && 
+                            if (bundle_jid == account.jid() &&
                                 bundle_device_id == account.omemo.device_id)
                             {
                                 weechat_printf(account.buffer,
@@ -5061,7 +5101,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                             account.omemo.handle_bundle(
                                 &account,
                                 account.buffer,
-                                from ? from : account.jid().data(),
+                                bundle_jid.c_str(),
                                 bundle_device_id,
                                 items);
                         }

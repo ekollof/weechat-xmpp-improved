@@ -2603,6 +2603,10 @@ char *omemo::decode(weechat::account *account, struct t_gui_buffer *buffer,
                 xmpp_string_guard uuid_g(account->context, xmpp_uuid_gen(account->context));
                 children[0] = stanza__iq(account->context, nullptr, children, nullptr,
                                          uuid_g.ptr, jid, account->jid().data(), "get");
+                // Register so the IQ result handler resolves to the contact's JID,
+                // not the server domain that responds on their behalf.
+                if (uuid_g.ptr)
+                    omemo->pending_iq_jid[uuid_g.ptr] = jid;
                 account->connection.send(children[0]);
                 xmpp_stanza_release(children[0]);
             }
@@ -2751,6 +2755,7 @@ xmpp_stanza_t *omemo::encode(weechat::account *account, struct t_gui_buffer *buf
             xmpp_string_guard dl_uuid_g(account->context, xmpp_uuid_gen(account->context));
             dl_children[0] = stanza__iq(account->context, nullptr, dl_children, nullptr,
                 dl_uuid_g.ptr, target, account->jid().data(), "get");
+            omemo->pending_iq_jid[dl_uuid_g.ptr] = target;
             account->connection.send(dl_children[0]);
             xmpp_stanza_release(dl_children[0]);
             signal_int_list_free(devicelist);
