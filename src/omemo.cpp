@@ -1998,9 +1998,12 @@ void omemo::init(struct t_gui_buffer *buffer, const char *account_name)
         // causing a SIGABRT in ratchet_identity_key_pair_destroy later.
         ec_public_key *pub_key = nullptr;
         ec_private_key *priv_key = nullptr;
+        // public_data came from ec_public_key_serialize(), which stores the
+        // full 33-byte serialized form: [0x05][32 raw bytes].
+        // curve_decode_point() expects exactly this prefixed form — no +1 skip.
         curve_decode_point(&pub_key,
-                signal_buffer_data(public_data) + 1,
-                signal_buffer_len(public_data) - 1,
+                signal_buffer_data(public_data),
+                signal_buffer_len(public_data),
                 omemo->context);
         curve_decode_private_point(&priv_key,
                 signal_buffer_data(private_data),
