@@ -1017,6 +1017,25 @@ int spks_load_signed_pre_key(struct signal_buffer **record, uint32_t signed_pre_
             goto cleanup;
         };
 
+        // Also write current ID and timestamp metadata so show_status and
+        // get_bundle() can find them — only if not already set.
+        {
+            auto meta_txn = lmdb::txn::begin(omemo->db_env);
+            lmdb::val k_cur_id{"signed_pre_key_current_id"}, v_cur_id{};
+            bool already_set = omemo->dbi.omemo.get(meta_txn, k_cur_id, v_cur_id)
+                               && v_cur_id.size() > 0;
+            if (!already_set) {
+                std::string v_id_str = std::to_string(signed_pre_key_id);
+                std::string v_ts_str = std::to_string((long long)time(NULL));
+                std::string k_ts_str = fmt::format("signed_pre_key_ts_{}", signed_pre_key_id);
+                omemo->dbi.omemo.put(meta_txn,
+                    lmdb::val{"signed_pre_key_current_id"}, lmdb::val{v_id_str});
+                omemo->dbi.omemo.put(meta_txn,
+                    lmdb::val{k_ts_str}, lmdb::val{v_ts_str});
+            }
+            meta_txn.commit();
+        }
+
         *record = serialized_key;
     }
 
@@ -2716,6 +2735,30 @@ xmpp_stanza_t *omemo::encode(weechat::account *account, struct t_gui_buffer *buf
     for (int self = 0; self <= 1; self++)
     {
         if (dls_load_devicelist(&devicelist, target, omemo)) return NULL;
+
+        // If the recipient's devicelist is empty we have no keys to encrypt for.
+        // Trigger an async devicelist fetch so a subsequent message will work.
+        if (self == 0 && signal_int_list_size(devicelist) == 0) {
+            weechat_printf(buffer,
+                "%somemo: no known devices for %s — fetching devicelist, retry in a moment",
+                weechat_prefix("error"), target);
+            // Fetch their devicelist via PubSub IQ
+            xmpp_stanza_t *dl_children[2] = {nullptr, nullptr};
+            dl_children[0] = stanza__iq_pubsub_items(account->context, nullptr,
+                "eu.siacs.conversations.axolotl.devicelist");
+            dl_children[0] = stanza__iq_pubsub(account->context, nullptr, dl_children,
+                with_noop("http://jabber.org/protocol/pubsub"));
+            xmpp_string_guard dl_uuid_g(account->context, xmpp_uuid_gen(account->context));
+            dl_children[0] = stanza__iq(account->context, nullptr, dl_children, nullptr,
+                dl_uuid_g.ptr, target, account->jid().data(), "get");
+            account->connection.send(dl_children[0]);
+            xmpp_stanza_release(dl_children[0]);
+            signal_int_list_free(devicelist);
+            xmpp_stanza_release(encrypted);
+            xmpp_stanza_release(header);
+            return NULL;
+        }
+
         for (size_t i = 0; i < signal_int_list_size(devicelist); i++)
         {
             uint32_t device_id = signal_int_list_at(devicelist, i);
