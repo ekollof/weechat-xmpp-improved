@@ -523,11 +523,14 @@ int iks_get_identity_key_pair(struct signal_buffer **public_data, signal_buffer 
         return -1;
     }
 
-    if (!mdb_get(transaction, omemo->dbi.omemo,
-                 &k_local_private_key, &v_local_private_key) &&
-        !mdb_get(transaction, omemo->dbi.omemo,
-                 &k_local_public_key, &v_local_public_key))
+    bool have_priv = !mdb_get(transaction, omemo->dbi.omemo,
+                              &k_local_private_key, &v_local_private_key);
+    bool have_pub  = !mdb_get(transaction, omemo->dbi.omemo,
+                              &k_local_public_key, &v_local_public_key);
+
+    if (have_priv && have_pub)
     {
+        // Both keys present — normal path.
         *private_data = signal_buffer_create((const uint8_t*)v_local_private_key.mv_data, v_local_private_key.mv_size);
         *public_data = signal_buffer_create((const uint8_t*)v_local_public_key.mv_data, v_local_public_key.mv_size);
 
@@ -537,8 +540,59 @@ int iks_get_identity_key_pair(struct signal_buffer **public_data, signal_buffer 
             goto cleanup;
         };
     }
+    else if (have_priv && !have_pub)
+    {
+        // Private key exists but public key is missing (e.g. due to a previous
+        // crash/bug mid-write).  Derive the public key from the private key and
+        // store it so we stay consistent with our published identity.
+        weechat_printf(NULL, "%somemo: local_public_key missing, deriving from private key",
+                       weechat_prefix("network"));
+        ec_private_key *priv_key = nullptr;
+        curve_decode_private_point(&priv_key,
+                (const uint8_t*)v_local_private_key.mv_data,
+                v_local_private_key.mv_size, omemo->context);
+        if (!priv_key) {
+            weechat_printf(NULL, "%sxmpp: failed to decode private key for public key derivation",
+                           weechat_prefix("error"));
+            goto cleanup;
+        }
+        ec_public_key *pub_key = nullptr;
+        curve_generate_public_key(&pub_key, priv_key);
+        SIGNAL_UNREF(priv_key);
+        if (!pub_key) {
+            weechat_printf(NULL, "%sxmpp: failed to derive public key from private key",
+                           weechat_prefix("error"));
+            goto cleanup;
+        }
+        ec_public_key_serialize(public_data, pub_key);
+        SIGNAL_UNREF(pub_key);
+        *private_data = signal_buffer_create((const uint8_t*)v_local_private_key.mv_data,
+                v_local_private_key.mv_size);
+
+        v_local_public_key.mv_data = signal_buffer_data(*public_data);
+        v_local_public_key.mv_size = signal_buffer_len(*public_data);
+
+        mdb_txn_abort(transaction);
+        if (mdb_txn_begin(omemo->db_env, NULL, 0, &transaction)) {
+            weechat_printf(NULL, "%sxmpp: failed to open lmdb transaction",
+                           weechat_prefix("error"));
+            return -1;
+        }
+        if (mdb_put(transaction, omemo->dbi.omemo,
+                    &k_local_public_key, &v_local_public_key, 0)) {
+            weechat_printf(NULL, "%sxmpp: failed to write derived public key",
+                           weechat_prefix("error"));
+            goto cleanup;
+        }
+        if (mdb_txn_commit(transaction)) {
+            weechat_printf(NULL, "%sxmpp: failed to write lmdb transaction",
+                           weechat_prefix("error"));
+            goto cleanup;
+        }
+    }
     else
     {
+        // Neither key exists — generate a fresh identity key pair.
         auto identity = libsignal::identity_key_pair::generate(omemo->context);
 
         // Use raw pointers directly — do NOT wrap in RAII types here.
