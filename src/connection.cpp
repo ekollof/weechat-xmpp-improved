@@ -1485,12 +1485,6 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
                             ch->unreads.clear();
                         }
 
-                        weechat_printf_date_tags(ch->buffer, 0,
-                                                 "xmpp_mds,notify_none",
-                                                 "%s%sRead sync from another device (id: %.8s…)",
-                                                 weechat_prefix("network"),
-                                                 weechat_color("darkgray"),
-                                                 last_id ? last_id : "all");
                     }
                 }
             }
