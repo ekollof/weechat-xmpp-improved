@@ -205,18 +205,18 @@ void weechat::xmpp::omemo::handle_bundle(weechat::account *account,
     const bool is_own_device = (account && !bare_jid.empty() && own_bare_jid == bare_jid)
                                 && (remote_device_id == device_id);
 
-    if (db_env && jid)
+    if (db_env && !bare_jid.empty())
     {
         if (const auto bundle = extract_bundle_from_items(items))
         {
-            store_bundle(*this, jid, remote_device_id, *bundle);
+            store_bundle(*this, bare_jid, remote_device_id, *bundle);
             if (!is_own_device)
             {
-                const bool had_session_before = has_session(jid, remote_device_id);
+                const bool had_session_before = has_session(bare_jid.c_str(), remote_device_id);
                 try
                 {
                     (void)establish_session_from_bundle(
-                        *this, account ? *account->context : nullptr, jid, remote_device_id);
+                        *this, account ? *account->context : nullptr, bare_jid, remote_device_id);
                 }
                 catch (const std::exception &ex)
                 {
@@ -225,32 +225,36 @@ void weechat::xmpp::omemo::handle_bundle(weechat::account *account,
                             "OMEMO session setup failed for {}/{}: {}",
                             jid, remote_device_id, ex.what()));
                 }
-                const bool session_is_fresh = !had_session_before && has_session(jid, remote_device_id);
+                const bool session_is_fresh = !had_session_before
+                    && has_session(bare_jid.c_str(), remote_device_id);
                 if ((session_is_fresh || needs_key_transport) && account && buffer)
                 {
-                    send_key_transport(*this, *account, buffer, jid, remote_device_id);
+                    send_key_transport(*this, *account, buffer, bare_jid.c_str(), remote_device_id);
                 }
             }
         }
     }
 
-    if (buffer && jid)
+    if (buffer && !bare_jid.empty())
     {
-        const auto bundle = db_env ? load_bundle(*this, jid, remote_device_id) : std::nullopt;
+        const auto bundle = db_env ? load_bundle(*this, bare_jid, remote_device_id) : std::nullopt;
         const auto prekey_count = bundle ? bundle->prekeys.size() : 0U;
         if (!is_own_device)
             print_info(buffer, fmt::format(
                 "OMEMO received bundle for {}/{} ({} prekeys).",
-                jid, remote_device_id, prekey_count));
+                bare_jid, remote_device_id, prekey_count));
     }
 
     // After successfully building a session with a remote contact's device,
     // auto-enable OMEMO on the corresponding PM channel if it has no transport
     // set yet. This ensures that the next message the user sends is encrypted
     // even if they haven't manually run /omemo on.
-    if (!is_own_device && account && jid && has_session(jid, remote_device_id))
+    if (!is_own_device
+        && account
+        && !bare_jid.empty()
+        && has_session(bare_jid.c_str(), remote_device_id))
     {
-        auto ch_it = account->channels.find(jid);
+        auto ch_it = account->channels.find(bare_jid);
         if (ch_it != account->channels.end())
         {
             auto &ch = ch_it->second;
@@ -260,7 +264,7 @@ void weechat::xmpp::omemo::handle_bundle(weechat::account *account,
             {
                 weechat_printf(ch.buffer,
                                "%sAuto-enabling OMEMO (OMEMO session established with %s)",
-                               weechat_prefix("network"), jid);
+                               weechat_prefix("network"), bare_jid.c_str());
                 ch.omemo.enabled = 1;
                 ch.set_transport(weechat::channel::transport::OMEMO, 0);
             }

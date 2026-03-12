@@ -98,6 +98,14 @@ bool weechat::account::search_device(weechat::account::device* out, std::uint32_
 
 void weechat::account::add_device(weechat::account::device *device)
 {
+    if (!device || device->id == 0 || device->id > 0x7fffffffU)
+    {
+        weechat_printf(buffer,
+                       "%somemo: ignoring invalid cached device id %u",
+                       weechat_prefix("error"), device ? device->id : 0);
+        return;
+    }
+
     if (!devices.contains(device->id))
     {
         devices[device->id].id = device->id;
@@ -115,6 +123,14 @@ xmpp_stanza_t *weechat::account::get_devicelist()
 {
     int i = 0;
 
+    if (omemo.device_id == 0 || omemo.device_id > 0x7fffffffU)
+    {
+        weechat_printf(buffer,
+                       "%somemo: refusing to publish devicelist: invalid local device id %u",
+                       weechat_prefix("error"), omemo.device_id);
+        return nullptr;
+    }
+
     account::device device;
 
     device.id = omemo.device_id;
@@ -128,9 +144,32 @@ xmpp_stanza_t *weechat::account::get_devicelist()
 
     for (auto& device : devices)
     {
-        if (device.first != omemo.device_id && device.first != 0 && device.second.name != "%u")
+        if (device.first == omemo.device_id || device.first == 0 || device.first > 0x7fffffffU)
+            continue;
+
+        if (device.second.name == "%u")
+            continue;
+
+        const auto expected_device_name = fmt::format("{}", device.first);
+        if (device.second.name != expected_device_name)
+        {
+            weechat_printf(buffer,
+                           "%somemo: skipping cached device entry %u with mismatched published id '%s'",
+                           weechat_prefix("error"),
+                           device.first,
+                           device.second.name.c_str());
+            continue;
+        }
+
+        if (device.second.label.empty())
+            device.second.label = "weechat";
+
+        if (device.first != omemo.device_id)
             children[i++] = stanza__iq_pubsub_publish_item_list_device(
-                context, NULL, with_noop(device.second.name.data()), with_noop(nullptr));
+                context,
+                NULL,
+                with_noop(device.second.name.data()),
+                with_noop(device.second.label.empty() ? nullptr : device.second.label.c_str()));
     }
 
     children[i] = NULL;
@@ -196,6 +235,10 @@ xmpp_stanza_t *weechat::account::get_devicelist()
     xmpp_stanza_t * parent = stanza__iq(context, NULL,
                                         children, NULL, "announce1",
                                         NULL, NULL, "set");
+
+    weechat_printf(buffer,
+                   "%somemo: publishing devicelist for device %u with open access model",
+                   weechat_prefix("network"), omemo.device_id);
 
     return parent;
 }
@@ -299,6 +342,11 @@ weechat::account::~account()
     // xmpp_stanza_release() on an already-freed context, causing a segfault.
     // Explicitly drain the queue here, while the context is still valid.
     sm_outqueue.clear();
+
+    // channels are destroyed after mam_db_env in member reverse-destruction order,
+    // but channel::~channel() updates MAM state for PM buffers. Destroy channels
+    // explicitly here while the cache environment is still alive.
+    channels.clear();
 
     mam_cache_cleanup();
         
@@ -1188,6 +1236,51 @@ bool weechat::account::caps_cache_get(const std::string& verification_hash,
         return true;
     }
     return false;
+}
+
+void weechat::account::peer_features_update(const std::string& jid,
+                                            const std::vector<std::string>& features)
+{
+    if (jid.empty() || features.empty())
+        return;
+
+    std::string bare = jid;
+    if (const auto slash = bare.find('/'); slash != std::string::npos)
+        bare.resize(slash);
+
+    auto &merged = peer_features[bare];
+    for (const auto &feature : features)
+    {
+        if (std::find(merged.begin(), merged.end(), feature) == merged.end())
+            merged.push_back(feature);
+    }
+}
+
+bool weechat::account::peer_supports_feature(const std::string& jid,
+                                             const std::string& feature) const
+{
+    if (jid.empty() || feature.empty())
+        return false;
+
+    std::string bare = jid;
+    if (const auto slash = bare.find('/'); slash != std::string::npos)
+        bare.resize(slash);
+
+    auto it = peer_features.find(bare);
+    if (it == peer_features.end())
+        return false;
+
+    const auto &features = it->second;
+    return std::find(features.begin(), features.end(), feature) != features.end();
+}
+
+bool weechat::account::peer_has_legacy_axolotl_only(const std::string& jid) const
+{
+    static const std::string legacy_axolotl = "eu.siacs.conversations.axolotl";
+    static const std::string omemo2 = "urn:xmpp:omemo:2";
+
+    return peer_supports_feature(jid, legacy_axolotl)
+        && !peer_supports_feature(jid, omemo2);
 }
 
 // Client State Indication (XEP-0352) - Idle timer callback

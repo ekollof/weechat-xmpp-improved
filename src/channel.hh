@@ -5,6 +5,7 @@
 #pragma once
 
 #include <ctime>
+#include <deque>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -127,6 +128,12 @@ namespace weechat
         // For MUC we always send (room echoes tell us all clients support it).
         std::unordered_set<std::string> chat_state_supported;
 
+        // Conversations-style deferred OMEMO send queue for PMs.
+        // When we cannot encrypt yet (missing sessions/bundles), we queue
+        // plaintexts here and flush them once sessions become available.
+        std::deque<std::string> pending_omemo_messages;
+        bool flushing_pending_omemo = false;
+
     public:
         struct t_gui_buffer *buffer;
 
@@ -178,6 +185,9 @@ namespace weechat
                          std::optional<std::string> oob = {},
                          std::optional<file_metadata> file_meta = {});
         int send_message(const char *to, const char *body);
+
+        void queue_pending_omemo_message(const std::string& body);
+        void flush_pending_omemo_messages();
 
         void send_link_preview(const std::string& to, const std::string& url);
 

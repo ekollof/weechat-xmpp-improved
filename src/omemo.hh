@@ -99,7 +99,9 @@ namespace weechat {
 
             void init(struct t_gui_buffer *buffer, const char *account_name);
 
-            void handle_devicelist(const char *jid, xmpp_stanza_t *items);
+            void handle_devicelist(weechat::account *account,
+                                   const char *jid,
+                                   xmpp_stanza_t *items);
 
             void handle_bundle(weechat::account *account,
                                struct t_gui_buffer *buffer,
@@ -136,6 +138,10 @@ namespace weechat {
             // Safe to call even if a fetch is already in-flight (deduplication is
             // handled in the IQ result handler via pending_iq_jid).
             void request_devicelist(weechat::account &account, std::string_view jid);
+
+            // Drop a cached bundle for a remote device after a fresh bundle fetch
+            // proves the server no longer has usable OMEMO:2 data for it.
+            void clear_cached_bundle(std::string_view jid, std::uint32_t device_id);
         };
     }
 }

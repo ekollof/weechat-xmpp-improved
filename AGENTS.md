@@ -3,6 +3,7 @@
 All coding agents working in this repository **must** read and follow the rules in:
 
 - [`.github/copilot-instructions.md`](.github/copilot-instructions.md)
+- [`docs/specs/xep-0384-reference.md`](docs/specs/xep-0384-reference.md) for OMEMO protocol constraints
 
 That file is the authoritative source for:
 

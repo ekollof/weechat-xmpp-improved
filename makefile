@@ -15,13 +15,13 @@ FIND ?= find
 INCLUDES=-Ilibstrophe -Ideps/lmdbxx -Ideps -Isrc -I. -I/usr/include/omemo/ \
 	 $(shell xml2-config --cflags) \
 	 $(shell pkg-config --cflags gpgme) \
-	 $(shell pkg-config --cflags libsignal-protocol-c)
+		 $(shell pkg-config --cflags libomemo-c)
 CFLAGS+=$(DBGCFLAGS) \
 	-fno-omit-frame-pointer -fPIC \
 	-fvisibility=hidden -fvisibility-inlines-hidden \
 	-fdebug-prefix-map=.=$(shell readlink -f .) \
 	-std=gnu99 -gdwarf-4 \
-	-Wall -Wextra -pedantic \
+	-Wall -Wextra -pedantic -Werror\
 	-Werror-implicit-function-declaration \
 	-Wno-missing-field-initializers \
 	-D_XOPEN_SOURCE=700 \
@@ -35,7 +35,7 @@ CPPFLAGS+=$(DBGCFLAGS) \
 	  -fno-omit-frame-pointer -fPIC \
 	  -fvisibility=hidden -fvisibility-inlines-hidden \
 	  -std=c++23 -gdwarf-4 \
-	  -Wall -Wextra -pedantic \
+	  -Wall -Wextra -pedantic -Werror \
 	  -Wno-missing-field-initializers \
 	  $(INCLUDES)
 # -DDOCTEST_CONFIG_DISABLE
@@ -54,7 +54,7 @@ LDLIBS=-lstrophe \
 	   -lcrypto \
 	   $(shell xml2-config --libs) \
 	   $(shell pkg-config --libs gpgme) \
-	   $(shell pkg-config --libs libsignal-protocol-c) \
+		   $(shell pkg-config --libs libomemo-c) \
 	   -lgcrypt \
 	   -llmdb -lfmt
 

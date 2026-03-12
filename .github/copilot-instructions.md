@@ -4,6 +4,13 @@
 
 This is a WeeChat plugin for XMPP/Jabber written in C++. It uses libstrophe for XMPP protocol handling and LMDB for local persistence (MAM cache, capabilities cache). This is a fork with bug fixes and feature enhancements.
 
+## OMEMO Protocol Reference
+
+- Primary OMEMO specification: https://xmpp.org/extensions/xep-0384.html
+- Local implementation checklist: `docs/specs/xep-0384-reference.md`
+- For OMEMO changes, always verify stanza structure, namespaces, and pubsub node behavior against XEP-0384 before finalizing code.
+- Prefer strict OMEMO:2 compliance. If a compatibility fallback is added, keep it explicit, narrow, and documented.
+
 ## Build System
 
 - **Build command**: `make`
@@ -250,6 +257,14 @@ Skip autojoin for IRC gateway rooms (causes connection issues):
 - Manual testing required in WeeChat
 - Use `/debug dump` for troubleshooting
 - Check logs: `/set xmpp.look.debug_level 2`
+
+### WeeChat Log Locations
+
+- **Main logs directory**: `~/.local/share/weechat/logs/`
+- **XMPP plugin logs**: `~/.local/share/weechat/logs/xmpp.account.<account>.weechatlog`
+- Example: `tail -n 300 ~/.local/share/weechat/logs/xmpp.account.andrath.weechatlog`
+- Filter logs: `grep "OMEMO\|bundle\|devicelist" ~/.local/share/weechat/logs/xmpp.account.*.weechatlog`
+- **Note**: Plugin must be restarted (WeeChat closed/reopened) after code changes to test - cannot safely reload in-place
 
 **Testing Approach:**
 - **Pragmatic manual testing** - The codebase uses minimal automated tests due to:

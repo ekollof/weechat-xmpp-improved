@@ -1282,19 +1282,10 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                     if (ptr_channel != account.channels.end())
                         ptr_channel->second.update_name(name.data());
                 }
-                else if (category == "client")
-                {
-                    xmpp_stanza_t *children[2] = {NULL};
-                    children[0] = stanza__iq_pubsub_items(account.context, NULL,
-                            "urn:xmpp:omemo:2:devices");
-                    children[0] = stanza__iq_pubsub(account.context, NULL,
-                            children, with_noop("http://jabber.org/protocol/pubsub"));
-                    children[0] = stanza__iq(account.context, NULL, children, NULL,
-                        "fetch2", account.jid().data(),
-                        binding.from ? binding.from->bare.data() : NULL, "get");
-                    account.connection.send(children[0]);
-                    xmpp_stanza_release(children[0]);
-                }
+                // Legacy OMEMO devicelist fetch via hard-coded IQ id ("fetch2")
+                // was removed. It generated request storms from disco identity
+                // traffic (notably MUC contexts) and is superseded by targeted
+                // roster/PM-driven request_devicelist() paths.
                 
                 identity = xmpp_stanza_get_next(identity);
             }
@@ -1362,6 +1353,12 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                     }
                 }
             }
+
+            // Keep OMEMO device lists warm for all roster contacts.
+            // Connect-time prefetch may run before roster results are populated,
+            // so refresh again as roster data arrives.
+            if (account.omemo)
+                account.omemo.request_devicelist(account, jid);
         }
     }
 
@@ -1415,6 +1412,11 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                         weechat_printf(account.buffer, "%sRoster: %s updated (subscription: %s)",
                                        weechat_prefix("network"), jid,
                                        subscription ? subscription : "none");
+
+                    // Keep OMEMO device lists warm for all roster contacts on
+                    // roster push updates as well.
+                    if (account.omemo)
+                        account.omemo.request_devicelist(account, jid);
                 }
             }
         }
@@ -1842,6 +1844,31 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                                     continue;
                                 }
 
+                                // If a foreign contact advertises our own local device id,
+                                // ignore it. This prevents self-targeted bundle requests
+                                // under another JID due to stale or malformed remote state.
+                                if (*parsed_device_id == account.omemo.device_id)
+                                {
+                                    weechat_printf(account.buffer,
+                                                   "%somemo: skipping foreign self-device id %u for %s",
+                                                   weechat_prefix("network"),
+                                                   *parsed_device_id,
+                                                   node_owner);
+                                    continue;
+                                }
+
+                                const auto bundle_key =
+                                    std::make_pair(std::string(node_owner), *parsed_device_id);
+                                if (account.omemo.pending_bundle_fetch.count(bundle_key) != 0)
+                                {
+                                    weechat_printf(account.buffer,
+                                                   "%somemo: bundle request for %s/%u already pending (skipping duplicate)",
+                                                   weechat_prefix("network"),
+                                                   node_owner,
+                                                   *parsed_device_id);
+                                    continue;
+                                }
+
                                 device_count++;
 
                                 xmpp_stanza_t *item_stanza =
@@ -1867,6 +1894,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
                                 // can recover the correct JID even if `from` is server domain.
                                 if (uuid && account.omemo)
                                     account.omemo.pending_iq_jid[uuid] = node_owner;
+                                account.omemo.pending_bundle_fetch.insert(bundle_key);
                                 // freed by uuid_g
 
                                 weechat_printf(account.buffer,

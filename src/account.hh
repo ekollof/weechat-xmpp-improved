@@ -202,6 +202,8 @@ namespace weechat
 
         // Capability cache (XEP-0115)
         std::unordered_map<std::string, std::vector<std::string>> caps_cache;  // verification_hash -> features
+        // Last seen disco features per peer bare JID.
+        std::unordered_map<std::string, std::vector<std::string>> peer_features;
         
         // MAM cache database
         lmdb::env mam_db_env = nullptr;
@@ -264,6 +266,9 @@ namespace weechat
         void caps_cache_load();
         void caps_cache_save(const std::string& verification_hash, const std::vector<std::string>& features);
         bool caps_cache_get(const std::string& verification_hash, std::vector<std::string>& features);
+        void peer_features_update(const std::string& jid, const std::vector<std::string>& features);
+        bool peer_supports_feature(const std::string& jid, const std::string& feature) const;
+        bool peer_has_legacy_axolotl_only(const std::string& jid) const;
 
         struct t_gui_buffer* create_buffer();
 

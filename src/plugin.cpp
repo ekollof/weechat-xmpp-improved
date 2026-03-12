@@ -166,9 +166,11 @@ void weechat::plugin::end() {
     // Write config before clearing accounts
     weechat::config::write();
     
-    // Clear accounts while plugin is still valid
-    // The global is a never-freed pointer so it won't be destroyed at program exit
-    weechat::accounts.clear();
+    // Do not clear accounts during shutdown.
+    // account/omemo teardown can still race libsignal/libstrophe object lifetime
+    // during process exit and has historically caused ref-count assertions.
+    // The global account map is intentionally never freed and the OS reclaims
+    // memory at process end.
 
     weechat::config::instance.reset();
 

@@ -80,9 +80,14 @@ char *weechat::xmpp::omemo::decode(weechat::account *account,
         print_info(buffer, fmt::format("OMEMO decode: <keys jid='{}'> element found",
                                        keys_jid ? keys_jid : "(none)"));
         if (!keys_jid)
-            continue;
+        {
+            // Legacy compatibility: OMEMO:1 senders may omit keys@jid.
+            print_info(buffer,
+                       "OMEMO decode: accepting legacy <keys> without jid attribute.");
+            found_keys_for_our_bare_jid = true;
+        }
 
-        if (std::string_view {keys_jid}.find('/') != std::string_view::npos)
+        if (keys_jid && std::string_view {keys_jid}.find('/') != std::string_view::npos)
         {
             print_error(buffer, fmt::format(
                 "OMEMO message has non-bare keys jid '{}'; ignoring non-compliant element.",
@@ -90,10 +95,11 @@ char *weechat::xmpp::omemo::decode(weechat::account *account,
             continue;
         }
 
-        if (own_bare_jid != keys_jid)
+        if (keys_jid && own_bare_jid != keys_jid)
             continue;
 
-        found_keys_for_our_bare_jid = true;
+        if (keys_jid)
+            found_keys_for_our_bare_jid = true;
 
         for (xmpp_stanza_t *key_stanza = xmpp_stanza_get_children(child);
              key_stanza && !transport_key;
@@ -137,6 +143,47 @@ char *weechat::xmpp::omemo::decode(weechat::account *account,
                                                   is_prekey ? &used_prekey_id : nullptr);
             if (!transport_key)
                 print_error(buffer, "OMEMO Signal decryption of transport key failed.");
+        }
+    }
+
+    // Legacy compatibility: some OMEMO:1 payloads place <key/> elements
+    // directly under <header> instead of wrapping them in <keys/>.
+    if (!transport_key && !found_keys_elem)
+    {
+        for (xmpp_stanza_t *key_stanza = xmpp_stanza_get_children(header);
+             key_stanza && !transport_key;
+             key_stanza = xmpp_stanza_get_next(key_stanza))
+        {
+            const char *key_name = xmpp_stanza_get_name(key_stanza);
+            if (!key_name || weechat_strcasecmp(key_name, "key") != 0)
+                continue;
+
+            const char *rid = xmpp_stanza_get_attribute(key_stanza, "rid");
+            const auto rid_val = rid ? parse_uint32(rid).value_or(0) : 0;
+            if (rid_val != device_id)
+                continue;
+
+            found_keys_elem = true;
+            found_keys_for_our_bare_jid = true;
+            found_key_for_us = true;
+
+            const char *kex_val = xmpp_stanza_get_attribute(key_stanza, "kex");
+            const char *legacy_prekey_val = xmpp_stanza_get_attribute(key_stanza, "prekey");
+            const bool is_prekey = (kex_val != nullptr
+                && (weechat_strcasecmp(kex_val, "true") == 0
+                    || weechat_strcasecmp(kex_val, "1") == 0))
+                || (kex_val == nullptr && legacy_prekey_val != nullptr
+                    && (weechat_strcasecmp(legacy_prekey_val, "true") == 0
+                        || weechat_strcasecmp(legacy_prekey_val, "1") == 0));
+
+            const auto serialized = base64_decode(*account->context, stanza_text(key_stanza));
+            if (serialized.empty())
+                continue;
+
+            print_info(buffer,
+                       "OMEMO decode: accepting legacy <header><key .../></header> layout.");
+            transport_key = decrypt_transport_key(*this, jid, *sender_device_id, serialized, is_prekey,
+                                                  is_prekey ? &used_prekey_id : nullptr);
         }
     }
 
