@@ -2132,11 +2132,13 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool /* top_lev
     return true;
 }
 
-xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash)
+xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash, const char *node)
 {
     xmpp_stanza_t *query = xmpp_stanza_new(account.context);
     xmpp_stanza_set_name(query, "query");
     xmpp_stanza_set_ns(query, "http://jabber.org/protocol/disco#info");
+    if (node && *node)
+        xmpp_stanza_set_attribute(query, "node", node);
 
     char *client_name = weechat_string_eval_expression(
             "weechat ${info:version}", NULL, NULL, NULL);
@@ -2154,81 +2156,77 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash)
     xmpp_stanza_add_child(query, identity);
     xmpp_stanza_release(identity);
 
-    xmpp_stanza_t *feature = NULL;
+    const std::vector<std::string_view> advertised_features {
+        "urn:xmpp:omemo:2",
+        "urn:xmpp:omemo:2:devices+notify",
+        "http://jabber.org/protocol/caps",
+        "http://jabber.org/protocol/chatstates",
+        "http://jabber.org/protocol/disco#info",
+        "http://jabber.org/protocol/disco#items",
+        "http://jabber.org/protocol/muc",
+        "http://jabber.org/protocol/nick+notify",
+        "http://jabber.org/protocol/pep",
+        "jabber:iq:version",
+        "jabber:x:conference",
+        "jabber:x:oob",
+        "storage:bookmarks+notify",
+        "urn:xmpp:avatar:metadata+notify",
+        "urn:xmpp:chat-markers:0",
+        "urn:xmpp:delay",
+        "urn:xmpp:hints",
+        "urn:xmpp:idle:1",
+        "urn:xmpp:message-correct:0",
+        "urn:xmpp:message-retract:1",
+        "urn:xmpp:message-moderate:1",
+        "urn:xmpp:fasten:0",
+        "urn:xmpp:reactions:0",
+        "urn:xmpp:reply:0",
+        "urn:xmpp:sid:0",
+        "urn:xmpp:styling:0",
+        "urn:xmpp:eme:0",
+        "http://jabber.org/protocol/mood",
+        "http://jabber.org/protocol/mood+notify",
+        "http://jabber.org/protocol/activity",
+        "http://jabber.org/protocol/activity+notify",
+        "urn:xmpp:blocking",
+        "urn:xmpp:bookmarks:1",
+        "urn:xmpp:bookmarks:1+notify",
+        "urn:xmpp:carbons:2",
+        "urn:xmpp:ping",
+        "urn:xmpp:receipts",
+        "urn:xmpp:time",
+        "urn:xmpp:attention:0",
+        "urn:xmpp:spoiler:0",
+        "urn:xmpp:fallback:0",
+        "vcard-temp:x:update",
+        "urn:xmpp:reference:0",
+        "http://jabber.org/protocol/commands",
+        "urn:xmpp:mam:2",
+        "urn:xmpp:mds:displayed:0",
+        "urn:xmpp:mds:displayed:0+notify",
+        "urn:xmpp:channel-search:0:search",
+        "urn:ietf:params:xml:ns:vcard-4.0"
+    };
 
-#define FEATURE(NS)                                 \
-    feature = xmpp_stanza_new(account.context);     \
-    xmpp_stanza_set_name(feature, "feature");       \
-    xmpp_stanza_set_attribute(feature, "var", NS);  \
-    xmpp_stanza_add_child(query, feature);          \
-    xmpp_stanza_release(feature);                   \
-    weechat_string_dyn_concat(serial, NS, -1);      \
-    weechat_string_dyn_concat(serial, "<", -1);
+    std::vector<std::string> sorted_features;
+    sorted_features.reserve(advertised_features.size());
+    for (const auto feature : advertised_features)
+        sorted_features.emplace_back(feature);
+    std::sort(sorted_features.begin(), sorted_features.end());
 
-    FEATURE("urn:xmpp:omemo:2");
-    FEATURE("urn:xmpp:omemo:2:devices+notify");
-    FEATURE("http://jabber.org/protocol/caps");
-    FEATURE("http://jabber.org/protocol/chatstates");
-    FEATURE("http://jabber.org/protocol/disco#info");
-    FEATURE("http://jabber.org/protocol/disco#items");
-    FEATURE("http://jabber.org/protocol/muc");
-    FEATURE("http://jabber.org/protocol/nick+notify");
-    FEATURE("http://jabber.org/protocol/pep");
-    FEATURE("jabber:iq:version");
-    FEATURE("jabber:x:conference");
-    FEATURE("jabber:x:oob");
-    FEATURE("storage:bookmarks+notify");
-    FEATURE("urn:xmpp:avatar:metadata+notify");
-    FEATURE("urn:xmpp:chat-markers:0");
-    FEATURE("urn:xmpp:delay");  // XEP-0203: Delayed Delivery
-    FEATURE("urn:xmpp:hints");  // XEP-0334: Message Processing Hints
-    FEATURE("urn:xmpp:idle:1");
-  //FEATURE("urn:xmpp:jingle-message:0");
-  //FEATURE("urn:xmpp:jingle:1");
-  //FEATURE("urn:xmpp:jingle:apps:dtls:0");
-  //FEATURE("urn:xmpp:jingle:apps:file-transfer:3");
-  //FEATURE("urn:xmpp:jingle:apps:file-transfer:4");
-  //FEATURE("urn:xmpp:jingle:apps:file-transfer:5");
-  //FEATURE("urn:xmpp:jingle:apps:rtp:1");
-  //FEATURE("urn:xmpp:jingle:apps:rtp:audio");
-  //FEATURE("urn:xmpp:jingle:apps:rtp:video");
-  //FEATURE("urn:xmpp:jingle:jet-omemo:0");
-  //FEATURE("urn:xmpp:jingle:jet:0");
-  //FEATURE("urn:xmpp:jingle:transports:ibb:1");
-  //FEATURE("urn:xmpp:jingle:transports:ice-udp:1");
-  //FEATURE("urn:xmpp:jingle:transports:s5b:1");
-    FEATURE("urn:xmpp:message-correct:0");
-    FEATURE("urn:xmpp:message-retract:1");
-    FEATURE("urn:xmpp:message-moderate:1");  // XEP-0425: Message Moderation
-    FEATURE("urn:xmpp:fasten:0");  // XEP-0422: Message Fastening (used by moderation)
-    FEATURE("urn:xmpp:reactions:0");  // XEP-0444: Message Reactions
-    FEATURE("urn:xmpp:reply:0");  // XEP-0461: Message Replies
-    FEATURE("urn:xmpp:sid:0");  // XEP-0359: Stanza IDs
-    FEATURE("urn:xmpp:styling:0");
-    FEATURE("urn:xmpp:eme:0");  // XEP-0380: Explicit Message Encryption
-    FEATURE("http://jabber.org/protocol/mood");  // XEP-0107: User Mood
-    FEATURE("http://jabber.org/protocol/mood+notify");  // Subscribe to mood updates
-    FEATURE("http://jabber.org/protocol/activity");  // XEP-0108: User Activity
-    FEATURE("http://jabber.org/protocol/activity+notify");  // Subscribe to activity updates
-    FEATURE("urn:xmpp:blocking");      // XEP-0191: Blocking Command
-    FEATURE("urn:xmpp:bookmarks:1");  // XEP-0402: PEP Native Bookmarks
-    FEATURE("urn:xmpp:bookmarks:1+notify");  // Subscribe to bookmark updates
-    FEATURE("urn:xmpp:carbons:2");     // XEP-0280: Message Carbons
-    FEATURE("urn:xmpp:ping");
-    FEATURE("urn:xmpp:receipts");
-    FEATURE("urn:xmpp:time");
-    FEATURE("urn:xmpp:attention:0");   // XEP-0224: Attention
-    FEATURE("urn:xmpp:spoiler:0");     // XEP-0382: Spoiler Messages
-    FEATURE("urn:xmpp:fallback:0");    // XEP-0428: Fallback Indication
-    FEATURE("vcard-temp:x:update");    // XEP-0153: vCard-Based Avatars
-    FEATURE("urn:xmpp:reference:0");   // XEP-0372: References (mentions)
-    FEATURE("http://jabber.org/protocol/commands");  // XEP-0050: Ad-Hoc Commands
-    FEATURE("urn:xmpp:mam:2");                               // XEP-0313: Message Archive Management
-    FEATURE("urn:xmpp:mds:displayed:0");             // XEP-0490: Message Displayed Synchronization
-    FEATURE("urn:xmpp:mds:displayed:0+notify");      // Subscribe to MDS events
-    FEATURE("urn:xmpp:channel-search:0:search");     // XEP-0433: Extended Channel Search (searcher)
-    FEATURE("urn:ietf:params:xml:ns:vcard-4.0");     // XEP-0292: vCard4 Over XMPP
-#undef FEATURE
+    xmpp_stanza_t *feature = nullptr;
+    for (const auto &ns : sorted_features)
+    {
+        feature = xmpp_stanza_new(account.context);
+        xmpp_stanza_set_name(feature, "feature");
+        xmpp_stanza_set_attribute(feature, "var", ns.c_str());
+        xmpp_stanza_add_child(query, feature);
+        xmpp_stanza_release(feature);
+
+        // XEP-0115 hash input must use sorted features.
+        weechat_string_dyn_concat(serial, ns.c_str(), -1);
+        weechat_string_dyn_concat(serial, "<", -1);
+    }
 
     xmpp_stanza_t *x = xmpp_stanza_new(account.context);
     xmpp_stanza_set_name(x, "x");

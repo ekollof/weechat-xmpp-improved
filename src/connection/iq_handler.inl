@@ -1135,7 +1135,8 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool /* top_level */
     {
         if (weechat_strcasecmp(type, "get") == 0)
         {
-            reply = get_caps(xmpp_stanza_reply(stanza), NULL);
+            const char *requested_node = xmpp_stanza_get_attribute(query, "node");
+            reply = get_caps(xmpp_stanza_reply(stanza), NULL, requested_node);
 
             account.connection.send(reply);
             xmpp_stanza_release(reply);

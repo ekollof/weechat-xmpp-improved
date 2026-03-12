@@ -72,6 +72,6 @@ namespace weechat {
 
         bool conn_handler(event status, int error, xmpp_stream_error_t *stream_error);
 
-        xmpp_stanza_t *get_caps(xmpp_stanza_t *reply, char **hash);
+        xmpp_stanza_t *get_caps(xmpp_stanza_t *reply, char **hash, const char *node = nullptr);
     };
 }
