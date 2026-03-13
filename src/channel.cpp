@@ -24,6 +24,25 @@
 #include "xmpp/node.hh"
 #include "xmpp/stanza.hh"
 
+namespace {
+std::string channel_short_name(weechat::channel::chat_type type, const char *name)
+{
+    if (!name || !name[0])
+        return {};
+
+    const char prefix =
+        (type == weechat::channel::chat_type::MUC) ? '#' : '@';
+    if (name[0] == prefix)
+        return std::string(name);
+
+    std::string prefixed;
+    prefixed.reserve(std::strlen(name) + 1);
+    prefixed.push_back(prefix);
+    prefixed.append(name);
+    return prefixed;
+}
+} // namespace
+
 void weechat::channel::set_transport(enum weechat::channel::transport transport, int force)
 {
     if (force)
@@ -123,8 +142,10 @@ struct t_gui_buffer *weechat::channel::create_buffer(weechat::channel::chat_type
     {
         char *res = (char*)strrchr(name, '/');
         if (!weechat_buffer_get_integer(ptr_buffer, "short_name_is_set"))
-            weechat_buffer_set(ptr_buffer, "short_name",
-                               res ? res + 1 : name);
+        {
+            auto short_name_value = channel_short_name(type, res ? res + 1 : name);
+            weechat_buffer_set(ptr_buffer, "short_name", short_name_value.c_str());
+        }
     }
     else
     {
@@ -136,7 +157,8 @@ struct t_gui_buffer *weechat::channel::create_buffer(weechat::channel::chat_type
             (localvar_remote_jid && (strcmp(localvar_remote_jid, short_name) == 0)))
         {
             char *node = xmpp_jid_node(account.context, name);
-            weechat_buffer_set(ptr_buffer, "short_name", node);
+            auto short_name_value = channel_short_name(type, node ? node : name);
+            weechat_buffer_set(ptr_buffer, "short_name", short_name_value.c_str());
             xmpp_free(account.context, node);
         }
     }
@@ -627,7 +649,10 @@ void weechat::channel::update_topic(const char* topic, const char* creator, int 
 void weechat::channel::update_name(const char* name)
 {
     if (name)
-        weechat_buffer_set(buffer, "short_name", name);
+    {
+        auto short_name_value = channel_short_name(type, name);
+        weechat_buffer_set(buffer, "short_name", short_name_value.c_str());
+    }
     else
         weechat_buffer_set(buffer, "short_name", "");
 }

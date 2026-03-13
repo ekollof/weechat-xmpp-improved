@@ -1523,7 +1523,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                             ptr_channel != account.channels.end()
                             ? ptr_channel->second.buffer : NULL;
                         if (ptr_buffer)
-                            weechat_buffer_set(ptr_buffer, "short_name", name);
+                            ptr_channel->second.update_name(name);
                         weechat_string_dyn_free(command, 1);
                     }
                 }
