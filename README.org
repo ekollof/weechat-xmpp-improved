@@ -1061,7 +1061,6 @@
   #+begin_src sh
   git clone --depth 1 git@git.hackerheaven.org:ekollof/weechat-xmpp-fixed.git
   cd weechat-xmpp
-  git submodule update --init --recursive
   make install-deps              # Install system dependencies (requires sudo)
   make
   make test
