@@ -1049,11 +1049,14 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
         channel->set_transport(weechat::channel::transport::PGP, 0);
     }
     
-    if (encrypted && account.omemo && !is_self_outbound_copy)
+    if (encrypted && account.omemo)
     {
         cleartext = account.omemo.decode(&account, channel->buffer, from_bare, encrypted);
         if (!cleartext)
         {
+            if (is_self_outbound_copy)
+                goto message_handler_after_omemo;
+
             xmpp_stanza_t *payload = xmpp_stanza_get_child_by_name(encrypted, "payload");
             const char *payload_text = payload ? xmpp_stanza_get_text_ptr(payload) : nullptr;
             if (!payload || !payload_text || !*payload_text)
@@ -1070,6 +1073,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
             weechat_printf(NULL, "%sOMEMO: encrypted message but account.omemo is NULL/false",
                            weechat_prefix("error"));
     }
+message_handler_after_omemo:
     if (x)
     {
         char *ciphertext = xmpp_stanza_get_text(x);

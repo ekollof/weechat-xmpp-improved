@@ -169,7 +169,9 @@ void request_devicelist(weechat::account &account, std::string_view jid)
 void request_bundle(weechat::account &account, std::string_view jid, std::uint32_t device_id)
 {
     const std::string target_jid = normalize_bare_jid(account.context, jid);
-    if (!account.omemo.has_peer_traffic(account.context, target_jid))
+    const std::string own_bare_jid = normalize_bare_jid(account.context, account.jid());
+    const bool is_own_jid = weechat_strcasecmp(target_jid.c_str(), own_bare_jid.c_str()) == 0;
+    if (!is_own_jid && !account.omemo.has_peer_traffic(account.context, target_jid))
     {
         weechat_printf(account.buffer,
                        "%somemo: deferring OMEMO:2 bundle request for %s/%u until PM/MAM traffic is observed",
@@ -503,7 +505,9 @@ void request_legacy_devicelist(weechat::account &account, std::string_view jid)
 void request_legacy_bundle(weechat::account &account, std::string_view jid, std::uint32_t device_id)
 {
     const std::string target_jid = normalize_bare_jid(account.context, jid);
-    if (!account.omemo.has_peer_traffic(account.context, target_jid))
+    const std::string own_bare_jid = normalize_bare_jid(account.context, account.jid());
+    const bool is_own_jid = weechat_strcasecmp(target_jid.c_str(), own_bare_jid.c_str()) == 0;
+    if (!is_own_jid && !account.omemo.has_peer_traffic(account.context, target_jid))
     {
         weechat_printf(account.buffer,
                        "%somemo: deferring legacy bundle request for %s/%u until PM/MAM traffic is observed",

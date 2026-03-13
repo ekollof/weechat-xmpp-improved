@@ -2262,6 +2262,66 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         xmpp_stanza_release(reply);
                     }
                 }
+                else if (account.omemo)
+                {
+                    xmpp_stanza_t *item = xmpp_stanza_get_child_by_name(items, "item");
+                    xmpp_stanza_t *list = item
+                        ? xmpp_stanza_get_child_by_name_and_ns(
+                            item, "list", "eu.siacs.conversations.axolotl")
+                        : nullptr;
+
+                    int legacy_device_count = 0;
+                    for (xmpp_stanza_t *device = list ? xmpp_stanza_get_children(list) : nullptr;
+                         device;
+                         device = xmpp_stanza_get_next(device))
+                    {
+                        const char *name = xmpp_stanza_get_name(device);
+                        if (!name || weechat_strcasecmp(name, "device") != 0)
+                            continue;
+
+                        const char *did = xmpp_stanza_get_attribute(device, "id");
+                        const auto parsed_did = parse_omemo_device_id(did);
+                        if (!parsed_did)
+                            continue;
+
+                        if (*parsed_did == account.omemo.device_id)
+                            continue;
+
+                        const auto bundle_key =
+                            std::make_pair(std::string(node_owner_str), *parsed_did);
+                        if (account.omemo.pending_bundle_fetch.count(bundle_key) != 0)
+                            continue;
+
+                        const auto bundle_node = fmt::format(
+                            "eu.siacs.conversations.axolotl.bundles:{}",
+                            *parsed_did);
+                        xmpp_stanza_t *items_stanza =
+                            stanza__iq_pubsub_items(account.context, NULL, bundle_node.c_str());
+                        xmpp_stanza_t *pubsub_children[] = {items_stanza, NULL};
+                        xmpp_stanza_t *pubsub_stanza =
+                            stanza__iq_pubsub(account.context, NULL, pubsub_children,
+                                              with_noop("http://jabber.org/protocol/pubsub"));
+                        xmpp_string_guard uuid_g(account.context, xmpp_uuid_gen(account.context));
+                        const char *uuid = uuid_g.ptr;
+                        xmpp_stanza_t *iq_children[] = {pubsub_stanza, NULL};
+                        xmpp_stanza_t *iq_stanza =
+                            stanza__iq(account.context, NULL, iq_children, NULL, uuid,
+                                       account.jid().data(), node_owner_str.c_str(), "get");
+                        if (uuid)
+                            account.omemo.pending_iq_jid[uuid] = node_owner_str;
+                        account.omemo.pending_bundle_fetch.insert(bundle_key);
+
+                        ++legacy_device_count;
+                        account.connection.send(iq_stanza);
+                        xmpp_stanza_release(iq_stanza);
+                    }
+
+                    weechat_printf(account.buffer,
+                                   "%somemo: requested %d legacy bundle(s) for %s",
+                                   weechat_prefix("network"),
+                                   legacy_device_count,
+                                   node_owner_str.c_str());
+                }
             }
             else if (items_node
                      && std::string_view(items_node).starts_with(

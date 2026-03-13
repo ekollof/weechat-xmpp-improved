@@ -100,7 +100,9 @@ namespace libstrophe {
         }
 
         type(const type &other) = delete; /* no copy construction */
-        type(type &&other) = default;
+        type(type &&other) noexcept : _ptr(other._ptr) {
+            other._ptr = nullptr;
+        }
 
         template<typename... Args>
         inline void create(Args&&... args) {
@@ -110,7 +112,16 @@ namespace libstrophe {
         }
 
         type& operator =(const type &other) = delete; /* no copy assignment */
-        type& operator =(type &&other) = default;
+        type& operator =(type &&other) noexcept {
+            if (this != &other)
+            {
+                if (_ptr)
+                    f_destroy(reinterpret_cast<Base*>(_ptr));
+                _ptr = other._ptr;
+                other._ptr = nullptr;
+            }
+            return *this;
+        }
 
         inline operator bool() const { return _ptr; }
 
