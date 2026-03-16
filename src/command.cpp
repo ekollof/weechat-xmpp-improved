@@ -1645,6 +1645,14 @@ int command__edit(const void *pointer, void *data,
     xmpp_stanza_add_child(message, message__store);
     xmpp_stanza_release(message__store);
 
+    // XEP-0359: origin-id so the sender can correlate the edit in MAM
+    xmpp_stanza_t *edit_origin_id = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(edit_origin_id, "origin-id");
+    xmpp_stanza_set_ns(edit_origin_id, "urn:xmpp:sid:0");
+    xmpp_stanza_set_attribute(edit_origin_id, "id", id);
+    xmpp_stanza_add_child(message, edit_origin_id);
+    xmpp_stanza_release(edit_origin_id);
+
     ptr_account->connection.send( message);
     xmpp_stanza_release(message);
     // last_msg_id freed by std::string destructor
@@ -1795,6 +1803,14 @@ int command__retract(const void *pointer, void *data,
     xmpp_stanza_set_ns(message__store, "urn:xmpp:hints");
     xmpp_stanza_add_child(message, message__store);
     xmpp_stanza_release(message__store);
+
+    // XEP-0359: origin-id so the sender can correlate the retraction in MAM
+    xmpp_stanza_t *retract_origin_id = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(retract_origin_id, "origin-id");
+    xmpp_stanza_set_ns(retract_origin_id, "urn:xmpp:sid:0");
+    xmpp_stanza_set_attribute(retract_origin_id, "id", id);
+    xmpp_stanza_add_child(message, retract_origin_id);
+    xmpp_stanza_release(retract_origin_id);
 
     ptr_account->connection.send(message);
     xmpp_stanza_release(message);
