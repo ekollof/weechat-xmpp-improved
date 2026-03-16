@@ -612,10 +612,9 @@ void weechat::channel::mark_chat_state_supported(const std::string& from_jid)
 
 bool weechat::channel::is_chat_state_supported(const std::string& to_jid) const
 {
-    // For MUC, always send — the room broadcasts to all participants and
-    // all modern clients in a room implicitly support chat states.
+    // XEP-0085 §5.1: MUST NOT send chat state notifications to MUC rooms.
     if (type == weechat::channel::chat_type::MUC)
-        return true;
+        return false;
 
     // For PM: only send if the contact has previously sent us a chat state,
     // or if the full JID (with resource) or bare JID is in the support set.
@@ -845,10 +844,16 @@ int weechat::channel::send_message(std::string to, std::string body,
     if (oob && file_meta)
     {
         // Build SIMS reference wrapper
+        // XEP-0385 §3: <reference> MUST include begin/end character offsets
+        // pointing to the URL in the message body (body IS the URL).
         xmpp_stanza_t *reference = xmpp_stanza_new(account.context);
         xmpp_stanza_set_name(reference, "reference");
         xmpp_stanza_set_ns(reference, "urn:xmpp:reference:0");
         xmpp_stanza_set_attribute(reference, "type", "data");
+        xmpp_stanza_set_attribute(reference, "begin", "0");
+        // end is exclusive character offset after the URL (body == URL)
+        xmpp_stanza_set_attribute(reference, "end",
+            std::to_string(oob->size()).c_str());
         
         // media-sharing container
         xmpp_stanza_t *media_sharing = xmpp_stanza_new(account.context);
@@ -1180,7 +1185,10 @@ int weechat::channel::send_message(const char *to, const char *body)
         xmpp_stanza_t *message__encryption = xmpp_stanza_new(account.context);
         xmpp_stanza_set_name(message__encryption, "encryption");
         xmpp_stanza_set_ns(message__encryption, "urn:xmpp:eme:0");
-        xmpp_stanza_set_attribute(message__encryption, "namespace", "jabber:x:encryption");
+        // XEP-0380: correct namespace for Legacy OpenPGP is "jabber:x:encrypted"
+        // (with trailing 'd'), and the name attribute SHOULD be set.
+        xmpp_stanza_set_attribute(message__encryption, "namespace", "jabber:x:encrypted");
+        xmpp_stanza_set_attribute(message__encryption, "name", "Legacy OpenPGP");
 
         xmpp_stanza_add_child(message, message__encryption);
         xmpp_stanza_release(message__encryption);
@@ -1590,7 +1598,11 @@ void weechat::channel::send_reads()
     {
         auto* unread = &*i;
 
-        xmpp_stanza_t *message = xmpp_message_new(account.context, NULL,
+        // XEP-0333: <displayed> markers MUST use the correct message type
+        // (chat for PM, groupchat for MUC) so the server routes them correctly.
+        const char *marker_type = (this->type == weechat::channel::chat_type::MUC)
+                                   ? "groupchat" : "chat";
+        xmpp_stanza_t *message = xmpp_message_new(account.context, marker_type,
                                                     id.data(), NULL);
 
         xmpp_stanza_t *message__displayed = xmpp_stanza_new(account.context);
@@ -1613,6 +1625,13 @@ void weechat::channel::send_reads()
 
         xmpp_stanza_add_child(message, message__displayed);
         xmpp_stanza_release(message__displayed);
+
+        // XEP-0334: <no-store/> hint — chat marker replies MUST NOT be stored
+        xmpp_stanza_t *no_store = xmpp_stanza_new(account.context);
+        xmpp_stanza_set_name(no_store, "no-store");
+        xmpp_stanza_set_ns(no_store, "urn:xmpp:hints");
+        xmpp_stanza_add_child(message, no_store);
+        xmpp_stanza_release(no_store);
 
         account.connection.send( message);
         xmpp_stanza_release(message);
@@ -1766,6 +1785,11 @@ void weechat::channel::send_paused(weechat::user *user)
             || !weechat::config::instance->look.send_chat_states.boolean())
         return;
 
+    // XEP-0085 §5.1: only send to contacts that have indicated support
+    std::string to_jid = user ? std::string(user->id) : id;
+    if (!is_chat_state_supported(to_jid))
+        return;
+
     xmpp_stanza_t *message = xmpp_message_new(account.context,
                                               type == weechat::channel::chat_type::MUC
                                               ? "groupchat" : "chat",
@@ -1827,6 +1851,11 @@ void weechat::channel::send_gone(weechat::user *user)
 {
     if (!weechat::config::instance
             || !weechat::config::instance->look.send_chat_states.boolean())
+        return;
+
+    // XEP-0085 §5.1: only send to contacts that have indicated support
+    std::string to_jid = user ? std::string(user->id) : id;
+    if (!is_chat_state_supported(to_jid))
         return;
 
     xmpp_stanza_t *message = xmpp_message_new(account.context,

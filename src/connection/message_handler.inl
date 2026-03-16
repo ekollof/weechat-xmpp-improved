@@ -898,7 +898,10 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
         unread_val.stanza_id_by = stanza_id_by ? std::optional<std::string>(stanza_id_by) : std::nullopt;
         auto unread = &unread_val;
 
-        xmpp_stanza_t *message = xmpp_message_new(account.context, NULL,
+        // XEP-0334: receipt/marker replies MUST NOT be stored.
+        // Use the incoming message type so routing is correct.
+        xmpp_stanza_t *message = xmpp_message_new(account.context,
+                                                  type,  // "chat" or "groupchat"
                                                   channel->id.data(), NULL);
 
         if (request)
@@ -935,6 +938,15 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
 
             xmpp_stanza_add_child(message, message__thread);
             xmpp_stanza_release(message__thread);
+        }
+
+        // XEP-0334: receipt/marker replies MUST NOT be stored
+        {
+            xmpp_stanza_t *no_store = xmpp_stanza_new(account.context);
+            xmpp_stanza_set_name(no_store, "no-store");
+            xmpp_stanza_set_ns(no_store, "urn:xmpp:hints");
+            xmpp_stanza_add_child(message, no_store);
+            xmpp_stanza_release(no_store);
         }
 
         account.connection.send( message);
