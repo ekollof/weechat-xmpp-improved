@@ -1558,27 +1558,36 @@ message_handler_after_omemo:
                             if (strlen(tag) > strlen("id_") &&
                                 weechat_strcasecmp(tag+strlen("id_"), reactions_id) == 0)
                             {
-                                // Found the message - get original text and append reaction
+                                // Found the message.
+                                // XEP-0444: a new <reactions> from a sender REPLACES their
+                                // previous reaction set — do not accumulate. Strip any
+                                // previously-appended reaction blocks (our format:
+                                // " <blue>[…]<reset>") before appending the new set.
                                 const char *orig_message = weechat_hdata_string(
                                     weechat_hdata_get("line_data"), line_data, "message");
-                                
-                                char new_message[4096];
-                                snprintf(new_message, sizeof(new_message), 
-                                        "%s %s[%s]%s", 
-                                        orig_message,
-                                        weechat_color("blue"),
-                                        emojis,
-                                        weechat_color("resetcolor"));
-                                
-                                // Update the line with reaction appended
+
+                                std::string base(orig_message ? orig_message : "");
+                                // The reaction suffix we append starts with " " + weechat_color("blue") + "["
+                                static const std::string rxn_prefix =
+                                    std::string(" ") + weechat_color("blue") + "[";
+                                auto rxn_pos = base.find(rxn_prefix);
+                                if (rxn_pos != std::string::npos)
+                                    base.resize(rxn_pos);
+
+                                std::string new_message = base
+                                    + " " + weechat_color("blue")
+                                    + "[" + emojis + "]"
+                                    + weechat_color("resetcolor");
+
+                                // Update the line with reaction replaced
                                 struct t_hashtable *hashtable = weechat_hashtable_new(8,
                                     WEECHAT_HASHTABLE_STRING,
                                     WEECHAT_HASHTABLE_STRING,
                                     NULL, NULL);
-                                weechat_hashtable_set(hashtable, "message", new_message);
+                                weechat_hashtable_set(hashtable, "message", new_message.c_str());
                                 weechat_hdata_update(weechat_hdata_get("line_data"), line_data, hashtable);
                                 weechat_hashtable_free(hashtable);
-                                
+
                                 weechat_string_dyn_free(dyn_emojis, 1);
                                 return 1;
                             }
