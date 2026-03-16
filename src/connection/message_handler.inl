@@ -948,7 +948,9 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
         account.omemo.note_peer_traffic(account.context, channel->id);
     }
 
-    if (id && (markable || request))
+    // XEP-0333 §5 Business Rules: MUST NOT send Displayed Markers for outgoing
+    // messages we sent (received back via carbons or MAM).
+    if (id && (markable || request) && !is_self_outbound_copy)
     {
         weechat::channel::unread unread_val;
         unread_val.id = id;

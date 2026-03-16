@@ -1624,7 +1624,13 @@ void weechat::channel::send_reads()
         xmpp_stanza_t *message__displayed = xmpp_stanza_new(account.context);
         xmpp_stanza_set_name(message__displayed, "displayed");
         xmpp_stanza_set_ns(message__displayed, "urn:xmpp:chat-markers:0");
-        xmpp_stanza_set_id(message__displayed, unread->id.c_str());
+        // XEP-0333 §4.3: In a MUC that supports XEP-0359, MUST use the
+        // MUC-assigned stanza-id, NOT the sender's message id attribute.
+        const char *displayed_id = unread->id.c_str();
+        if (this->type == weechat::channel::chat_type::MUC
+                && unread->stanza_id.has_value())
+            displayed_id = unread->stanza_id->c_str();
+        xmpp_stanza_set_id(message__displayed, displayed_id);
         if (unread->thread.has_value())
         {
             xmpp_stanza_t *message__thread = xmpp_stanza_new(account.context);
