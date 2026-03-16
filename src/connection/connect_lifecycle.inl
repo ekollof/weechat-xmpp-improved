@@ -327,47 +327,19 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         
         // FORM_TYPE field
         {
-            xmpp_stanza_t *field = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_name(field, "field");
-            xmpp_stanza_set_attribute(field, "var", "FORM_TYPE");
-            xmpp_stanza_set_attribute(field, "type", "hidden");
-            
-            xmpp_stanza_t *value = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_name(value, "value");
-            
-            xmpp_stanza_t *text = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_text(text, "urn:xmpp:mam:2");
-            xmpp_stanza_add_child(value, text);
-            xmpp_stanza_release(text);
-            
-            xmpp_stanza_add_child(field, value);
-            xmpp_stanza_release(value);
-            
-            xmpp_stanza_add_child(x, field);
-            xmpp_stanza_release(field);
+            xmpp_stanza_t *f = stanza_make_field(account.context,
+                "FORM_TYPE", "urn:xmpp:mam:2", "hidden");
+            xmpp_stanza_add_child(x, f);
+            xmpp_stanza_release(f);
         }
         
         // Start time field
         {
-            xmpp_stanza_t *field = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_name(field, "field");
-            xmpp_stanza_set_attribute(field, "var", "start");
-            
-            xmpp_stanza_t *value = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_name(value, "value");
-            
-            xmpp_stanza_t *text = xmpp_stanza_new(account.context);
             char time_buf[256];
             strftime(time_buf, sizeof(time_buf), "%Y-%m-%dT%H:%M:%SZ", gmtime(&start));
-            xmpp_stanza_set_text(text, time_buf);
-            xmpp_stanza_add_child(value, text);
-            xmpp_stanza_release(text);
-            
-            xmpp_stanza_add_child(field, value);
-            xmpp_stanza_release(value);
-            
-            xmpp_stanza_add_child(x, field);
-            xmpp_stanza_release(field);
+            xmpp_stanza_t *f = stanza_make_field(account.context, "start", time_buf);
+            xmpp_stanza_add_child(x, f);
+            xmpp_stanza_release(f);
         }
         
         xmpp_stanza_add_child(query, x);

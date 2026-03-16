@@ -1882,95 +1882,28 @@ void weechat::channel::fetch_mam(const char *id, time_t *start, time_t *end, con
     xmpp_stanza_set_ns(x, "jabber:x:data");
     xmpp_stanza_set_attribute(x, "type", "submit");
 
-    xmpp_stanza_t *field, *value, *text;
+    auto add_field = [&](xmpp_stanza_t *parent, const char *var,
+                         const char *val, const char *type_attr = nullptr) {
+        xmpp_stanza_t *f = stanza_make_field(account.context, var, val, type_attr);
+        xmpp_stanza_add_child(parent, f);
+        xmpp_stanza_release(f);
+    };
 
-    {
-        field = xmpp_stanza_new(account.context);
-        xmpp_stanza_set_name(field, "field");
-        xmpp_stanza_set_attribute(field, "var", "FORM_TYPE");
-        xmpp_stanza_set_attribute(field, "type", "hidden");
-
-        value = xmpp_stanza_new(account.context);
-        xmpp_stanza_set_name(value, "value");
-
-        text = xmpp_stanza_new(account.context);
-        xmpp_stanza_set_text(text, "urn:xmpp:mam:2");
-        xmpp_stanza_add_child(value, text);
-        xmpp_stanza_release(text);
-
-        xmpp_stanza_add_child(field, value);
-        xmpp_stanza_release(value);
-
-        xmpp_stanza_add_child(x, field);
-        xmpp_stanza_release(field);
-    }
-
-    {
-        field = xmpp_stanza_new(account.context);
-        xmpp_stanza_set_name(field, "field");
-        xmpp_stanza_set_attribute(field, "var", "with");
-
-        value = xmpp_stanza_new(account.context);
-        xmpp_stanza_set_name(value, "value");
-
-        text = xmpp_stanza_new(account.context);
-        xmpp_stanza_set_text(text, this->id.data());  // Use channel JID, not query ID
-        xmpp_stanza_add_child(value, text);
-        xmpp_stanza_release(text);
-
-        xmpp_stanza_add_child(field, value);
-        xmpp_stanza_release(value);
-
-        xmpp_stanza_add_child(x, field);
-        xmpp_stanza_release(field);
-    }
+    add_field(x, "FORM_TYPE", "urn:xmpp:mam:2", "hidden");
+    add_field(x, "with", this->id.data());
 
     if (start)
     {
-        field = xmpp_stanza_new(account.context);
-        xmpp_stanza_set_name(field, "field");
-        xmpp_stanza_set_attribute(field, "var", "start");
-
-        value = xmpp_stanza_new(account.context);
-        xmpp_stanza_set_name(value, "value");
-
-        text = xmpp_stanza_new(account.context);
-        char time[256] = {0};
-        strftime(time, sizeof(time), "%Y-%m-%dT%H:%M:%SZ", gmtime(start));
-        xmpp_stanza_set_text(text, time);
-        
-        xmpp_stanza_add_child(value, text);
-        xmpp_stanza_release(text);
-
-        xmpp_stanza_add_child(field, value);
-        xmpp_stanza_release(value);
-
-        xmpp_stanza_add_child(x, field);
-        xmpp_stanza_release(field);
+        char time_buf[256] = {0};
+        strftime(time_buf, sizeof(time_buf), "%Y-%m-%dT%H:%M:%SZ", gmtime(start));
+        add_field(x, "start", time_buf);
     }
 
     if (end)
     {
-        field = xmpp_stanza_new(account.context);
-        xmpp_stanza_set_name(field, "field");
-        xmpp_stanza_set_attribute(field, "var", "end");
-
-        value = xmpp_stanza_new(account.context);
-        xmpp_stanza_set_name(value, "value");
-
-        text = xmpp_stanza_new(account.context);
-        char time[256] = {0};
-        strftime(time, sizeof(time), "%Y-%m-%dT%H:%M:%SZ", gmtime(end));
-        xmpp_stanza_set_text(text, time);
-        
-        xmpp_stanza_add_child(value, text);
-        xmpp_stanza_release(text);
-
-        xmpp_stanza_add_child(field, value);
-        xmpp_stanza_release(value);
-
-        xmpp_stanza_add_child(x, field);
-        xmpp_stanza_release(field);
+        char time_buf[256] = {0};
+        strftime(time_buf, sizeof(time_buf), "%Y-%m-%dT%H:%M:%SZ", gmtime(end));
+        add_field(x, "end", time_buf);
     }
 
     xmpp_stanza_add_child(query, x);
