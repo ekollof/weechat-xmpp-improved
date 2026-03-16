@@ -132,6 +132,11 @@ namespace weechat
         // For MUC we always send (room echoes tell us all clients support it).
         std::unordered_set<std::string> chat_state_supported;
 
+        // XEP-0085 §5.2: Duplicate suppression — track the last chat state we
+        // sent to each JID (key = bare JID, value = state element name).
+        // Don't re-send the same state twice in a row to the same recipient.
+        std::unordered_map<std::string, std::string> last_sent_chat_state;
+
         // Conversations-style deferred OMEMO send queue for PMs.
         // When we cannot encrypt yet (missing sessions/bundles), we queue
         // plaintexts here and flush them once sessions become available.

@@ -1797,6 +1797,11 @@ void weechat::channel::send_active(weechat::user *user)
     if (!is_chat_state_supported(to_jid))
         return;
 
+    // XEP-0085 §5.2: don't send the same state twice in a row
+    auto &last = last_sent_chat_state[to_jid];
+    if (last == "active") return;
+    last = "active";
+
     xmpp_stanza_t *message = xmpp_message_new(account.context,
                                               type == weechat::channel::chat_type::MUC
                                               ? "groupchat" : "chat",
@@ -1828,6 +1833,11 @@ void weechat::channel::send_typing(weechat::user *user)
 
     if (add_self_typing(user))
     {
+        std::string to_jid = user ? std::string(user->id) : id;
+        // Update dedup tracker: composing clears prior state so subsequent
+        // active/paused/inactive sends are not suppressed.
+        last_sent_chat_state[to_jid] = "composing";
+
         xmpp_stanza_t *message = xmpp_message_new(account.context,
                                                   type == weechat::channel::chat_type::MUC
                                                   ? "groupchat" : "chat",
@@ -1863,6 +1873,11 @@ void weechat::channel::send_paused(weechat::user *user)
     if (!is_chat_state_supported(to_jid))
         return;
 
+    // XEP-0085 §5.2: don't send the same state twice in a row
+    auto &last = last_sent_chat_state[to_jid];
+    if (last == "paused") return;
+    last = "paused";
+
     xmpp_stanza_t *message = xmpp_message_new(account.context,
                                               type == weechat::channel::chat_type::MUC
                                               ? "groupchat" : "chat",
@@ -1897,6 +1912,11 @@ void weechat::channel::send_inactive(weechat::user *user)
     if (!is_chat_state_supported(to_jid))
         return;
 
+    // XEP-0085 §5.2: don't send the same state twice in a row
+    auto &last = last_sent_chat_state[to_jid];
+    if (last == "inactive") return;
+    last = "inactive";
+
     xmpp_stanza_t *message = xmpp_message_new(account.context,
                                               type == weechat::channel::chat_type::MUC
                                               ? "groupchat" : "chat",
@@ -1930,6 +1950,13 @@ void weechat::channel::send_gone(weechat::user *user)
     std::string to_jid = user ? std::string(user->id) : id;
     if (!is_chat_state_supported(to_jid))
         return;
+
+    // XEP-0085 §5.2: don't send the same state twice in a row
+    // Also clear tracking on 'gone' since the conversation ends — next
+    // re-open starts fresh (any state is valid again).
+    auto &last = last_sent_chat_state[to_jid];
+    if (last == "gone") return;
+    last_sent_chat_state.erase(to_jid);  // reset: conversation ended
 
     xmpp_stanza_t *message = xmpp_message_new(account.context,
                                               type == weechat::channel::chat_type::MUC
