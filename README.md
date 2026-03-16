@@ -6,7 +6,7 @@ comprehensive set of XEPs targeting CCS2022 compliance.
 > **Fork of [bqv/weechat-xmpp](https://github.com/bqv/weechat-xmpp)**  
 > Original author: **Tony Olagbaiye** &lt;bqv@fron.io&gt;  
 > This fork is maintained at
-> [git.hackerheaven.org/ekollof/weechat-xmpp-fixed](https://git.hackerheaven.org/ekollof/weechat-xmpp-fixed)
+> [git.hackerheaven.org/ekollof/weechat-xmpp-improved](https://git.hackerheaven.org/ekollof/weechat-xmpp-improved)
 > and carries critical bug fixes, new XEP implementations, and ongoing
 > refactoring not yet merged upstream.
 
@@ -204,7 +204,7 @@ comprehensive set of XEPs targeting CCS2022 compliance.
 ### Build
 
 ```sh
-git clone --depth 1 git@git.hackerheaven.org:ekollof/weechat-xmpp-fixed.git
+git clone --depth 1 git@git.hackerheaven.org:ekollof/weechat-xmpp-improved.git
 cd weechat-xmpp-fixed
 make install-deps   # installs system packages (requires sudo)
 make
