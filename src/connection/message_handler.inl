@@ -2359,67 +2359,51 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash, 
         *osinfo.release = 0;
     }
 
-    xmpp_stanza_t *field, *value, *text;
-    // This is utter bullshit, TODO: anything but this
-#define FEATURE1(VAR, TYPE, VALUE)                            \
-    field = xmpp_stanza_new(account.context);                 \
-    xmpp_stanza_set_name(field, "field");                     \
-    xmpp_stanza_set_attribute(field, "var", VAR);             \
-    if(TYPE) xmpp_stanza_set_attribute(field, "type", TYPE);  \
-    value = xmpp_stanza_new(account.context);                 \
-    xmpp_stanza_set_name(value, "value");                     \
-    text = xmpp_stanza_new(account.context);                  \
-    xmpp_stanza_set_text(text, VALUE);                        \
-    xmpp_stanza_add_child(value, text);                       \
-    xmpp_stanza_release(text);                                \
-    xmpp_stanza_add_child(field, value);                      \
-    xmpp_stanza_release(value);                               \
-    xmpp_stanza_add_child(x, field);                          \
-    xmpp_stanza_release(field);                               \
-    if (strcmp(VAR, "FORM_TYPE") == 0) {                      \
-        weechat_string_dyn_concat(serial, VAR, -1);           \
-        weechat_string_dyn_concat(serial, "<", -1);           \
-    }                                                         \
-    weechat_string_dyn_concat(serial, VALUE, -1);             \
-    weechat_string_dyn_concat(serial, "<", -1);
-#define FEATURE2(VAR, TYPE, VALUE1, VALUE2)                   \
-    field = xmpp_stanza_new(account.context);                 \
-    xmpp_stanza_set_name(field, "field");                     \
-    xmpp_stanza_set_attribute(field, "var", VAR);             \
-    xmpp_stanza_set_attribute(field, "type", TYPE);           \
-    value = xmpp_stanza_new(account.context);                 \
-    xmpp_stanza_set_name(value, "value");                     \
-    text = xmpp_stanza_new(account.context);                  \
-    xmpp_stanza_set_text(text, VALUE1);                       \
-    xmpp_stanza_add_child(value, text);                       \
-    xmpp_stanza_release(text);                                \
-    xmpp_stanza_add_child(field, value);                      \
-    xmpp_stanza_release(value);                               \
-    value = xmpp_stanza_new(account.context);                 \
-    xmpp_stanza_set_name(value, "value");                     \
-    text = xmpp_stanza_new(account.context);                  \
-    xmpp_stanza_set_text(text, VALUE2);                       \
-    xmpp_stanza_add_child(value, text);                       \
-    xmpp_stanza_release(text);                                \
-    xmpp_stanza_add_child(field, value);                      \
-    xmpp_stanza_release(value);                               \
-    xmpp_stanza_add_child(x, field);                          \
-    xmpp_stanza_release(field);                               \
-    weechat_string_dyn_concat(serial, VAR, -1);               \
-    weechat_string_dyn_concat(serial, "<", -1);               \
-    weechat_string_dyn_concat(serial, VALUE1, -1);            \
-    weechat_string_dyn_concat(serial, "<", -1);               \
-    weechat_string_dyn_concat(serial, VALUE2, -1);            \
-    weechat_string_dyn_concat(serial, "<", -1);
+    // Add a single-value x-data field and append it to the XEP-0115 serial
+    auto add_feature1 = [&](const char *var, const char *type, const char *val) {
+        xmpp_stanza_t *f = stanza_make_field(account.context, var, val, type);
+        xmpp_stanza_add_child(x, f);
+        xmpp_stanza_release(f);
+        if (strcmp(var, "FORM_TYPE") == 0) {
+            weechat_string_dyn_concat(serial, var, -1);
+            weechat_string_dyn_concat(serial, "<", -1);
+        }
+        weechat_string_dyn_concat(serial, val, -1);
+        weechat_string_dyn_concat(serial, "<", -1);
+    };
+    // Add a two-value x-data field and append both values to the serial
+    auto add_feature2 = [&](const char *var, const char *type,
+                            const char *val1, const char *val2) {
+        xmpp_stanza_t *field = xmpp_stanza_new(account.context);
+        xmpp_stanza_set_name(field, "field");
+        xmpp_stanza_set_attribute(field, "var", var);
+        xmpp_stanza_set_attribute(field, "type", type);
+        for (const char *v : {val1, val2}) {
+            xmpp_stanza_t *value = xmpp_stanza_new(account.context);
+            xmpp_stanza_set_name(value, "value");
+            xmpp_stanza_t *text = xmpp_stanza_new(account.context);
+            xmpp_stanza_set_text(text, v);
+            xmpp_stanza_add_child(value, text);
+            xmpp_stanza_release(text);
+            xmpp_stanza_add_child(field, value);
+            xmpp_stanza_release(value);
+        }
+        xmpp_stanza_add_child(x, field);
+        xmpp_stanza_release(field);
+        weechat_string_dyn_concat(serial, var,  -1);
+        weechat_string_dyn_concat(serial, "<",  -1);
+        weechat_string_dyn_concat(serial, val1, -1);
+        weechat_string_dyn_concat(serial, "<",  -1);
+        weechat_string_dyn_concat(serial, val2, -1);
+        weechat_string_dyn_concat(serial, "<",  -1);
+    };
 
-    FEATURE1("FORM_TYPE", "hidden", "urn:xmpp:dataforms:softwareinfo");
-    FEATURE2("ip_version", "text-multi", "ipv4", "ipv6");
-    FEATURE1("os", NULL, osinfo.sysname);
-    FEATURE1("os_version", NULL, osinfo.release);
-    FEATURE1("software", NULL, "weechat");
-    FEATURE1("software_version", NULL, weechat_info_get("version", NULL));
-#undef FEATURE1
-#undef FEATURE2
+    add_feature1("FORM_TYPE", "hidden", "urn:xmpp:dataforms:softwareinfo");
+    add_feature2("ip_version", "text-multi", "ipv4", "ipv6");
+    add_feature1("os",               nullptr, osinfo.sysname);
+    add_feature1("os_version",       nullptr, osinfo.release);
+    add_feature1("software",         nullptr, "weechat");
+    add_feature1("software_version", nullptr, weechat_info_get("version", nullptr));
 
     xmpp_stanza_add_child(query, x);
     xmpp_stanza_release(x);
