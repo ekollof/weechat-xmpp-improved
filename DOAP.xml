@@ -480,7 +480,7 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0424.html' />
         <xmpp:status>complete</xmpp:status>
-        <xmpp:version>0.4.0</xmpp:version>
+        <xmpp:version>0.4.2</xmpp:version>
         <xmpp:note
                     xml:lang='en'
                 >Message Retraction - allows users to retract/delete sent messages</xmpp:note>
@@ -643,7 +643,7 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0424.html' />
         <xmpp:status>complete</xmpp:status>
-        <xmpp:version>0.4.0</xmpp:version>
+        <xmpp:version>0.4.2</xmpp:version>
         <xmpp:note xml:lang='en'>Message Retraction - /retract command with tombstone display and MAM cache update</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
