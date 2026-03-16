@@ -2200,7 +2200,7 @@ int command__trap(const void *pointer, void *data,
 
     (void) channel; // trap is for debugging only
 
-    __asm("int3");
+    __builtin_trap();
 
     return WEECHAT_RC_OK;
 }

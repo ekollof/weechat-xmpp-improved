@@ -1,9 +1,9 @@
-#!/bin/bash
+#!/bin/sh
 # Build distribution packages for weechat-xmpp
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 VERSION="${1:-0.2.0}"
 
@@ -16,8 +16,7 @@ if [ -f /etc/os-release ]; then
     . /etc/os-release
     OS=$ID
 else
-    echo "Cannot detect OS - /etc/os-release not found"
-    exit 1
+    OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 fi
 
 echo "Detected OS: $OS"

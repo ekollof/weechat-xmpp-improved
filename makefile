@@ -1,14 +1,18 @@
 #!/usr/bin/env -S gmake all
 # vim: set noexpandtab:
 
+UNAME_S := $(shell uname -s)
+
 ifdef DEBUG
 	DBGCFLAGS=-DDEBUG -fno-omit-frame-pointer -fsanitize=address #-fsanitize=undefined -fsanitize=leak
+ifeq ($(UNAME_S),Linux)
 	DBGLDFLAGS=-lasan -lrt -lasan #-lubsan -llsan
 endif
+endif
 
-CC ?= gcc
-CXX ?= g++
-SHELL = bash
+CC ?= cc
+CXX ?= c++
+SHELL = /bin/sh
 RM ?= rm -f
 FIND ?= find
 
@@ -19,7 +23,7 @@ INCLUDES=-Ilibstrophe -Ideps/lmdbxx -Ideps -Isrc -I. -I/usr/include/omemo/ \
 CFLAGS+=$(DBGCFLAGS) \
 	-fno-omit-frame-pointer -fPIC \
 	-fvisibility=hidden -fvisibility-inlines-hidden \
-	-fdebug-prefix-map=.=$(shell readlink -f .) \
+	-fdebug-prefix-map=.=$(CURDIR) \
 	-std=gnu99 -gdwarf-4 \
 	-Wall -Wextra -pedantic -Werror\
 	-Werror-implicit-function-declaration \
@@ -60,6 +64,14 @@ LDLIBS=-lstrophe \
 
 PREFIX ?= /usr/local
 LIBDIR ?= $(PREFIX)/lib
+
+OBJCOPY ?= $(shell command -v objcopy 2>/dev/null || command -v llvm-objcopy 2>/dev/null || true)
+
+ifeq ($(UNAME_S),Linux)
+AS_NEEDED := -Wl,--as-needed
+else
+AS_NEEDED :=
+endif
 
 HDRS=src/plugin.hh \
 	 src/account.hh \
@@ -140,8 +152,10 @@ all: depend
 weechat-xmpp: $(DEPS) xmpp.so
 
 xmpp.so: $(DEPS) $(OBJS) $(HDRS)
-	$(CXX) -shared $(LDFLAGS) -o $@ -Wl,--as-needed $(OBJS) $(DEPS) $(LDLIBS)
-	git ls-files | xargs ls -d | xargs tar cz | objcopy --add-section .source=/dev/stdin xmpp.so
+	$(CXX) -shared $(LDFLAGS) -o $@ $(AS_NEEDED) $(OBJS) $(DEPS) $(LDLIBS)
+ifneq ($(OBJCOPY),)
+	git ls-files | xargs ls -d | xargs tar cz | $(OBJCOPY) --add-section .source=/dev/stdin xmpp.so
+endif
 
 sexp/sexp.a: sexp/parser.o sexp/lexer.o sexp/driver.o
 	ar -r $@ $^

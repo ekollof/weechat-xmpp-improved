@@ -1,5 +1,6 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+# Correlate WeeChat OMEMO log events with raw XML trace entries by timestamp.
+# POSIX sh — no bash extensions; awk uses only POSIX + gawk-compatible arithmetic.
 
 usage() {
   cat <<'EOF'
@@ -42,7 +43,7 @@ max_hits=4
 direction="any"
 stanza_name="any"
 
-while [[ $# -gt 0 ]]; do
+while [ $# -gt 0 ]; do
   case "$1" in
     --account)
       account="${2:-}"
@@ -85,46 +86,52 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      echo "Unknown option: $1" >&2
+      printf 'Unknown option: %s\n' "$1" >&2
       usage >&2
       exit 2
       ;;
   esac
 done
 
-if [[ -z "$account" ]]; then
-  echo "--account is required" >&2
+if [ -z "$account" ]; then
+  printf '%s\n' "--account is required" >&2
   usage >&2
   exit 2
 fi
 
-if [[ -z "$event_log" ]]; then
+if [ -z "$event_log" ]; then
   event_log="$HOME/.local/share/weechat/logs/xmpp.account.${account}.weechatlog"
 fi
 
-if [[ -z "$raw_log" ]]; then
+if [ -z "$raw_log" ]; then
   raw_log="$HOME/.local/share/weechat/xmpp/raw_xml_${account}.log"
 fi
 
-if [[ ! -f "$event_log" ]]; then
-  echo "Event log not found: $event_log" >&2
+if [ ! -f "$event_log" ]; then
+  printf 'Event log not found: %s\n' "$event_log" >&2
   exit 1
 fi
 
-if [[ ! -f "$raw_log" ]]; then
-  echo "Raw XML log not found: $raw_log" >&2
+if [ ! -f "$raw_log" ]; then
+  printf 'Raw XML log not found: %s\n' "$raw_log" >&2
   exit 1
 fi
 
-if [[ "$direction" != "any" && "$direction" != "send" && "$direction" != "recv" ]]; then
-  echo "Invalid --direction: $direction (use any|send|recv)" >&2
-  exit 2
-fi
+case "$direction" in
+  any|send|recv) ;;
+  *)
+    printf 'Invalid --direction: %s (use any|send|recv)\n' "$direction" >&2
+    exit 2
+    ;;
+esac
 
-if [[ "$stanza_name" != "any" && "$stanza_name" != "message" && "$stanza_name" != "iq" && "$stanza_name" != "presence" && "$stanza_name" != "a" ]]; then
-  echo "Invalid --stanza-name: $stanza_name (use any|message|iq|presence|a)" >&2
-  exit 2
-fi
+case "$stanza_name" in
+  any|message|iq|presence|a) ;;
+  *)
+    printf 'Invalid --stanza-name: %s (use any|message|iq|presence|a)\n' "$stanza_name" >&2
+    exit 2
+    ;;
+esac
 
 awk \
   -v event_pattern="$pattern" \
@@ -134,12 +141,25 @@ awk \
   -v dir_filter="$direction" \
   -v stanza_filter="$stanza_name" \
   '
-function to_epoch(ts, parts, normalized) {
+# Pure-arithmetic POSIX epoch from "YYYY-MM-DD HH:MM:SS".
+# Uses the Julian Day Number method; no mktime() required.
+function to_epoch(ts,    parts, Y, M, D, h, m, s, jdn, j2000) {
   split(ts, parts, /[- :]/)
   if (length(parts) < 6)
     return 0
-  normalized = sprintf("%d %d %d %d %d %d", parts[1], parts[2], parts[3], parts[4], parts[5], parts[6])
-  return mktime(normalized)
+  Y = parts[1] + 0
+  M = parts[2] + 0
+  D = parts[3] + 0
+  h = parts[4] + 0
+  m = parts[5] + 0
+  s = parts[6] + 0
+  # Julian Day Number (integer) for the given calendar date
+  jdn = int((1461 * (Y + 4800 + int((M - 14) / 12))) / 4) \
+      + int((367 * (M - 2 - 12 * int((M - 14) / 12))) / 12) \
+      - int((3 * int((Y + 4900 + int((M - 14) / 12)) / 100)) / 4) \
+      + D - 32075
+  # JDN for 1970-01-01 is 2440588
+  return (jdn - 2440588) * 86400 + h * 3600 + m * 60 + s
 }
 
 function flush_raw_entry() {

@@ -46,7 +46,7 @@ extern "C"
 void wrapped_signal_handler(int arg)
 { // wrap weechat's handler
     weechat_signal_handler(arg);
-    __asm__("int3");
+    __builtin_trap();
 }
 
 extern "C"

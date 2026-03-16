@@ -6,21 +6,25 @@ depend: $(DEPS) $(SRCS) $(HDRS)
 	echo > ./.depend
 	for src in $(SRCS) tests/main.cc; do \
 		dir="$$(dirname $$src)"; \
-		src="$$(basename $$src)"; \
-		if [[ $$src == *.cpp ]]; then \
-			objdir="$${dir/src/obj}"; \
+		base="$$(basename $$src)"; \
+		case "$$base" in \
+		*.cpp) \
+			objdir="$$(echo $$dir | sed 's|src|obj|')"; \
+			obj="$$(echo $$base | sed 's|\.cpp|\.o|')"; \
 			echo "$(CXX) $(CPPFLAGS) -MM -MMD -MP -MF - \
-				-MT $$objdir/$${src/.cpp/.o} $$dir/$$src >> ./.depend"; \
+				-MT $$objdir/$$obj $$dir/$$base >> ./.depend"; \
 			$(CXX) $(CPPFLAGS) -MM -MMD -MP -MF - \
-				-MT $$objdir/$${src/.cpp/.o} $$dir/$$src >> ./.depend || true ; \
-		elif [[ $$src == *.c ]]; then \
-			objdir="$${dir/src/obj}"; \
+				-MT $$objdir/$$obj $$dir/$$base >> ./.depend || true ;; \
+		*.c) \
+			objdir="$$(echo $$dir | sed 's|src|obj|')"; \
+			obj="$$(echo $$base | sed 's|\.c|\.o|')"; \
 			echo "$(CC) $(CFLAGS) -MM -MMD -MP -MF - \
-				-MT $$objdir/$${src/.c/.o} $$dir/$$src >> ./.depend"; \
+				-MT $$objdir/$$obj $$dir/$$base >> ./.depend"; \
 			$(CC) $(CFLAGS) -MM -MMD -MP -MF - \
-				-MT $$objdir/$${src/.c/.o} $$dir/$$src >> ./.depend || true ; \
-		else continue; \
-		fi; \
+				-MT $$objdir/$$obj $$dir/$$base >> ./.depend || true ;; \
+		*) \
+			continue ;; \
+		esac; \
 	done
 
 include .depend

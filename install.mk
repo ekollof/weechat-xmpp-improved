@@ -24,6 +24,8 @@ release: xmpp.so
 
 .xmpp.so.%:
 	mkdir src$@
-	objcopy --dump-section .source=/dev/stdout $@ | tar -C src$@ xz
+ifneq ($(OBJCOPY),)
+	$(OBJCOPY) --dump-section .source=/dev/stdout $@ | tar -C src$@ xz
+endif
 
 .PHONY: install install-deps release .xmpp.so.%

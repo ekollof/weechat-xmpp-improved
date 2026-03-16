@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Install dependencies for weechat-xmpp
 
 set -e
@@ -9,8 +9,7 @@ if [ -f /etc/os-release ]; then
     . /etc/os-release
     OS=$ID
 else
-    echo "Cannot detect OS - /etc/os-release not found"
-    exit 1
+    OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 fi
 
 echo "Detected OS: $OS"
@@ -151,6 +150,61 @@ case "$OS" in
             net-im/weechat
         ;;
     
+    freebsd)
+        echo "Installing dependencies for FreeBSD..."
+        sudo pkg install -y \
+            gcc \
+            gmake \
+            git \
+            bison \
+            flex \
+            libstrophe \
+            libxml2 \
+            lmdb \
+            libsignal-protocol-c \
+            gpgme \
+            libfmt \
+            curl \
+            openssl \
+            weechat
+        ;;
+
+    openbsd)
+        echo "Installing dependencies for OpenBSD..."
+        doas pkg_add \
+            gcc \
+            gmake \
+            git \
+            bison \
+            flex \
+            libstrophe \
+            libxml \
+            lmdb \
+            gpgme \
+            curl \
+            weechat
+        echo "Note: libsignal-protocol-c and libfmt may need to be built from source on OpenBSD."
+        ;;
+
+    netbsd)
+        echo "Installing dependencies for NetBSD..."
+        sudo pkgin install \
+            gcc \
+            gmake \
+            git \
+            bison \
+            flex \
+            libstrophe \
+            libxml2 \
+            lmdb \
+            gpgme \
+            libfmt \
+            curl \
+            openssl \
+            weechat
+        echo "Note: libsignal-protocol-c may need to be built from source on NetBSD."
+        ;;
+
     *)
         echo "Unknown or unsupported distribution: $OS"
         echo ""

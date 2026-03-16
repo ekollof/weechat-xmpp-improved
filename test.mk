@@ -7,7 +7,7 @@ debug: xmpp.so
 		weechat -a -P 'alias,buflist,exec,irc,relay' -r '/plugin load ./xmpp.so'
 
 tests/xmpp.cov.so: $(COVS) $(DEPS) $(HDRS)
-	$(CXX) --coverage -shared $(LDFLAGS) -o tests/xmpp.cov.so -Wl,--as-needed $(DEPS) $(LDLIBS) $(COVS)
+	$(CXX) --coverage -shared $(LDFLAGS) -o tests/xmpp.cov.so $(AS_NEEDED) $(DEPS) $(LDLIBS) $(COVS)
 
 tests/run: $(COVS) tests/main.cc tests/xmpp.cov.so $(wildcard tests/*.inl)
 	cd tests && $(CXX) $(CPPFLAGS) $(LDFLAGS) -o run $$PWD/xmpp.cov.so main.cc $(patsubst %,../%,$(DEPS)) $(LDLIBS)
