@@ -67,36 +67,13 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
                 });
 
             // Stream Management handlers (XEP-0198)
-            this->handler_add(
-                "enabled", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
-                    auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
-                    if (connection != conn) return 0;
-                    return connection.sm_handler(stanza) ? 1 : 0;
-                });
-            this->handler_add(
-                "resumed", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
-                    auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
-                    if (connection != conn) return 0;
-                    return connection.sm_handler(stanza) ? 1 : 0;
-                });
-            this->handler_add(
-                "failed", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
-                    auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
-                    if (connection != conn) return 0;
-                    return connection.sm_handler(stanza) ? 1 : 0;
-                });
-            this->handler_add(
-                "a", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
-                    auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
-                    if (connection != conn) return 0;
-                    return connection.sm_handler(stanza) ? 1 : 0;
-                });
-            this->handler_add(
-                "r", nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
-                    auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
-                    if (connection != conn) return 0;
-                    return connection.sm_handler(stanza) ? 1 : 0;
-                });
+            for (const char *sm_name : {"enabled", "resumed", "failed", "a", "r"})
+                this->handler_add(
+                    sm_name, nullptr, [](xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata) {
+                        auto& connection = *reinterpret_cast<weechat::connection*>(userdata);
+                        if (connection != conn) return 0;
+                        return connection.sm_handler(stanza) ? 1 : 0;
+                    });
             
             account.sm_handlers_registered = true;
         }
