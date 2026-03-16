@@ -2064,6 +2064,32 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
     {
         const char *items_node;
 
+        // Resolve the node owner JID from pending_iq_jid map, then bare `from`,
+        // then bare `to` / own JID. Used by both OMEMO:2 and legacy devicelist handlers.
+        auto resolve_node_owner = [&]() -> std::string {
+            std::string owner;
+            if (id) {
+                auto it = account.omemo.pending_iq_jid.find(id);
+                if (it != account.omemo.pending_iq_jid.end()) {
+                    owner = it->second;
+                    account.omemo.pending_iq_jid.erase(it);
+                }
+            }
+            if (owner.empty()) {
+                xmpp_string_guard from_bare_g(account.context,
+                    from ? xmpp_jid_bare(account.context, from) : nullptr);
+                if (from_bare_g.ptr && *from_bare_g.ptr)
+                    owner = from_bare_g.ptr;
+            }
+            if (owner.empty()) {
+                xmpp_string_guard to_bare_g(account.context,
+                    to ? xmpp_jid_bare(account.context, to) : nullptr);
+                owner = (to_bare_g.ptr && *to_bare_g.ptr)
+                    ? to_bare_g.ptr : account.jid().data();
+            }
+            return owner;
+        };
+
         items = xmpp_stanza_get_child_by_name(pubsub, "items");
         if (items)
         {
@@ -2079,34 +2105,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         item, "devices", "urn:xmpp:omemo:2");
                     if (list && account.omemo)
                     {
-                        // For PubSub IQ results, `from` may be the server domain,
-                        // not the node owner.  Recover the correct JID by:
-                        //   1. Checking the pending_iq_jid map (keyed by IQ id).
-                        //   2. Falling back to bare `to` (works for our own JID fetches).
-                        //   3. Finally using `from` if all else fails.
-                        std::string node_owner_str;
-                        if (id) {
-                            auto it = account.omemo.pending_iq_jid.find(id);
-                            if (it != account.omemo.pending_iq_jid.end()) {
-                                node_owner_str = it->second;
-                                account.omemo.pending_iq_jid.erase(it);
-                            }
-                        }
-                        if (node_owner_str.empty()) {
-                            // For unsolicited PubSub events there is no pending IQ id.
-                            // In that case, `from` identifies the node owner while `to`
-                            // is typically our own JID. Prefer bare `from` first.
-                            xmpp_string_guard from_bare_g(account.context,
-                                from ? xmpp_jid_bare(account.context, from) : nullptr);
-                            if (from_bare_g.ptr && *from_bare_g.ptr)
-                                node_owner_str = from_bare_g.ptr;
-                        }
-                        if (node_owner_str.empty()) {
-                            xmpp_string_guard to_bare_g(account.context,
-                                to ? xmpp_jid_bare(account.context, to) : nullptr);
-                            node_owner_str = (to_bare_g.ptr && *to_bare_g.ptr)
-                                ? to_bare_g.ptr : account.jid().data();
-                        }
+                        std::string node_owner_str = resolve_node_owner();
                         const char *node_owner = node_owner_str.c_str();
                         xmpp_string_guard account_bare_g(account.context,
                             xmpp_jid_bare(account.context, account.jid().data()));
@@ -2451,30 +2450,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                                            "eu.siacs.conversations.axolotl.devicelist") == 0)
             {
                 // Recover the correct JID using the same logic as OMEMO:2.
-                std::string node_owner_str;
-                if (id)
-                {
-                    auto it = account.omemo.pending_iq_jid.find(id);
-                    if (it != account.omemo.pending_iq_jid.end())
-                    {
-                        node_owner_str = it->second;
-                        account.omemo.pending_iq_jid.erase(it);
-                    }
-                }
-                if (node_owner_str.empty())
-                {
-                    xmpp_string_guard from_bare_g(account.context,
-                        from ? xmpp_jid_bare(account.context, from) : nullptr);
-                    if (from_bare_g.ptr && *from_bare_g.ptr)
-                        node_owner_str = from_bare_g.ptr;
-                }
-                if (node_owner_str.empty())
-                {
-                    xmpp_string_guard to_bare_g(account.context,
-                        to ? xmpp_jid_bare(account.context, to) : nullptr);
-                    node_owner_str = (to_bare_g.ptr && *to_bare_g.ptr)
-                        ? to_bare_g.ptr : account.jid().data();
-                }
+                std::string node_owner_str = resolve_node_owner();
 
                 xmpp_string_guard account_bare_g(account.context,
                     xmpp_jid_bare(account.context, account.jid().data()));
