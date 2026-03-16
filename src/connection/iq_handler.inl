@@ -2300,6 +2300,18 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 if (bundle_jid.empty())
                     bundle_jid = from ? from : account.jid().data();
 
+                // Clear all in-flight pending_bundle_fetch entries for a given JID
+                auto clear_pending_fetches_for_jid = [&](const std::string &jid) {
+                    for (auto it = account.omemo.pending_bundle_fetch.begin();
+                         it != account.omemo.pending_bundle_fetch.end();)
+                    {
+                        if (it->first == jid)
+                            it = account.omemo.pending_bundle_fetch.erase(it);
+                        else
+                            ++it;
+                    }
+                };
+
                 if (!items)
                 {
                     weechat_printf(account.buffer,
@@ -2400,29 +2412,13 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                                    weechat_prefix("error"), bundle_jid.c_str());
                     // Clear all pending fetches for this JID since the result is empty
                     if (account.omemo)
-                    {
-                        for (auto it = account.omemo.pending_bundle_fetch.begin();
-                             it != account.omemo.pending_bundle_fetch.end();)
-                        {
-                            if (it->first == bundle_jid)
-                                it = account.omemo.pending_bundle_fetch.erase(it);
-                            else
-                                ++it;
-                        }
-                    }
+                        clear_pending_fetches_for_jid(bundle_jid);
                 }
                 else if (account.omemo && type && weechat_strcasecmp(type, "error") == 0)
                 {
                     // No item id available: clear all in-flight entries for this JID so
                     // subsequent send attempts can retry bundle fetches.
-                    for (auto it = account.omemo.pending_bundle_fetch.begin();
-                         it != account.omemo.pending_bundle_fetch.end();)
-                    {
-                        if (it->first == bundle_jid)
-                            it = account.omemo.pending_bundle_fetch.erase(it);
-                        else
-                            ++it;
-                    }
+                    clear_pending_fetches_for_jid(bundle_jid);
                     weechat_printf(account.buffer,
                                    "%somemo: bundle fetch for %s returned error without item id; cleared pending fetch state",
                                    weechat_prefix("error"), bundle_jid.c_str());
