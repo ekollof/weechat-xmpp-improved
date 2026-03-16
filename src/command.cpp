@@ -2004,6 +2004,7 @@ int command__reply(const void *pointer, void *data,
     void *last_line = weechat_hdata_pointer(weechat_hdata_get("lines"),
                                             lines, "last_line");
     const char *target_id = NULL;
+    std::string target_sender_nick;  // nick_ tag of the message being replied to
     std::string own_nick = std::string(ptr_account->jid());
 
     while (last_line)
@@ -2039,7 +2040,7 @@ int command__reply(const void *pointer, void *data,
             
             if (!from_self)
             {
-                // Found a message not from us - extract its ID
+                // Found a message not from us - extract its ID and sender nick
                 for (int n_tag = 0; n_tag < tags_count; n_tag++)
                 {
                     snprintf(str_tag, sizeof(str_tag), "%d|tags_array", n_tag);
@@ -2049,7 +2050,13 @@ int command__reply(const void *pointer, void *data,
                         strncmp(tag, "id_", strlen("id_")) == 0)
                     {
                         target_id = tag + strlen("id_");
-                        break;
+                    }
+                    // Capture the sender nick for building the reply-to JID
+                    if (strlen(tag) > strlen("nick_") &&
+                        strncmp(tag, "nick_", strlen("nick_")) == 0 &&
+                        target_sender_nick.empty())
+                    {
+                        target_sender_nick = tag + strlen("nick_");
                     }
                 }
                 
@@ -2070,10 +2077,20 @@ int command__reply(const void *pointer, void *data,
     }
 
     // Send the reply using XEP-0461
-    // The message goes to the channel with a <reply> element
+    // The message goes to the channel/peer JID (routing destination)
     const char *to = ptr_channel->name.c_str();
     const char *type = (ptr_channel->type == weechat::channel::chat_type::MUC) 
                         ? "groupchat" : "chat";
+
+    // XEP-0461 §3.1: <reply to='...'> MUST be the JID of the original sender,
+    // not the room/channel JID.
+    // For MUC: room_jid/nick (full JID of the occupant)
+    // For PM: the peer's bare JID (which is the channel name)
+    std::string reply_to_jid;
+    if (ptr_channel->type == weechat::channel::chat_type::MUC && !target_sender_nick.empty())
+        reply_to_jid = ptr_channel->name + "/" + target_sender_nick;
+    else
+        reply_to_jid = ptr_channel->name;
 
     xmpp_stanza_t *message = xmpp_message_new(ptr_account->context, type, to, NULL);
     xmpp_string_guard uuid_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
@@ -2089,13 +2106,22 @@ int command__reply(const void *pointer, void *data,
     xmpp_stanza_add_child(body, body_text);
     xmpp_stanza_add_child(message, body);
 
-    // Add <reply xmlns='urn:xmpp:reply:0' id='target-id' />
+    // Add <reply xmlns='urn:xmpp:reply:0' id='target-id' to='original-sender-jid'/>
     xmpp_stanza_t *reply_elem = xmpp_stanza_new(ptr_account->context);
     xmpp_stanza_set_name(reply_elem, "reply");
     xmpp_stanza_set_ns(reply_elem, "urn:xmpp:reply:0");
     xmpp_stanza_set_attribute(reply_elem, "id", target_id);
-    xmpp_stanza_set_attribute(reply_elem, "to", to);
+    xmpp_stanza_set_attribute(reply_elem, "to", reply_to_jid.c_str());
     xmpp_stanza_add_child(message, reply_elem);
+
+    // XEP-0461 §4 + XEP-0428: add <fallback> so clients that don't support
+    // XEP-0461 know the body is a fallback representation of the reply.
+    xmpp_stanza_t *fallback_elem = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(fallback_elem, "fallback");
+    xmpp_stanza_set_ns(fallback_elem, "urn:xmpp:fallback:0");
+    xmpp_stanza_set_attribute(fallback_elem, "for", "urn:xmpp:reply:0");
+    xmpp_stanza_add_child(message, fallback_elem);
+    xmpp_stanza_release(fallback_elem);
 
     // Add store hint for MAM
     xmpp_stanza_t *store_hint = xmpp_stanza_new(ptr_account->context);
