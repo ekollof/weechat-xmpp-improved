@@ -1861,20 +1861,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                     // Build node configure IQ.
                     auto make_field = [&](const char *var, const char *val,
                                          const char *type_attr = nullptr) {
-                        xmpp_stanza_t *field = xmpp_stanza_new(account.context);
-                        xmpp_stanza_set_name(field, "field");
-                        xmpp_stanza_set_attribute(field, "var", var);
-                        if (type_attr)
-                            xmpp_stanza_set_attribute(field, "type", type_attr);
-                        xmpp_stanza_t *value = xmpp_stanza_new(account.context);
-                        xmpp_stanza_set_name(value, "value");
-                        xmpp_stanza_t *txt = xmpp_stanza_new(account.context);
-                        xmpp_stanza_set_text(txt, val);
-                        xmpp_stanza_add_child(value, txt);
-                        xmpp_stanza_release(txt);
-                        xmpp_stanza_add_child(field, value);
-                        xmpp_stanza_release(value);
-                        return field;
+                        return stanza_make_field(account.context, var, val, type_attr);
                     };
 
                     xmpp_stanza_t *x = xmpp_stanza_new(account.context);

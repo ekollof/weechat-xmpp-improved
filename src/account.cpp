@@ -192,19 +192,7 @@ xmpp_stanza_t *weechat::account::get_devicelist()
         xmpp_stanza_t *pubsub = children[0];
 
         auto make_field = [&](const char *var, const char *val, const char *type = nullptr) {
-            xmpp_stanza_t *field = xmpp_stanza_new(context);
-            xmpp_stanza_set_name(field, "field");
-            xmpp_stanza_set_attribute(field, "var", var);
-            if (type) xmpp_stanza_set_attribute(field, "type", type);
-            xmpp_stanza_t *value = xmpp_stanza_new(context);
-            xmpp_stanza_set_name(value, "value");
-            xmpp_stanza_t *text = xmpp_stanza_new(context);
-            xmpp_stanza_set_text(text, val);
-            xmpp_stanza_add_child(value, text);
-            xmpp_stanza_release(text);
-            xmpp_stanza_add_child(field, value);
-            xmpp_stanza_release(value);
-            return field;
+            return stanza_make_field(context, var, val, type);
         };
 
         xmpp_stanza_t *x = xmpp_stanza_new(context);
@@ -306,19 +294,7 @@ xmpp_stanza_t *weechat::account::get_legacy_devicelist()
     // OMEMO:1 can reliably discover this device.
     {
         auto make_field = [&](const char *var, const char *val, const char *type = nullptr) {
-            xmpp_stanza_t *field = xmpp_stanza_new(context);
-            xmpp_stanza_set_name(field, "field");
-            xmpp_stanza_set_attribute(field, "var", var);
-            if (type) xmpp_stanza_set_attribute(field, "type", type);
-            xmpp_stanza_t *value = xmpp_stanza_new(context);
-            xmpp_stanza_set_name(value, "value");
-            xmpp_stanza_t *text = xmpp_stanza_new(context);
-            xmpp_stanza_set_text(text, val);
-            xmpp_stanza_add_child(value, text);
-            xmpp_stanza_release(text);
-            xmpp_stanza_add_child(field, value);
-            xmpp_stanza_release(value);
-            return field;
+            return stanza_make_field(context, var, val, type);
         };
 
         xmpp_stanza_t *x = xmpp_stanza_new(context);

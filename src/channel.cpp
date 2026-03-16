@@ -1708,19 +1708,7 @@ void weechat::channel::send_reads()
 
             auto make_field = [&](const char *var, const char *val,
                                   const char *type = nullptr) {
-                xmpp_stanza_t *field = xmpp_stanza_new(account.context);
-                xmpp_stanza_set_name(field, "field");
-                xmpp_stanza_set_attribute(field, "var", var);
-                if (type) xmpp_stanza_set_attribute(field, "type", type);
-                xmpp_stanza_t *value = xmpp_stanza_new(account.context);
-                xmpp_stanza_set_name(value, "value");
-                xmpp_stanza_t *text = xmpp_stanza_new(account.context);
-                xmpp_stanza_set_text(text, val);
-                xmpp_stanza_add_child(value, text);
-                xmpp_stanza_release(text);
-                xmpp_stanza_add_child(field, value);
-                xmpp_stanza_release(value);
-                return field;
+                return stanza_make_field(account.context, var, val, type);
             };
 
             xmpp_stanza_t *x = xmpp_stanza_new(account.context);
