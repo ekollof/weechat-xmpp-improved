@@ -397,7 +397,7 @@ void weechat::channel::member_speaking_rename_if_present(const char *nick)
 
 // typing_search is unused now that we delegate to the native typing plugin.
 
-int weechat::channel::remove_typing(weechat::user *user)
+int weechat::channel::set_typing_state(weechat::user *user, const char *state)
 {
     if (!user || user->id.empty() || !buffer)
         return 0;
@@ -420,47 +420,24 @@ int weechat::channel::remove_typing(weechat::user *user)
     if (nick.empty())
         return 0;
 
-    // Signal format: "<buf_ptr_hex>;off;<nick>"
+    // Signal format: "<buf_ptr_hex>;<state>;<nick>"
     char signal_data[512];
-    snprintf(signal_data, sizeof(signal_data), "%lx;off;%s",
-             (unsigned long)(void *)buffer, nick.c_str());
+    snprintf(signal_data, sizeof(signal_data), "%lx;%s;%s",
+             (unsigned long)(void *)buffer, state, nick.c_str());
     weechat_hook_signal_send("typing_set_nick",
                              WEECHAT_HOOK_SIGNAL_STRING,
                              signal_data);
     return 1;
 }
 
+int weechat::channel::remove_typing(weechat::user *user)
+{
+    return set_typing_state(user, "off");
+}
+
 int weechat::channel::add_typing(weechat::user *user)
 {
-    if (!user || user->id.empty() || !buffer)
-        return 0;
-
-    // Build nick string (resource for MUC, bare JID for PM)
-    std::string nick;
-    if (type == chat_type::MUC)
-    {
-        char *res = xmpp_jid_resource(account.context, user->id.c_str());
-        nick = res ? res : user->id;
-        if (res) xmpp_free(account.context, res);
-    }
-    else
-    {
-        char *bare = xmpp_jid_bare(account.context, user->id.c_str());
-        nick = bare ? bare : user->id;
-        if (bare) xmpp_free(account.context, bare);
-    }
-
-    if (nick.empty())
-        return 0;
-
-    // Signal format: "<buf_ptr_hex>;typing;<nick>"
-    char signal_data[512];
-    snprintf(signal_data, sizeof(signal_data), "%lx;typing;%s",
-             (unsigned long)(void *)buffer, nick.c_str());
-    weechat_hook_signal_send("typing_set_nick",
-                             WEECHAT_HOOK_SIGNAL_STRING,
-                             signal_data);
-    return 1;
+    return set_typing_state(user, "typing");
 }
 
 int weechat::channel::self_typing_cb(const void *pointer, void *data, int remaining_calls)
