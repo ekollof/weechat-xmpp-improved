@@ -288,27 +288,12 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
                 xmpp_stanza_release(children[0]);
             }
 
-            // Publish our devicelist with our device_id included.  This runs
-            // before we receive the server's existing list.  We MUST clear
-            // account.devices first to flush any stale entries carried over from
-            // the previous session (the map persists across reconnects and can
-            // contain old/invalid IDs including "%u" entries).
-            // When the server responds with the full list we merge and re-publish
-            // (see the IQ result handler above).
-            {
-                account.device_free_all();
-                xmpp_stanza_t *dl_stanza = account.get_devicelist();
-                xmpp_string_guard dl_uuid_g(account.context, xmpp_uuid_gen(account.context));
-                xmpp_stanza_set_id(dl_stanza, dl_uuid_g.ptr);
-                this->send(dl_stanza);
-                xmpp_stanza_release(dl_stanza);
-
-                xmpp_stanza_t *legacy_dl_stanza = account.get_legacy_devicelist();
-                xmpp_string_guard legacy_dl_uuid_g(account.context, xmpp_uuid_gen(account.context));
-                xmpp_stanza_set_id(legacy_dl_stanza, legacy_dl_uuid_g.ptr);
-                this->send(legacy_dl_stanza);
-                xmpp_stanza_release(legacy_dl_stanza);
-            }
+            // Do NOT publish our devicelist here.  We first fetch the server's
+            // current list (IQ sent above).  The IQ result handler merges our
+            // device_id into the server list and only republishes if our device
+            // is absent.  Publishing here — before the result arrives — would
+            // overwrite sibling clients' device entries and trigger a ping-pong
+            // storm with any other active client on the same account.
         }
 
         // Discover HTTP File Upload service (XEP-0363)
