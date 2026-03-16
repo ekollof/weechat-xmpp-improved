@@ -17,9 +17,9 @@ Build-Depends: debhelper-compat (= 13),
                libssl-dev,
                weechat-dev
 Standards-Version: 4.6.0
-Homepage: https://git.hackerheaven.org/ekollof/weechat-xmpp-fixed
-Vcs-Git: https://git.hackerheaven.org/ekollof/weechat-xmpp-fixed.git
-Vcs-Browser: https://git.hackerheaven.org/ekollof/weechat-xmpp-fixed
+Homepage: https://git.hackerheaven.org/ekollof/weechat-xmpp-improved
+Vcs-Git: https://git.hackerheaven.org/ekollof/weechat-xmpp-improved.git
+Vcs-Browser: https://git.hackerheaven.org/ekollof/weechat-xmpp-improved
 
 Package: weechat-xmpp
 Architecture: any

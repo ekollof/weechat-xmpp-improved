@@ -64,8 +64,8 @@ build_rpm() {
     # Create source tarball
     cd "$PROJECT_DIR/.."
     tar czf "$HOME/rpmbuild/SOURCES/weechat-xmpp-$VERSION.tar.gz" \
-        --transform "s|^weechat-xmpp-fixed|weechat-xmpp-$VERSION|" \
-        weechat-xmpp-fixed/
+        --transform "s|^weechat-xmpp-improved|weechat-xmpp-$VERSION|" \
+        weechat-xmpp-improved/
     
     # Copy spec file
     cp "$PROJECT_DIR/packaging/rpm/weechat-xmpp.spec" "$HOME/rpmbuild/SPECS/"

@@ -4,7 +4,7 @@ Release:        1%{?dist}
 Summary:        WeeChat plugin for XMPP/Jabber protocol
 
 License:        MPL-2.0
-URL:            https://git.hackerheaven.org/ekollof/weechat-xmpp-fixed
+URL:            https://git.hackerheaven.org/ekollof/weechat-xmpp-improved
 Source0:        %{name}-%{version}.tar.gz
 
 BuildRequires:  gcc-c++ >= 12
@@ -58,7 +58,7 @@ install -D -m 0755 xmpp.so %{buildroot}%{_libdir}/weechat/plugins/xmpp.so
 
 %files
 %license LICENSE
-%doc README.org
+%doc README.md
 %{_libdir}/weechat/plugins/xmpp.so
 
 %changelog

@@ -48,10 +48,10 @@ rpmdev-setuptree
 
 # Create source tarball
 cd ..
-tar czf ~/rpmbuild/SOURCES/weechat-xmpp-0.2.0.tar.gz weechat-xmpp-fixed/
+tar czf ~/rpmbuild/SOURCES/weechat-xmpp-0.2.0.tar.gz weechat-xmpp-improved/
 
 # Copy spec file
-cp weechat-xmpp-fixed/packaging/rpm/weechat-xmpp.spec ~/rpmbuild/SPECS/
+cp weechat-xmpp-improved/packaging/rpm/weechat-xmpp.spec ~/rpmbuild/SPECS/
 
 # Build package
 cd ~/rpmbuild/SPECS
@@ -210,4 +210,4 @@ See: https://docs.fedoraproject.org/en-US/package-maintainers/
 
 For packaging issues, contact:
 - Maintainer: Emiel Kollof <emiel@kollof.nl>
-- Repository: https://git.hackerheaven.org/ekollof/weechat-xmpp-fixed
+- Repository: https://git.hackerheaven.org/ekollof/weechat-xmpp-improved

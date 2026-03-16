@@ -1,7 +1,7 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: weechat-xmpp
 Upstream-Contact: Emiel Kollof <emiel@kollof.nl>
-Source: https://git.hackerheaven.org/ekollof/weechat-xmpp-fixed
+Source: https://git.hackerheaven.org/ekollof/weechat-xmpp-improved
 
 Files: *
 Copyright: 2021-2026 Tony Olagbaiye <frony0@gmail.com>
