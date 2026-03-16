@@ -101,6 +101,29 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
             account.sm_handlers_registered = true;
         }
 
+        // XEP-0198 §3.1: <enable>/<resume> MUST be sent immediately after
+        // stream feature negotiation, before any application stanzas, so that
+        // SM covers the entire session from the start.
+        if (account.sm_available)
+        {
+            if (!account.sm_id.empty() && account.sm_h_inbound > 0)
+            {
+                weechat_printf(account.buffer, "%sAttempting to resume SM session (id=%s, h=%u)...",
+                              weechat_prefix("network"),
+                              account.sm_id.data(),
+                              account.sm_h_inbound);
+                this->send(stanza::xep0198::resume(account.sm_h_inbound, account.sm_id)
+                           .build(account.context)
+                           .get());
+            }
+            else
+            {
+                this->send(stanza::xep0198::enable(true, 300)
+                           .build(account.context)
+                           .get());
+            }
+        }
+
         /* Send initial <presence/> so that we appear online to contacts */
         /* children layout: [0]=<c/> [1]=<status/> [2]=<x vcard-temp:x:update/> [3]=<x pgp/> [4]=NULL */
         auto children = std::unique_ptr<xmpp_stanza_t*[]>(new xmpp_stanza_t*[4 + 1]);
@@ -448,31 +471,6 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         // Set up idle timer (check every 60 seconds)
         account.idle_timer_hook = (struct t_hook *)weechat_hook_timer(60 * 1000, 0, 0,
                                  &account::idle_timer_cb, &account, nullptr);
-
-        // Enable/Resume Stream Management (XEP-0198) if available
-        // Note: libstrophe's built-in SM is disabled via XMPP_CONN_FLAG_DISABLE_SM
-        // Only try once per manual connect - don't retry on auto-reconnect if failed
-        if (account.sm_available)
-        {
-            // Try to resume if we have a saved session
-            if (!account.sm_id.empty() && account.sm_h_inbound > 0)
-            {
-                weechat_printf(account.buffer, "%sAttempting to resume SM session (id=%s, h=%u)...",
-                              weechat_prefix("network"),
-                              account.sm_id.data(),
-                              account.sm_h_inbound);
-                this->send(stanza::xep0198::resume(account.sm_h_inbound, account.sm_id)
-                           .build(account.context)
-                           .get());
-            }
-            else
-            {
-                // No saved session, request new one
-                this->send(stanza::xep0198::enable(true, 300)
-                           .build(account.context)
-                           .get());
-            }
-        }
 
         (void) weechat_hook_signal_send("xmpp_account_connected",
                                         WEECHAT_HOOK_SIGNAL_STRING, account.name.data());
