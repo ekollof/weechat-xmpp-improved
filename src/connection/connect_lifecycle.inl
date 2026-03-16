@@ -542,7 +542,21 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
             account.sm_h_outbound = 0;
             account.sm_last_ack = 0;
         }
-        
+
+        // On <conflict>, the server kicked us because another session connected
+        // with the same full JID (user@domain/resource). Clear the stored resource
+        // so that the next connect() call generates a fresh random one, avoiding
+        // an infinite kick-reconnect-kick storm between two instances on the same
+        // account. We still reconnect so the user's session is restored.
+        if (stream_error && stream_error->type == XMPP_SE_CONFLICT)
+        {
+            weechat_printf(account.buffer,
+                           "%s<conflict>: resource collision — will reconnect with "
+                           "a new resource",
+                           weechat_prefix("network"));
+            account.resource("");
+        }
+
         account.disconnect(1);
       //xmpp_stop(account.context); //keep context?
     }
