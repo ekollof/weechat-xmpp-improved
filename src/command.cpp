@@ -1236,10 +1236,9 @@ int command__enter(const void *pointer, void *data,
                 ptr_channel->send_message(jid, text);
             }
 
-            char buf[16];
             int num = weechat_buffer_get_integer(ptr_channel->buffer, "number");
-            snprintf(buf, sizeof(buf), "/buffer %d", num);
-            weechat_command(ptr_account->buffer, buf);
+            auto buf = fmt::format("/buffer {}", num);
+            weechat_command(ptr_account->buffer, buf.c_str());
         }
         weechat_string_free_split(jids);
     }
@@ -1368,10 +1367,9 @@ int command__open(const void *pointer, void *data,
                 channel->second.send_message(jid, text);
             }
 
-            char buf[16];
             int num = weechat_buffer_get_integer(channel->second.buffer, "number");
-            snprintf(buf, sizeof(buf), "/buffer %d", num);
-            weechat_command(ptr_account->buffer, buf);
+            auto buf = fmt::format("/buffer {}", num);
+            weechat_command(ptr_account->buffer, buf.c_str());
         }
         weechat_string_free_split(jids);
     }
@@ -2762,13 +2760,13 @@ int command__reply(const void *pointer, void *data,
             int tags_count = weechat_hdata_integer(weechat_hdata_get("line_data"),
                                                    line_data, "tags_count");
             bool from_self = false;
-            char str_tag[24] = {0};
+            std::string str_tag;
             
             for (int n_tag = 0; n_tag < tags_count; n_tag++)
             {
-                snprintf(str_tag, sizeof(str_tag), "%d|tags_array", n_tag);
+                str_tag = fmt::format("{}|tags_array", n_tag);
                 const char *tag = weechat_hdata_string(weechat_hdata_get("line_data"),
-                                                       line_data, str_tag);
+                                                       line_data, str_tag.c_str());
                 
                 // Check if message is from self
                 if (strlen(tag) > strlen("nick_") &&
@@ -2791,9 +2789,9 @@ int command__reply(const void *pointer, void *data,
                 std::string sid_by_str;
                 for (int n_tag = 0; n_tag < tags_count; n_tag++)
                 {
-                    snprintf(str_tag, sizeof(str_tag), "%d|tags_array", n_tag);
+                    str_tag = fmt::format("{}|tags_array", n_tag);
                     const char *tag = weechat_hdata_string(weechat_hdata_get("line_data"),
-                                                           line_data, str_tag);
+                                                           line_data, str_tag.c_str());
                     if (!tag) continue;
                     if (strncmp(tag, "id_", 3) == 0 && msg_id_str.empty())
                         msg_id_str = tag + 3;
@@ -2975,12 +2973,12 @@ int command__moderate(const void *pointer, void *data,
             // Extract message ID from tags
             int tags_count = weechat_hdata_integer(weechat_hdata_get("line_data"),
                                                    line_data, "tags_count");
-            char str_tag[24] = {0};
+            std::string str_tag;
             for (int n_tag = 0; n_tag < tags_count; n_tag++)
             {
-                snprintf(str_tag, sizeof(str_tag), "%d|tags_array", n_tag);
+                str_tag = fmt::format("{}|tags_array", n_tag);
                 const char *tag = weechat_hdata_string(weechat_hdata_get("line_data"),
-                                                       line_data, str_tag);
+                                                       line_data, str_tag.c_str());
                 
                 // Skip retracted messages
                 if (weechat_strcasecmp(tag, "xmpp_retracted") == 0)
@@ -4624,9 +4622,8 @@ int command__upload(const void *pointer, void *data,
     // In XEP-0363 v0.3.0+, filename and size are attributes, not child elements
     xmpp_stanza_set_attribute(request, "filename", sanitized_basename.c_str());
     
-    char size_str[32];
-    snprintf(size_str, sizeof(size_str), "%zu", file_size);
-    xmpp_stanza_set_attribute(request, "size", size_str);
+    auto size_str = fmt::format("{}", file_size);
+    xmpp_stanza_set_attribute(request, "size", size_str.c_str());
     
     // Add content-type attribute if applicable
     if (!content_type.empty())

@@ -345,9 +345,9 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
             
             // Start time field
             {
-                char time_buf[256];
-                strftime(time_buf, sizeof(time_buf), "%Y-%m-%dT%H:%M:%SZ", gmtime(&start));
-                xmpp_stanza_t *f = stanza_make_field(account.context, "start", time_buf);
+                std::ostringstream time_ss;
+                time_ss << std::put_time(gmtime(&start), "%Y-%m-%dT%H:%M:%SZ");
+                xmpp_stanza_t *f = stanza_make_field(account.context, "start", time_ss.str().c_str());
                 xmpp_stanza_add_child(x, f);
                 xmpp_stanza_release(f);
             }
@@ -541,8 +541,7 @@ int weechat::connection::connect(std::string jid, std::string password, weechat:
     if (!(resource && strlen(resource)))
     {
         const std::string rand = rand_string(8);
-        char ident[64] = {0};
-        snprintf(ident, sizeof(ident), "weechat.%s", rand.c_str());
+        auto ident = fmt::format("weechat.{}", rand);
 
         account.resource(ident);
         resource = account.resource().data();

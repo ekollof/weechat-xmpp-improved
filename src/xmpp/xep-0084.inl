@@ -84,19 +84,18 @@ namespace weechat::xep0084
         xmpp_stanza_set_attribute(info, "id", hash_id);
         xmpp_stanza_set_attribute(info, "type", mime_type);
 
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%zu", bytes);
-        xmpp_stanza_set_attribute(info, "bytes", buf);
+        auto bytes_str = fmt::format("{}", bytes);
+        xmpp_stanza_set_attribute(info, "bytes", bytes_str.c_str());
 
         if (width > 0)
         {
-            snprintf(buf, sizeof(buf), "%u", width);
-            xmpp_stanza_set_attribute(info, "width", buf);
+            auto width_str = fmt::format("{}", width);
+            xmpp_stanza_set_attribute(info, "width", width_str.c_str());
         }
         if (height > 0)
         {
-            snprintf(buf, sizeof(buf), "%u", height);
-            xmpp_stanza_set_attribute(info, "height", buf);
+            auto height_str = fmt::format("{}", height);
+            xmpp_stanza_set_attribute(info, "height", height_str.c_str());
         }
 
         xmpp_stanza_add_child(metadata, info);

@@ -938,7 +938,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                                          weechat_color("reset"),
                                          cmd_node ? cmd_node : "",
                                          cmd_jid && cmd_jid != adhoc_info.target_jid
-                                             ? (std::string(" [") + cmd_jid + "]").c_str() : "");
+                                             ? fmt::format(" [{}]", cmd_jid).c_str() : "");
                 count++;
                 cmd_item = xmpp_stanza_get_next(cmd_item);
             }

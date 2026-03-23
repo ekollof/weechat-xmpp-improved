@@ -15,8 +15,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
     struct free_guard { char *ptr; ~free_guard() { if (ptr) ::free(ptr); } };
     free_guard cleartext_g { nullptr };
     char *&cleartext = cleartext_g.ptr;
-    free_guard difftext_g { nullptr };
-    char *&difftext = difftext_g.ptr;
+    std::string difftext;
     struct tm time = {0};
     time_t date = 0;
 
@@ -732,12 +731,11 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                             if (line_data)
                             {
                                 int tags_count = weechat_hdata_integer(hdata_line_data, line_data, "tags_count");
-                                char str_tag[24] = {0};
                                 bool found = false;
                                 for (int n = 0; n < tags_count && !found; n++)
                                 {
-                                    snprintf(str_tag, sizeof(str_tag), "%d|tags_array", n);
-                                    const char *tag = weechat_hdata_string(hdata_line_data, line_data, str_tag);
+                                    auto str_tag = fmt::format("{}|tags_array", n);
+                                    const char *tag = weechat_hdata_string(hdata_line_data, line_data, str_tag.c_str());
                                     if (tag && weechat_strcasecmp(tag, target_tag.c_str()) == 0)
                                         found = true;
                                 }
@@ -806,12 +804,11 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                             if (line_data)
                             {
                                 int tags_count = weechat_hdata_integer(hdata_line_data, line_data, "tags_count");
-                                char str_tag[24] = {0};
                                 bool found = false;
                                 for (int n = 0; n < tags_count && !found; n++)
                                 {
-                                    snprintf(str_tag, sizeof(str_tag), "%d|tags_array", n);
-                                    const char *tag = weechat_hdata_string(hdata_line_data, line_data, str_tag);
+                                    auto str_tag = fmt::format("{}|tags_array", n);
+                                    const char *tag = weechat_hdata_string(hdata_line_data, line_data, str_tag.c_str());
                                     if (tag && weechat_strcasecmp(tag, target_tag.c_str()) == 0)
                                         found = true;
                                 }
@@ -1217,12 +1214,12 @@ message_handler_after_omemo:
                 {
                     int tags_count = weechat_hdata_integer(weechat_hdata_get("line_data"),
                                                            line_data, "tags_count");
-                    char str_tag[24] = {0};
+                    std::string str_tag;
                     for (int n_tag = 0; n_tag < tags_count; n_tag++)
                     {
-                        snprintf(str_tag, sizeof(str_tag), "%d|tags_array", n_tag);
+                        str_tag = fmt::format("{}|tags_array", n_tag);
                         const char *tag = weechat_hdata_string(weechat_hdata_get("line_data"),
-                                                               line_data, str_tag);
+                                                               line_data, str_tag.c_str());
                         if (strlen(tag) > strlen("id_") &&
                             weechat_strcasecmp(tag+strlen("id_"), replace_id) == 0)
                         {
@@ -1240,9 +1237,9 @@ message_handler_after_omemo:
                             bool sender_matches = false;
                             for (int chk = 0; chk < tags_count; chk++)
                             {
-                                snprintf(str_tag, sizeof(str_tag), "%d|tags_array", chk);
+                                str_tag = fmt::format("{}|tags_array", chk);
                                 const char *chk_tag = weechat_hdata_string(
-                                    weechat_hdata_get("line_data"), line_data, str_tag);
+                                    weechat_hdata_get("line_data"), line_data, str_tag.c_str());
                                 if (strlen(chk_tag) > strlen("nick_") &&
                                     weechat_strcasecmp(chk_tag + strlen("nick_"), corr_nick) == 0)
                                 {
@@ -1281,9 +1278,9 @@ message_handler_after_omemo:
                                                                        line_data, "tags_count");
                                     for (n_tag = 0; n_tag < tags_count; n_tag++)
                                     {
-                                        snprintf(str_tag, sizeof(str_tag), "%d|tags_array", n_tag);
+                                        str_tag = fmt::format("{}|tags_array", n_tag);
                                         tag = weechat_hdata_string(weechat_hdata_get("line_data"),
-                                                                   line_data, str_tag);
+                                                                   line_data, str_tag.c_str());
                                         if (strlen(tag) > strlen("id_") &&
                                             weechat_strcasecmp(tag+strlen("id_"), replace_id) == 0)
                                         {
@@ -1364,7 +1361,7 @@ message_handler_after_omemo:
                     weechat_string_dyn_concat(visual, weechat_color("green"), -1);
                     weechat_string_dyn_concat(visual, text, -1);
                 }
-                difftext = strdup(*visual);
+                difftext = *visual;
                 weechat_string_dyn_free(visual, 1);
             }
         }
@@ -1412,35 +1409,31 @@ message_handler_after_omemo:
                     {
                         int tags_count = weechat_hdata_integer(weechat_hdata_get("line_data"),
                                                                line_data, "tags_count");
-                        char str_tag[24] = {0};
+                        std::string str_tag;
                         for (int n_tag = 0; n_tag < tags_count; n_tag++)
                         {
-                            snprintf(str_tag, sizeof(str_tag), "%d|tags_array", n_tag);
+                            str_tag = fmt::format("{}|tags_array", n_tag);
                             const char *tag = weechat_hdata_string(weechat_hdata_get("line_data"),
-                                                                   line_data, str_tag);
+                                                                   line_data, str_tag.c_str());
                             if (strlen(tag) > strlen("id_") &&
                                 weechat_strcasecmp(tag+strlen("id_"), moderate_id) == 0)
                             {
                                 // Found the message to moderate - update it with tombstone
-                                char tombstone[512];
-                                if (moderate_reason)
-                                    snprintf(tombstone, sizeof(tombstone), 
-                                            "%s[Message moderated: %s]%s", 
-                                            weechat_color("darkgray"),
-                                            moderate_reason,
-                                            weechat_color("resetcolor"));
-                                else
-                                    snprintf(tombstone, sizeof(tombstone), 
-                                            "%s[Message moderated by room moderator]%s", 
-                                            weechat_color("darkgray"),
-                                            weechat_color("resetcolor"));
+                                std::string tombstone = moderate_reason
+                                    ? fmt::format("{}[Message moderated: {}]{}",
+                                                  weechat_color("darkgray"),
+                                                  moderate_reason,
+                                                  weechat_color("resetcolor"))
+                                    : fmt::format("{}[Message moderated by room moderator]{}",
+                                                  weechat_color("darkgray"),
+                                                  weechat_color("resetcolor"));
                                 
                                 // Update the line with tombstone
                                 struct t_hashtable *hashtable = weechat_hashtable_new(8,
                                     WEECHAT_HASHTABLE_STRING,
                                     WEECHAT_HASHTABLE_STRING,
                                     NULL, NULL);
-                                weechat_hashtable_set(hashtable, "message", tombstone);
+                                weechat_hashtable_set(hashtable, "message", tombstone.c_str());
                                 weechat_hashtable_set(hashtable, "tags", "xmpp_retracted,xmpp_moderated,notify_none");
                                 weechat_hdata_update(weechat_hdata_get("line_data"), line_data, hashtable);
                                 weechat_hashtable_free(hashtable);
@@ -1513,29 +1506,27 @@ message_handler_after_omemo:
                 {
                     int tags_count = weechat_hdata_integer(weechat_hdata_get("line_data"),
                                                            line_data, "tags_count");
-                    char str_tag[24] = {0};
+                    std::string str_tag;
                     for (int n_tag = 0; n_tag < tags_count; n_tag++)
                     {
-                        snprintf(str_tag, sizeof(str_tag), "%d|tags_array", n_tag);
+                        str_tag = fmt::format("{}|tags_array", n_tag);
                         const char *tag = weechat_hdata_string(weechat_hdata_get("line_data"),
-                                                               line_data, str_tag);
+                                                               line_data, str_tag.c_str());
                         if (strlen(tag) > strlen("id_") &&
                             weechat_strcasecmp(tag+strlen("id_"), retract_id) == 0)
                         {
                             // Found the message to retract - update it with tombstone
                             // Create tombstone text
-                            char tombstone[256];
-                            snprintf(tombstone, sizeof(tombstone), 
-                                    "%s[Message deleted]%s", 
-                                    weechat_color("darkgray"),
-                                    weechat_color("resetcolor"));
+                            auto tombstone = fmt::format("{}[Message deleted]{}",
+                                                         weechat_color("darkgray"),
+                                                         weechat_color("resetcolor"));
                             
                             // Update the line with tombstone
                             struct t_hashtable *hashtable = weechat_hashtable_new(8,
                                 WEECHAT_HASHTABLE_STRING,
                                 WEECHAT_HASHTABLE_STRING,
                                 NULL, NULL);
-                            weechat_hashtable_set(hashtable, "message", tombstone);
+                            weechat_hashtable_set(hashtable, "message", tombstone.c_str());
                             weechat_hashtable_set(hashtable, "tags", "xmpp_retracted,notify_none");
                             weechat_hdata_update(weechat_hdata_get("line_data"), line_data, hashtable);
                             weechat_hashtable_free(hashtable);
@@ -1612,12 +1603,12 @@ message_handler_after_omemo:
                     {
                         int tags_count = weechat_hdata_integer(weechat_hdata_get("line_data"),
                                                                line_data, "tags_count");
-                        char str_tag[24] = {0};
+                        std::string str_tag;
                         for (int n_tag = 0; n_tag < tags_count; n_tag++)
                         {
-                            snprintf(str_tag, sizeof(str_tag), "%d|tags_array", n_tag);
+                            str_tag = fmt::format("{}|tags_array", n_tag);
                             const char *tag = weechat_hdata_string(weechat_hdata_get("line_data"),
-                                                                   line_data, str_tag);
+                                                                   line_data, str_tag.c_str());
                             if (strlen(tag) > strlen("id_") &&
                                 weechat_strcasecmp(tag+strlen("id_"), reactions_id) == 0)
                             {
@@ -1908,12 +1899,12 @@ message_handler_after_omemo:
                 {
                     int tags_count = weechat_hdata_integer(weechat_hdata_get("line_data"),
                                                            line_data, "tags_count");
-                    char str_tag[24] = {0};
+                    std::string str_tag;
                     for (int n_tag = 0; n_tag < tags_count; n_tag++)
                     {
-                        snprintf(str_tag, sizeof(str_tag), "%d|tags_array", n_tag);
+                        str_tag = fmt::format("{}|tags_array", n_tag);
                         const char *tag = weechat_hdata_string(weechat_hdata_get("line_data"),
-                                                               line_data, str_tag);
+                                                               line_data, str_tag.c_str());
                         if (strlen(tag) > strlen("id_") &&
                             weechat_strcasecmp(tag+strlen("id_"), reply_to_id) == 0)
                         {
@@ -1931,17 +1922,9 @@ message_handler_after_omemo:
                                     msg_text = orig_message;
                                 
                                 // Create prefix showing what message this is replying to (max 40 chars)
-                                char excerpt[45];
-                                if (strlen(msg_text) > 40)
-                                {
-                                    strncpy(excerpt, msg_text, 40);
-                                    excerpt[40] = '\0';
-                                    strcat(excerpt, "...");
-                                }
-                                else
-                                {
-                                    strcpy(excerpt, msg_text);
-                                }
+                                std::string excerpt = (strlen(msg_text) > 40)
+                                    ? std::string(msg_text, 40) + "..."
+                                    : std::string(msg_text);
                                 
                                 reply_prefix = std::string(weechat_color("cyan")) + 
                                              "↪ " + excerpt + " " +
@@ -1982,20 +1965,20 @@ message_handler_after_omemo:
                 char *desc_text = desc_elem ? xmpp_stanza_get_text(desc_elem) : NULL;
                 
                 // Format: [URL: url] or [URL: description (url)]
-                oob_suffix = std::string(" ") + 
-                            weechat_color("blue") + "[URL: ";
                 if (desc_text && strlen(desc_text) > 0)
                 {
-                    oob_suffix += desc_text;
-                    oob_suffix += " (";
-                    oob_suffix += url_text;
-                    oob_suffix += ")";
+                    oob_suffix = fmt::format(" {}[URL: {} ({})]{}",
+                                            weechat_color("blue"),
+                                            desc_text, url_text,
+                                            weechat_color("resetcolor"));
                 }
                 else
                 {
-                    oob_suffix += url_text;
+                    oob_suffix = fmt::format(" {}[URL: {}]{}",
+                                            weechat_color("blue"),
+                                            url_text,
+                                            weechat_color("resetcolor"));
                 }
-                oob_suffix += "]" + std::string(weechat_color("resetcolor"));
                 
                 xmpp_free(account.context, url_text);
                 if (desc_text) xmpp_free(account.context, desc_text);
@@ -2197,14 +2180,14 @@ message_handler_after_omemo:
     std::string styled_text;
     bool has_unstyled = xmpp_stanza_get_child_by_name_and_ns(
         stanza, "unstyled", "urn:xmpp:styling:0") != nullptr;
-    if (text && !difftext && !has_unstyled)  // Don't style diffs (already styled)
+    if (text && difftext.empty() && !has_unstyled)  // Don't style diffs (already styled)
     {
         styled_text = apply_xep393_styling(text);
         display_text = styled_text.c_str();
     }
-    else if (difftext)
+    else if (!difftext.empty())
     {
-        display_text = difftext;
+        display_text = difftext.c_str();
     }
     
     // Prepend reply context if this is a reply
@@ -2269,7 +2252,7 @@ message_handler_after_omemo:
         weechat_printf_date_tags(channel->buffer, date, *dyn_tags, "%s%s\t%s %s%s",
                                  edit, weechat_prefix("action"), display_prefix.data(),
                                  encrypted_glyph,
-                                 difftext ? difftext+4 : display_text ? display_text+4 : "");
+                                 !difftext.empty() ? difftext.c_str()+4 : display_text ? display_text+4 : "");
     else
         weechat_printf_date_tags(channel->buffer, date, *dyn_tags, "%s%s\t%s%s",
                                  edit, display_prefix.data(),
