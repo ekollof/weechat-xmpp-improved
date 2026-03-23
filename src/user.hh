@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <optional>
 #include <vector>
 
@@ -55,28 +56,29 @@ namespace weechat
         struct profile profile;
 
     public:
-        user(weechat::account *account, weechat::channel *channel, const char *id, const char *display_name);
+        user(weechat::account *account, weechat::channel *channel,
+             std::string_view id, std::string_view display_name);
 
-        static std::string get_colour(const char *name);
-        static std::string get_colour_for_nicklist(const char *name);
+        static std::string get_colour(std::string_view name);
+        static std::string get_colour_for_nicklist(std::string_view name);
         std::string get_colour();
         std::string get_colour_for_nicklist();
-        static std::string as_prefix_raw(const char *name);
-        static std::string as_prefix(const char *name);
+        static std::string as_prefix_raw(std::string_view name);
+        static std::string as_prefix(std::string_view name);
         std::string as_prefix_raw();
         std::string as_prefix();
 
-        static std::string as_prefix_raw(weechat::account *account, const char *id) {
+        static std::string as_prefix_raw(weechat::account *account, std::string_view id) {
             auto found = search(account, id);
             return found ? found->as_prefix_raw() : "";
         }
-        static std::string as_prefix(weechat::account *account, const char *id) {
+        static std::string as_prefix(weechat::account *account, std::string_view id) {
             auto found = search(account, id);
             return found ? found->as_prefix() : "";
         }
 
-        static weechat::user *bot_search(weechat::account *account, const char *pgp_id);
-        static weechat::user *search(weechat::account *account, const char *id);
+        static weechat::user *bot_search(weechat::account *account, std::string_view pgp_id);
+        static weechat::user *search(weechat::account *account, std::string_view id);
 
         void nicklist_add(weechat::account *account, weechat::channel *channel);
         void nicklist_remove(weechat::account *account, weechat::channel *channel);

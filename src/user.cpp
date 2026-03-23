@@ -3,9 +3,10 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <stdint.h>
-#include <stdio.h>
+#include <string_view>
 #include <strophe.h>
 #include <weechat/weechat-plugin.h>
+#include <fmt/core.h>
 
 #include "plugin.hh"
 #include "account.hh"
@@ -16,107 +17,90 @@
 
 std::string weechat::user::get_colour()
 {
-    return weechat::user::get_colour(this->profile.display_name.c_str());
+    return weechat::user::get_colour(this->profile.display_name);
 }
 
-std::string weechat::user::get_colour(const char *name)
+std::string weechat::user::get_colour(std::string_view name)
 {
     // XEP-0392: Consistent Color Generation
-    std::string color_code = weechat::consistent_color(name);
+    std::string color_code = weechat::consistent_color(std::string(name).c_str());
     if (!color_code.empty())
         return weechat_color(color_code.c_str());
-    
+
     // Fallback to WeeChat's built-in color if generation fails
-    return weechat_info_get("nick_color", name);
+    return weechat_info_get("nick_color", std::string(name).c_str());
 }
 
 std::string weechat::user::get_colour_for_nicklist()
 {
-    return weechat::user::get_colour_for_nicklist(this->profile.display_name.c_str());
+    return weechat::user::get_colour_for_nicklist(this->profile.display_name);
 }
 
-std::string weechat::user::get_colour_for_nicklist(const char *name)
+std::string weechat::user::get_colour_for_nicklist(std::string_view name)
 {
     // XEP-0392: Consistent Color Generation (return color name for nicklist)
-    std::string color_code = weechat::consistent_color(name);
+    std::string color_code = weechat::consistent_color(std::string(name).c_str());
     if (!color_code.empty())
         return color_code;
-    
+
     // Fallback to WeeChat's built-in color if generation fails
-    return weechat_info_get("nick_color_name", name);
+    return weechat_info_get("nick_color_name", std::string(name).c_str());
 }
 
 std::string weechat::user::as_prefix_raw()
 {
-    std::string avatar_prefix = "";
-    
-    // Add avatar if available and rendered
+    std::string prefix;
     if (!this->profile.avatar_rendered.empty())
-    {
-        avatar_prefix = this->profile.avatar_rendered + " ";
-    }
-    
-    return avatar_prefix + weechat::user::as_prefix_raw(this->profile.display_name.c_str());
+        prefix = this->profile.avatar_rendered + " ";
+    return prefix + weechat::user::as_prefix_raw(this->profile.display_name);
 }
 
-std::string weechat::user::as_prefix_raw(const char *name)
+std::string weechat::user::as_prefix_raw(std::string_view name)
 {
-    static char result[2048];
-
-    snprintf(result, sizeof(result), "%s%s%s",
-             weechat_info_get("nick_color", name),
-             name, weechat_color("reset"));
-
-    return result;
+    return fmt::format("{}{}{}",
+                       weechat_info_get("nick_color", std::string(name).c_str()),
+                       name,
+                       weechat_color("reset"));
 }
 
 std::string weechat::user::as_prefix()
 {
-    std::string avatar_prefix = "";
-    
-    // Add avatar if available and rendered
+    std::string prefix;
     if (!this->profile.avatar_rendered.empty())
-    {
-        avatar_prefix = this->profile.avatar_rendered + " ";
-    }
-    
-    return avatar_prefix + weechat::user::as_prefix(this->profile.display_name.c_str());
+        prefix = this->profile.avatar_rendered + " ";
+    return prefix + weechat::user::as_prefix(this->profile.display_name);
 }
 
-std::string weechat::user::as_prefix(const char *name)
+std::string weechat::user::as_prefix(std::string_view name)
 {
-    static char result[2048];
-
-    snprintf(result, sizeof(result), "%s%s\t",
-             weechat::user::get_colour(name).data(), name);
-
-    return result;
+    return fmt::format("{}{}\t",
+                       weechat::user::get_colour(name),
+                       name);
 }
 
 weechat::user *weechat::user::bot_search(weechat::account *account,
-                                         const char *pgp_id)
+                                         std::string_view pgp_id)
 {
-    if (!account || !pgp_id)
+    if (!account || pgp_id.empty())
         return nullptr;
 
-    for (auto& ptr_user : account->users)
+    for (auto& [key, u] : account->users)
     {
-        if (ptr_user.second.profile.pgp_id.has_value() &&
-            ptr_user.second.profile.pgp_id.value() == pgp_id)
-            return &ptr_user.second;
+        if (u.profile.pgp_id.has_value() && u.profile.pgp_id.value() == pgp_id)
+            return &u;
     }
 
     return nullptr;
 }
 
 weechat::user *weechat::user::search(weechat::account *account,
-                                     const char *id)
+                                     std::string_view id)
 {
-    if (!account || !id)
+    if (!account || id.empty())
         return nullptr;
 
-    if (auto user = account->users.find(id); user != account->users.end())
-        return &user->second;
+    if (auto it = account->users.find(std::string(id)); it != account->users.end())
+        return &it->second;
 
     return nullptr;
 }
@@ -127,7 +111,7 @@ void weechat::user::nicklist_add(weechat::account *account,
     struct t_gui_nick_group *ptr_group;
     struct t_gui_buffer *ptr_buffer;
     const char *name = channel ? this->profile.display_name.c_str() : this->id.c_str();
-    
+
     // For roster contacts (account buffer), strip resource from JID
     std::string bare_buf, resource_buf;
     if (!channel)
@@ -203,32 +187,27 @@ void weechat::user::nicklist_remove(weechat::account *account,
 }
 
 weechat::user::user(weechat::account *account, weechat::channel *channel,
-                    const char *id, const char *display_name)
+                    std::string_view id, std::string_view display_name)
 {
-    if (!account || !id)
-    {
+    if (!account || id.empty())
         throw nullptr;
-    }
 
     if (account->users.empty() && channel)
         channel->add_nicklist_groups();
 
     weechat::user *ptr_user = user::search(account, id);
     if (ptr_user)
-    {
         throw nullptr;
-    }
 
     this->id = id;
-
-    this->profile.display_name = display_name ? display_name : "";
+    this->profile.display_name = display_name;
 
     // Try to load cached avatar if available
     weechat::avatar::load_for_user(*account, *this);
 
     // Add to nicklist:
     // - For MUC users: add to channel nicklist
-    // - For roster contacts: add to account buffer nicklist (will be shown when online)
+    // - For roster contacts: add to account buffer nicklist (shown when online)
     if (channel)
         nicklist_add(account, channel);
     // Note: Roster contacts added to nicklist when they come online in presence_handler

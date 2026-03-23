@@ -1669,21 +1669,28 @@ message_handler_after_omemo:
 
     nick = from;
     const char *display_from = from_bare;
+    std::string nick_str; // owns the nick string when extracted from a scoped guard
     if (weechat_strcasecmp(type, "groupchat") == 0)
     {
         xmpp_string_guard gc_bare_g { account.context, xmpp_jid_bare(account.context, from) };
         xmpp_string_guard gc_resource_g { account.context, xmpp_jid_resource(account.context, from) };
-        nick = channel->name == gc_bare_g.ptr
-            ? gc_resource_g.ptr
-            : from;
+        if (channel->name == gc_bare_g.ptr && gc_resource_g.ptr && *gc_resource_g.ptr)
+        {
+            nick_str = gc_resource_g.ptr; // copy into surviving std::string
+            nick = nick_str.c_str();
+        }
+        // else nick stays as `from` (the full JID)
         display_from = from;
     }
     else if (parent_channel && parent_channel->type == weechat::channel::chat_type::MUC)
     {
         xmpp_string_guard muc_resource_g { account.context, xmpp_jid_resource(account.context, from) };
-        nick = channel->name == from
-            ? muc_resource_g.ptr
-            : from;
+        if (channel->name == from && muc_resource_g.ptr && *muc_resource_g.ptr)
+        {
+            nick_str = muc_resource_g.ptr;
+            nick = nick_str.c_str();
+        }
+        // else nick stays as `from`
         display_from = from;
     }
     delay = xmpp_stanza_get_child_by_name_and_ns(stanza, "delay", "urn:xmpp:delay");
@@ -1693,6 +1700,41 @@ message_handler_after_omemo:
     {
         strptime(timestamp, "%FT%T", &time);
         date = timegm(&time);
+    }
+
+    // XEP-0313 dedup for MUC history: when the MUC server re-delivers old messages
+    // via <delay> on rejoin, suppress any message whose stanza-id is already tagged
+    // in the buffer.  This prevents duplicates on every reconnect.
+    if (delay && stanza_id && channel && channel->buffer)
+    {
+        std::string needle = std::string("stanza_id_") + stanza_id;
+        struct t_hdata *hdata_line      = weechat_hdata_get("line");
+        struct t_hdata *hdata_line_data = weechat_hdata_get("line_data");
+        struct t_gui_lines *own_lines   = (struct t_gui_lines*)
+            weechat_hdata_pointer(weechat_hdata_get("buffer"),
+                                  channel->buffer, "own_lines");
+        bool already_shown = false;
+        if (own_lines)
+        {
+            struct t_gui_line *ln = (struct t_gui_line*)
+                weechat_hdata_pointer(hdata_line, own_lines, "last_line");
+            while (ln && !already_shown)
+            {
+                struct t_gui_line_data *ld = (struct t_gui_line_data*)
+                    weechat_hdata_pointer(hdata_line, ln, "data");
+                if (ld)
+                {
+                    const char *tags = (const char*)
+                        weechat_hdata_string(hdata_line_data, ld, "tags");
+                    if (tags && strstr(tags, needle.c_str()))
+                        already_shown = true;
+                }
+                ln = (struct t_gui_line*)
+                    weechat_hdata_move(hdata_line, ln, -1);
+            }
+        }
+        if (already_shown)
+            return 1;
     }
 
     // XEP-0085: receiving a message implicitly clears the composing state
@@ -1842,7 +1884,7 @@ message_handler_after_omemo:
     }
     auto display_prefix = user::as_prefix_raw(&account, display_from);
     if (display_prefix.empty())
-        display_prefix = user::as_prefix_raw(from_bare);
+        display_prefix = user::as_prefix_raw(nick && *nick ? nick : from_bare);
     
     // XEP-0461: Message Replies - extract reply context
     xmpp_stanza_t *reply_elem = xmpp_stanza_get_child_by_name_and_ns(stanza, "reply", "urn:xmpp:reply:0");
