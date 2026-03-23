@@ -2206,167 +2206,9 @@ int command__trap(const void *pointer, void *data,
 
 
 
-int command__edit(const void *pointer, void *data,
-                  struct t_gui_buffer *buffer, int argc,
-                  char **argv, char **argv_eol)
-{
-    weechat::account *ptr_account = NULL;
-    weechat::channel *ptr_channel = NULL;
-    const char *text;
-
-    (void) pointer;
-    (void) data;
-    (void) argv;
-
-    buffer__get_account_and_channel(buffer, &ptr_account, &ptr_channel);
-
-    if (!ptr_account)
-        return WEECHAT_RC_ERROR;
-
-    if (!ptr_channel)
-    {
-        weechat_printf(buffer, "%sxmpp: you must be in a channel to edit messages",
-                      weechat_prefix("error"));
-        return WEECHAT_RC_OK;
-    }
-
-    if (!ptr_account->connected())
-    {
-        weechat_printf(buffer, "%sxmpp: you are not connected to server",
-                      weechat_prefix("error"));
-        return WEECHAT_RC_OK;
-    }
-
-    if (argc < 2)
-    {
-        weechat_printf(buffer, "%sxmpp: missing message text",
-                      weechat_prefix("error"));
-        return WEECHAT_RC_OK;
-    }
-
-    text = argv_eol[1];
-
-    // Find the last message sent by us
-    struct t_hdata *hdata_line = weechat_hdata_get("line");
-    struct t_hdata *hdata_line_data = weechat_hdata_get("line_data");
-    struct t_gui_lines *own_lines = (struct t_gui_lines*)weechat_hdata_pointer(
-        weechat_hdata_get("buffer"), buffer, "own_lines");
-    
-    if (!own_lines)
-    {
-        weechat_printf(buffer, "%sxmpp: cannot access buffer lines",
-                      weechat_prefix("error"));
-        return WEECHAT_RC_OK;
-    }
-
-    struct t_gui_line *line = (struct t_gui_line*)weechat_hdata_pointer(
-        hdata_line, own_lines, "last_line");
-    
-    std::string last_msg_id;
-    
-    // Search backwards for our last sent message
-    while (line && last_msg_id.empty())
-    {
-        struct t_gui_line_data *line_data = (struct t_gui_line_data*)weechat_hdata_pointer(
-            hdata_line, line, "data");
-        
-        if (line_data)
-        {
-            const char *tags = (const char*)weechat_hdata_string(hdata_line_data, line_data, "tags");
-            
-            // Check if this is our message (has self_msg tag and id_ tag)
-            if (tags && strstr(tags, "self_msg") && strstr(tags, "id_"))
-            {
-                // Extract message ID and (for MUC) stanza-id from tags
-                // XEP-0308: correction uses the *original* message id, not any
-                // intermediate correction id — the buffer line stores the
-                // original origin-id (or stanza-id for MUC).
-                std::string msg_id;
-                std::string sid;
-                std::string sid_by;
-                char **tag_array = weechat_string_split(tags, ",", NULL, 0, 0, NULL);
-                if (tag_array)
-                {
-                    for (int i = 0; tag_array[i]; i++)
-                    {
-                        if (strncmp(tag_array[i], "id_", 3) == 0 && msg_id.empty())
-                            msg_id = tag_array[i] + 3;
-                        else if (strncmp(tag_array[i], "stanza_id_by_", 13) == 0)
-                            sid_by = tag_array[i] + 13;
-                        else if (strncmp(tag_array[i], "stanza_id_", 10) == 0)
-                            sid = tag_array[i] + 10;
-                    }
-                    weechat_string_free_split(tag_array);
-                }
-                // For MUC use stanza-id (the stable server-assigned ID the room
-                // expects for corrections); for PM use the client-generated id.
-                if (ptr_channel->type == weechat::channel::chat_type::MUC
-                        && !sid.empty()
-                        && weechat_strcasecmp(sid_by.c_str(), ptr_channel->id.c_str()) == 0)
-                    last_msg_id = sid;
-                else
-                    last_msg_id = msg_id;
-                break;
-            }
-        }
-        
-        line = (struct t_gui_line*)weechat_hdata_move(hdata_line, line, -1);
-    }
-    
-    if (last_msg_id.empty())
-    {
-        weechat_printf(buffer, "%sxmpp: no message found to edit",
-                      weechat_prefix("error"));
-        return WEECHAT_RC_OK;
-    }
-
-    // Send message correction
-    xmpp_stanza_t *message = xmpp_message_new(ptr_account->context,
-                    ptr_channel->type == weechat::channel::chat_type::MUC
-                    ? "groupchat" : "chat",
-                    ptr_channel->id.data(), NULL);
-
-    xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
-    const char *id = id_g.ptr;
-    xmpp_stanza_set_id(message, id);
-    // freed by id_g
-    xmpp_message_set_body(message, text);
-
-    // Add replace element with original message ID
-    xmpp_stanza_t *replace = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(replace, "replace");
-    xmpp_stanza_set_ns(replace, "urn:xmpp:message-correct:0");
-    xmpp_stanza_set_id(replace, last_msg_id.c_str());
-    xmpp_stanza_add_child(message, replace);
-    xmpp_stanza_release(replace);
-
-    xmpp_stanza_t *message__store = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(message__store, "store");
-    xmpp_stanza_set_ns(message__store, "urn:xmpp:hints");
-    xmpp_stanza_add_child(message, message__store);
-    xmpp_stanza_release(message__store);
-
-    // XEP-0359: origin-id so the sender can correlate the edit in MAM
-    xmpp_stanza_t *edit_origin_id = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(edit_origin_id, "origin-id");
-    xmpp_stanza_set_ns(edit_origin_id, "urn:xmpp:sid:0");
-    xmpp_stanza_set_attribute(edit_origin_id, "id", id);
-    xmpp_stanza_add_child(message, edit_origin_id);
-    xmpp_stanza_release(edit_origin_id);
-
-    ptr_account->connection.send( message);
-    xmpp_stanza_release(message);
-    // last_msg_id freed by std::string destructor
-
-    weechat_printf(buffer, "%sxmpp: message edit sent",
-                  weechat_prefix("network"));
-
-    return WEECHAT_RC_OK;
-}
-
 // ---------------------------------------------------------------------------
 // msg_entry — one buffer line's worth of message metadata, used by the
-// Tier 3 message-history pickers (/retract, /reply, /moderate).
+// Tier 3 message-history pickers (/retract, /reply, /moderate, /edit).
 // ---------------------------------------------------------------------------
 struct msg_entry {
     std::string id;           // origin-id / message id
@@ -2379,7 +2221,8 @@ struct msg_entry {
 };
 
 // Walk up to `max` buffer lines backwards, newest first.
-// Returns entries with a non-empty id only.
+// Returns entries that have a non-empty id OR a non-empty stanza_id, so that
+// MAM-replayed MUC messages (which may only carry stanza_id_) are included.
 static std::vector<msg_entry>
 collect_buffer_messages(struct t_gui_buffer *buffer, int max)
 {
@@ -2423,8 +2266,13 @@ collect_buffer_messages(struct t_gui_buffer *buffer, int max)
                     e.nick = tag + 5;
             }
 
-            if (!e.id.empty())
+            // Accept lines that have at least one usable ID (origin-id or stanza-id).
+            // MAM-replayed MUC messages may only have stanza_id_ with no id_ tag.
+            if (!e.id.empty() || !e.stanza_id.empty())
             {
+                // When id is absent, promote stanza_id as the fallback identity.
+                if (e.id.empty())
+                    e.id = e.stanza_id;
                 const char *msg = weechat_hdata_string(hd_line_data, line_data, "message");
                 if (msg) e.body = msg;
                 result.push_back(std::move(e));
@@ -2435,6 +2283,196 @@ collect_buffer_messages(struct t_gui_buffer *buffer, int max)
     }
 
     return result;
+}
+
+// /edit — open a picker of the last 20 own non-retracted messages.
+// On selection, pre-fill the input bar with "/edit-to <id> <original body>"
+// so the user can modify the text before pressing Enter.
+// The actual correction stanza is sent by command__edit_to (below).
+int command__edit(const void *pointer, void *data,
+                  struct t_gui_buffer *buffer, int argc,
+                  char **argv, char **argv_eol)
+{
+    weechat::account *ptr_account = NULL;
+    weechat::channel *ptr_channel = NULL;
+
+    (void) pointer;
+    (void) data;
+    (void) argc;
+    (void) argv;
+    (void) argv_eol;
+
+    buffer__get_account_and_channel(buffer, &ptr_account, &ptr_channel);
+
+    if (!ptr_account)
+        return WEECHAT_RC_ERROR;
+
+    if (!ptr_channel)
+    {
+        weechat_printf(buffer, "%sxmpp: you must be in a channel to edit messages",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    if (!ptr_account->connected())
+    {
+        weechat_printf(buffer, "%sxmpp: you are not connected to server",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    // Collect last own non-retracted messages for picker
+    auto messages = collect_buffer_messages(buffer, 500);
+    std::vector<msg_entry> own_messages;
+    for (auto &m : messages)
+    {
+        if (m.from_self && !m.retracted)
+            own_messages.push_back(m);
+        if (static_cast<int>(own_messages.size()) >= 20)
+            break;
+    }
+
+    if (own_messages.empty())
+    {
+        weechat_printf(buffer, "%sxmpp: no message found to edit",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    using picker_t = weechat::ui::picker<std::string>;
+    struct edit_entry { std::string id; std::string body; };
+    auto *entry_list = new std::vector<edit_entry>();
+    std::vector<picker_t::entry> entries;
+
+    for (auto &m : own_messages)
+    {
+        // Resolve ID: prefer MUC stanza-id when applicable (XEP-0308)
+        std::string resolved_id;
+        if (ptr_channel->type == weechat::channel::chat_type::MUC
+                && !m.stanza_id.empty()
+                && weechat_strcasecmp(m.stanza_id_by.c_str(),
+                                     ptr_channel->id.c_str()) == 0)
+            resolved_id = m.stanza_id;
+        else
+            resolved_id = m.id;
+
+        entry_list->push_back({resolved_id, m.body});
+        std::string label = m.body.empty() ? resolved_id : m.body;
+        entries.push_back({resolved_id, label, {}});
+    }
+
+    auto *p = new picker_t(
+        "xmpp.picker.edit",
+        "Edit message  (XEP-0308)",
+        std::move(entries),
+        [buf = buffer, el = entry_list](const std::string &selected) {
+            // Find the body for the selected ID so we can pre-fill it
+            std::string body;
+            for (auto &e : *el)
+                if (e.id == selected) { body = e.body; break; }
+
+            // Strip WeeChat colour codes from body before pre-filling
+            std::string clean_body;
+            if (!body.empty())
+            {
+                char *stripped = weechat_string_remove_color(body.c_str(), NULL);
+                if (stripped) { clean_body = stripped; free(stripped); }
+                else clean_body = body;
+            }
+
+            std::string input = fmt::format("/edit-to {} {}", selected, clean_body);
+            weechat_buffer_set(buf, "input", input.c_str());
+            weechat_buffer_set(buf, "input_pos",
+                               std::to_string(input.size()).c_str());
+            weechat_buffer_set(buf, "display", "1");
+        },
+        [el = entry_list]() { delete el; },
+        buffer);
+    (void) p;
+    return WEECHAT_RC_OK;
+}
+
+// /edit-to <id> <text> — send a XEP-0308 message correction for <id>.
+// This command is generated internally by the /edit picker which pre-fills the
+// input bar; users may also call it directly if they know the message ID.
+int command__edit_to(const void *pointer, void *data,
+                     struct t_gui_buffer *buffer, int argc,
+                     char **argv, char **argv_eol)
+{
+    weechat::account *ptr_account = NULL;
+    weechat::channel *ptr_channel = NULL;
+
+    (void) pointer;
+    (void) data;
+
+    buffer__get_account_and_channel(buffer, &ptr_account, &ptr_channel);
+
+    if (!ptr_account)
+        return WEECHAT_RC_ERROR;
+
+    if (!ptr_channel)
+    {
+        weechat_printf(buffer, "%sxmpp: you must be in a channel to edit messages",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    if (!ptr_account->connected())
+    {
+        weechat_printf(buffer, "%sxmpp: you are not connected to server",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    if (argc < 3)
+    {
+        weechat_printf(buffer, "%sxmpp: usage: /edit-to <message-id> <new text>",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    const char *target_id  = argv[1];
+    const char *new_text   = argv_eol[2];
+    const char *type       = (ptr_channel->type == weechat::channel::chat_type::MUC)
+                              ? "groupchat" : "chat";
+
+    xmpp_stanza_t *message = xmpp_message_new(ptr_account->context,
+                                              type,
+                                              ptr_channel->id.data(), NULL);
+
+    xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+    const char *new_id = id_g.ptr;
+    xmpp_stanza_set_id(message, new_id);
+    xmpp_message_set_body(message, new_text);
+
+    // XEP-0308 <replace> element
+    xmpp_stanza_t *replace = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(replace, "replace");
+    xmpp_stanza_set_ns(replace, "urn:xmpp:message-correct:0");
+    xmpp_stanza_set_id(replace, target_id);
+    xmpp_stanza_add_child(message, replace);
+    xmpp_stanza_release(replace);
+
+    // <store xmlns='urn:xmpp:hints'/>
+    xmpp_stanza_t *store = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(store, "store");
+    xmpp_stanza_set_ns(store, "urn:xmpp:hints");
+    xmpp_stanza_add_child(message, store);
+    xmpp_stanza_release(store);
+
+    // XEP-0359 origin-id so the sender can correlate the edit in MAM
+    xmpp_stanza_t *origin_id = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(origin_id, "origin-id");
+    xmpp_stanza_set_ns(origin_id, "urn:xmpp:sid:0");
+    xmpp_stanza_set_attribute(origin_id, "id", new_id);
+    xmpp_stanza_add_child(message, origin_id);
+    xmpp_stanza_release(origin_id);
+
+    ptr_account->connection.send(message);
+    xmpp_stanza_release(message);
+
+    weechat_printf(buffer, "%sxmpp: message edit sent", weechat_prefix("network"));
+    return WEECHAT_RC_OK;
 }
 
 // Send a XEP-0424 message retraction for `msg_id` on `account`/`channel`.
@@ -2586,7 +2624,7 @@ int command__retract(const void *pointer, void *data,
     }
 
     // Collect last 20 own messages for picker
-    auto messages = collect_buffer_messages(buffer, 200);
+    auto messages = collect_buffer_messages(buffer, 500);
     std::vector<msg_entry> own_messages;
     for (auto &m : messages)
     {
@@ -2830,7 +2868,7 @@ int command__reply(const void *pointer, void *data,
         // On selection, pre-fill the input bar with /reply <id> so the user
         // can type the reply body.  We encode the resolved ID into the command
         // so the argc>=2 path can do the actual send without another hdata walk.
-        auto messages = collect_buffer_messages(buffer, 200);
+        auto messages = collect_buffer_messages(buffer, 500);
 
         using picker_t = weechat::ui::picker<std::string>;
         std::vector<picker_t::entry> entries;
@@ -3198,7 +3236,7 @@ int command__moderate(const void *pointer, void *data,
     const char *reason = (argc > 1) ? argv_eol[1] : nullptr;
 
     // Open picker over last 20 messages (any sender, skip retracted)
-    auto messages = collect_buffer_messages(buffer, 200);
+    auto messages = collect_buffer_messages(buffer, 500);
 
     using picker_t = weechat::ui::picker<std::string>;
     std::vector<picker_t::entry> entries;
@@ -5895,12 +5933,29 @@ void command__init()
 
     hook = weechat_hook_command(
         "edit",
-        N_("edit the last message sent"),
-        N_("<message>"),
-        N_("message: new message text to replace the last one"),
+        N_("pick one of your recent messages to edit (XEP-0308)"),
+        N_(""),
+        N_("Opens an interactive picker of the last 20 messages you sent.\n"
+           "Select a message with arrows and press Enter.\n"
+           "The input bar is pre-filled with /edit-to <id> <original text>.\n"
+           "Edit the text and press Enter to send the correction.\n"
+           "Examples:\n"
+           "  /edit"),
         NULL, &command__edit, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /edit");
+
+    hook = weechat_hook_command(
+        "edit-to",
+        N_("send a message correction by ID (XEP-0308)"),
+        N_("<id> <message>"),
+        N_("id     : message id to correct (the original, not any prior correction)\n"
+           "message: new message text\n\n"
+           "This command is used internally by the /edit picker.\n"
+           "You can also use it directly if you know the message ID."),
+        NULL, &command__edit_to, NULL, NULL);
+    if (!hook)
+        weechat_printf(NULL, "Failed to setup command /edit-to");
 
     hook = weechat_hook_command(
         "retract",
