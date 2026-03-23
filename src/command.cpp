@@ -4529,10 +4529,13 @@ int command__bookmark(const void *pointer, void *data,
 // XEP-0433: Extended Channel Search
 // Send a search IQ to the given service JID with optional keywords.
 // Two steps: first request the form (type=get <search/>), then submit it.
+// picker_ptr: non-owning pointer to a picker<std::string> to populate with
+//             results; nullptr to print inline.
 static void xep0433_send_search(weechat::account *account,
                                 struct t_gui_buffer *buffer,
                                 const char *service_jid,
-                                const char *keywords)
+                                const char *keywords,
+                                weechat::ui::picker<std::string> *picker_ptr = nullptr)
 {
     xmpp_string_guard search_id_g(account->context, xmpp_uuid_gen(account->context));
     const char *search_id = search_id_g.ptr;
@@ -4542,6 +4545,7 @@ static void xep0433_send_search(weechat::account *account,
     info.keywords    = keywords ? keywords : "";
     info.buffer      = buffer;
     info.form_requested = true;
+    info.picker      = picker_ptr;
     account->channel_search_queries[search_id] = info;
 
     // Build: <iq type='get' to='service' id='...'><search xmlns='urn:xmpp:channel-search:0:search'/></iq>
@@ -4618,7 +4622,41 @@ int command__list(const void *pointer, void *data,
         weechat_printf(buffer, "%sSearching for popular MUC rooms via %s (XEP-0433)…",
                       weechat_prefix("network"), service_jid);
 
-    xep0433_send_search(ptr_account, buffer, service_jid, keywords[0] ? keywords : NULL);
+    // Create an interactive picker that will be populated as results stream in.
+    // On select: join the chosen room.
+    using picker_t = weechat::ui::picker<std::string>;
+    weechat::account *acct = ptr_account;
+
+    std::string title_str = keywords[0]
+        ? fmt::format("MUC room search: \"{}\"  (XEP-0433)  — select to join", keywords)
+        : fmt::format("Popular MUC rooms via {}  (XEP-0433)  — select to join", service_jid);
+
+    // Two-step init: create picker, then patch on_close_ after we have the pointer.
+    // We use a shared_ptr<picker_t*> so the lambda can see the final pointer value
+    // without capturing a stack reference that would dangle after command__list returns.
+    auto p_holder = std::make_shared<picker_t *>(nullptr);
+    auto *p = new picker_t(
+        "xmpp.picker.list",
+        title_str,
+        {},   // populated async as IQ results arrive
+        [acct](const std::string &jid) {
+            // on_select: switch focus to origin buffer and join the room
+            std::string cmd = fmt::format("/join {}", jid);
+            weechat_command(acct->buffer, cmd.c_str());
+        },
+        [acct, p_holder]() {
+            // on_close: null out any pending channel_search_queries entries that
+            // hold a dangling pointer to this picker (closed before IQ finished).
+            picker_t *raw = *p_holder;
+            for (auto &[id, info] : acct->channel_search_queries)
+                if (info.picker == raw) info.picker = nullptr;
+        },
+        buffer);
+    *p_holder = p;
+    (void) p;
+
+    xep0433_send_search(ptr_account, buffer, service_jid,
+                        keywords[0] ? keywords : nullptr, p);
 
     return WEECHAT_RC_OK;
 }

@@ -183,6 +183,7 @@ namespace weechat
             std::string keywords;           // search keywords
             struct t_gui_buffer *buffer;    // buffer to print results into
             bool form_requested;            // true = waiting for form, false = waiting for results
+            weechat::ui::picker<std::string> *picker = nullptr;  // non-owning; picker owns itself
         };
         std::unordered_map<std::string, channel_search_query_info> channel_search_queries;  // iq_id -> info
 

@@ -1199,7 +1199,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                     xmpp_stanza_t *item = xmpp_stanza_get_child_by_name(result_el, "item");
                     while (item)
                     {
-                        if (count == 0)
+                        if (count == 0 && !cs_info.picker)
                         {
                             weechat_printf_date_tags(cs_buf, 0, "xmpp_channel_search,notify_none",
                                                      "%sMUC Rooms (via %s):",
@@ -1270,7 +1270,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         std::string info_str;
                         if (!meta_parts.empty())
                         {
-                            info_str = " [";
+                            info_str = "[";
                             for (size_t i = 0; i < meta_parts.size(); ++i)
                             {
                                 if (i) info_str += ", ";
@@ -1279,66 +1279,99 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                             info_str += "]";
                         }
 
-                        weechat_printf_date_tags(cs_buf, 0, "xmpp_channel_search,notify_none",
-                                                 "  %s%s%s%s",
-                                                 weechat_color("chat_nick"),
-                                                 display.c_str(),
-                                                 weechat_color("reset"),
-                                                 info_str.c_str());
-
-                        // Truncate long descriptions
-                        if (desc_raw && desc_raw[0])
+                        if (cs_info.picker)
                         {
-                            std::string desc(desc_raw);
-                            if (desc.length() > 120)
-                                desc = desc.substr(0, 117) + "...";
-                            weechat_printf_date_tags(cs_buf, 0, "xmpp_channel_search,notify_none",
-                                                     "    %s", desc.c_str());
+                            // Picker path: add_entry with address as data, display as label.
+                            // Sublabel carries metadata. Skip async disco#info enrichment
+                            // since picker entries cannot be updated in-place.
+                            using picker_t = weechat::ui::picker<std::string>;
+                            std::string sublabel = info_str;
+                            if (desc_raw && desc_raw[0])
+                            {
+                                std::string desc(desc_raw);
+                                if (desc.length() > 60)
+                                    desc = desc.substr(0, 57) + "...";
+                                if (!sublabel.empty()) sublabel += "  ";
+                                sublabel += desc;
+                            }
+                            cs_info.picker->add_entry(
+                                picker_t::entry{std::string(address), display, sublabel, true});
                         }
-
-                        // If the directory result is sparse, query room disco#info for
-                        // additional metadata (name/description/occupants/language).
-                        if ((!name_raw || !name_raw[0])
-                            || (!desc_raw || !desc_raw[0])
-                            || (!nusers_raw || !nusers_raw[0])
-                            || (!language_raw || !language_raw[0]))
+                        else
                         {
-                            xmpp_string_guard disco_id_g(account.context, xmpp_uuid_gen(account.context));
-                            const char *disco_id = disco_id_g.ptr;
+                            // Inline print path (legacy / non-picker).
+                            std::string info_bracketed = info_str.empty() ? "" : " " + info_str;
+                            weechat_printf_date_tags(cs_buf, 0, "xmpp_channel_search,notify_none",
+                                                     "  %s%s%s%s",
+                                                     weechat_color("chat_nick"),
+                                                     display.c_str(),
+                                                     weechat_color("reset"),
+                                                     info_bracketed.c_str());
 
-                            weechat::account::channel_search_disco_query_info dq;
-                            dq.buffer = cs_buf;
-                            dq.room_jid = address;
-                            account.channel_search_disco_queries[disco_id] = dq;
+                            // Truncate long descriptions
+                            if (desc_raw && desc_raw[0])
+                            {
+                                std::string desc(desc_raw);
+                                if (desc.length() > 120)
+                                    desc = desc.substr(0, 117) + "...";
+                                weechat_printf_date_tags(cs_buf, 0, "xmpp_channel_search,notify_none",
+                                                         "    %s", desc.c_str());
+                            }
 
-                            xmpp_stanza_t *iq = xmpp_iq_new(account.context, "get", disco_id);
-                            xmpp_stanza_set_to(iq, address);
+                            // If the directory result is sparse, query room disco#info for
+                            // additional metadata (name/description/occupants/language).
+                            if ((!name_raw || !name_raw[0])
+                                || (!desc_raw || !desc_raw[0])
+                                || (!nusers_raw || !nusers_raw[0])
+                                || (!language_raw || !language_raw[0]))
+                            {
+                                xmpp_string_guard disco_id_g(account.context, xmpp_uuid_gen(account.context));
+                                const char *disco_id = disco_id_g.ptr;
 
-                            xmpp_stanza_t *q = xmpp_stanza_new(account.context);
-                            xmpp_stanza_set_name(q, "query");
-                            xmpp_stanza_set_ns(q, "http://jabber.org/protocol/disco#info");
-                            xmpp_stanza_add_child(iq, q);
-                            xmpp_stanza_release(q);
+                                weechat::account::channel_search_disco_query_info dq;
+                                dq.buffer = cs_buf;
+                                dq.room_jid = address;
+                                account.channel_search_disco_queries[disco_id] = dq;
 
-                            account.connection.send(iq);
-                            xmpp_stanza_release(iq);
+                                xmpp_stanza_t *iq = xmpp_iq_new(account.context, "get", disco_id);
+                                xmpp_stanza_set_to(iq, address);
+
+                                xmpp_stanza_t *q = xmpp_stanza_new(account.context);
+                                xmpp_stanza_set_name(q, "query");
+                                xmpp_stanza_set_ns(q, "http://jabber.org/protocol/disco#info");
+                                xmpp_stanza_add_child(iq, q);
+                                xmpp_stanza_release(q);
+
+                                account.connection.send(iq);
+                                xmpp_stanza_release(iq);
+                            }
                         }
 
                         count++;
                         item = xmpp_stanza_get_next(item);
                     }
 
-                    if (count == 0)
+                    if (!cs_info.picker)
                     {
-                        weechat_printf_date_tags(cs_buf, 0, "xmpp_channel_search,notify_none",
-                                                 "%sNo rooms found matching your query",
-                                                 weechat_prefix("network"));
+                        if (count == 0)
+                        {
+                            weechat_printf_date_tags(cs_buf, 0, "xmpp_channel_search,notify_none",
+                                                     "%sNo rooms found matching your query",
+                                                     weechat_prefix("network"));
+                        }
+                        else
+                        {
+                            weechat_printf_date_tags(cs_buf, 0, "xmpp_channel_search,notify_none",
+                                                     "%sUse /enter <address> to join a room",
+                                                     weechat_prefix("network"));
+                        }
                     }
-                    else
+                    else if (count == 0)
                     {
-                        weechat_printf_date_tags(cs_buf, 0, "xmpp_channel_search,notify_none",
-                                                 "%sUse /enter <address> to join a room",
-                                                 weechat_prefix("network"));
+                        // No results — add a non-selectable placeholder.
+                        using picker_t = weechat::ui::picker<std::string>;
+                        cs_info.picker->add_entry(
+                            picker_t::entry{"", "(no rooms found)", "", false});
                     }
                 }
                 else
