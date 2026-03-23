@@ -545,12 +545,18 @@ void weechat::account::disconnect(int reconnect)
 
     if (reconnect)
     {
-        if (current_retry++ == 0)
-        {
+        // Exponential backoff: 5 → 10 → 20 → 40 → 80 → 120s (capped)
+        if (reconnect_delay == 0)
             reconnect_delay = 5;
-            reconnect_start = time(NULL) + reconnect_delay;
-        }
-        current_retry %= 5;
+        else
+            reconnect_delay = std::min(reconnect_delay * 2, 120);
+        current_retry++;
+        reconnect_start = time(NULL) + reconnect_delay;
+        weechat_printf(buffer,
+                       "%sxmpp: reconnecting in %ds (attempt %d)…",
+                       weechat_prefix("network"),
+                       reconnect_delay,
+                       current_retry);
     }
     else
     {
@@ -689,6 +695,11 @@ int weechat::account::timer_cb(const void *pointer, void *data, int remaining_ca
             else if (ptr_account.second.reconnect_start > 0
                      && ptr_account.second.reconnect_start < time(NULL))
             {
+                // Clear reconnect_start BEFORE calling connect() so that a
+                // failed connect() does not cause an immediate re-fire on the
+                // next timer tick. The next disconnect() call will set a new
+                // (longer) reconnect_start via the exponential backoff.
+                ptr_account.second.reconnect_start = 0;
                 ptr_account.second.connect();
             }
         }
