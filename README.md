@@ -381,30 +381,30 @@ you: [edit] Hello everyone!
 
 ### Message Retraction — `/retract` (XEP-0424)
 
-Deletes the last message you sent in the current buffer.
+Deletes one of your own messages from the current buffer.
 
 ```
 /retract
 ```
 
-Takes no arguments. Just run it in the buffer where you sent the message you
-want to remove.
+Takes no arguments. Opens an **interactive picker** showing your last 20
+non-retracted messages. Navigate with `↑`/`↓`, press `Enter` to retract the
+selected message, or `q`/`Esc` to cancel.
 
 **How it works:**
 
-1. The plugin searches backwards through the buffer for the most recent line
-   tagged `self_msg` + `id_` — i.e. your last sent message.
-2. A retraction stanza is sent referencing that message's ID. In MUC rooms the
+1. An interactive picker opens listing your last 20 sent messages (most recent
+   at the top).
+2. Select the message to retract and press `Enter`.
+3. A retraction stanza is sent referencing that message's ID. In MUC rooms the
    server-assigned stanza-id (XEP-0359) is used, which is required by the spec.
-3. Supporting clients replace the original message with a tombstone. The local
+4. Supporting clients replace the original message with a tombstone. The local
    buffer shows `[Message deleted]` in place of the original text.
-4. A `store` hint (XEP-0334) is included so MAM archives record the retraction,
+5. A `store` hint (XEP-0334) is included so MAM archives record the retraction,
    and other devices that sync history will also see the tombstone.
 
 **Notes:**
 
-- Only your *last* sent message can be retracted — there is no way to target an
-  earlier one.
 - Retraction is **not a guarantee**: recipients who already received the message
   keep it. Clients that do not support XEP-0424 will instead display the
   fallback body: `[user] retracted a previous message, but it's unsupported by
@@ -418,6 +418,7 @@ want to remove.
 ```
 you: I should not have said that
 /retract
+[interactive picker opens — select the message, press Enter]
 -- xmpp: message retraction sent
 you: [Message deleted]
 ```
@@ -460,6 +461,87 @@ Sends an emoji reaction to the last received message in the current buffer.
 
 ---
 
+### Message Replies — `/reply` and `/reply-to` (XEP-0461)
+
+Sends a reply with a message reference so supporting clients can display a
+quoted preview.
+
+```
+/reply                  # open interactive picker to choose which message to reply to
+/reply <text>           # reply immediately to the last received message
+/reply-to <id> <text>   # reply to a specific message by ID (used internally by picker)
+```
+
+**How `/reply` works (no arguments — interactive picker):**
+
+1. An interactive picker opens listing the last 20 messages received from others
+   (non-own, non-retracted).
+2. Navigate with `↑`/`↓` and press `Enter` to select.
+3. The picker closes and the input bar is pre-filled with `/reply-to <id> `.
+4. Type your reply text and press `Enter` to send.
+
+**How `/reply <text>` works (with text):**
+
+The plugin finds the most recent non-own message and sends a reply directly,
+without opening the picker. Useful for quick replies.
+
+**Notes:**
+
+- Clients that do not support XEP-0461 will display the plain message text
+  without the quoted context.
+- In MUC rooms, the MUC-assigned stanza-id (XEP-0359) is used when present,
+  as required by the spec for rooms with `stanza-id` support.
+- You must be connected and inside a chat buffer to use `/reply`.
+
+**Examples:**
+
+```
+/reply                        # opens picker
+/reply Thanks, that helped!   # immediate reply to last received message
+```
+
+---
+
+### Message Moderation — `/moderate` (XEP-0425)
+
+Removes another user's message from a MUC room (requires moderator role).
+
+```
+/moderate [reason]
+```
+
+Opens an **interactive picker** showing the last 20 non-retracted messages in
+the room. Navigate with `↑`/`↓`, press `Enter` to moderate the selected
+message, or `q`/`Esc` to cancel. The optional reason is forwarded in the
+moderation stanza.
+
+**How it works:**
+
+1. An interactive picker opens listing the last 20 messages in the MUC buffer
+   (both own and others', excluding already-retracted messages).
+2. Select the message to moderate and press `Enter`.
+3. A moderation stanza is sent referencing the server-assigned stanza-id
+   (XEP-0359), which is required by XEP-0425 for MUC moderation.
+4. Supporting clients replace the original message with a moderation tombstone.
+
+**Notes:**
+
+- Requires MUC moderator role. The server will reject the request otherwise.
+- Use `/retract` to delete your *own* messages instead.
+- Moderation is **not a guarantee**: clients that do not support XEP-0425 may
+  still show the original message.
+- Must be used inside a MUC buffer (not a PM channel).
+
+**Examples:**
+
+```
+/moderate
+/moderate Spam message
+/moderate Violates community guidelines
+```
+
+---
+
 ### Ad-hoc Commands and Data Forms (XEP-0050 / XEP-0004)
 
 ```
@@ -490,17 +572,34 @@ Required fields are marked with `*`. Multi-step sessions are supported.
 | Command | Description |
 |---------|-------------|
 | `/enter <jid>` | Join a MUC room |
+| `/join <jid>` | Alias for `/enter` |
 | `/open <jid>` | Open a direct chat (PM) |
+| `/query <jid> [msg]` | Alias for `/open` |
 | `/msg <text>` | Send a message to the current buffer |
 | `/me <text>` | Send a `/me` action (XEP-0245) |
 | `/invite <jid> [reason]` | Invite a user to the current MUC (XEP-0249) |
 | `/selfping` | Verify MUC membership (XEP-0410) |
 | `/edit <text>` | Correct last sent message (XEP-0308) |
-| `/retract` | Delete last sent message (XEP-0424) |
-| `/moderate [reason]` | Remove another user's message as moderator (XEP-0425) |
+| `/retract` | Picker: choose a sent message to delete (XEP-0424) |
+| `/moderate [reason]` | Picker: choose a MUC message to moderate (XEP-0425) |
 | `/react <emoji>` | React to the last received message (XEP-0444) |
-| `/reply <text>` | Reply with context to the last received message (XEP-0461) |
+| `/reply` | Picker: choose a message to reply to (XEP-0461) |
+| `/reply <text>` | Reply to the last received message (XEP-0461) |
+| `/reply-to <id> <text>` | Reply to a specific message by ID (XEP-0461) |
+| `/spoiler [hint:] <text>` | Send a spoiler message (XEP-0382) |
+| `/buzz` | Send attention request to current PM contact (XEP-0224) |
 | `/whois [jid]` | Retrieve vCard information (XEP-0054) |
+| `/setvcard <field> <value>` | Publish a vCard field (XEP-0054) |
+| `/setavatar <filepath>` | Publish avatar image (XEP-0084) |
+
+### MUC room management
+
+| Command | Description |
+|---------|-------------|
+| `/kick <nick> [reason]` | Kick a user from the MUC (requires moderator role) |
+| `/ban <jid> [reason]` | Ban a user by JID (requires admin/owner role) |
+| `/topic [text]` | Set or clear the room topic |
+| `/nick [newnick]` | Change your nickname in the current MUC |
 
 ### Privacy & blocking
 
@@ -508,7 +607,7 @@ Required fields are marked with `*`. Multi-step sessions are supported.
 |---------|-------------|
 | `/block <jid> [...]` | Block one or more JIDs (XEP-0191) |
 | `/unblock [jid ...]` | Unblock JIDs, or all if no argument given |
-| `/blocklist` | Show all blocked JIDs |
+| `/blocklist` | List all blocked JIDs |
 
 ### Encryption
 
@@ -561,6 +660,17 @@ Required fields are marked with `*`. Multi-step sessions are supported.
 | `/xml <stanza>` | Send raw XML (advanced/debug) |
 | `/xmpp` | Show plugin version |
 | `/trap` | Trigger debug breakpoint (developers only) |
+
+### Interactive picker UI
+
+Several commands open an in-buffer interactive picker when invoked without
+arguments. Picker key bindings:
+
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Navigate up/down |
+| `Enter` | Confirm selection |
+| `q` / `Esc` | Cancel and return to previous buffer |
 
 ---
 

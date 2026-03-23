@@ -25,6 +25,7 @@
 #include "channel.hh"
 #include "connection.hh"
 #include "user.hh"
+#include "ui/picker.hh"
 
 namespace weechat
 {
@@ -206,6 +207,9 @@ namespace weechat
             std::string value;            // new value to set
         };
         std::unordered_map<std::string, setvcard_query_info> setvcard_queries;  // iq_id -> info
+
+        // XEP-0191: Blocking Command — pending unblock picker (non-owning; picker owns itself)
+        weechat::ui::picker<std::string> *blocklist_picker = nullptr;
 
         // Capability cache (XEP-0115)
         std::unordered_map<std::string, std::vector<std::string>> caps_cache;  // verification_hash -> features

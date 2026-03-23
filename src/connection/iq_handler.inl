@@ -780,30 +780,53 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
     
     if (blocklist && type && weechat_strcasecmp(type, "result") == 0)
     {
-        // Handle blocklist response
+        // Handle blocklist response — populate the picker if open, else print inline.
         xmpp_stanza_t *item = xmpp_stanza_get_child_by_name(blocklist, "item");
-        
-        if (item)
+
+        if (account.blocklist_picker)
         {
-            weechat_printf(account.buffer, "%sBlocked JIDs:",
-                          weechat_prefix("network"));
-            
-            while (item)
+            // Picker is open: feed entries into it.
+            using picker_t = weechat::ui::picker<std::string>;
+            if (!item)
             {
-                const char *jid = xmpp_stanza_get_attribute(item, "jid");
-                if (jid)
+                // No blocked JIDs — add a non-selectable placeholder row.
+                account.blocklist_picker->add_entry(
+                    picker_t::entry{"", "(no blocked JIDs)", "", false});
+            }
+            else
+            {
+                while (item)
                 {
-                    weechat_printf(account.buffer, "  %s", jid);
+                    const char *jid = xmpp_stanza_get_attribute(item, "jid");
+                    if (jid)
+                        account.blocklist_picker->add_entry(
+                            picker_t::entry{std::string(jid), std::string(jid), "", true});
+                    item = xmpp_stanza_get_next(item);
                 }
-                item = xmpp_stanza_get_next(item);
             }
         }
         else
         {
-            weechat_printf(account.buffer, "%sNo JIDs blocked",
-                          weechat_prefix("network"));
+            // Picker not open (e.g. called without /blocklist picker path) — print inline.
+            if (item)
+            {
+                weechat_printf(account.buffer, "%sBlocked JIDs:",
+                              weechat_prefix("network"));
+                while (item)
+                {
+                    const char *jid = xmpp_stanza_get_attribute(item, "jid");
+                    if (jid)
+                        weechat_printf(account.buffer, "  %s", jid);
+                    item = xmpp_stanza_get_next(item);
+                }
+            }
+            else
+            {
+                weechat_printf(account.buffer, "%sNo JIDs blocked",
+                              weechat_prefix("network"));
+            }
         }
-        
+
         return true;
     }
     

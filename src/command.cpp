@@ -4076,7 +4076,6 @@ int command__blocklist(const void *pointer, void *data,
 {
     weechat::account *ptr_account = NULL;
     weechat::channel *ptr_channel = NULL;
-    xmpp_stanza_t *iq;
 
     (void) pointer;
     (void) data;
@@ -4096,20 +4095,72 @@ int command__blocklist(const void *pointer, void *data,
         return WEECHAT_RC_OK;
     }
 
-    // Request block list
-    xmpp_string_guard iq_id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
-    iq = xmpp_iq_new(ptr_account->context, "get", iq_id_g.ptr);
-    
-    xmpp_stanza_t *blocklist = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(blocklist, "blocklist");
-    xmpp_stanza_set_ns(blocklist, "urn:xmpp:blocking");
-    
-    xmpp_stanza_add_child(iq, blocklist);
-    xmpp_stanza_release(blocklist);
-    
-    weechat_printf(buffer, "%sRequesting block list...",
-                   weechat_prefix("network"));
-    
+    // If a picker is already open for this account, don't open another.
+    if (ptr_account->blocklist_picker)
+    {
+        weechat_printf(buffer, "%sxmpp: blocklist picker already open",
+                       weechat_prefix("network"));
+        return WEECHAT_RC_OK;
+    }
+
+    // Open picker with no entries yet; the IQ result handler will populate it.
+    using picker_t = weechat::ui::picker<std::string>;
+    weechat::account *acct = ptr_account;  // capture for lambdas
+
+    auto *p = new picker_t(
+        "xmpp.picker.blocklist",
+        "Blocked JIDs  (XEP-0191)  — select to unblock",
+        {},  // populated async by IQ handler
+        [acct](const std::string &jid) {
+            // on_select: send unblock IQ for selected JID
+            xmpp_stanza_t *iq;
+            {
+                xmpp_string_guard iq_id_g(acct->context, xmpp_uuid_gen(acct->context));
+                iq = xmpp_iq_new(acct->context, "set", iq_id_g.ptr);
+            }
+            xmpp_stanza_t *unblock = xmpp_stanza_new(acct->context);
+            xmpp_stanza_set_name(unblock, "unblock");
+            xmpp_stanza_set_ns(unblock, "urn:xmpp:blocking");
+
+            xmpp_stanza_t *item = xmpp_stanza_new(acct->context);
+            xmpp_stanza_set_name(item, "item");
+            xmpp_stanza_set_attribute(item, "jid", jid.c_str());
+            xmpp_stanza_add_child(unblock, item);
+            xmpp_stanza_release(item);
+
+            xmpp_stanza_add_child(iq, unblock);
+            xmpp_stanza_release(unblock);
+
+            acct->connection.send(iq);
+            xmpp_stanza_release(iq);
+
+            weechat_printf(acct->buffer, "%sUnblocking %s…",
+                           weechat_prefix("network"), jid.c_str());
+        },
+        [acct]() {
+            // on_close: clear the non-owning pointer in account
+            acct->blocklist_picker = nullptr;
+        },
+        buffer);
+    (void) p;
+
+    // Store non-owning pointer so the IQ handler can call add_entry().
+    ptr_account->blocklist_picker = p;
+
+    // Request the block list from the server.
+    xmpp_stanza_t *iq;
+    {
+        xmpp_string_guard iq_id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+        iq = xmpp_iq_new(ptr_account->context, "get", iq_id_g.ptr);
+    }
+
+    xmpp_stanza_t *blocklist_el = xmpp_stanza_new(ptr_account->context);
+    xmpp_stanza_set_name(blocklist_el, "blocklist");
+    xmpp_stanza_set_ns(blocklist_el, "urn:xmpp:blocking");
+
+    xmpp_stanza_add_child(iq, blocklist_el);
+    xmpp_stanza_release(blocklist_el);
+
     ptr_account->connection.send(iq);
     xmpp_stanza_release(iq);
 
