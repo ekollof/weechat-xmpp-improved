@@ -8,3 +8,10 @@ int command__enter(const void *pointer, void *data,
                    struct t_gui_buffer *buffer, int argc,
                    char **argv, char **argv_eol);
 void command__init();
+
+// Internal picker navigation command — implemented in src/ui/picker.cpp
+namespace weechat::ui {
+int picker_nav_cb(const void *pointer, void *data,
+                  struct t_gui_buffer *buffer,
+                  int argc, char **argv, char **argv_eol);
+} // namespace weechat::ui

@@ -28,6 +28,7 @@
 #include "message.hh"
 #include "command.hh"
 #include "sexp/driver.hh"
+#include "ui/picker.hh"
 
 #define MAM_DEFAULT_DAYS 2
 #define STR(X) #X
@@ -3180,6 +3181,28 @@ int command__mood(const void *pointer, void *data,
             text = argv_eol[2];
     }
 
+    // No arguments: open interactive picker
+    if (!mood)
+    {
+        using picker_t = weechat::ui::picker<std::string>;
+        std::vector<picker_t::entry> entries;
+        for (int i = 0; valid_moods[i] != NULL; i++)
+            entries.push_back({ std::string(valid_moods[i]), valid_moods[i], "", true });
+
+        auto *p = new picker_t(
+            "xmpp.picker.mood",
+            "Select a mood  (XEP-0107)",
+            std::move(entries),
+            [ptr_account, buf = buffer](const std::string &selected) {
+                auto cmd = fmt::format("/mood {}", selected);
+                weechat_command(buf, cmd.c_str());
+            },
+            {},
+            buffer);
+        (void) p;  // picker owns itself
+        return WEECHAT_RC_OK;
+    }
+
     // Build PEP mood publish stanza
     // <iq type='set' id='...'>
     //   <pubsub xmlns='http://jabber.org/protocol/pubsub'>
@@ -3352,6 +3375,28 @@ int command__activity(const void *pointer, void *data,
     }
 
     const char *category = category_s.empty() ? NULL : category_s.c_str();
+
+    // No arguments: open interactive picker
+    if (!category)
+    {
+        using picker_t = weechat::ui::picker<std::string>;
+        std::vector<picker_t::entry> entries;
+        for (int i = 0; valid_categories[i] != NULL; i++)
+            entries.push_back({ std::string(valid_categories[i]), valid_categories[i], "", true });
+
+        auto *p = new picker_t(
+            "xmpp.picker.activity",
+            "Select an activity  (XEP-0108)",
+            std::move(entries),
+            [ptr_account, buf = buffer](const std::string &selected) {
+                auto cmd = fmt::format("/activity {}", selected);
+                weechat_command(buf, cmd.c_str());
+            },
+            {},
+            buffer);
+        (void) p;  // picker owns itself
+        return WEECHAT_RC_OK;
+    }
 
     // Build PEP activity publish stanza
     // <iq type='set'>
@@ -3977,7 +4022,7 @@ int command__roster(const void *pointer, void *data,
         return WEECHAT_RC_OK;
     }
 
-    // /roster - display roster
+    // /roster - display roster as interactive picker
     if (argc == 1)
     {
         if (ptr_account->roster.empty())
@@ -3986,37 +4031,36 @@ int command__roster(const void *pointer, void *data,
             return WEECHAT_RC_OK;
         }
 
-        weechat_printf(buffer, "");
-        weechat_printf(buffer, "%sRoster (%zu contacts):", 
-                      weechat_prefix("network"), 
-                      ptr_account->roster.size());
-        
+        using picker_t = weechat::ui::picker<std::string>;
+        std::vector<picker_t::entry> entries;
         for (const auto& [jid, item] : ptr_account->roster)
         {
-            std::string display = jid;
+            std::string label = jid;
             if (!item.name.empty())
-                display = item.name + " <" + jid + ">";
-            
-            std::string groups_str = "";
-            if (!item.groups.empty())
-            {
-                groups_str = " [";
-                for (size_t i = 0; i < item.groups.size(); i++)
-                {
-                    if (i > 0) groups_str += ", ";
-                    groups_str += item.groups[i];
+                label = item.name + " <" + jid + ">";
+            std::string sublabel = item.subscription;
+            if (!item.groups.empty()) {
+                sublabel += "  [";
+                for (size_t i = 0; i < item.groups.size(); i++) {
+                    if (i > 0) sublabel += ", ";
+                    sublabel += item.groups[i];
                 }
-                groups_str += "]";
+                sublabel += "]";
             }
-            
-            weechat_printf(buffer, "  %s%s%s - %s%s",
-                          weechat_color("chat_nick"),
-                          display.c_str(),
-                          weechat_color("reset"),
-                          item.subscription.c_str(),
-                          groups_str.c_str());
+            entries.push_back({ jid, label, sublabel, true });
         }
-        
+
+        auto *p = new picker_t(
+            "xmpp.picker.roster",
+            "Open chat with contact  (roster)",
+            std::move(entries),
+            [ptr_account, buf = buffer](const std::string &selected) {
+                auto cmd = fmt::format("/open {}", selected);
+                weechat_command(buf, cmd.c_str());
+            },
+            {},
+            buffer);
+        (void) p;  // picker owns itself
         return WEECHAT_RC_OK;
     }
 
@@ -4130,7 +4174,7 @@ int command__bookmark(const void *pointer, void *data,
         return WEECHAT_RC_OK;
     }
 
-    // /bookmark - list bookmarks
+    // /bookmark - list bookmarks via interactive picker
     if (argc == 1)
     {
         if (ptr_account->bookmarks.empty())
@@ -4139,31 +4183,29 @@ int command__bookmark(const void *pointer, void *data,
             return WEECHAT_RC_OK;
         }
 
-        weechat_printf(buffer, "");
-        weechat_printf(buffer, "%sBookmarks (%zu):", 
-                      weechat_prefix("network"), 
-                      ptr_account->bookmarks.size());
-        
+        using picker_t = weechat::ui::picker<std::string>;
+        std::vector<picker_t::entry> entries;
         for (const auto& [jid, bookmark] : ptr_account->bookmarks)
         {
-            std::string display = jid;
-            if (!bookmark.name.empty())
-                display = bookmark.name + " <" + jid + ">";
-            
-            std::string nick_str = "";
+            std::string label = bookmark.name.empty() ? jid : bookmark.name + " <" + jid + ">";
+            std::string sublabel;
             if (!bookmark.nick.empty())
-                nick_str = " (nick: " + bookmark.nick + ")";
-            
-            std::string autojoin_str = bookmark.autojoin ? " [autojoin]" : "";
-            
-            weechat_printf(buffer, "  %s%s%s%s%s",
-                          weechat_color("chat_nick"),
-                          display.c_str(),
-                          weechat_color("reset"),
-                          nick_str.c_str(),
-                          autojoin_str.c_str());
+                sublabel += "nick: " + bookmark.nick;
+            if (bookmark.autojoin)
+                sublabel += sublabel.empty() ? "autojoin" : "  autojoin";
+            entries.push_back({jid, label, sublabel});
         }
-        
+        auto *p = new picker_t(
+            "xmpp.picker.bookmark",
+            "Open bookmark  (XEP-0048)",
+            std::move(entries),
+            [buf = buffer](const std::string &selected) {
+                auto cmd = fmt::format("/enter {}", selected);
+                weechat_command(buf, cmd.c_str());
+            },
+            {},
+            buffer);
+        (void) p;
         return WEECHAT_RC_OK;
     }
 
@@ -5845,4 +5887,17 @@ void command__init()
         NULL, &command__muc_nick, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /nick");
+
+    // Internal hidden command used by picker key bindings.
+    // Not listed in /help — the leading space makes WeeChat treat it as internal.
+    hook = weechat_hook_command(
+        "xmpp-picker-nav",
+        N_("navigate the XMPP interactive picker (internal)"),
+        N_("up|down|enter|quit"),
+        N_("Internal command dispatched by per-buffer key bindings in the picker UI.\n"
+           "Not intended for direct user invocation."),
+        "up|down|enter|quit",
+        &weechat::ui::picker_nav_cb, NULL, NULL);
+    if (!hook)
+        weechat_printf(NULL, "Failed to setup command /xmpp-picker-nav");
 }

@@ -105,6 +105,7 @@ HDRS=src/plugin.hh \
 	 src/xmpp/stanza.hh \
 	 src/xmpp/ns.hh \
 	 src/xmpp/node.hh \
+	 src/ui/picker.hh \
 
 SRCS=src/plugin.cpp \
 	 src/account.cpp \
@@ -132,6 +133,7 @@ SRCS=src/plugin.cpp \
 	 src/xmpp/presence.cpp \
 	 src/xmpp/iq.cpp \
 	 src/xmpp/node.cpp \
+	 src/ui/picker.cpp \
 
 DEPS=deps/diff/libdiff.a \
 	 sexp/sexp.a \
