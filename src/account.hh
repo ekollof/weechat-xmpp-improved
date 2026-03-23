@@ -174,6 +174,7 @@ namespace weechat
             bool is_list;             // true = listing commands, false = executing one
             std::string node;         // command node being executed (for execute queries)
             std::string session_id;   // session id (for multi-step forms)
+            weechat::ui::picker<std::string> *picker = nullptr;  // non-owning; picker owns itself
         };
         std::unordered_map<std::string, adhoc_query_info> adhoc_queries;  // iq_id -> info
 

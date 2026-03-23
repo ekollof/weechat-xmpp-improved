@@ -5167,7 +5167,32 @@ int command__adhoc(const void *pointer, void *data,
 
     if (argc == 2)
     {
-        // List available commands via disco#items with commands node
+        // List available commands via disco#items with commands node.
+        // Open an interactive picker so the user can choose a command to run.
+        using picker_t = weechat::ui::picker<std::string>;
+        weechat::account *acct = ptr_account;
+        std::string tjid_str = target_jid;
+
+        auto p_holder = std::make_shared<picker_t *>(nullptr);
+        auto *p = new picker_t(
+            "xmpp.picker.adhoc",
+            fmt::format("Ad-hoc commands on {}  (XEP-0050)  — select to execute", target_jid),
+            {},   // populated async as disco#items result arrives
+            [acct, tjid_str](const std::string &node_uri) {
+                // on_select: run /adhoc <jid> <node>
+                std::string cmd = fmt::format("/adhoc {} {}", tjid_str, node_uri);
+                weechat_command(acct->buffer, cmd.c_str());
+            },
+            [acct, p_holder]() {
+                // on_close: null out any pending adhoc_queries that reference this picker.
+                picker_t *raw = *p_holder;
+                for (auto &[id, info] : acct->adhoc_queries)
+                    if (info.picker == raw) info.picker = nullptr;
+            },
+            buffer);
+        *p_holder = p;
+        (void) p;
+
         xmpp_string_guard query_id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
         const char *query_id = query_id_g.ptr;
 
@@ -5175,6 +5200,7 @@ int command__adhoc(const void *pointer, void *data,
         info.target_jid = target_jid;
         info.buffer = buffer;
         info.is_list = true;
+        info.picker = *p_holder;
         ptr_account->adhoc_queries[query_id] = info;
 
         xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "get", query_id);
@@ -5190,8 +5216,6 @@ int command__adhoc(const void *pointer, void *data,
         xmpp_stanza_release(iq);
         // freed by query_id_g
 
-        weechat_printf(buffer, "%sxmpp: querying commands on %s…",
-                      weechat_prefix("network"), target_jid);
         return WEECHAT_RC_OK;
     }
 

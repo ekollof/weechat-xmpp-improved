@@ -939,41 +939,69 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
             struct t_gui_buffer *adhoc_buf = adhoc_info.buffer
                 ? adhoc_info.buffer : account.buffer;
 
-            weechat_printf_date_tags(adhoc_buf, 0, "xmpp_adhoc,notify_none",
-                                     "%s%sCommands available on %s%s:",
-                                     weechat_prefix("network"),
-                                     weechat_color("bold"),
-                                     adhoc_info.target_jid.c_str(),
-                                     weechat_color("reset"));
+            // For inline (non-picker) path, print header first.
+            if (!adhoc_info.picker)
+                weechat_printf_date_tags(adhoc_buf, 0, "xmpp_adhoc,notify_none",
+                                         "%s%sCommands available on %s%s:",
+                                         weechat_prefix("network"),
+                                         weechat_color("bold"),
+                                         adhoc_info.target_jid.c_str(),
+                                         weechat_color("reset"));
 
             xmpp_stanza_t *cmd_item = xmpp_stanza_get_child_by_name(items_query, "item");
             int count = 0;
             while (cmd_item)
             {
-                const char *cmd_jid = xmpp_stanza_get_attribute(cmd_item, "jid");
                 const char *cmd_node = xmpp_stanza_get_attribute(cmd_item, "node");
                 const char *cmd_name = xmpp_stanza_get_attribute(cmd_item, "name");
-                weechat_printf_date_tags(adhoc_buf, 0, "xmpp_adhoc,notify_none",
-                                         "%s  %s%-40s%s  %s%s",
-                                         weechat_prefix("network"),
-                                         weechat_color("bold"),
-                                         cmd_name ? cmd_name : "(unnamed)",
-                                         weechat_color("reset"),
-                                         cmd_node ? cmd_node : "",
-                                         cmd_jid && cmd_jid != adhoc_info.target_jid
-                                             ? fmt::format(" [{}]", cmd_jid).c_str() : "");
+                const char *cmd_jid  = xmpp_stanza_get_attribute(cmd_item, "jid");
+
+                if (adhoc_info.picker)
+                {
+                    // Picker path: add entry (value = node URI, label = friendly name)
+                    using picker_t = weechat::ui::picker<std::string>;
+                    std::string label = cmd_name ? cmd_name : (cmd_node ? cmd_node : "(unnamed)");
+                    std::string sublabel = cmd_node ? cmd_node : "";
+                    adhoc_info.picker->add_entry(
+                        picker_t::entry{cmd_node ? std::string(cmd_node) : "",
+                                        label, sublabel, true});
+                }
+                else
+                {
+                    // Inline print path
+                    weechat_printf_date_tags(adhoc_buf, 0, "xmpp_adhoc,notify_none",
+                                             "%s  %s%-40s%s  %s%s",
+                                             weechat_prefix("network"),
+                                             weechat_color("bold"),
+                                             cmd_name ? cmd_name : "(unnamed)",
+                                             weechat_color("reset"),
+                                             cmd_node ? cmd_node : "",
+                                             cmd_jid && cmd_jid != adhoc_info.target_jid
+                                                 ? fmt::format(" [{}]", cmd_jid).c_str() : "");
+                }
                 count++;
                 cmd_item = xmpp_stanza_get_next(cmd_item);
             }
-            if (count == 0)
-                weechat_printf_date_tags(adhoc_buf, 0, "xmpp_adhoc,notify_none",
-                                         "%s  (no commands available)",
-                                         weechat_prefix("network"));
-            else
-                weechat_printf_date_tags(adhoc_buf, 0, "xmpp_adhoc,notify_none",
-                                         "%s  Use /adhoc %s <node> to execute a command",
-                                         weechat_prefix("network"),
-                                         adhoc_info.target_jid.c_str());
+
+            if (!adhoc_info.picker)
+            {
+                if (count == 0)
+                    weechat_printf_date_tags(adhoc_buf, 0, "xmpp_adhoc,notify_none",
+                                             "%s  (no commands available)",
+                                             weechat_prefix("network"));
+                else
+                    weechat_printf_date_tags(adhoc_buf, 0, "xmpp_adhoc,notify_none",
+                                             "%s  Use /adhoc %s <node> to execute a command",
+                                             weechat_prefix("network"),
+                                             adhoc_info.target_jid.c_str());
+            }
+            else if (count == 0)
+            {
+                using picker_t = weechat::ui::picker<std::string>;
+                adhoc_info.picker->add_entry(
+                    picker_t::entry{"", "(no commands available)", "", false});
+            }
+
             account.adhoc_queries.erase(iq_id);
         }
     }
