@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <time.h>
 #include <regex>
+#include <sstream>
+#include <iomanip>
 #include <fmt/core.h>
 #include <optional>
 #include <strophe.h>
@@ -25,9 +27,9 @@
 #include "xmpp/stanza.hh"
 
 namespace {
-std::string channel_short_name(weechat::channel::chat_type type, const char *name)
+std::string channel_short_name(weechat::channel::chat_type type, std::string_view name)
 {
-    if (!name || !name[0])
+    if (name.empty())
         return {};
 
     const char prefix =
@@ -36,7 +38,7 @@ std::string channel_short_name(weechat::channel::chat_type type, const char *nam
         return std::string(name);
 
     std::string prefixed;
-    prefixed.reserve(std::strlen(name) + 1);
+    prefixed.reserve(name.size() + 1);
     prefixed.push_back(prefix);
     prefixed.append(name);
     return prefixed;
@@ -233,18 +235,19 @@ void weechat::channel::add_nicklist_groups()
 
 weechat::channel::channel(weechat::account& account,
                           weechat::channel::chat_type type,
-                          const char *id, const char *name) : id(id), name(name), type(type), account(account)
+                          std::string_view id, std::string_view name) : id(id), name(name), type(type), account(account)
 {
-    if (!id || !name || !name[0])
+    if (id.empty() || name.empty())
         throw std::invalid_argument("channel()");
 
-    buffer = weechat::channel::create_buffer(type, name);
+    std::string name_str(name);
+    buffer = weechat::channel::create_buffer(type, name_str.c_str());
     if (!buffer)
         throw std::invalid_argument("buffer fail");
     else if (type == weechat::channel::chat_type::PM)
     {
         auto muc_channel = account.channels.find(jid(account.context,
-                                                                               id).bare.data());
+                                                                               std::string(id)).bare.data());
         if (muc_channel != account.channels.end())
         {
             weechat_buffer_merge(buffer, muc_channel->second.buffer);
@@ -279,19 +282,19 @@ weechat::channel::channel(weechat::account& account,
         
         // Load last fetch timestamp from cache
         if (last_mam_fetch == 0)
-            last_mam_fetch = account.mam_cache_get_last_timestamp(id);
+            last_mam_fetch = account.mam_cache_get_last_timestamp(this->id);
         
         // If the channel was previously closed (-1), treat it as a fresh open:
         // reset the flag so MAM runs normally this time.
         if (last_mam_fetch == -1)
         {
             last_mam_fetch = 0;
-            account.mam_cache_set_last_timestamp(id, 0);
+            account.mam_cache_set_last_timestamp(this->id, 0);
         }
         
         // Load and display cached messages
         if (last_mam_fetch > 0)
-            account.mam_cache_load_messages(id, buffer);
+            account.mam_cache_load_messages(this->id, buffer);
         
         // If we've fetched recently, only get new messages since last fetch
         if (last_mam_fetch > 0 && (now - last_mam_fetch) < 300)  // Less than 5 minutes
@@ -421,12 +424,11 @@ int weechat::channel::set_typing_state(weechat::user *user, const char *state)
         return 0;
 
     // Signal format: "<buf_ptr_hex>;<state>;<nick>"
-    char signal_data[512];
-    snprintf(signal_data, sizeof(signal_data), "%lx;%s;%s",
-             (unsigned long)(void *)buffer, state, nick.c_str());
+    std::string signal_data = fmt::format("{:x};{};{}",
+        (unsigned long)(void *)buffer, state, nick);
     weechat_hook_signal_send("typing_set_nick",
                              WEECHAT_HOOK_SIGNAL_STRING,
-                             signal_data);
+                             signal_data.data());
     return 1;
 }
 
@@ -1345,9 +1347,8 @@ int weechat::channel::send_message(std::string_view to, std::string_view body, b
         auto *self_user = user::search(&account, account.jid().data());
         auto prefix = self_user ? std::string(self_user->as_prefix_raw()) : std::string(account.jid());
         const bool is_action = weechat_string_match(body_str.c_str(), "/me *", 0);
-        std::string tag = std::string("xmpp_message,message,")
-            + (is_action ? "action," : "")
-            + "private,notify_none,self_msg,log1,id_" + saved_id;
+        std::string tag = fmt::format("xmpp_message,message,{}private,notify_none,self_msg,log1,id_{}",
+            is_action ? "action," : "", saved_id);
         bool encrypted = (transport == weechat::channel::transport::OMEMO ||
                           transport == weechat::channel::transport::PGP);
         if (is_action)
@@ -1898,16 +1899,16 @@ void weechat::channel::fetch_mam(const char *id, time_t *start, time_t *end, con
 
     if (start)
     {
-        char time_buf[256] = {0};
-        strftime(time_buf, sizeof(time_buf), "%Y-%m-%dT%H:%M:%SZ", gmtime(start));
-        add_field(x, "start", time_buf);
+        std::ostringstream oss;
+        oss << std::put_time(gmtime(start), "%Y-%m-%dT%H:%M:%SZ");
+        add_field(x, "start", oss.str().c_str());
     }
 
     if (end)
     {
-        char time_buf[256] = {0};
-        strftime(time_buf, sizeof(time_buf), "%Y-%m-%dT%H:%M:%SZ", gmtime(end));
-        add_field(x, "end", time_buf);
+        std::ostringstream oss;
+        oss << std::put_time(gmtime(end), "%Y-%m-%dT%H:%M:%SZ");
+        add_field(x, "end", oss.str().c_str());
     }
 
     xmpp_stanza_add_child(query, x);

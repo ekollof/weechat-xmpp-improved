@@ -6,6 +6,7 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace weechat::xmpp
@@ -23,12 +24,12 @@ namespace weechat::xmpp
 
         ~pgp();
 
-        std::optional<std::string> decrypt(struct t_gui_buffer *buffer, const char *ciphertext);
+        std::optional<std::string> decrypt(struct t_gui_buffer *buffer, std::string_view ciphertext);
 
-        std::optional<std::string> encrypt(struct t_gui_buffer *buffer, const char *source, std::vector<std::string>&& target, const char *message);
+        std::optional<std::string> encrypt(struct t_gui_buffer *buffer, std::string_view source, std::vector<std::string>&& target, std::string_view message);
 
-        std::optional<std::string> verify(struct t_gui_buffer *buffer, const char *certificate);
+        std::optional<std::string> verify(struct t_gui_buffer *buffer, std::string_view certificate);
 
-        std::optional<std::string> sign(struct t_gui_buffer *buffer, const char *source, const char *message);
+        std::optional<std::string> sign(struct t_gui_buffer *buffer, std::string_view source, std::string_view message);
     };
 }

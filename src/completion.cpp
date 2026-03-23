@@ -7,6 +7,7 @@
 #include <string.h>
 #include <string>
 #include <stdio.h>
+#include <fmt/core.h>
 #include <strophe.h>
 #include <weechat/weechat-plugin.h>
 
@@ -139,13 +140,7 @@ void completion__init()
     default_template = weechat_config_string(option);
     if (!weechat_strcasestr(default_template, "%(xmpp_account)"))
     {
-        size_t length = snprintf(NULL, 0, "%s|%s",
-                                default_template,
-                                "%(xmpp_account)") + 1;
-        std::string new_template(length - 1, '\0');
-        snprintf(new_template.data(), length, "%s|%s",
-                 default_template,
-                 "%(xmpp_account)");
+        std::string new_template = fmt::format("{}|{}", default_template, "%(xmpp_account)");
         weechat_config_option_set(option, new_template.c_str(), 1);
     }
 }

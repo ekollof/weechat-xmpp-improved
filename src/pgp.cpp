@@ -110,7 +110,7 @@ weechat::xmpp::pgp::~pgp()
     gpgme_release(this->gpgme);
 }
 
-std::optional<std::string> weechat::xmpp::pgp::encrypt(struct t_gui_buffer *buffer, const char *source, std::vector<std::string>&& targets, const char *message)
+std::optional<std::string> weechat::xmpp::pgp::encrypt(struct t_gui_buffer *buffer, std::string_view source, std::vector<std::string>&& targets, std::string_view message)
 {
     struct data_guard {
         gpgme_data_t h = nullptr;
@@ -121,7 +121,7 @@ std::optional<std::string> weechat::xmpp::pgp::encrypt(struct t_gui_buffer *buff
     gpgme_key_t keys[3] = {nullptr, nullptr, nullptr};
     gpgme_error_t err;
 
-    err = gpgme_data_new_from_mem(&in_g.h, message, strlen(message), false);
+    err = gpgme_data_new_from_mem(&in_g.h, message.data(), message.size(), false);
     if (err) goto encrypt_finish;
 
     err = gpgme_data_new(&out_g.h);
@@ -132,7 +132,7 @@ std::optional<std::string> weechat::xmpp::pgp::encrypt(struct t_gui_buffer *buff
         err = gpgme_get_key(this->gpgme, target.data(), &keys[0], false);
         if (err) goto encrypt_finish;
     }
-    err = gpgme_get_key(this->gpgme, source, &keys[1], false);
+    err = gpgme_get_key(this->gpgme, source.data(), &keys[1], false);
     if (err) goto encrypt_finish;
 
     err = gpgme_op_encrypt(this->gpgme, keys, GPGME_ENCRYPT_ALWAYS_TRUST, in_g.h, out_g.h);
@@ -163,7 +163,7 @@ encrypt_finish:
 }
 
 //"hQIMAzlgcSFDGLKEAQ//cGG3DFughC5xBF7xeXz1RdayOfhBAPfoZIq62MVuSnfS\nMfig65Zxz1LtAnnFq90TZY7hiHPBtVlYqg47AbSoYweMdpXsKgbUrd3NNf6k2nsZ\nUkChCtyGuHi8pTzclfle7gT0nNXJ1WcLCZ4ORZCrg3D5A+YTO9tdmE8GQsTT6TdV\nbbxF5yR4JF5SzFhuFL3ZoXPXrWylcwKXarYfoOTa6M2vSsCwApVIXQgJ/FI46sLT\nb0B/EVCjFvcvjkNr7+K7mQtth+x0a0pC4BtEhRvnIRAe/sdGp8NY+DP76clx4U+k\nIDG4H92F632pR6eEIoZttnBoaj0O4sTVAJCao5AoecR4w2FDqBWWtIyQp5vbo17/\nMtzungkk5vQP6Jhu36wa+JKpbHoxomVpHPZfAtIoyaY6pzQ0bUomIlSVpbZDvF68\nZKTlFd89Pm5x0JO5gsVYvf+N9Ed33d34n/0CFz5K5Tgu4Bk0v4LWEy3wtNsuQB4p\nkBSZJk7I2BakcRwP0zwld6rRHFIX1pb7zqThBPZGB9RkWPltiktUTibOII12tWhi\nksFpQJ8l1A8h9vM5kUXIeD6H2yP0CBUEIZF3Sf+jiSRZ/1/n3KoUrKEzkf/y4xgv\n1LA4pMjNLEr6J2fqGyYRFv4Bxv3PIvF17V5CwOtguxGRJHJXdIzm1BSHSqXxHezS\nYAFXMUb9fw3QX7Ed23KiyZjzd/LRsQBqMs9RsYyZB2PqF9x84lQYYbE8lErrryvK\nUEtmJKPw3Hvb7kgGox5vl5+KCg9q64EU9TgQpufYNShKtDz7Fsvc+ncgZoshDUeo\npw==\n=euIB"
-std::optional<std::string> weechat::xmpp::pgp::decrypt(struct t_gui_buffer *buffer, const char *ciphertext)
+std::optional<std::string> weechat::xmpp::pgp::decrypt(struct t_gui_buffer *buffer, std::string_view ciphertext)
 {
     struct data_guard {
         gpgme_data_t h = nullptr;
@@ -174,11 +174,8 @@ std::optional<std::string> weechat::xmpp::pgp::decrypt(struct t_gui_buffer *buff
     std::string keyids;
     gpgme_error_t err;
 
-    size_t buf_len = strlen(PGP_MESSAGE_HEADER) + strlen(ciphertext) + strlen(PGP_MESSAGE_FOOTER) + 1;
-    auto buf = std::make_unique<char[]>(buf_len);
-    buf_len = snprintf(buf.get(), buf_len, PGP_MESSAGE_HEADER "%s" PGP_MESSAGE_FOOTER, ciphertext);
-
-    err = gpgme_data_new_from_mem(&in_g.h, buf.get(), buf_len, false);
+    std::string buf = fmt::format(PGP_MESSAGE_HEADER "{}" PGP_MESSAGE_FOOTER, ciphertext);
+    err = gpgme_data_new_from_mem(&in_g.h, buf.data(), buf.size(), false);
     if (err) goto decrypt_finish;
 
     err = gpgme_data_new(&out_g.h);
@@ -214,7 +211,7 @@ decrypt_finish:
     return decrypted;
 }
 
-std::optional<std::string> weechat::xmpp::pgp::verify(struct t_gui_buffer *buffer, const char *certificate)
+std::optional<std::string> weechat::xmpp::pgp::verify(struct t_gui_buffer *buffer, std::string_view certificate)
 {
     struct data_guard {
         gpgme_data_t h = nullptr;
@@ -225,11 +222,8 @@ std::optional<std::string> weechat::xmpp::pgp::verify(struct t_gui_buffer *buffe
     gpgme_verify_result_t vrf_result = nullptr;
     gpgme_error_t err;
 
-    size_t buf_len = strlen(PGP_SIGNATURE_HEADER) + strlen(certificate) + strlen(PGP_SIGNATURE_FOOTER) + 1;
-    auto buf = std::make_unique<char[]>(buf_len);
-    buf_len = snprintf(buf.get(), buf_len, PGP_SIGNATURE_HEADER "%s" PGP_SIGNATURE_FOOTER, certificate);
-
-    err = gpgme_data_new_from_mem(&in_g.h, buf.get(), buf_len, false);
+    std::string buf = fmt::format(PGP_SIGNATURE_HEADER "{}" PGP_SIGNATURE_FOOTER, certificate);
+    err = gpgme_data_new_from_mem(&in_g.h, buf.data(), buf.size(), false);
     if (err) goto verify_finish;
 
     err = gpgme_data_new(&out_g.h);
@@ -266,7 +260,7 @@ verify_finish:
     return result;
 }
 
-std::optional<std::string> weechat::xmpp::pgp::sign(struct t_gui_buffer *buffer, const char *source, const char *message)
+std::optional<std::string> weechat::xmpp::pgp::sign(struct t_gui_buffer *buffer, std::string_view source, std::string_view message)
 {
     struct data_guard {
         gpgme_data_t h = nullptr;
@@ -280,7 +274,7 @@ std::optional<std::string> weechat::xmpp::pgp::sign(struct t_gui_buffer *buffer,
     std::string signature;
     gpgme_error_t err;
 
-    err = gpgme_data_new_from_mem(&in_g.h, (char *)message, strlen(message), false);
+    err = gpgme_data_new_from_mem(&in_g.h, message.data(), message.size(), false);
     if (err) goto sign_finish;
 
     err = gpgme_data_new(&out_g.h);
@@ -294,20 +288,20 @@ std::optional<std::string> weechat::xmpp::pgp::sign(struct t_gui_buffer *buffer,
     }
     if (err) goto sign_finish;
 
-    err = gpgme_get_key(this->gpgme, source, &key_g.k, false);
+    err = gpgme_get_key(this->gpgme, source.data(), &key_g.k, false);
     if (err) {
-        weechat_printf(nullptr, "(gpg) get key fail for %s", source);
+        weechat_printf(nullptr, "(gpg) get key fail for %s", source.data());
         goto sign_finish;
     }
     err = gpgme_signers_add(this->gpgme, key_g.k);
     if (err) {
-        weechat_printf(nullptr, "(gpg) add key fail for %s", source);
+        weechat_printf(nullptr, "(gpg) add key fail for %s", source.data());
         goto sign_finish;
     }
 
     err = gpgme_op_sign(this->gpgme, in_g.h, out_g.h, GPGME_SIG_MODE_DETACH);
     if (err) {
-        weechat_printf(nullptr, "(gpg) sign fail for %s", source);
+        weechat_printf(nullptr, "(gpg) sign fail for %s", source.data());
         goto sign_finish;
     }
     if (gpgme_sign_result_t sgn_result = gpgme_op_sign_result(this->gpgme);

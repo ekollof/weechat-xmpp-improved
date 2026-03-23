@@ -153,7 +153,7 @@ void message__htmldecode(char *dest, const char *src, size_t n)
 }
 
 std::string message__decode(weechat::account *account,
-                           const char *text)
+                           std::string_view text)
 {
     int rc;
     regex_t reg;
@@ -170,13 +170,13 @@ std::string message__decode(weechat::account *account,
             _("%s%s: error compiling message formatting regex: %s"),
             weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
             msgbuf);
-        return text;
+        return std::string(text);
     }
 
     std::string decoded_text;
     decoded_text.reserve(MESSAGE_MAX_LENGTH);
 
-    for (cursor = text; regexec(&reg, cursor, max_groups, groups, 0) == 0; cursor += offset)
+    for (cursor = text.data(); regexec(&reg, cursor, max_groups, groups, 0) == 0; cursor += offset)
     {
         offset = groups[0].rm_eo;
 

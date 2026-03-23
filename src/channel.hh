@@ -148,7 +148,7 @@ namespace weechat
         struct t_gui_buffer *buffer;
 
     public:
-        channel(weechat::account& account, enum chat_type type, const char *id, const char *name);
+        channel(weechat::account& account, enum chat_type type, std::string_view id, std::string_view name);
         ~channel();
 
         void set_transport(enum weechat::channel::transport transport, int force);

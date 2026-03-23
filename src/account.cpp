@@ -10,6 +10,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <fmt/core.h>
+#include <fmt/ranges.h>
 #include <libxml/xmlwriter.h>
 #include <libxml/xmlerror.h>
 #include <libxml/parser.h>
@@ -702,23 +703,14 @@ int weechat::account::timer_cb(const void *pointer, void *data, int remaining_ca
 
 void weechat::account::save_pgp_keys()
 {
-    std::string keys_str;
-    
+    std::vector<std::string> key_entries;
     for (auto& channel_pair : channels)
     {
         auto& channel = channel_pair.second;
-        if (!channel.pgp.ids.empty())
-        {
-            for (const auto& key : channel.pgp.ids)
-            {
-                if (!keys_str.empty())
-                    keys_str += ",";
-                keys_str += channel.id + ":" + key;
-            }
-        }
+        for (const auto& key : channel.pgp.ids)
+            key_entries.push_back(fmt::format("{}:{}", channel.id, key));
     }
-    
-    option_pgp_keys = keys_str;
+    option_pgp_keys = fmt::format("{}", fmt::join(key_entries, ","));
 }
 
 void weechat::account::load_pgp_keys()
@@ -1323,12 +1315,7 @@ void weechat::account::caps_cache_save(const std::string& verification_hash,
         lmdb::txn txn = lmdb::txn::begin(mam_db_env, parentTransaction, 0);
         
         // Join features with commas
-        std::string features_str;
-        for (size_t i = 0; i < features.size(); i++)
-        {
-            if (i > 0) features_str += ",";
-            features_str += features[i];
-        }
+        std::string features_str = fmt::format("{}", fmt::join(features, ","));
         
         MDB_val key = {verification_hash.size(), (void*)verification_hash.data()};
         MDB_val value = {features_str.size(), (void*)features_str.data()};

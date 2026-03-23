@@ -340,6 +340,126 @@ even without server-side injection. To disable:
 /set xmpp.look.outgoing_link_preview off
 ```
 
+### Message Correction — `/edit` (XEP-0308)
+
+Replaces the last message you sent in the current buffer with a corrected
+version. The original message is updated in place in recipients' clients that
+support XEP-0308.
+
+```
+/edit <new message text>
+```
+
+**How it works:**
+
+1. Type `/edit` followed by the corrected text.
+2. The plugin finds your most recent sent message in the buffer (identified by
+   its `self_msg` + `id_` tags) and sends a correction stanza referencing that
+   message's original ID.
+3. In the local buffer the line is updated to show the corrected text with a
+   `[edit]` prefix so you can see the correction was applied.
+
+**Notes:**
+
+- Only your *last* sent message can be corrected — there is no way to correct
+  an earlier message.
+- In MUC rooms, correction uses the server-assigned stanza-id (XEP-0359) when
+  available, falling back to the origin-id.
+- Recipients who do not support XEP-0308 will receive the correction as a new
+  message with a `[CORRECTION]` fallback body.
+- You must be connected and inside a chat buffer (PM or MUC) to use `/edit`.
+
+**Example:**
+
+```
+you: Hello eweryone!
+/edit Hello everyone!
+you: [edit] Hello everyone!
+```
+
+---
+
+### Message Retraction — `/retract` (XEP-0424)
+
+Deletes the last message you sent in the current buffer.
+
+```
+/retract
+```
+
+Takes no arguments. Just run it in the buffer where you sent the message you
+want to remove.
+
+**How it works:**
+
+1. The plugin searches backwards through the buffer for the most recent line
+   tagged `self_msg` + `id_` — i.e. your last sent message.
+2. A retraction stanza is sent referencing that message's ID. In MUC rooms the
+   server-assigned stanza-id (XEP-0359) is used, which is required by the spec.
+3. Supporting clients replace the original message with a tombstone. The local
+   buffer shows `[Message deleted]` in place of the original text.
+4. A `store` hint (XEP-0334) is included so MAM archives record the retraction,
+   and other devices that sync history will also see the tombstone.
+
+**Notes:**
+
+- Only your *last* sent message can be retracted — there is no way to target an
+  earlier one.
+- Retraction is **not a guarantee**: recipients who already received the message
+  keep it. Clients that do not support XEP-0424 will instead display the
+  fallback body: `[user] retracted a previous message, but it's unsupported by
+  your client.`
+- You cannot retract another user's message with `/retract`. Use `/moderate`
+  (XEP-0425) for that (requires MUC moderator role).
+- You must be connected and inside a chat buffer (PM or MUC) to use `/retract`.
+
+**Example:**
+
+```
+you: I should not have said that
+/retract
+-- xmpp: message retraction sent
+you: [Message deleted]
+```
+
+---
+
+### Message Reactions — `/react` (XEP-0444)
+
+Sends an emoji reaction to the last received message in the current buffer.
+
+```
+/react <emoji>
+```
+
+**How it works:**
+
+1. Type `/react` followed by one or more emoji (the entire argument after
+   `/react` is used as the reaction string).
+2. The plugin finds the most recent message in the buffer that was *not* sent
+   by you (identified by having an `id_` tag and no `self_msg` tag).
+3. A reaction stanza is sent referencing that message's ID.
+
+**Notes:**
+
+- Reactions target the last *incoming* message, not your own messages.
+- In MUC rooms, the stanza-id (XEP-0359) is used when available.
+- Multiple emoji in a single argument are sent as one reaction (e.g.,
+  `/react 👍❤️` sends the two-emoji string as a single reaction).
+- Clients that do not support XEP-0444 ignore the reaction stanza silently.
+- You must be connected and inside a chat buffer to use `/react`.
+
+**Examples:**
+
+```
+/react 👍
+/react ❤️
+/react 😂
+/react 🎉
+```
+
+---
+
 ### Ad-hoc Commands and Data Forms (XEP-0050 / XEP-0004)
 
 ```

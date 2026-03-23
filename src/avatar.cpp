@@ -11,6 +11,7 @@
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
 #include <weechat/weechat-plugin.h>
+#include <fmt/format.h>
 
 #include "avatar.hh"
 #include "account.hh"
@@ -24,12 +25,12 @@ std::string weechat::avatar::calculate_hash(const std::vector<uint8_t>& data)
     unsigned char hash[SHA_DIGEST_LENGTH];
     SHA1(data.data(), data.size(), hash);
     
-    char hex[SHA_DIGEST_LENGTH * 2 + 1];
+    std::string hex;
+    hex.reserve(SHA_DIGEST_LENGTH * 2);
     for (int i = 0; i < SHA_DIGEST_LENGTH; i++)
-        sprintf(hex + (i * 2), "%02x", hash[i]);
-    hex[SHA_DIGEST_LENGTH * 2] = '\0';
+        hex += fmt::format("{:02x}", hash[i]);
     
-    return std::string(hex);
+    return hex;
 }
 
 std::string weechat::avatar::get_cache_dir(const account& acc)
@@ -38,10 +39,10 @@ std::string weechat::avatar::get_cache_dir(const account& acc)
     if (!weechat_dir)
         return "";
     
-    std::string cache_dir = std::string(weechat_dir) + "/xmpp_avatars/" + acc.name.data();
+    std::string cache_dir = fmt::format("{}/xmpp_avatars/{}", weechat_dir, acc.name.data());
     
     // Create directory if it doesn't exist
-    mkdir((std::string(weechat_dir) + "/xmpp_avatars").c_str(), 0755);
+    mkdir(fmt::format("{}/xmpp_avatars", weechat_dir).c_str(), 0755);
     mkdir(cache_dir.c_str(), 0755);
     
     return cache_dir;
@@ -167,11 +168,7 @@ std::string weechat::avatar::render_unicode_blocks(
     int color_idx = (hash >> 8) % (sizeof(colors) / sizeof(colors[0]));
     
     // Format: <color><char><reset>
-    char result[128];
-    snprintf(result, sizeof(result), "\x19%03d%s", 
-             colors[color_idx], avatar_chars[char_idx]);
-    
-    return std::string(result);
+    return fmt::format("\x19{:03d}{}", colors[color_idx], avatar_chars[char_idx]);
 }
 
 void weechat::avatar::request_metadata(account& /*acc*/, const char * /*jid*/)

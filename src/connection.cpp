@@ -6,6 +6,8 @@
 #include <charconv>
 #include <thread>
 #include <filesystem>
+#include <sstream>
+#include <iomanip>
 #include <time.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -110,12 +112,13 @@ void append_raw_xml_trace(weechat::account &account,
     time_t now = time(NULL);
     struct tm local_tm = {0};
     localtime_r(&now, &local_tm);
-    char timestamp[32] = {0};
-    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &local_tm);
+    std::ostringstream ts_oss;
+    ts_oss << std::put_time(&local_tm, "%Y-%m-%d %H:%M:%S");
+    std::string timestamp = ts_oss.str();
 
     const char *stanza_name = xmpp_stanza_get_name(stanza);
     fprintf(fp, "[%s] %s %s\n%s\n\n",
-            timestamp,
+            timestamp.c_str(),
             direction ? direction : "XML",
             stanza_name ? stanza_name : "(unknown)",
             xml);
@@ -203,24 +206,24 @@ bool weechat::connection::time_handler(xmpp_stanza_t *stanza)
     struct tm *tm_local = localtime(&now);
     
     // Format UTC time as ISO 8601: YYYY-MM-DDTHH:MM:SSZ
-    char utc_str[32];
-    strftime(utc_str, sizeof(utc_str), "%Y-%m-%dT%H:%M:%SZ", tm_utc);
+    std::ostringstream utc_oss;
+    utc_oss << std::put_time(tm_utc, "%Y-%m-%dT%H:%M:%SZ");
+    std::string utc_str = utc_oss.str();
     
     // Calculate timezone offset
     long tz_offset = tm_local->tm_gmtoff;  // Offset in seconds
     int tz_hours = tz_offset / 3600;
     int tz_mins = abs((tz_offset % 3600) / 60);
-    char tzo_str[16];
-    snprintf(tzo_str, sizeof(tzo_str), "%+03d:%02d", tz_hours, tz_mins);
+    std::string tzo_str = fmt::format("{:+03d}:{:02d}", tz_hours, tz_mins);
 
     query.add_child(libstrophe::stanza(account.context)
                     .set_name("utc")
                     .add_child(libstrophe::stanza(account.context)
-                               .set_text(utc_str)));
+                               .set_text(utc_str.c_str())));
     query.add_child(libstrophe::stanza(account.context)
                     .set_name("tzo")
                     .add_child(libstrophe::stanza(account.context)
-                               .set_text(tzo_str)));
+                               .set_text(tzo_str.c_str())));
 
     reply.add_child(std::move(query));
 
