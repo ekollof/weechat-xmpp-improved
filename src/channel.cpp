@@ -1492,7 +1492,25 @@ void weechat::channel::send_link_preview(const std::string& to, const std::strin
             std::string og_url         = extract_og("url");
             std::string og_image       = extract_og("image");
 
-            // Only send a preview stanza if we got at least a title or og:url
+            // Fallback: use <title> when og:title is absent
+            if (og_title.empty()) {
+                // head_html is lowercased; offsets are identical to html up to head_end
+                auto t0 = head_html.find("<title");
+                if (t0 != std::string::npos) {
+                    auto t1 = head_html.find('>', t0);          // end of opening tag
+                    auto t2 = head_html.find("</title>", t0);   // closing tag
+                    if (t1 != std::string::npos && t2 != std::string::npos && t2 > t1 + 1) {
+                        // Use original-case slice from html (same offsets)
+                        og_title = html.substr(t1 + 1, t2 - (t1 + 1));
+                    }
+                }
+            }
+
+            // Fallback: use the request URL when og:url is absent
+            if (og_url.empty())
+                og_url = task->url;
+
+            // Only send a preview stanza if we got at least a title or url
             if (og_title.empty() && og_url.empty()) {
                 delete task;
                 return WEECHAT_RC_OK;
