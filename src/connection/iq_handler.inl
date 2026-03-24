@@ -528,6 +528,88 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
         }
     }
 
+    // XEP-0060: PubSub subscriptions result — /feed <service> (default, no --all)
+    {
+        xmpp_stanza_t *pubsub_subs = xmpp_stanza_get_child_by_name_and_ns(
+            stanza, "pubsub", "http://jabber.org/protocol/pubsub");
+        if (pubsub_subs && id && type && weechat_strcasecmp(type, "result") == 0)
+        {
+            auto subs_it = account.pubsub_subscriptions_queries.find(id);
+            if (subs_it != account.pubsub_subscriptions_queries.end())
+            {
+                std::string feed_service = subs_it->second;
+                account.pubsub_subscriptions_queries.erase(subs_it);
+
+                xmpp_stanza_t *subscriptions = xmpp_stanza_get_child_by_name(pubsub_subs, "subscriptions");
+                int node_count = 0;
+
+                if (subscriptions)
+                {
+                    for (xmpp_stanza_t *sub = xmpp_stanza_get_children(subscriptions);
+                         sub; sub = xmpp_stanza_get_next(sub))
+                    {
+                        const char *sub_name = xmpp_stanza_get_name(sub);
+                        if (!sub_name || weechat_strcasecmp(sub_name, "subscription") != 0)
+                            continue;
+
+                        const char *sub_state = xmpp_stanza_get_attribute(sub, "subscription");
+                        const char *node_attr = xmpp_stanza_get_attribute(sub, "node");
+
+                        if (!node_attr || !sub_state
+                            || weechat_strcasecmp(sub_state, "subscribed") != 0)
+                            continue;
+
+                        std::string node_name(node_attr);
+                        std::string feed_key = fmt::format("{}/{}", feed_service, node_name);
+
+                        // Ensure FEED buffer exists
+                        account.channels.try_emplace(
+                            feed_key,
+                            account,
+                            weechat::channel::chat_type::FEED,
+                            feed_key,
+                            feed_key);
+
+                        // Fetch items for this subscribed node
+                        std::array<xmpp_stanza_t *, 2> children = {nullptr, nullptr};
+                        children[0] = stanza__iq_pubsub_items(account.context, nullptr, node_name.c_str());
+                        children[0] = stanza__iq_pubsub(account.context, nullptr, children.data(),
+                                                        with_noop("http://jabber.org/protocol/pubsub"));
+
+                        xmpp_string_guard uid_g(account.context, xmpp_uuid_gen(account.context));
+                        const char *uid = uid_g.ptr;
+
+                        children[0] = stanza__iq(account.context, nullptr, children.data(),
+                                                 nullptr, uid,
+                                                 account.jid().data(),
+                                                 feed_service.c_str(),
+                                                 "get");
+
+                        if (uid)
+                            account.pubsub_fetch_ids[uid] = {feed_service, node_name};
+
+                        this->send(children[0]);
+                        xmpp_stanza_release(children[0]);
+                        node_count++;
+                    }
+                }
+
+                if (node_count == 0)
+                    weechat_printf(account.buffer,
+                                   "%sNo subscribed feeds found on %s. "
+                                   "Try: /feed %s --all",
+                                   weechat_prefix("network"),
+                                   feed_service.c_str(),
+                                   feed_service.c_str());
+                else
+                    weechat_printf(account.buffer,
+                                   "%sFeed subscriptions on %s: fetching %d subscribed node(s)",
+                                   weechat_prefix("network"),
+                                   feed_service.c_str(), node_count);
+            }
+        }
+    }
+
     // XEP-0363: HTTP File Upload - handle upload slot response
     xmpp_stanza_t *slot = xmpp_stanza_get_child_by_name_and_ns(
         stanza, "slot", "urn:xmpp:http:upload:0");

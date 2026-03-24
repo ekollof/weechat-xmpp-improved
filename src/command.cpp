@@ -5692,18 +5692,28 @@ int command__feed(const void *pointer, void *data,
     if (argc < 2)
     {
         weechat_printf(buffer,
-                       _("%s%s: usage: /feed <service-jid> [<node>]"),
+                       _("%s%s: usage: /feed <service-jid> [--all | <node>]"),
                        weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
         return WEECHAT_RC_OK;
     }
 
     std::string service_jid = argv[1];
 
-    if (argc >= 3)
+    // Check for --all flag anywhere in args after service-jid
+    bool fetch_all = false;
+    std::string node_name;
+    for (int i = 2; i < argc; ++i)
+    {
+        if (std::string_view(argv[i]) == "--all")
+            fetch_all = true;
+        else if (node_name.empty())
+            node_name = argv[i];
+    }
+
+    if (!node_name.empty())
     {
         // Specific node requested: fetch items directly.
-        std::string node_name = argv[2];
-        std::string feed_key  = fmt::format("{}/{}", service_jid, node_name);
+        std::string feed_key = fmt::format("{}/{}", service_jid, node_name);
 
         // Ensure the FEED buffer exists before we send the IQ so the result
         // handler can find it.
@@ -5717,9 +5727,6 @@ int command__feed(const void *pointer, void *data,
         weechat_printf(buffer, "%sFetching PubSub feed %s from %s (XEP-0060)…",
                        weechat_prefix("network"), node_name.c_str(), service_jid.c_str());
 
-        // Build and send: <iq type="get" to="service_jid">
-        //                   <pubsub><items node="node_name"/></pubsub>
-        //                 </iq>
         std::array<xmpp_stanza_t *, 2> children = {nullptr, nullptr};
         children[0] = stanza__iq_pubsub_items(ptr_account->context, nullptr, node_name.c_str());
         children[0] = stanza__iq_pubsub(ptr_account->context, nullptr, children.data(),
@@ -5740,11 +5747,10 @@ int command__feed(const void *pointer, void *data,
         ptr_account->connection.send(children[0]);
         xmpp_stanza_release(children[0]);
     }
-    else
+    else if (fetch_all)
     {
-        // No node given: discover all nodes on the service via disco#items,
-        // then fetch each one automatically.
-        weechat_printf(buffer, "%sDiscovering PubSub nodes on %s…",
+        // --all: discover all nodes via disco#items and fetch each one.
+        weechat_printf(buffer, "%sDiscovering all PubSub nodes on %s…",
                        weechat_prefix("network"), service_jid.c_str());
 
         xmpp_string_guard uid_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
@@ -5761,6 +5767,41 @@ int command__feed(const void *pointer, void *data,
 
         if (uid)
             ptr_account->pubsub_disco_queries[uid] = service_jid;
+
+        ptr_account->connection.send(iq);
+        xmpp_stanza_release(iq);
+    }
+    else
+    {
+        // Default: query subscriptions and fetch only subscribed nodes.
+        weechat_printf(buffer, "%sFetching subscribed PubSub feeds from %s…",
+                       weechat_prefix("network"), service_jid.c_str());
+
+        xmpp_string_guard uid_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+        const char *uid = uid_g.ptr;
+
+        // <iq type="get" to="service">
+        //   <pubsub xmlns="http://jabber.org/protocol/pubsub">
+        //     <subscriptions/>
+        //   </pubsub>
+        // </iq>
+        xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "get", uid);
+        xmpp_stanza_set_to(iq, service_jid.c_str());
+
+        xmpp_stanza_t *pubsub = xmpp_stanza_new(ptr_account->context);
+        xmpp_stanza_set_name(pubsub, "pubsub");
+        xmpp_stanza_set_ns(pubsub, "http://jabber.org/protocol/pubsub");
+
+        xmpp_stanza_t *subs = xmpp_stanza_new(ptr_account->context);
+        xmpp_stanza_set_name(subs, "subscriptions");
+        xmpp_stanza_add_child(pubsub, subs);
+        xmpp_stanza_release(subs);
+
+        xmpp_stanza_add_child(iq, pubsub);
+        xmpp_stanza_release(pubsub);
+
+        if (uid)
+            ptr_account->pubsub_subscriptions_queries[uid] = service_jid;
 
         ptr_account->connection.send(iq);
         xmpp_stanza_release(iq);

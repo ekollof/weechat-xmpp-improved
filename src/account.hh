@@ -215,9 +215,13 @@ namespace weechat
         // Maps IQ id → (pubsub_service_jid, node_name)
         std::unordered_map<std::string, std::pair<std::string, std::string>> pubsub_fetch_ids;
 
-        // XEP-0060: pending disco#items queries for PubSub node enumeration (/feed <service>).
+        // XEP-0060: pending disco#items queries for PubSub node enumeration (/feed <service> --all).
         // Maps IQ id → service_jid
         std::unordered_map<std::string, std::string> pubsub_disco_queries;
+
+        // XEP-0060: pending subscriptions queries (/feed <service>).
+        // Maps IQ id → service_jid
+        std::unordered_map<std::string, std::string> pubsub_subscriptions_queries;
 
         // XEP-0191: Blocking Command — pending unblock picker (non-owning; picker owns itself)
         weechat::ui::picker<std::string> *blocklist_picker = nullptr;

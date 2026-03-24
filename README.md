@@ -647,7 +647,9 @@ Required fields are marked with `*`. Multi-step sessions are supported.
 | `/roster add <jid> [name]` | Add a contact |
 | `/roster del <jid>` | Remove a contact |
  | `/list [keywords]` | Search public MUC rooms (XEP-0433) |
- | `/feed <service-jid> <node>` | Fetch a PubSub feed node into a dedicated buffer (XEP-0060) |
+ | `/feed <service-jid>` | Fetch all subscribed PubSub nodes from a service (XEP-0060) |
+ | `/feed <service-jid> --all` | Discover and fetch all PubSub nodes on a service via disco#items |
+ | `/feed <service-jid> <node>` | Fetch a specific PubSub node directly into a dedicated buffer |
  | `/bookmark` | List bookmarks |
 | `/bookmark add [jid] [name]` | Add a bookmark |
 | `/bookmark del <jid>` | Remove a bookmark |
