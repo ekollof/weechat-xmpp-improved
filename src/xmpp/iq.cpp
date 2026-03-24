@@ -66,7 +66,8 @@ xmpp_stanza_t *stanza__iq_pubsub(xmpp_ctx_t *context, xmpp_stanza_t *base,
     return parent;
 }
 
-xmpp_stanza_t *stanza__iq_pubsub_items(xmpp_ctx_t *context, xmpp_stanza_t *base, const char *node)
+xmpp_stanza_t *stanza__iq_pubsub_items(xmpp_ctx_t *context, xmpp_stanza_t *base, const char *node,
+                                       int max_items)
 {
     xmpp_stanza_t *parent = base;
 
@@ -78,6 +79,12 @@ xmpp_stanza_t *stanza__iq_pubsub_items(xmpp_ctx_t *context, xmpp_stanza_t *base,
 
     if (node)
         xmpp_stanza_set_attribute(parent, "node", node);
+
+    if (max_items > 0)
+    {
+        auto s = std::to_string(max_items);
+        xmpp_stanza_set_attribute(parent, "max_items", s.c_str());
+    }
 
     return parent;
 }

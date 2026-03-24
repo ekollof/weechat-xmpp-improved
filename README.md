@@ -650,6 +650,7 @@ Required fields are marked with `*`. Multi-step sessions are supported.
  | `/feed <service-jid>` | Fetch all subscribed PubSub nodes from a service (XEP-0060) |
  | `/feed <service-jid> --all` | Discover and fetch all PubSub nodes on a service via disco#items |
  | `/feed <service-jid> <node>` | Fetch a specific PubSub node directly into a dedicated buffer |
+ | `/feed ... --limit N` | Override the per-node item limit (default: 20) |
  | `/bookmark` | List bookmarks |
 | `/bookmark add [jid] [name]` | Add a bookmark |
 | `/bookmark del <jid>` | Remove a bookmark |

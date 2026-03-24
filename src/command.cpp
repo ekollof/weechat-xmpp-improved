@@ -5692,20 +5692,30 @@ int command__feed(const void *pointer, void *data,
     if (argc < 2)
     {
         weechat_printf(buffer,
-                       _("%s%s: usage: /feed <service-jid> [--all | <node>]"),
+                       _("%s%s: usage: /feed <service-jid> [--all | <node>] [--limit N]"),
                        weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
         return WEECHAT_RC_OK;
     }
 
     std::string service_jid = argv[1];
 
-    // Check for --all flag anywhere in args after service-jid
+    // Check for --all flag and --limit N anywhere in args after service-jid
     bool fetch_all = false;
+    int  max_items = 20;   // default: request 20 most-recent items
     std::string node_name;
     for (int i = 2; i < argc; ++i)
     {
-        if (std::string_view(argv[i]) == "--all")
+        std::string_view arg(argv[i]);
+        if (arg == "--all")
             fetch_all = true;
+        else if (arg == "--limit" && i + 1 < argc)
+        {
+            char *end = nullptr;
+            long v = std::strtol(argv[i + 1], &end, 10);
+            if (end && *end == '\0' && v > 0)
+                max_items = static_cast<int>(v);
+            ++i;   // consume the value token
+        }
         else if (node_name.empty())
             node_name = argv[i];
     }
@@ -5728,7 +5738,7 @@ int command__feed(const void *pointer, void *data,
                        weechat_prefix("network"), node_name.c_str(), service_jid.c_str());
 
         std::array<xmpp_stanza_t *, 2> children = {nullptr, nullptr};
-        children[0] = stanza__iq_pubsub_items(ptr_account->context, nullptr, node_name.c_str());
+        children[0] = stanza__iq_pubsub_items(ptr_account->context, nullptr, node_name.c_str(), max_items);
         children[0] = stanza__iq_pubsub(ptr_account->context, nullptr, children.data(),
                                         with_noop("http://jabber.org/protocol/pubsub"));
 
@@ -6411,16 +6421,19 @@ void command__init()
     hook = weechat_hook_command(
         "feed",
         N_("fetch PubSub feeds from a service and display them in dedicated buffers (XEP-0060)"),
-        N_("<service-jid> [<node>]"),
+        N_("<service-jid> [--all | <node>] [--limit N]"),
         N_("service-jid: JID of the PubSub service (e.g. news.movim.eu)\n"
-           "       node: node name on the service (e.g. Phoronix)\n\n"
-           "Without a node: discovers all nodes on the service via disco#items\n"
-           "and automatically fetches each one into its own FEED buffer.\n\n"
-           "With a node: fetches that specific node directly.\n\n"
+           "      --all: discover all nodes on the service via disco#items\n"
+           "       node: node name on the service (e.g. Phoronix)\n"
+           "  --limit N: max items to fetch per node (default: 20)\n\n"
+           "Without --all or a node: fetches your subscribed nodes (XEP-0060 subscriptions).\n"
+           "If no subscriptions are found, a suggestion to use --all is shown.\n\n"
            "Examples:\n"
-           "  /feed news.movim.eu              (discover and fetch all nodes)\n"
-           "  /feed news.movim.eu Phoronix     (fetch one specific node)\n"
-           "  /feed pubsub.example.com my-node"),
+           "  /feed news.movim.eu                       (fetch subscribed nodes)\n"
+           "  /feed news.movim.eu --all                 (fetch all discovered nodes)\n"
+           "  /feed news.movim.eu --all --limit 50      (fetch up to 50 items per node)\n"
+           "  /feed news.movim.eu Phoronix              (fetch one specific node)\n"
+           "  /feed news.movim.eu Phoronix --limit 5"),
         NULL, &command__feed, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /feed");

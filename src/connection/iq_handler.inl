@@ -572,7 +572,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
 
                         // Fetch items for this subscribed node
                         std::array<xmpp_stanza_t *, 2> children = {nullptr, nullptr};
-                        children[0] = stanza__iq_pubsub_items(account.context, nullptr, node_name.c_str());
+                        children[0] = stanza__iq_pubsub_items(account.context, nullptr, node_name.c_str(), 20);
                         children[0] = stanza__iq_pubsub(account.context, nullptr, children.data(),
                                                         with_noop("http://jabber.org/protocol/pubsub"));
 
@@ -1227,7 +1227,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
 
                     // Fetch items for this node
                     std::array<xmpp_stanza_t *, 2> children = {nullptr, nullptr};
-                    children[0] = stanza__iq_pubsub_items(account.context, nullptr, node_name.c_str());
+                    children[0] = stanza__iq_pubsub_items(account.context, nullptr, node_name.c_str(), 20);
                     children[0] = stanza__iq_pubsub(account.context, nullptr, children.data(),
                                                     with_noop("http://jabber.org/protocol/pubsub"));
 

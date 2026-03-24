@@ -55,7 +55,8 @@ xmpp_stanza_t *stanza__iq(xmpp_ctx_t *context, xmpp_stanza_t *base,
 xmpp_stanza_t *stanza__iq_pubsub(xmpp_ctx_t *context, xmpp_stanza_t *base,
                                  xmpp_stanza_t **children, t_string ns);
 
-xmpp_stanza_t *stanza__iq_pubsub_items(xmpp_ctx_t *context, xmpp_stanza_t *base, const char *node);
+xmpp_stanza_t *stanza__iq_pubsub_items(xmpp_ctx_t *context, xmpp_stanza_t *base, const char *node,
+                                       int max_items = 0);
 
 xmpp_stanza_t *stanza__iq_pubsub_items_item(xmpp_ctx_t *context, xmpp_stanza_t *base,
                                             t_string id);
