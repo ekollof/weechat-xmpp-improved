@@ -5731,6 +5731,20 @@ int command__feed(const void *pointer, void *data,
         // Specific node requested: fetch items directly.
         std::string feed_key = fmt::format("{}/{}", service_jid, node_name);
 
+        // If no --before was given, check LMDB for a persisted RSM cursor so
+        // that successive /feed invocations automatically page forward through
+        // older items without the user having to copy-paste a cursor id.
+        if (before_cursor.empty())
+        {
+            std::string cursor_key = fmt::format("pubsub:{}", feed_key);
+            before_cursor = ptr_account->mam_cursor_get(cursor_key);
+            if (!before_cursor.empty())
+                weechat_printf(buffer,
+                               "%sResuming from saved cursor for %s/%s…",
+                               weechat_prefix("network"),
+                               service_jid.c_str(), node_name.c_str());
+        }
+
         // Ensure the FEED buffer exists before we send the IQ so the result
         // handler can find it.
         ptr_account->channels.try_emplace(
