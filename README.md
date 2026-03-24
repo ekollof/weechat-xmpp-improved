@@ -6,7 +6,7 @@ comprehensive set of XEPs targeting CCS2022 compliance.
 > **Fork of [bqv/weechat-xmpp](https://github.com/bqv/weechat-xmpp)**  
 > Original author: **Tony Olagbaiye** &lt;bqv@fron.io&gt;  
 > This fork is maintained at
-> [git.hackerheaven.org/ekollof/weechat-xmpp-improved](https://git.hackerheaven.org/ekollof/weechat-xmpp-improved)
+> [github.com/ekollof/weechat-xmpp-improved](https://github.com/ekollof/weechat-xmpp-improved)
 > and carries critical bug fixes, new XEP implementations, and ongoing
 > refactoring not yet merged upstream.
 
@@ -23,8 +23,9 @@ comprehensive set of XEPs targeting CCS2022 compliance.
 - **WeeChat 4.3.0+ compatibility**: Updated base64 API calls for newer WeeChat
   while retaining backwards compatibility.
 - **MAM (Message Archive Management)**:
-  - Fixed IQ routing: PM queries were sent to the contact's JID instead of the
-    local server domain.
+  - Fixed IQ routing: PM queries were sent to the bare server domain instead of
+    the user's own bare JID, causing `<service-unavailable/>` errors on every
+    PM catchup.
   - Fixed UTC timestamp parsing: `strptime` fills a UTC `struct tm` but
     `mktime` was interpreting it as local time, shifting all timestamps.
   - Fixed multi-page MAM results: the global discovery query stalled after the
@@ -220,7 +221,7 @@ platforms are **not routinely tested**. Known considerations:
 ### Build
 
 ```sh
-git clone --depth 1 git@git.hackerheaven.org:ekollof/weechat-xmpp-improved.git
+git clone --depth 1 git@github.com:ekollof/weechat-xmpp-improved.git
 cd weechat-xmpp-fixed
 make install-deps   # installs system packages (requires sudo)
 make

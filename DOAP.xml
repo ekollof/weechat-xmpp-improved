@@ -18,16 +18,16 @@
         >Weechat plugin for accessing XMPP, written in C++. This fork includes bug fixes and feature enhancements.</description>
 
     <homepage
-            rdf:resource='https://git.hackerheaven.org/ekollof/weechat-xmpp-improved'
+            rdf:resource='https://github.com/ekollof/weechat-xmpp-improved'
         />
     <bug-database
-            rdf:resource='https://git.hackerheaven.org/ekollof/weechat-xmpp-improved/issues'
+            rdf:resource='https://github.com/ekollof/weechat-xmpp-improved/issues'
         />
     <developer-forum rdf:resource='xmpp:weechat@muc.xa0.uk?join' />
     <support-forum rdf:resource='xmpp:weechat@muc.xa0.uk?join' />
 
     <license
-            rdf:resource='https://git.hackerheaven.org/ekollof/weechat-xmpp-improved/src/branch/master/LICENSE'
+            rdf:resource='https://github.com/ekollof/weechat-xmpp-improved/blob/master/LICENSE'
         />
 
     <language>en</language>
@@ -43,10 +43,10 @@
     <repository>
       <GitRepository>
         <browse
-                    rdf:resource='https://git.hackerheaven.org/ekollof/weechat-xmpp-improved'
+                    rdf:resource='https://github.com/ekollof/weechat-xmpp-improved'
                 />
         <location
-                    rdf:resource='https://git.hackerheaven.org/ekollof/weechat-xmpp-improved.git'
+                    rdf:resource='https://github.com/ekollof/weechat-xmpp-improved.git'
                 />
       </GitRepository>
     </repository>
@@ -296,11 +296,11 @@
     <implements>
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0313.html' />
-        <xmpp:status>partial</xmpp:status>
+        <xmpp:status>complete</xmpp:status>
         <xmpp:version>1.1.0</xmpp:version>
         <xmpp:note
                     xml:lang='en'
-                >Message Archive Management (MAM) v2 with persistent local caching</xmpp:note>
+                >Message Archive Management (MAM) v2 with persistent local caching; IQ routing fixed to address own bare JID for personal archive queries</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
 
@@ -710,6 +710,16 @@
         <xmpp:note xml:lang='en'>In-Band Registration — §3.1 /account register &lt;name&gt; &lt;jid&gt; &lt;password&gt;: new account registration before authentication; supports username/password flat fields, already-registered detection, OOB-redirect, and x:data form detection with helpful abort message. §3.2 /account unregister &lt;account&gt;: cancels the account on the server while authenticated. §3.3 /account password &lt;account&gt; &lt;new-password&gt;: in-band password change while authenticated (TLS required). §10: advertises jabber:iq:register in disco#info.</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
+
+    <release>
+      <Version>
+        <revision>0.4.1-fork</revision>
+        <created>2026-03-24</created>
+        <xmpp:note
+                    xml:lang='en'
+                >Bug fixes: XEP-0511 outgoing link preview double-send and missing &lt;body/&gt; element; &lt;title&gt; fallback for pages without OpenGraph metadata; MAM PM queries now correctly addressed to own bare JID instead of bare server domain; first-build no longer requires a pre-existing .depend file</xmpp:note>
+      </Version>
+    </release>
 
     <release>
       <Version>
