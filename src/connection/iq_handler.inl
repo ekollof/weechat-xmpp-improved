@@ -1118,6 +1118,61 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
 
             account.adhoc_queries.erase(iq_id);
         }
+
+        // XEP-0060: /feed <service> — auto-fetch all discovered nodes
+        if (iq_id && account.pubsub_disco_queries.count(iq_id))
+        {
+            std::string feed_service = account.pubsub_disco_queries[iq_id];
+            account.pubsub_disco_queries.erase(iq_id);
+
+            int node_count = 0;
+            xmpp_stanza_t *disco_item = xmpp_stanza_get_child_by_name(items_query, "item");
+            while (disco_item)
+            {
+                const char *node_attr = xmpp_stanza_get_attribute(disco_item, "node");
+                if (node_attr)
+                {
+                    std::string node_name(node_attr);
+                    std::string feed_key = fmt::format("{}/{}", feed_service, node_name);
+
+                    // Ensure FEED buffer exists
+                    account.channels.try_emplace(
+                        feed_key,
+                        account,
+                        weechat::channel::chat_type::FEED,
+                        feed_key,
+                        feed_key);
+
+                    // Fetch items for this node
+                    std::array<xmpp_stanza_t *, 2> children = {nullptr, nullptr};
+                    children[0] = stanza__iq_pubsub_items(account.context, nullptr, node_name.c_str());
+                    children[0] = stanza__iq_pubsub(account.context, nullptr, children.data(),
+                                                    with_noop("http://jabber.org/protocol/pubsub"));
+
+                    xmpp_string_guard uid_g(account.context, xmpp_uuid_gen(account.context));
+                    const char *uid = uid_g.ptr;
+
+                    children[0] = stanza__iq(account.context, nullptr, children.data(),
+                                             nullptr, uid,
+                                             account.jid().data(),
+                                             feed_service.c_str(),
+                                             "get");
+
+                    if (uid)
+                        account.pubsub_fetch_ids[uid] = {feed_service, node_name};
+
+                    this->send(children[0]);
+                    xmpp_stanza_release(children[0]);
+                    node_count++;
+                }
+                disco_item = xmpp_stanza_get_next(disco_item);
+            }
+
+            weechat_printf(account.buffer,
+                           "%sFeed discovery on %s: fetching %d node(s)",
+                           weechat_prefix("network"),
+                           feed_service.c_str(), node_count);
+        }
     }
 
     // XEP-0050: Ad-Hoc Commands — handle command execute/form result (type=result/error)

@@ -163,6 +163,7 @@ namespace weechat
         std::unordered_map<std::string, struct t_config_option *> options;
         
         std::unordered_set<std::string> user_disco_queries;
+        std::unordered_set<std::string> user_disco_items_queries;  // disco#items queries initiated by /disco items
         std::unordered_map<std::string, time_t> user_ping_queries;  // ping_id -> start_time
         std::unordered_map<std::string, std::string> caps_disco_queries;  // disco_id -> verification_hash
         std::unordered_map<std::string, std::string> upload_disco_queries;  // disco_id -> service_jid
@@ -210,9 +211,13 @@ namespace weechat
         };
         std::unordered_map<std::string, setvcard_query_info> setvcard_queries;  // iq_id -> info
 
-        // XEP-0060: pending pubsub item-fetch IQs triggered by <retract> events.
+        // XEP-0060: pending pubsub item-fetch IQs triggered by <retract> events or /feed.
         // Maps IQ id → (pubsub_service_jid, node_name)
         std::unordered_map<std::string, std::pair<std::string, std::string>> pubsub_fetch_ids;
+
+        // XEP-0060: pending disco#items queries for PubSub node enumeration (/feed <service>).
+        // Maps IQ id → service_jid
+        std::unordered_map<std::string, std::string> pubsub_disco_queries;
 
         // XEP-0191: Blocking Command — pending unblock picker (non-owning; picker owns itself)
         weechat::ui::picker<std::string> *blocklist_picker = nullptr;

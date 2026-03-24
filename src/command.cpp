@@ -4229,31 +4229,45 @@ int command__disco(const void *pointer, void *data,
         return WEECHAT_RC_OK;
     }
 
+    // Subcommand: /disco items [jid]
+    bool do_items = argc > 1 && weechat_strcasecmp(argv[1], "items") == 0;
+    int jid_arg = do_items ? 2 : 1;  // argv index of optional jid
+
     const char *target = NULL;
-    if (argc > 1)
-        target = argv[1];
+    if (argc > jid_arg)
+        target = argv[jid_arg];
     else
         target = xmpp_jid_domain(ptr_account->context, ptr_account->jid().data());
 
     xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
     const char *id = id_g.ptr;
-    ptr_account->user_disco_queries.insert(id);
-    
+
     xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "get", id);
     xmpp_stanza_set_to(iq, target);
-    
+
     xmpp_stanza_t *query = xmpp_stanza_new(ptr_account->context);
     xmpp_stanza_set_name(query, "query");
-    xmpp_stanza_set_ns(query, "http://jabber.org/protocol/disco#info");
-    
+
+    if (do_items)
+    {
+        xmpp_stanza_set_ns(query, "http://jabber.org/protocol/disco#items");
+        ptr_account->user_disco_items_queries.insert(id);
+    }
+    else
+    {
+        xmpp_stanza_set_ns(query, "http://jabber.org/protocol/disco#info");
+        ptr_account->user_disco_queries.insert(id);
+    }
+
     xmpp_stanza_add_child(iq, query);
     xmpp_stanza_release(query);
-    
-    ptr_account->connection.send( iq);
+
+    ptr_account->connection.send(iq);
     xmpp_stanza_release(iq);
     // freed by id_g
 
-    weechat_printf(buffer, "Querying service discovery for %s...", target);
+    weechat_printf(buffer, "Querying service discovery (%s) for %s...",
+                   do_items ? "items" : "info", target);
 
     return WEECHAT_RC_OK;
 }
@@ -5675,52 +5689,82 @@ int command__feed(const void *pointer, void *data,
         return WEECHAT_RC_OK;
     }
 
-    if (argc < 3)
+    if (argc < 2)
     {
         weechat_printf(buffer,
-                       _("%s%s: usage: /feed <service-jid> <node>"),
+                       _("%s%s: usage: /feed <service-jid> [<node>]"),
                        weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
         return WEECHAT_RC_OK;
     }
 
     std::string service_jid = argv[1];
-    std::string node_name   = argv[2];
-    std::string feed_key    = fmt::format("{}/{}", service_jid, node_name);
 
-    // Ensure the FEED buffer exists before we send the IQ so the result
-    // handler can find it.
-    ptr_account->channels.try_emplace(
-        feed_key,
-        *ptr_account,
-        weechat::channel::chat_type::FEED,
-        feed_key,
-        feed_key);
+    if (argc >= 3)
+    {
+        // Specific node requested: fetch items directly.
+        std::string node_name = argv[2];
+        std::string feed_key  = fmt::format("{}/{}", service_jid, node_name);
 
-    weechat_printf(buffer, "%sFetching PubSub feed %s from %s (XEP-0060)…",
-                   weechat_prefix("network"), node_name.c_str(), service_jid.c_str());
+        // Ensure the FEED buffer exists before we send the IQ so the result
+        // handler can find it.
+        ptr_account->channels.try_emplace(
+            feed_key,
+            *ptr_account,
+            weechat::channel::chat_type::FEED,
+            feed_key,
+            feed_key);
 
-    // Build and send: <iq type="get" to="service_jid">
-    //                   <pubsub><items node="node_name"/></pubsub>
-    //                 </iq>
-    std::array<xmpp_stanza_t *, 2> children = {nullptr, nullptr};
-    children[0] = stanza__iq_pubsub_items(ptr_account->context, nullptr, node_name.c_str());
-    children[0] = stanza__iq_pubsub(ptr_account->context, nullptr, children.data(),
-                                    with_noop("http://jabber.org/protocol/pubsub"));
+        weechat_printf(buffer, "%sFetching PubSub feed %s from %s (XEP-0060)…",
+                       weechat_prefix("network"), node_name.c_str(), service_jid.c_str());
 
-    xmpp_string_guard uid_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
-    const char *uid = uid_g.ptr;
+        // Build and send: <iq type="get" to="service_jid">
+        //                   <pubsub><items node="node_name"/></pubsub>
+        //                 </iq>
+        std::array<xmpp_stanza_t *, 2> children = {nullptr, nullptr};
+        children[0] = stanza__iq_pubsub_items(ptr_account->context, nullptr, node_name.c_str());
+        children[0] = stanza__iq_pubsub(ptr_account->context, nullptr, children.data(),
+                                        with_noop("http://jabber.org/protocol/pubsub"));
 
-    children[0] = stanza__iq(ptr_account->context, nullptr, children.data(),
-                              nullptr, uid,
-                              ptr_account->jid().data(),
-                              service_jid.c_str(),
-                              "get");
+        xmpp_string_guard uid_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+        const char *uid = uid_g.ptr;
 
-    if (uid)
-        ptr_account->pubsub_fetch_ids[uid] = {service_jid, node_name};
+        children[0] = stanza__iq(ptr_account->context, nullptr, children.data(),
+                                  nullptr, uid,
+                                  ptr_account->jid().data(),
+                                  service_jid.c_str(),
+                                  "get");
 
-    ptr_account->connection.send(children[0]);
-    xmpp_stanza_release(children[0]);
+        if (uid)
+            ptr_account->pubsub_fetch_ids[uid] = {service_jid, node_name};
+
+        ptr_account->connection.send(children[0]);
+        xmpp_stanza_release(children[0]);
+    }
+    else
+    {
+        // No node given: discover all nodes on the service via disco#items,
+        // then fetch each one automatically.
+        weechat_printf(buffer, "%sDiscovering PubSub nodes on %s…",
+                       weechat_prefix("network"), service_jid.c_str());
+
+        xmpp_string_guard uid_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+        const char *uid = uid_g.ptr;
+
+        xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "get", uid);
+        xmpp_stanza_set_to(iq, service_jid.c_str());
+
+        xmpp_stanza_t *query = xmpp_stanza_new(ptr_account->context);
+        xmpp_stanza_set_name(query, "query");
+        xmpp_stanza_set_ns(query, "http://jabber.org/protocol/disco#items");
+        xmpp_stanza_add_child(iq, query);
+        xmpp_stanza_release(query);
+
+        if (uid)
+            ptr_account->pubsub_disco_queries[uid] = service_jid;
+
+        ptr_account->connection.send(iq);
+        xmpp_stanza_release(iq);
+    }
 
     return WEECHAT_RC_OK;
 }
@@ -6104,9 +6148,16 @@ void command__init()
     hook = weechat_hook_command(
         "disco",
         N_("discover services and features (XEP-0030)"),
-        N_("[jid]"),
-        N_("jid: optional target jid (defaults to server domain)"),
-        NULL, &command__disco, NULL, NULL);
+        N_("[items] [jid]"),
+        N_("items: list child items (nodes/services) instead of features\n"
+           "  jid: optional target JID (defaults to server domain)\n"
+           "\n"
+           "Examples:\n"
+           "  /disco                        - query server for identities and features\n"
+           "  /disco conference.example.org - query a specific service\n"
+           "  /disco items                  - list items/nodes on server\n"
+           "  /disco items pubsub.example.org - list PubSub nodes on a service"),
+        "items", &command__disco, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /disco");
 
@@ -6318,14 +6369,16 @@ void command__init()
 
     hook = weechat_hook_command(
         "feed",
-        N_("fetch a PubSub feed node and display it in a dedicated buffer (XEP-0060)"),
-        N_("<service-jid> <node>"),
+        N_("fetch PubSub feeds from a service and display them in dedicated buffers (XEP-0060)"),
+        N_("<service-jid> [<node>]"),
         N_("service-jid: JID of the PubSub service (e.g. news.movim.eu)\n"
            "       node: node name on the service (e.g. Phoronix)\n\n"
-           "Sends a PubSub items-fetch IQ to the service and displays\n"
-           "the Atom feed items in a dedicated FEED buffer.\n\n"
+           "Without a node: discovers all nodes on the service via disco#items\n"
+           "and automatically fetches each one into its own FEED buffer.\n\n"
+           "With a node: fetches that specific node directly.\n\n"
            "Examples:\n"
-           "  /feed news.movim.eu Phoronix\n"
+           "  /feed news.movim.eu              (discover and fetch all nodes)\n"
+           "  /feed news.movim.eu Phoronix     (fetch one specific node)\n"
            "  /feed pubsub.example.com my-node"),
         NULL, &command__feed, NULL, NULL);
     if (!hook)
