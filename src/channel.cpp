@@ -1276,12 +1276,9 @@ int weechat::channel::send_message(std::string_view to, std::string_view body, b
                             std::string_view(task->to), std::string_view(task->body),
                             /*skip_probe=*/true);
                 }
-                // XEP-0511: send link preview now that the message stanza is sent
-                if (weechat::config::instance
-                        && weechat::config::instance->look.outgoing_link_preview.boolean())
-                {
-                    task->channel.send_link_preview(task->to, task->url);
-                }
+                // XEP-0511: link preview is sent by the recursive send_message()
+                // call above (skip_probe=true path hits the URL scan loop).
+                // Do NOT call send_link_preview() here — that would double-send.
 
                 delete task;
                 return WEECHAT_RC_OK;
@@ -1511,6 +1508,10 @@ void weechat::channel::send_link_preview(const std::string& to, const std::strin
             char *preview_id = xmpp_uuid_gen(ctx);
             xmpp_stanza_set_id(msg, preview_id);
             xmpp_free(ctx, preview_id);
+
+            // XEP-0511 §4.2: include an empty <body/> so clients that don't
+            // understand XEP-0511 don't display an empty message bubble.
+            xmpp_message_set_body(msg, "");
 
             // <rdf:Description xmlns:rdf="..." xmlns:og="..." rdf:about="URL">
             // NOTE: xmpp_stanza_set_ns() sets the *default* namespace (xmlns=""),

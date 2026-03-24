@@ -262,6 +262,7 @@ Skip autojoin for IRC gateway rooms (causes connection issues):
 
 - **Main logs directory**: `~/.local/share/weechat/logs/`
 - **XMPP plugin logs**: `~/.local/share/weechat/logs/xmpp.account.<account>.weechatlog`
+- **Raw XML log**: `~/.local/share/weechat/xmpp/raw_xml_<account>.log`
 - **OMEMO correlation helper**: `tools/correlate_omemo_xml.sh`
 - For OMEMO log debugging, always run `tools/correlate_omemo_xml.sh --account <account>` first to correlate event logs with raw XML before proposing protocol-level fixes.
 - Example: `tail -n 300 ~/.local/share/weechat/logs/xmpp.account.andrath.weechatlog`
