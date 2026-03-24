@@ -2077,9 +2077,32 @@ message_handler_after_omemo:
                                  weechat_prefix("network"), weechat_color("gray"),
                                  channel::transport_name(channel->transport));
     }
-    auto display_prefix = user::as_prefix_raw(&account, display_from);
-    if (display_prefix.empty())
-        display_prefix = user::as_prefix_raw(nick && *nick ? nick : from_bare);
+    // For groupchat messages, display_from is the full occupant JID (room/nick).
+    // Look up the user by full JID to get their avatar/color, but always format
+    // the prefix using nick (the resource) to avoid showing the full JID.
+    std::string display_prefix;
+    if (weechat_strcasecmp(type, "groupchat") == 0 && nick && *nick)
+    {
+        auto *display_user = user::search(&account, display_from);
+        if (display_user)
+        {
+            std::string pfx;
+            if (!display_user->profile.avatar_rendered.empty())
+                pfx = display_user->profile.avatar_rendered + " ";
+            pfx += user::as_prefix_raw(nick);
+            display_prefix = pfx;
+        }
+        else
+        {
+            display_prefix = user::as_prefix_raw(nick);
+        }
+    }
+    else
+    {
+        display_prefix = user::as_prefix_raw(&account, display_from);
+        if (display_prefix.empty())
+            display_prefix = user::as_prefix_raw(nick && *nick ? nick : from_bare);
+    }
     
     // XEP-0461: Message Replies - extract reply context
     xmpp_stanza_t *reply_elem = xmpp_stanza_get_child_by_name_and_ns(stanza, "reply", "urn:xmpp:reply:0");
