@@ -1865,7 +1865,9 @@ message_handler_after_omemo:
     {
         xmpp_string_guard gc_bare_g { account.context, xmpp_jid_bare(account.context, from) };
         xmpp_string_guard gc_resource_g { account.context, xmpp_jid_resource(account.context, from) };
-        if (channel->name == gc_bare_g.ptr && gc_resource_g.ptr && *gc_resource_g.ptr)
+        // Use case-insensitive compare: JIDs are case-insensitive per RFC 6122
+        if (gc_bare_g.ptr && weechat_strcasecmp(channel->name.c_str(), gc_bare_g.ptr) == 0
+            && gc_resource_g.ptr && *gc_resource_g.ptr)
         {
             nick_str = gc_resource_g.ptr; // copy into surviving std::string
             nick = nick_str.c_str();
@@ -1876,7 +1878,9 @@ message_handler_after_omemo:
     else if (parent_channel && parent_channel->type == weechat::channel::chat_type::MUC)
     {
         xmpp_string_guard muc_resource_g { account.context, xmpp_jid_resource(account.context, from) };
-        if (channel->name == from && muc_resource_g.ptr && *muc_resource_g.ptr)
+        // Use case-insensitive compare: JIDs are case-insensitive per RFC 6122
+        if (weechat_strcasecmp(channel->name.c_str(), from) == 0
+            && muc_resource_g.ptr && *muc_resource_g.ptr)
         {
             nick_str = muc_resource_g.ptr;
             nick = nick_str.c_str();
