@@ -584,6 +584,72 @@ moderation stanza.
 
 ---
 
+### Microblogging — `/feed post`, `/feed reply`, `/feed retract` (XEP-0277 / XEP-0472)
+
+Publish and interact with microblog posts on PubSub services such as
+[Movim](https://movim.eu/) and [Libervia/Salut-à-Toi](https://libervia.org/).
+XMPP microblogging is XMPP's equivalent of a federated social timeline — posts
+are Atom entries stored on PubSub nodes; contacts who subscribe to your
+`urn:xmpp:microblog:0` PEP node receive your posts in real-time.
+
+> **Note:** XEP-0277 is Deferred and XEP-0472 is Experimental. Server support
+> varies. Movim and Libervia implement the full stack; ejabberd supports the
+> underlying XEP-0060 mechanics.
+
+```
+/feed post <service-jid> <node> <text>
+/feed reply <service-jid> <node> <item-id> <text>
+/feed retract <service-jid> <node> <item-id>
+```
+
+**Publishing a post:**
+
+```
+/feed post movim.eu urn:xmpp:microblog:0 Hello from WeeChat!
+```
+
+Sends an Atom `<entry>` to the `urn:xmpp:microblog:0` PubSub node on
+`movim.eu`. The entry carries `pubsub#type=urn:xmpp:microblog:0` and the
+`urn:xmpp:pubsub-social-feed:1` publish-option required by XEP-0472.
+Contacts who follow your microblog receive a PEP push notification immediately.
+
+**Replying to a post (threaded):**
+
+```
+/feed reply movim.eu urn:xmpp:microblog:0 abc123 That's a great point!
+```
+
+Adds a `thr:in-reply-to` element (RFC 4685) to the Atom entry referencing the
+original item ID `abc123`. Clients such as Movim render threaded conversations
+from these references.
+
+**Retracting (deleting) a post:**
+
+```
+/feed retract movim.eu urn:xmpp:microblog:0 abc123
+```
+
+Sends a PubSub retract for the given item ID. The post is removed from the
+node and a retraction notification is pushed to subscribers.
+
+**Receiving posts from contacts:**
+
+Incoming PEP pushes from contacts' `urn:xmpp:microblog:0` nodes are
+automatically rendered in the WeeChat buffer for that contact, showing the
+author name, timestamp, content body, and — when present — the
+`thr:in-reply-to` parent reference.
+
+**Reading a microblog feed:**
+
+```
+/feed movim.eu urn:xmpp:microblog:0
+```
+
+Fetches recent posts from the node and opens a dedicated buffer. Supports
+RSM paging (`--before <id>`, `--limit N`). See the PubSub feed reader section.
+
+---
+
 ### Ad-hoc Commands and Data Forms (XEP-0050 / XEP-0004)
 
 ```
