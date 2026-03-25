@@ -37,8 +37,25 @@ comprehensive set of XEPs targeting CCS2022 compliance.
   - Enabled automatic MAM retrieval on connect (7-day history for PM channels).
   - Full message caching with LMDB — instant display from cache, then fetch new
     messages.
+  - RSM cursor is persisted across reconnects so re-fetching the same 7-day
+    history is skipped on reconnect.
+  - MAM deduplication guard prevents messages already shown live from appearing
+    again when MAM results arrive.
 - **Channel type detection**: Fixed PM vs MUC detection for proper message
   handling.
+- **MUC occupant display**:
+  - Occupant `display_name` was always set to the full JID due to a pointer
+    comparison bug; now correctly shows the room nickname.
+  - Messages from MUC occupants always use the resource nick, never the full JID,
+    even when JID casing differs between presence and message stanzas.
+  - PM buffer opened from a MUC nick-click no longer shows MUC room history.
+  - Clicking a MUC nick to start a PM no longer triggers a Nickname Conflict
+    error (XEP-0045 §7.5).
+- **Reconnect stability**:
+  - Exponential backoff for reconnect attempts prevents hammering the server
+    after a disconnect.
+  - Resource is regenerated on `<conflict/>` to avoid infinite reconnect storms.
+  - OMEMO devicelist publish storm suppressed when sibling clients are present.
 
 ### Display improvements
 
@@ -52,6 +69,8 @@ comprehensive set of XEPs targeting CCS2022 compliance.
 - Reduced logging noise: debug-level log spam disabled by default.
 - OMEMO PM noise cleanup: high-frequency per-device status messages removed
   while preserving actionable queue/error output.
+- Buffer sidebar prefixes: MUC room buffers are prefixed with `#` and PM
+  buffers with `@` so they can be distinguished at a glance in the buffer list.
 
 ### OMEMO interoperability
 
@@ -72,10 +91,11 @@ comprehensive set of XEPs targeting CCS2022 compliance.
 | Personal Eventing Protocol | XEP-0163 |
 | Direct MUC Invitations (`/invite`) | XEP-0249 |
 | The `/me` Command | XEP-0245 |
-| vcard-temp (`/whois`) | XEP-0054 |
+| vcard-temp (`/whois`, `/setvcard`) | XEP-0054 |
+| vCard4 retrieval (`/whois`) | XEP-0292 |
 | MUC leave on `/close` | XEP-0045 |
 | XMPP Ping (`/ping`) | XEP-0199 |
-| Message Correction (`/edit`) | XEP-0308 |
+| Message Correction (`/edit` picker + `/edit-to`) | XEP-0308 |
 | Message Retraction (`/retract`) | XEP-0424 |
 | Message Moderation (`/moderate`) | XEP-0425 |
 | Message Styling | XEP-0393 |
@@ -88,12 +108,14 @@ comprehensive set of XEPs targeting CCS2022 compliance.
 | User Mood (`/mood`) | XEP-0107 |
 | User Activity (`/activity`) | XEP-0108 |
 | PEP Native Bookmarks (`/bookmark`) | XEP-0402 |
+| In-Band Registration (`/account register`, `unregister`, `password`) | XEP-0077 |
 | PGP key persistence | — |
 | Encryption status bar item | — |
+| Buffer sidebar prefixes (`#` MUC / `@` PM) | — |
 | Roster management (`/roster`) | RFC 6121 |
- | Public room search (`/list`) | XEP-0433 |
- | PubSub feed reader (`/feed`) | XEP-0060 |
- | Entity Capability caching | XEP-0115 |
+| Public room search (`/list`) | XEP-0433 |
+| PubSub feed reader (`/feed`) | XEP-0060 |
+| Entity Capability caching | XEP-0115 |
 | User Avatar (colored Unicode symbols) | XEP-0084 |
 | MUC status code handling | XEP-0045 |
 | Ad-hoc Commands (`/adhoc`) | XEP-0050 |
@@ -115,7 +137,8 @@ comprehensive set of XEPs targeting CCS2022 compliance.
 
 - ✅ XEP-0030: Service Discovery
 - ✅ XEP-0045: Multi-User Chat (core features)
-- ✅ XEP-0054: vcard-temp (retrieval via `/whois`)
+- ✅ XEP-0054: vcard-temp (retrieval via `/whois`, publishing via `/setvcard`)
+- ✅ XEP-0077: In-Band Registration (`/account register`, `unregister`, `password`)
 - ✅ XEP-0115: Entity Capabilities (persistent caching)
 - ✅ XEP-0163: Personal Eventing Protocol
 - ✅ XEP-0191: Blocking Command
@@ -157,6 +180,7 @@ comprehensive set of XEPs targeting CCS2022 compliance.
 - ✅ XEP-0224: Attention
 - ✅ XEP-0280: Message Carbons
 - ✅ XEP-0283: Moved (account migration notices)
+- ✅ XEP-0292: vCard4 Over XMPP (fetch via `/whois`; no publish support yet)
 - ✅ XEP-0297: Forwarded Messages
 - ✅ XEP-0300: Cryptographic Hash Functions
 - ✅ XEP-0313: Message Archive Management (with LMDB caching)
@@ -342,29 +366,29 @@ even without server-side injection. To disable:
 /set xmpp.look.outgoing_link_preview off
 ```
 
-### Message Correction — `/edit` (XEP-0308)
+### Message Correction — `/edit` and `/edit-to` (XEP-0308)
 
-Replaces the last message you sent in the current buffer with a corrected
-version. The original message is updated in place in recipients' clients that
-support XEP-0308.
+Opens an **interactive picker** showing your last 20 non-retracted sent messages
+so you can select which one to correct, then pre-fills the input bar with the
+original text ready for editing.
 
 ```
-/edit <new message text>
+/edit                   # open interactive picker — select message, edit in input bar
+/edit-to <id> <text>    # correct a specific message by ID (used internally by picker)
 ```
 
 **How it works:**
 
-1. Type `/edit` followed by the corrected text.
-2. The plugin finds your most recent sent message in the buffer (identified by
-   its `self_msg` + `id_` tags) and sends a correction stanza referencing that
-   message's original ID.
-3. In the local buffer the line is updated to show the corrected text with a
-   `[edit]` prefix so you can see the correction was applied.
+1. Type `/edit` with no arguments to open the interactive picker.
+2. Navigate with `↑`/`↓` and press `Enter` to select the message you want to
+   correct.
+3. The picker closes and the input bar is pre-filled with
+   `/edit-to <id> <original text>`.  Edit the text and press `Enter` to send.
+4. A correction stanza is sent referencing the original message ID. The local
+   buffer updates the line with an `[edit]` prefix.
 
 **Notes:**
 
-- Only your *last* sent message can be corrected — there is no way to correct
-  an earlier message.
 - In MUC rooms, correction uses the server-assigned stanza-id (XEP-0359) when
   available, falling back to the origin-id.
 - Recipients who do not support XEP-0308 will receive the correction as a new
@@ -375,7 +399,10 @@ support XEP-0308.
 
 ```
 you: Hello eweryone!
-/edit Hello everyone!
+/edit
+[interactive picker opens — select the message, press Enter]
+> input bar is pre-filled: /edit-to abc123 Hello eweryone!
+> edit to: /edit-to abc123 Hello everyone!   [Enter]
 you: [edit] Hello everyone!
 ```
 
@@ -567,6 +594,9 @@ Required fields are marked with `*`. Multi-step sessions are supported.
 /account disconnect <account>
 /account reconnect <account>
 /account delete <account>
+/account register <name> <jid> <password>   # create account on server (XEP-0077)
+/account unregister <account>               # cancel account on server (XEP-0077)
+/account password <account> <new-password>  # change password in-band (XEP-0077)
 ```
 
 ### Messaging
@@ -581,7 +611,8 @@ Required fields are marked with `*`. Multi-step sessions are supported.
 | `/me <text>` | Send a `/me` action (XEP-0245) |
 | `/invite <jid> [reason]` | Invite a user to the current MUC (XEP-0249) |
 | `/selfping` | Verify MUC membership (XEP-0410) |
-| `/edit <text>` | Correct last sent message (XEP-0308) |
+| `/edit` | Picker: choose a sent message to correct (XEP-0308) |
+| `/edit-to <id> <text>` | Correct a specific message by ID — used by the `/edit` picker |
 | `/retract` | Picker: choose a sent message to delete (XEP-0424) |
 | `/moderate [reason]` | Picker: choose a MUC message to moderate (XEP-0425) |
 | `/react <emoji>` | React to the last received message (XEP-0444) |
@@ -662,13 +693,13 @@ Each nick in a MUC room displays a prefix indicating their role or affiliation
 | `/roster` | Display contact list |
 | `/roster add <jid> [name]` | Add a contact |
 | `/roster del <jid>` | Remove a contact |
- | `/list [keywords]` | Search public MUC rooms (XEP-0433) |
- | `/feed <service-jid>` | Fetch all subscribed PubSub nodes from a service (XEP-0060) |
- | `/feed <service-jid> --all` | Discover and fetch all PubSub nodes on a service via disco#items |
- | `/feed <service-jid> <node>` | Fetch a specific PubSub node directly into a dedicated buffer |
- | `/feed ... --limit N` | Override the per-node item limit (default: 20) |
- | `/feed ... --before <id>` | Fetch the page of items older than item `<id>` (XEP-0059 RSM paging) |
- | `/bookmark` | List bookmarks |
+| `/list [keywords]` | Search public MUC rooms (XEP-0433) |
+| `/feed <service-jid>` | Fetch all subscribed PubSub nodes from a service (XEP-0060) |
+| `/feed <service-jid> --all` | Discover and fetch all PubSub nodes on a service via disco#items |
+| `/feed <service-jid> <node>` | Fetch a specific PubSub node directly into a dedicated buffer |
+| `/feed ... --limit N` | Override the per-node item limit (default: 20) |
+| `/feed ... --before <id>` | Fetch the page of items older than item `<id>` (XEP-0059 RSM paging) |
+| `/bookmark` | List bookmarks |
 | `/bookmark add [jid] [name]` | Add a bookmark |
 | `/bookmark del <jid>` | Remove a bookmark |
 | `/bookmark autojoin <jid> <on\|off>` | Toggle autojoin |
