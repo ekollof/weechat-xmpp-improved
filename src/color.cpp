@@ -28,7 +28,7 @@ static double generate_angle(const std::string& input)
 
 // Map hue angle to WeeChat color code (256-color palette)
 // This uses a simplified mapping to WeeChat's extended colors (16-255)
-std::string angle_to_weechat_color(double angle)
+XMPP_TEST_EXPORT std::string angle_to_weechat_color(double angle)
 {
     // Map angle to one of WeeChat's 216 colors (6x6x6 RGB cube)
     // These are colors 16-231 in the 256-color palette
@@ -67,7 +67,7 @@ std::string angle_to_weechat_color(double angle)
 }
 
 // Main function: generate consistent color for a string (JID or nickname)
-std::string consistent_color(const std::string& input)
+XMPP_TEST_EXPORT std::string consistent_color(const std::string& input)
 {
     if (input.empty())
         return "";

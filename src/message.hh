@@ -6,10 +6,14 @@
 
 #include <string>
 #include <string_view>
+#include <cstddef>
+#include "test_export.hh"
 
 #define MESSAGE_MAX_LENGTH 40000
 
 namespace weechat { class account; }
+
+XMPP_TEST_EXPORT void message__htmldecode(char *dest, const char *src, std::size_t n);
 
 std::string message__decode(weechat::account *account,
                             std::string_view text);

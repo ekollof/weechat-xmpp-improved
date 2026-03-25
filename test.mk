@@ -18,7 +18,7 @@ test: tests/run
 
 .PHONY: coverage
 coverage: tests/run
-	gcovr --txt -s
+	gcovr --txt -s --merge-mode-functions=separate
 
 .PHONY: check
 check:

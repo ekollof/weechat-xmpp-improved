@@ -15,19 +15,20 @@
 #include <vector>
 #include <chrono>
 #include <variant>
-#include <fmt/core.h>
 #include <optional>
 #include <strophe.h>
 
-std::string get_name(xmpp_stanza_t *stanza);
+#include "../test_export.hh"
 
-std::optional<std::string> get_attribute(xmpp_stanza_t *stanza, const char *name);
+XMPP_TEST_EXPORT std::string get_name(xmpp_stanza_t *stanza);
 
-std::string get_text(xmpp_stanza_t *stanza);
+XMPP_TEST_EXPORT std::optional<std::string> get_attribute(xmpp_stanza_t *stanza, const char *name);
+
+XMPP_TEST_EXPORT std::string get_text(xmpp_stanza_t *stanza);
 
 std::chrono::system_clock::time_point get_time(const std::string& text);
 
-class jid {
+class XMPP_TEST_EXPORT jid {
 private:
     static const std::regex pattern;
 

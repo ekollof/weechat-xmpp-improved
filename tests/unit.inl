@@ -4,37 +4,34 @@
 
 // Unit tests for pure and near-pure plugin functions.
 //
-// Because all plugin symbols have hidden visibility (-fvisibility=hidden),
-// we cannot call them from the test binary directly.  Instead we inline the
-// same logic here – identical to the approach used in omemo_xep.inl, which
-// re-implements its validators without calling plugin symbols.
+// Calls the real symbols from xmpp.cov.so (coverage-instrumented plugin)
+// so that gcovr reports non-zero coverage for the exercised source files.
 //
-// Groups covered:
-//   A – pure stdlib/C++23: unescape, char_cmp, message__htmldecode
-//   B – libstrophe context: get_name, get_attribute, get_text, jid parsing,
-//        xml::node::bind-equivalent, xml::presence show/status
-//   C – OpenSSL: consistent_color / angle_to_weechat_color
+// Functions under test:
+//   • char_cmp, unescape                   → src/util.cpp
+//   • message__htmldecode                  → src/message.cpp
+//   • get_name, get_attribute, get_text    → src/xmpp/node.cpp
+//   • jid::jid, jid::is_bare              → src/xmpp/node.cpp
+//   • weechat::consistent_color            → src/color.cpp
+//   • weechat::angle_to_weechat_color      → src/color.cpp
 
 #include <doctest/doctest.h>
 
-// ── stdlib ───────────────────────────────────────────────────────────────────
-#include <cmath>
-#include <cstdint>
+// ── plugin headers (real symbols declared here) ───────────────────────────────
+#include "../src/util.hh"
+#include "../src/message.hh"
+#include "../src/color.hh"
+#include "../src/xmpp/node.hh"
+
+// ── stdlib ────────────────────────────────────────────────────────────────────
 #include <cstring>
-#include <optional>
-#include <regex>
-#include <sstream>
 #include <string>
-#include <string_view>
 
-// ── OpenSSL ──────────────────────────────────────────────────────────────────
-#include <openssl/sha.h>
-
-// ── libstrophe ───────────────────────────────────────────────────────────────
+// ── libstrophe ────────────────────────────────────────────────────────────────
 #include <strophe.h>
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared fixture (identical pattern to omemo_xep.inl)
+// Shared libstrophe fixture
 // ─────────────────────────────────────────────────────────────────────────────
 namespace {
 
@@ -53,179 +50,18 @@ struct unit_strophe_env {
     }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Group A helpers – inline mirrors of src/util.cpp and src/message.cpp
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Mirror of char_cmp() in src/util.cpp:17
-// Returns non-zero when *p1 == *p2 (OPPOSITE of strcmp semantics).
-int test_char_cmp(const void *p1, const void *p2)
-{
-    return *static_cast<const char *>(p1) == *static_cast<const char *>(p2);
-}
-
-// Mirror of unescape() in src/util.cpp:22
-std::string test_unescape(const std::string& str)
-{
-    std::regex re("\\&\\#(\\d+);");
-    std::sregex_iterator begin(str.begin(), str.end(), re), end;
-    if (begin != end)
-    {
-        std::ostringstream out;
-        do {
-            const std::smatch& m = *begin;
-            if (m[1].matched)
-                out << m.prefix() << static_cast<char>(std::stoul(m.str(1)));
-            else
-                out << m.prefix() << m.str(0);
-        } while (++begin != end);
-        out << str.substr(str.size() - begin->position());
-        return out.str();
-    }
-    return str;
-}
-
-// Mirror of message__htmldecode() in src/message.cpp:110
-void test_htmldecode(char *dest, const char *src, std::size_t n)
-{
-    std::size_t i = 0, j = 0;
-    for (; i < n; ++i, ++j)
-    {
-        switch (src[i])
-        {
-            case '\0':
-                dest[j] = '\0';
-                return;
-            case '&':
-                if (src[i+1]=='g' && src[i+2]=='t' && src[i+3]==';')
-                { dest[j] = '>'; i += 3; break; }
-                else if (src[i+1]=='l' && src[i+2]=='t' && src[i+3]==';')
-                { dest[j] = '<'; i += 3; break; }
-                else if (src[i+1]=='a' && src[i+2]=='m' && src[i+3]=='p' && src[i+4]==';')
-                { dest[j] = '&'; i += 4; break; }
-                /* fallthrough */
-                [[fallthrough]];
-            default:
-                dest[j] = src[i];
-                break;
-        }
-    }
-    dest[j-1] = '\0';
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Group B helpers – libstrophe wrappers mirroring src/xmpp/node.cpp
-// ─────────────────────────────────────────────────────────────────────────────
-
-std::string test_get_name(xmpp_stanza_t *s)
-{
-    const char *r = xmpp_stanza_get_name(s);
-    return r ? r : "";
-}
-
-std::optional<std::string> test_get_attribute(xmpp_stanza_t *s, const char *name)
-{
-    const char *r = xmpp_stanza_get_attribute(s, name);
-    return r ? std::optional<std::string>(r) : std::nullopt;
-}
-
-std::string test_get_text(xmpp_stanza_t *s)
-{
-    const char *r = xmpp_stanza_get_text_ptr(s);
-    return r ? r : "";
-}
-
-// Mirror of jid parser in src/xmpp/node.cpp:56–80
-struct test_jid {
-    std::string full;
-    std::string bare;
-    std::string local;
-    std::string domain;
-    std::string resource;
-    bool        bare_jid{false};  // true when no resource
-
-    explicit test_jid(std::string s) : full(std::move(s))
-    {
-        static const std::regex pat(
-            "^((?:([^@/<>'\"]+)@)?([^@/<>'\"]+))(?:/([^<>'\"]*))?$");
-        std::smatch m;
-        if (std::regex_search(full, m, pat))
-        {
-            auto as_str = [&](const std::ssub_match& sm) -> std::string {
-                return sm.matched ? sm.str() : "";
-            };
-            bare     = as_str(m[1]);
-            local    = as_str(m[2]);
-            domain   = as_str(m[3]);
-            resource = as_str(m[4]);
-        }
-        else
-        {
-            bare   = full;
-            domain = bare;
-        }
-        bare_jid = resource.empty();
-    }
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Group C helpers – mirrors of src/color.cpp
-// ─────────────────────────────────────────────────────────────────────────────
-
-static double test_generate_angle(const std::string& input)
-{
-    unsigned char hash[SHA_DIGEST_LENGTH];
-    SHA1(reinterpret_cast<const unsigned char *>(input.c_str()),
-         input.size(), hash);
-    std::uint16_t v = static_cast<std::uint16_t>(hash[0] | (hash[1] << 8));
-    return (static_cast<double>(v) / 65536.0) * 360.0;
-}
-
-std::string test_angle_to_color(double angle)
-{
-    while (angle < 0)     angle += 360.0;
-    while (angle >= 360.0) angle -= 360.0;
-
-    double h  = angle / 60.0;
-    double x  = 1.0 - std::abs(std::fmod(h, 2.0) - 1.0);
-    double r, g, b;
-    switch (static_cast<int>(h) % 6)
-    {
-        case 0: r=1; g=x; b=0; break;
-        case 1: r=x; g=1; b=0; break;
-        case 2: r=0; g=1; b=x; break;
-        case 3: r=0; g=x; b=1; break;
-        case 4: r=x; g=0; b=1; break;
-        case 5: r=1; g=0; b=x; break;
-        default: r=0; g=0; b=0; break;
-    }
-    int ri = static_cast<int>(r * 5.0 + 0.5);
-    int gi = static_cast<int>(g * 5.0 + 0.5);
-    int bi = static_cast<int>(b * 5.0 + 0.5);
-    return std::to_string(16 + 36*ri + 6*gi + bi);
-}
-
-std::string test_consistent_color(const std::string& input)
-{
-    if (input.empty()) return "";
-    std::string norm = input;
-    for (char& c : norm)
-        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return test_angle_to_color(test_generate_angle(norm));
-}
-
 }  // namespace
 
 // =============================================================================
-// TEST CASES – Group A: pure stdlib / C++23
+// TEST CASES – Group A: pure stdlib / C++23 (src/util.cpp, src/message.cpp)
 // =============================================================================
 
 TEST_CASE("char_cmp semantics")
 {
     // Returns non-zero when the two pointed-to chars are equal
     char a = 'x', b = 'x', c = 'y';
-    CHECK(test_char_cmp(&a, &b) != 0);  // equal → truthy
-    CHECK(test_char_cmp(&a, &c) == 0);  // unequal → falsy
+    CHECK(char_cmp(&a, &b) != 0);  // equal → truthy
+    CHECK(char_cmp(&a, &c) == 0);  // unequal → falsy
     // Note: deliberately opposite of strcmp/memcmp convention
 }
 
@@ -234,48 +70,48 @@ TEST_CASE("unescape: numeric HTML entity decoding")
     SUBCASE("no entities returns input unchanged")
     {
         const std::string s = "hello world";
-        CHECK(test_unescape(s) == s);
+        CHECK(unescape(s) == s);
     }
 
     SUBCASE("single entity in the middle")
     {
         // &#65; is 'A'
-        CHECK(test_unescape("&#65;") == "A");
+        CHECK(unescape("&#65;") == "A");
     }
 
     SUBCASE("entity at start")
     {
         // &#72; = 'H', &#101; = 'e'
-        CHECK(test_unescape("&#72;ello") == "Hello");
+        CHECK(unescape("&#72;ello") == "Hello");
     }
 
     SUBCASE("multiple entities")
     {
         // &#65;&#66;&#67; = "ABC"
-        CHECK(test_unescape("&#65;&#66;&#67;") == "ABC");
+        CHECK(unescape("&#65;&#66;&#67;") == "ABC");
     }
 
     SUBCASE("entity at end")
     {
         // "X&#33;" → "X!"  (33 = '!')
-        CHECK(test_unescape("X&#33;") == "X!");
+        CHECK(unescape("X&#33;") == "X!");
     }
 
     SUBCASE("mixed text and entities")
     {
         // "a&#43;b" → "a+b"  (43 = '+')
-        CHECK(test_unescape("a&#43;b") == "a+b");
+        CHECK(unescape("a&#43;b") == "a+b");
     }
 
     SUBCASE("non-entity ampersand left unchanged")
     {
         const std::string s = "AT&T";
-        CHECK(test_unescape(s) == s);
+        CHECK(unescape(s) == s);
     }
 
     SUBCASE("empty string returns empty")
     {
-        CHECK(test_unescape("") == "");
+        CHECK(unescape("") == "");
     }
 }
 
@@ -283,7 +119,7 @@ TEST_CASE("message__htmldecode")
 {
     auto decode = [](const std::string& src) -> std::string {
         std::string dest(src.size() + 1, '\0');
-        test_htmldecode(dest.data(), src.c_str(), src.size() + 1);
+        message__htmldecode(dest.data(), src.c_str(), src.size() + 1);
         dest.resize(std::strlen(dest.c_str()));
         return dest;
     };
@@ -349,19 +185,19 @@ TEST_CASE("strophe stanza accessors")
 
     SUBCASE("get_name returns element name")
     {
-        CHECK(test_get_name(root) == "message");
+        CHECK(get_name(root) == "message");
     }
 
     SUBCASE("get_attribute present attribute")
     {
-        auto from = test_get_attribute(root, "from");
+        auto from = get_attribute(root, "from");
         REQUIRE(from.has_value());
         CHECK(*from == "alice@example.org/phone");
     }
 
     SUBCASE("get_attribute missing attribute returns nullopt")
     {
-        auto absent = test_get_attribute(root, "nonexistent");
+        auto absent = get_attribute(root, "nonexistent");
         CHECK_FALSE(absent.has_value());
     }
 
@@ -369,7 +205,7 @@ TEST_CASE("strophe stanza accessors")
     {
         xmpp_stanza_t *body = xmpp_stanza_get_child_by_name(root, "body");
         REQUIRE(body != nullptr);
-        CHECK(test_get_name(body) == "body");
+        CHECK(get_name(body) == "body");
     }
 
     SUBCASE("get_text on child body returns text content")
@@ -379,7 +215,7 @@ TEST_CASE("strophe stanza accessors")
         // Body text is in a text child
         xmpp_stanza_t *text_node = xmpp_stanza_get_children(body);
         if (text_node && xmpp_stanza_is_text(text_node))
-            CHECK(test_get_text(text_node) == "Hello");
+            CHECK(get_text(text_node) == "Hello");
     }
 
     xmpp_stanza_release(root);
@@ -387,52 +223,54 @@ TEST_CASE("strophe stanza accessors")
 
 TEST_CASE("JID parser")
 {
+    unit_strophe_env env;
+    REQUIRE(env.ctx != nullptr);
+
     SUBCASE("full JID: local@domain/resource")
     {
-        test_jid j("alice@example.org/phone");
+        jid j(env.ctx, "alice@example.org/phone");
         CHECK(j.full     == "alice@example.org/phone");
         CHECK(j.bare     == "alice@example.org");
         CHECK(j.local    == "alice");
         CHECK(j.domain   == "example.org");
         CHECK(j.resource == "phone");
-        CHECK(j.bare_jid == false);
+        CHECK(j.is_bare() == false);
     }
 
     SUBCASE("bare JID: local@domain")
     {
-        test_jid j("alice@example.org");
+        jid j(env.ctx, "alice@example.org");
         CHECK(j.full     == "alice@example.org");
         CHECK(j.bare     == "alice@example.org");
         CHECK(j.local    == "alice");
         CHECK(j.domain   == "example.org");
         CHECK(j.resource.empty());
-        CHECK(j.bare_jid == true);
+        CHECK(j.is_bare() == true);
     }
 
     SUBCASE("domain-only JID (server or component)")
     {
-        test_jid j("conference.example.org");
+        jid j(env.ctx, "conference.example.org");
         CHECK(j.full   == "conference.example.org");
         CHECK(j.bare   == "conference.example.org");
         CHECK(j.domain == "conference.example.org");
         CHECK(j.local.empty());
         CHECK(j.resource.empty());
-        CHECK(j.bare_jid == true);
+        CHECK(j.is_bare() == true);
     }
 
     SUBCASE("resource may be empty string (trailing slash)")
     {
-        // A JID like "alice@example.org/" has an empty resource
-        test_jid j("alice@example.org/");
+        jid j(env.ctx, "alice@example.org/");
         CHECK(j.bare   == "alice@example.org");
         CHECK(j.local  == "alice");
         CHECK(j.domain == "example.org");
         CHECK(j.resource.empty());
     }
 
-    SUBCASE("resource with slash-like characters is captured")
+    SUBCASE("resource with spaces is captured")
     {
-        test_jid j("alice@example.org/res with spaces");
+        jid j(env.ctx, "alice@example.org/res with spaces");
         CHECK(j.resource == "res with spaces");
     }
 }
@@ -442,7 +280,7 @@ TEST_CASE("presence show/status extraction")
     unit_strophe_env env;
     REQUIRE(env.ctx != nullptr);
 
-    // Helper: return first child with given name's text
+    // Helper: return first child with given name's text via real plugin symbols
     auto first_child_text = [&](xmpp_stanza_t *parent, const char *child_name)
         -> std::optional<std::string>
     {
@@ -451,7 +289,7 @@ TEST_CASE("presence show/status extraction")
             return std::nullopt;
         xmpp_stanza_t *txt = xmpp_stanza_get_children(ch);
         if (txt && xmpp_stanza_is_text(txt))
-            return test_get_text(txt);
+            return get_text(txt);
         return std::nullopt;
     };
 
@@ -494,17 +332,16 @@ TEST_CASE("presence show/status extraction")
 }
 
 // =============================================================================
-// TEST CASES – Group C: consistent_color / angle_to_weechat_color
+// TEST CASES – Group C: consistent_color / angle_to_weechat_color (src/color.cpp)
 // =============================================================================
 
 TEST_CASE("angle_to_weechat_color output range")
 {
     SUBCASE("result is always in [16, 231]")
     {
-        // Sample angles across full circle
         for (int i = 0; i <= 360; i += 15)
         {
-            int color = std::stoi(test_angle_to_color(static_cast<double>(i)));
+            int color = std::stoi(weechat::angle_to_weechat_color(static_cast<double>(i)));
             CHECK(color >= 16);
             CHECK(color <= 231);
         }
@@ -512,19 +349,19 @@ TEST_CASE("angle_to_weechat_color output range")
 
     SUBCASE("normalises negative angle to same result as positive equivalent")
     {
-        CHECK(test_angle_to_color(-90.0) == test_angle_to_color(270.0));
+        CHECK(weechat::angle_to_weechat_color(-90.0) == weechat::angle_to_weechat_color(270.0));
     }
 
     SUBCASE("normalises angle >= 360 to same result as modulo equivalent")
     {
-        CHECK(test_angle_to_color(360.0) == test_angle_to_color(0.0));
-        CHECK(test_angle_to_color(720.0) == test_angle_to_color(0.0));
-        CHECK(test_angle_to_color(400.0) == test_angle_to_color(40.0));
+        CHECK(weechat::angle_to_weechat_color(360.0) == weechat::angle_to_weechat_color(0.0));
+        CHECK(weechat::angle_to_weechat_color(720.0) == weechat::angle_to_weechat_color(0.0));
+        CHECK(weechat::angle_to_weechat_color(400.0) == weechat::angle_to_weechat_color(40.0));
     }
 
     SUBCASE("0 degrees maps to a valid color")
     {
-        int c = std::stoi(test_angle_to_color(0.0));
+        int c = std::stoi(weechat::angle_to_weechat_color(0.0));
         CHECK(c >= 16);
         CHECK(c <= 231);
     }
@@ -534,35 +371,33 @@ TEST_CASE("consistent_color")
 {
     SUBCASE("empty string returns empty")
     {
-        CHECK(test_consistent_color("") == "");
+        CHECK(weechat::consistent_color("") == "");
     }
 
     SUBCASE("non-empty string returns a color in [16, 231]")
     {
-        int c = std::stoi(test_consistent_color("alice@example.org"));
+        int c = std::stoi(weechat::consistent_color("alice@example.org"));
         CHECK(c >= 16);
         CHECK(c <= 231);
     }
 
     SUBCASE("case-insensitive: same color for different cases")
     {
-        CHECK(test_consistent_color("Alice") == test_consistent_color("alice"));
-        CHECK(test_consistent_color("ALICE") == test_consistent_color("alice"));
-        CHECK(test_consistent_color("AlIcE@Example.ORG")
-              == test_consistent_color("alice@example.org"));
+        CHECK(weechat::consistent_color("Alice") == weechat::consistent_color("alice"));
+        CHECK(weechat::consistent_color("ALICE") == weechat::consistent_color("alice"));
+        CHECK(weechat::consistent_color("AlIcE@Example.ORG")
+              == weechat::consistent_color("alice@example.org"));
     }
 
     SUBCASE("different strings produce potentially different colors (determinism)")
     {
-        // Both calls with the same input must agree
-        CHECK(test_consistent_color("bob@example.org")
-              == test_consistent_color("bob@example.org"));
+        CHECK(weechat::consistent_color("bob@example.org")
+              == weechat::consistent_color("bob@example.org"));
     }
 
     SUBCASE("different JIDs do not necessarily map to the same color")
     {
-        // Probabilistically very unlikely to collide for clearly different strings
-        CHECK(test_consistent_color("alice@example.org")
-              != test_consistent_color("zzzz@totally-different-domain.net"));
+        CHECK(weechat::consistent_color("alice@example.org")
+              != weechat::consistent_color("zzzz@totally-different-domain.net"));
     }
 }

@@ -14,12 +14,12 @@
 #include "plugin.hh"
 #include "util.hh"
 
-int char_cmp(const void *p1, const void *p2)
+XMPP_TEST_EXPORT int char_cmp(const void *p1, const void *p2)
 {
     return *(const char *)p1 == *(const char *)p2;
 }
 
-std::string unescape(const std::string& str)
+XMPP_TEST_EXPORT std::string unescape(const std::string& str)
 {
     std::regex regex("\\&\\#(\\d+);");
     std::sregex_iterator begin(str.begin(), str.end(), regex), end;

@@ -5,10 +5,11 @@
 #pragma once
 
 #include <string>
+#include "test_export.hh"
 
-int char_cmp(const void *p1, const void *p2);
+XMPP_TEST_EXPORT int char_cmp(const void *p1, const void *p2);
 
-std::string unescape(const std::string& str);
+XMPP_TEST_EXPORT std::string unescape(const std::string& str);
 
 // XEP-0393: Message Styling
 std::string apply_xep393_styling(const std::string& text);

@@ -107,7 +107,7 @@ static std::string message__translate_code(weechat::account *account,
     return result;
 }
 
-void message__htmldecode(char *dest, const char *src, size_t n)
+XMPP_TEST_EXPORT void message__htmldecode(char *dest, const char *src, size_t n)
 {
     size_t i, j;
 
