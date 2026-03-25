@@ -2313,7 +2313,7 @@ int command__edit(const void *pointer, void *data,
 
     using picker_t = weechat::ui::picker<std::string>;
     struct edit_entry { std::string id; std::string body; };
-    auto *entry_list = new std::vector<edit_entry>();
+    std::vector<edit_entry> entry_list;
     std::vector<picker_t::entry> entries;
 
     for (auto &m : own_messages)
@@ -2321,7 +2321,7 @@ int command__edit(const void *pointer, void *data,
         // Resolve ID: prefer MUC stanza-id when applicable (XEP-0308)
         std::string resolved_id = resolve_msg_id(m, ptr_channel);
 
-        entry_list->push_back({resolved_id, m.body});
+        entry_list.push_back({resolved_id, m.body});
         std::string label = m.body.empty() ? resolved_id : m.body;
         entries.push_back({resolved_id, label, {}});
     }
@@ -2330,10 +2330,10 @@ int command__edit(const void *pointer, void *data,
         "xmpp.picker.edit",
         "Edit message  (XEP-0308)",
         std::move(entries),
-        [buf = buffer, el = entry_list](const std::string &selected) {
+        [buf = buffer, el = std::move(entry_list)](const std::string &selected) {
             // Find the body for the selected ID so we can pre-fill it
             std::string body;
-            for (auto &e : *el)
+            for (auto &e : el)
                 if (e.id == selected) { body = e.body; break; }
 
             // Strip WeeChat colour codes from body before pre-filling
@@ -2351,7 +2351,7 @@ int command__edit(const void *pointer, void *data,
                                std::to_string(input.size()).c_str());
             weechat_buffer_set(buf, "display", "1");
         },
-        [el = entry_list]() { delete el; },
+        {},
         buffer);
     (void) p;
     return WEECHAT_RC_OK;

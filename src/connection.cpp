@@ -6,6 +6,8 @@
 #include <charconv>
 #include <thread>
 #include <filesystem>
+#include <array>
+#include <ranges>
 #include <time.h>
 #include <stdlib.h>
 #include <stdint.h>

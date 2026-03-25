@@ -415,29 +415,28 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool top_level
 static std::string css_color_to_weechat(const std::string &css)
 {
     // Named colors → WeeChat terminal color names
-    struct { const char *css; const char *wc; } table[] = {
-        {"black",   "black"},
-        {"white",   "white"},
-        {"red",     "red"},
-        {"green",   "green"},
-        {"blue",    "blue"},
-        {"yellow",  "yellow"},
-        {"cyan",    "cyan"},
-        {"magenta", "magenta"},
-        {"orange",  "214"},    // WeeChat 256-color index
-        {"gray",    "gray"},
-        {"grey",    "gray"},
-        {"darkgray","darkgray"},
-        {"darkgrey","darkgray"},
-        {"purple",  "magenta"},
-        {"pink",    "213"},
-        {"brown",   "130"},
-        {"lime",    "46"},
-        {"teal",    "30"},
-        {"navy",    "18"},
-        {"silver",  "250"},
-        {nullptr, nullptr}
-    };
+    static constexpr std::array<std::pair<std::string_view, std::string_view>, 20> k_color_table = {{
+        {"black",    "black"},
+        {"white",    "white"},
+        {"red",      "red"},
+        {"green",    "green"},
+        {"blue",     "blue"},
+        {"yellow",   "yellow"},
+        {"cyan",     "cyan"},
+        {"magenta",  "magenta"},
+        {"orange",   "214"},   // WeeChat 256-color index
+        {"gray",     "gray"},
+        {"grey",     "gray"},
+        {"darkgray", "darkgray"},
+        {"darkgrey", "darkgray"},
+        {"purple",   "magenta"},
+        {"pink",     "213"},
+        {"brown",    "130"},
+        {"lime",     "46"},
+        {"teal",     "30"},
+        {"navy",     "18"},
+        {"silver",   "250"},
+    }};
     // Lowercase the input for comparison
     std::string lc = css;
     for (auto &c : lc) c = (char)tolower((unsigned char)c);
@@ -447,8 +446,9 @@ static std::string css_color_to_weechat(const std::string &css)
     if (s == std::string::npos) return "";
     lc = lc.substr(s, e - s + 1);
 
-    for (int i = 0; table[i].css; ++i)
-        if (lc == table[i].css) return table[i].wc;
+    auto it = std::ranges::find_if(k_color_table,
+        [&](const auto &entry) { return entry.first == lc; });
+    if (it != k_color_table.end()) return std::string(it->second);
 
     // #rrggbb or #rgb → WeeChat uses "color(r,g,b)" syntax for 24-bit,
     // but for broad terminal compat map to nearest of the 16 named colors.
