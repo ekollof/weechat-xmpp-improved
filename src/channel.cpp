@@ -225,21 +225,32 @@ void weechat::channel::add_nicklist_groups()
         || type == weechat::channel::chat_type::FEED)
         return;
 
-    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", 000, "~").data(),
+    // Sort order constants for XEP-0045 MUC role/affiliation prefixes.
+    // Lower numbers appear first in the nicklist; 999 = no-role sentinel.
+    static constexpr int k_nick_sort_owner   = 0;
+    static constexpr int k_nick_sort_admin   = 1;
+    static constexpr int k_nick_sort_op      = 2;
+    static constexpr int k_nick_sort_halfop  = 3;
+    static constexpr int k_nick_sort_voice   = 4;
+    static constexpr int k_nick_sort_unknown = 5;
+    static constexpr int k_nick_sort_novoice = 6;
+    static constexpr int k_nick_sort_norole  = 999;
+
+    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", k_nick_sort_owner,   "~").data(),
                                "weechat.color.nicklist_group", 1);
-    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", 001, "&").data(),
+    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", k_nick_sort_admin,   "&").data(),
                                "weechat.color.nicklist_group", 1);
-    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", 002, "@").data(),
+    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", k_nick_sort_op,      "@").data(),
                                "weechat.color.nicklist_group", 1);
-    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", 003, "%").data(),
+    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", k_nick_sort_halfop,  "%").data(),
                                "weechat.color.nicklist_group", 1);
-    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", 004, "+").data(),
+    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", k_nick_sort_voice,   "+").data(),
                                "weechat.color.nicklist_group", 1);
-    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", 005, "?").data(),
+    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", k_nick_sort_unknown, "?").data(),
                                "weechat.color.nicklist_group", 1);
-    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", 006, "!").data(),
+    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", k_nick_sort_novoice, "!").data(),
                                "weechat.color.nicklist_group", 1);
-    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", 999, ".").data(),
+    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", k_nick_sort_norole,  ".").data(),
                                "weechat.color.nicklist_group", 1);
 }
 

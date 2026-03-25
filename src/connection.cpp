@@ -6,8 +6,6 @@
 #include <charconv>
 #include <thread>
 #include <filesystem>
-#include <sstream>
-#include <iomanip>
 #include <time.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -112,9 +110,7 @@ void append_raw_xml_trace(weechat::account &account,
     time_t now = time(NULL);
     struct tm local_tm = {0};
     localtime_r(&now, &local_tm);
-    std::ostringstream ts_oss;
-    ts_oss << std::put_time(&local_tm, "%Y-%m-%d %H:%M:%S");
-    std::string timestamp = ts_oss.str();
+    std::string timestamp = fmt::format("{:%Y-%m-%d %H:%M:%S}", local_tm);
 
     const char *stanza_name = xmpp_stanza_get_name(stanza);
     fprintf(fp, "[%s] %s %s\n%s\n\n",
@@ -204,11 +200,9 @@ bool weechat::connection::time_handler(xmpp_stanza_t *stanza)
     time_t now = time(NULL);
     struct tm *tm_utc = gmtime(&now);
     struct tm *tm_local = localtime(&now);
-    
+
     // Format UTC time as ISO 8601: YYYY-MM-DDTHH:MM:SSZ
-    std::ostringstream utc_oss;
-    utc_oss << std::put_time(tm_utc, "%Y-%m-%dT%H:%M:%SZ");
-    std::string utc_str = utc_oss.str();
+    std::string utc_str = fmt::format("{:%Y-%m-%dT%H:%M:%SZ}", *tm_utc);
     
     // Calculate timezone offset
     long tz_offset = tm_local->tm_gmtoff;  // Offset in seconds
