@@ -102,7 +102,7 @@ struct t_gui_buffer *weechat::channel::search_buffer(weechat::channel::chat_type
                 && ptr_account_name && ptr_account_name[0]
                 && ptr_remote_jid && ptr_remote_jid[0]
                 && (   ((  (type == weechat::channel::chat_type::MUC))
-                        && (strcmp(ptr_type, "room") == 0))
+                        && (strcmp(ptr_type, "channel") == 0))
                     || ((  (type == weechat::channel::chat_type::PM))
                         && (strcmp(ptr_type, "private") == 0))
                     || ((  (type == weechat::channel::chat_type::FEED))
