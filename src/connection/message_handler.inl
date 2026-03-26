@@ -781,15 +781,53 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                             const std::string &author   = ae.author;
                             const std::string &reply_to = ae.reply_to;
 
+                            // When true, display was deferred to the IQ result handler;
+                            // do NOT mark the item seen here — the IQ handler will do it.
+                            bool deferred_to_iq = false;
+
                             if (ae.empty())
                             {
-                                // No Atom payload — just show the item ID
-                                const char *item_id = xmpp_stanza_get_id(child);
-                                weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
-                                    "%s[%s] New item: %s",
-                                    weechat_prefix("network"),
-                                    std::string(node_sv).c_str(),
-                                    item_id ? item_id : "(no id)");
+                                // Notification-only push (no Atom payload in stanza).
+                                // Fetch the specific item by ID so we can display it
+                                // properly once the IQ result arrives (XEP-0060 §6.5.7).
+                                if (item_id_raw)
+                                {
+                                    std::string feed_service_str(feed_service_sv);
+                                    std::string node_str(node_sv);
+                                    xmpp_stanza_t *item_req =
+                                        stanza__iq_pubsub_items_item(account.context, nullptr,
+                                                                     with_noop(item_id_raw));
+                                    xmpp_stanza_t *items_req =
+                                        stanza__iq_pubsub_items(account.context, nullptr,
+                                                                node_str.c_str());
+                                    xmpp_stanza_add_child(items_req, item_req);
+                                    xmpp_stanza_release(item_req);
+                                    std::array<xmpp_stanza_t *, 2> ch_arr = {items_req, nullptr};
+                                    ch_arr[0] = stanza__iq_pubsub(account.context, nullptr,
+                                                                  ch_arr.data(),
+                                                                  with_noop("http://jabber.org/protocol/pubsub"));
+                                    xmpp_string_guard uid_g(account.context,
+                                                            xmpp_uuid_gen(account.context));
+                                    const char *uid = uid_g.ptr;
+                                    ch_arr[0] = stanza__iq(account.context, nullptr, ch_arr.data(),
+                                                           nullptr, uid,
+                                                           to ? to : account.jid().data(),
+                                                           feed_service_str.c_str(), "get");
+                                    if (uid)
+                                        account.pubsub_fetch_ids[uid] = {feed_service_str,
+                                                                          node_str, "", 0};
+                                    account.connection.send(ch_arr[0]);
+                                    xmpp_stanza_release(ch_arr[0]);
+                                    deferred_to_iq = true;
+                                }
+                                else
+                                {
+                                    // No ID at all — nothing useful to show or fetch
+                                    weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                        "%s[%s] New item (no content)",
+                                        weechat_prefix("network"),
+                                        std::string(node_sv).c_str());
+                                }
                             }
                             else
                             {
@@ -834,8 +872,10 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                                     weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
                                         "  %s", body.c_str());
                             }
-                            // Mark this item seen so push duplicates are suppressed
-                            if (item_id_raw)
+                            // Mark this item seen so push duplicates are suppressed.
+                            // Skip if we deferred display to the IQ result handler —
+                            // it will call mark_seen after actually rendering the item.
+                            if (item_id_raw && !deferred_to_iq)
                                 account.feed_item_mark_seen(feed_key, item_id_raw);
                         }
                         else if (weechat_strcasecmp(child_name, "retract") == 0)
