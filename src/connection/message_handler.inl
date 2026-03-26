@@ -761,85 +761,27 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                         if (weechat_strcasecmp(child_name, "item") == 0)
                         {
                             has_item = true;
+
+                            // Dedup: skip items we have already rendered (XEP-0060 push)
+                            const char *item_id_raw = xmpp_stanza_get_id(child);
+                            if (item_id_raw && account.feed_item_seen(feed_key, item_id_raw))
+                                continue;
+
                             // Extract Atom payload (http://www.w3.org/2005/Atom)
                             xmpp_stanza_t *entry = xmpp_stanza_get_child_by_name_and_ns(
                                 child, "entry", "http://www.w3.org/2005/Atom");
                             if (!entry)
                                 entry = xmpp_stanza_get_child_by_name(child, "entry");
 
-                            auto atom_text = [&](const char *tag) -> std::string {
-                                if (!entry) return {};
-                                xmpp_stanza_t *el = xmpp_stanza_get_child_by_name(entry, tag);
-                                if (!el) return {};
-                                char *t = xmpp_stanza_get_text(el);
-                                if (!t) return {};
-                                std::string s(t);
-                                xmpp_free(account.context, t);
-                                return s;
-                            };
+                            atom_entry ae = parse_atom_entry(account.context, entry);
 
-                            auto atom_link = [&]() -> std::string {
-                                if (!entry) return {};
-                                for (xmpp_stanza_t *lk = xmpp_stanza_get_children(entry);
-                                     lk; lk = xmpp_stanza_get_next(lk))
-                                {
-                                    const char *lk_name = xmpp_stanza_get_name(lk);
-                                    if (!lk_name || weechat_strcasecmp(lk_name, "link") != 0)
-                                        continue;
-                                    const char *rel = xmpp_stanza_get_attribute(lk, "rel");
-                                    if (!rel || weechat_strcasecmp(rel, "alternate") == 0)
-                                    {
-                                        const char *href = xmpp_stanza_get_attribute(lk, "href");
-                                        if (href) return href;
-                                    }
-                                }
-                                return {};
-                            };
+                            const std::string &title    = ae.title;
+                            const std::string &pubdate  = ae.pubdate;
+                            const std::string &link     = ae.link;
+                            const std::string &author   = ae.author;
+                            const std::string &reply_to = ae.reply_to;
 
-                            // XEP-0472 / XEP-0277: extract author name
-                            auto atom_author = [&]() -> std::string {
-                                if (!entry) return {};
-                                xmpp_stanza_t *author_el = xmpp_stanza_get_child_by_name(entry, "author");
-                                if (!author_el) return {};
-                                xmpp_stanza_t *name_el = xmpp_stanza_get_child_by_name(author_el, "name");
-                                if (!name_el) return {};
-                                char *t = xmpp_stanza_get_text(name_el);
-                                if (!t) return {};
-                                std::string s(t);
-                                xmpp_free(account.context, t);
-                                return s;
-                            };
-
-                            // XEP-0472: extract thr:in-reply-to ref attribute
-                            auto atom_reply_to = [&]() -> std::string {
-                                if (!entry) return {};
-                                for (xmpp_stanza_t *el = xmpp_stanza_get_children(entry);
-                                     el; el = xmpp_stanza_get_next(el))
-                                {
-                                    const char *el_name = xmpp_stanza_get_name(el);
-                                    if (!el_name) continue;
-                                    // strophe may expose this as "in-reply-to" or "thr:in-reply-to"
-                                    if (weechat_strcasecmp(el_name, "in-reply-to") == 0 ||
-                                        weechat_strcasecmp(el_name, "thr:in-reply-to") == 0)
-                                    {
-                                        const char *ref = xmpp_stanza_get_attribute(el, "ref");
-                                        if (ref) return ref;
-                                        const char *href = xmpp_stanza_get_attribute(el, "href");
-                                        if (href) return href;
-                                    }
-                                }
-                                return {};
-                            };
-
-                            std::string title    = atom_text("title");
-                            std::string summary  = atom_text("summary");
-                            std::string content  = atom_text("content");
-                            std::string pubdate  = atom_text("published");
-                            std::string link     = atom_link();
-                            std::string author   = atom_author();
-                            std::string reply_to = atom_reply_to();
-
-                            if (title.empty() && summary.empty() && content.empty())
+                            if (ae.empty())
                             {
                                 // No Atom payload — just show the item ID
                                 const char *item_id = xmpp_stanza_get_id(child);
@@ -851,8 +793,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                             }
                             else
                             {
-                                const std::string &body = !summary.empty() ? summary
-                                                        : !content.empty() ? content : std::string{};
+                                const std::string &body = ae.body();
                                 const char *pfx = weechat_prefix("join");
                                 const char *bold = weechat_color("bold");
                                 const char *rst  = weechat_color("reset");
@@ -893,6 +834,9 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                                     weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
                                         "  %s", body.c_str());
                             }
+                            // Mark this item seen so push duplicates are suppressed
+                            if (item_id_raw)
+                                account.feed_item_mark_seen(feed_key, item_id_raw);
                         }
                         else if (weechat_strcasecmp(child_name, "retract") == 0)
                         {

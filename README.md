@@ -123,7 +123,7 @@ comprehensive set of XEPs targeting CCS2022 compliance.
 | Roster management (`/roster`) | RFC 6121 |
 | Public room search (`/list`) | XEP-0433 |
 | PubSub feed reader (`/feed`) | XEP-0060 |
-| Microblogging post/reply/retract (`/feed post`, `/feed reply`, `/feed retract`) | XEP-0277 / XEP-0472 |
+| Microblogging post/reply/repeat/retract + subscribe/unsubscribe (`/feed post`, `/feed reply`, `/feed repeat`, `/feed retract`, `/feed subscribe`, `/feed unsubscribe`, `/feed subscriptions`) | XEP-0277 / XEP-0472 |
 | Entity Capability caching | XEP-0115 |
 | User Avatar (colored Unicode symbols) | XEP-0084 |
 | MUC status code handling | XEP-0045 |
@@ -584,7 +584,7 @@ moderation stanza.
 
 ---
 
-### Microblogging — `/feed post`, `/feed reply`, `/feed retract` (XEP-0277 / XEP-0472)
+### Microblogging — `/feed post`, `/feed reply`, `/feed repeat`, `/feed retract`, `/feed subscribe` (XEP-0277 / XEP-0472)
 
 Publish and interact with microblog posts on PubSub services such as
 [Movim](https://movim.eu/) and [Libervia/Salut-à-Toi](https://libervia.org/).
@@ -597,21 +597,28 @@ are Atom entries stored on PubSub nodes; contacts who subscribe to your
 > underlying XEP-0060 mechanics.
 
 ```
-/feed post <service-jid> <node> <text>
+/feed post <service-jid> <node> [--open] <text>
 /feed reply <service-jid> <node> <item-id> <text>
+/feed repeat <service-jid> <node> <item-id> [comment]
 /feed retract <service-jid> <node> <item-id>
+/feed subscribe <service-jid> <node>
+/feed unsubscribe <service-jid> <node>
+/feed subscriptions <service-jid>
 ```
 
 **Publishing a post:**
 
 ```
 /feed post movim.eu urn:xmpp:microblog:0 Hello from WeeChat!
+/feed post movim.eu myblog --open My public post
 ```
 
-Sends an Atom `<entry>` to the `urn:xmpp:microblog:0` PubSub node on
-`movim.eu`. The entry carries `pubsub#type=urn:xmpp:microblog:0` and the
-`urn:xmpp:pubsub-social-feed:1` publish-option required by XEP-0472.
+Sends an Atom `<entry>` to the PubSub node on `movim.eu`. The entry carries
+`pubsub#type=urn:xmpp:microblog:0` and the `urn:xmpp:pubsub-social-feed:1`
+publish-option required by XEP-0472. Use `--open` to set
+`pubsub#access_model=open` (public node visible to all).
 Contacts who follow your microblog receive a PEP push notification immediately.
+Failed publishes are reported in the buffer with the server error condition.
 
 **Replying to a post (threaded):**
 
@@ -623,6 +630,17 @@ Adds a `thr:in-reply-to` element (RFC 4685) to the Atom entry referencing the
 original item ID `abc123`. Clients such as Movim render threaded conversations
 from these references.
 
+**Boosting / repeating a post (XEP-0472 §4.5):**
+
+```
+/feed repeat movim.eu urn:xmpp:microblog:0 abc123
+/feed repeat movim.eu urn:xmpp:microblog:0 abc123 Great post!
+```
+
+Publishes a new entry with a `<link rel='via'>` pointing to the original item,
+implementing the XEP-0472 boost/repeat pattern. An optional comment is included
+in the entry body.
+
 **Retracting (deleting) a post:**
 
 ```
@@ -632,12 +650,24 @@ from these references.
 Sends a PubSub retract for the given item ID. The post is removed from the
 node and a retraction notification is pushed to subscribers.
 
+**Subscribing and unsubscribing:**
+
+```
+/feed subscribe news.movim.eu Phoronix
+/feed unsubscribe news.movim.eu Phoronix
+/feed subscriptions news.movim.eu
+```
+
+Sends XEP-0060 subscribe/unsubscribe IQ stanzas. Use `/feed subscriptions` to
+list all nodes you are subscribed to on a given service.
+
 **Receiving posts from contacts:**
 
 Incoming PEP pushes from contacts' `urn:xmpp:microblog:0` nodes are
 automatically rendered in the WeeChat buffer for that contact, showing the
 author name, timestamp, content body, and — when present — the
-`thr:in-reply-to` parent reference.
+`thr:in-reply-to` parent reference. Duplicate items (already seen via IQ fetch)
+are suppressed via LMDB deduplication.
 
 **Reading a microblog feed:**
 

@@ -585,7 +585,7 @@
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0060.html' />
         <xmpp:status>partial</xmpp:status>
         <xmpp:version>1.25.0</xmpp:version>
-        <xmpp:note xml:lang='en'>Publish-Subscribe (PubSub) - passive feed reader receives and renders Atom items from arbitrary PubSub nodes into per-node WeeChat FEED buffers; /feed command fetches items on demand from any service/node pair; retract events trigger re-fetch</xmpp:note>
+        <xmpp:note xml:lang='en'>Publish-Subscribe (PubSub) - passive feed reader receives and renders Atom items from arbitrary PubSub nodes into per-node WeeChat FEED buffers; /feed command fetches items on demand from any service/node pair; retract events trigger re-fetch; /feed subscribe, /feed unsubscribe, /feed subscriptions manage XEP-0060 subscriptions; LMDB deduplication prevents duplicate item display across IQ fetch and push paths</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
 
@@ -594,7 +594,7 @@
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0277.html' />
         <xmpp:status>partial</xmpp:status>
         <xmpp:version>0.6.5</xmpp:version>
-        <xmpp:note xml:lang='en'>Microblogging over XMPP (Deferred) - /feed post publishes Atom entries to urn:xmpp:microblog:0 PEP node; /feed reply adds thr:in-reply-to threading; /feed retract retracts items; incoming PEP microblog push events are rendered; urn:xmpp:microblog:0+notify advertised in caps</xmpp:note>
+        <xmpp:note xml:lang='en'>Microblogging over XMPP (Deferred) - /feed post publishes Atom entries to urn:xmpp:microblog:0 PEP node; /feed reply adds thr:in-reply-to threading; /feed repeat publishes boost entry with &lt;link rel='via'&gt; (XEP-0472 §4.5); /feed retract retracts items; incoming PEP microblog push events are rendered with deduplication; urn:xmpp:microblog:0+notify advertised in caps</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
 
@@ -603,7 +603,7 @@
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0472.html' />
         <xmpp:status>partial</xmpp:status>
         <xmpp:version>0.2.1</xmpp:version>
-        <xmpp:note xml:lang='en'>Pubsub Social Feed (Experimental) - /feed post sets pubsub#type=urn:xmpp:microblog:0 and required publish-options (persist_items, max_items=max, notify_retract); urn:xmpp:pubsub-social-feed:1 advertised in disco#info; author and thr:in-reply-to parsed and displayed</xmpp:note>
+        <xmpp:note xml:lang='en'>Pubsub Social Feed (Experimental) - /feed post sets pubsub#type=urn:xmpp:microblog:0 and required publish-options (persist_items, max_items=max, notify_retract, deliver_payloads=false); --open flag sets pubsub#access_model=open; &lt;generator&gt; element included in published entries; urn:xmpp:pubsub-social-feed:1 advertised in disco#info; author and thr:in-reply-to parsed and displayed; publish errors reported in buffer</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
 

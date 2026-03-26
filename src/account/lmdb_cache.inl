@@ -353,6 +353,42 @@ void weechat::account::mam_cursor_set(const std::string& key, const std::string&
     }
 }
 
+bool weechat::account::feed_item_seen(const std::string& feed_key, const std::string& item_id)
+{
+    if (!mam_db_env || item_id.empty()) return false;
+
+    std::string key = fmt::format("feed_seen:{}:{}", feed_key, item_id);
+    try {
+        lmdb::txn parentTransaction{nullptr};
+        lmdb::txn txn = lmdb::txn::begin(mam_db_env, parentTransaction, MDB_RDONLY);
+        MDB_val k = {key.size(), (void*)key.data()};
+        MDB_val v;
+        bool found = (mdb_get(txn.handle(), mam_dbi.cursors.handle(), &k, &v) == 0);
+        txn.abort();
+        return found;
+    } catch (const lmdb::error&) {
+        return false;
+    }
+}
+
+void weechat::account::feed_item_mark_seen(const std::string& feed_key, const std::string& item_id)
+{
+    if (!mam_db_env || item_id.empty()) return;
+
+    std::string key = fmt::format("feed_seen:{}:{}", feed_key, item_id);
+    static const char *val_str = "1";
+    try {
+        lmdb::txn parentTransaction{nullptr};
+        lmdb::txn txn = lmdb::txn::begin(mam_db_env, parentTransaction, 0);
+        MDB_val k = {key.size(), (void*)key.data()};
+        MDB_val v = {1, (void*)val_str};
+        mdb_put(txn.handle(), mam_dbi.cursors.handle(), &k, &v, 0);
+        txn.commit();
+    } catch (const lmdb::error&) {
+        // Silently ignore write errors
+    }
+}
+
 void weechat::account::send_bookmarks()
 {
     // XEP-0402: PEP Native Bookmarks (preferred)

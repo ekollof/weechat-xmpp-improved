@@ -30,6 +30,7 @@
 #include "plugin.hh"
 #include "xmpp/node.hh"
 #include "xmpp/stanza.hh"
+#include "xmpp/atom.hh"
 #include "config.hh"
 #include "account.hh"
 #include "user.hh"

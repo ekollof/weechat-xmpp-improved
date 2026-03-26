@@ -421,6 +421,9 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
             stanza, "pubsub", "http://jabber.org/protocol/pubsub");
         if (pubsub_feed && id && type && weechat_strcasecmp(type, "result") == 0)
         {
+            // Clean up successful publish tracking (server may echo <publish> back).
+            account.pubsub_publish_ids.erase(id);
+
             auto fetch_it = account.pubsub_fetch_ids.find(id);
             if (fetch_it != account.pubsub_fetch_ids.end())
             {
@@ -449,83 +452,25 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                             if (!item || weechat_strcasecmp(xmpp_stanza_get_name(item), "item") != 0)
                                 continue;
 
+                            // Deduplication: skip items already rendered for this feed
+                            const char *item_id_raw = xmpp_stanza_get_id(item);
+                            if (item_id_raw && account.feed_item_seen(feed_key, item_id_raw))
+                                continue;
+
                             xmpp_stanza_t *entry = xmpp_stanza_get_child_by_name_and_ns(
                                 item, "entry", "http://www.w3.org/2005/Atom");
                             if (!entry)
                                 entry = xmpp_stanza_get_child_by_name(item, "entry");
 
-                            auto atom_text = [&](const char *tag) -> std::string {
-                                if (!entry) return {};
-                                xmpp_stanza_t *el = xmpp_stanza_get_child_by_name(entry, tag);
-                                if (!el) return {};
-                                char *t = xmpp_stanza_get_text(el);
-                                if (!t) return {};
-                                std::string s(t);
-                                xmpp_free(account.context, t);
-                                return s;
-                            };
+                            atom_entry ae = parse_atom_entry(account.context, entry);
 
-                            auto atom_link = [&]() -> std::string {
-                                if (!entry) return {};
-                                for (xmpp_stanza_t *lk = xmpp_stanza_get_children(entry);
-                                     lk; lk = xmpp_stanza_get_next(lk))
-                                {
-                                    const char *lk_name = xmpp_stanza_get_name(lk);
-                                    if (!lk_name || weechat_strcasecmp(lk_name, "link") != 0)
-                                        continue;
-                                    const char *rel = xmpp_stanza_get_attribute(lk, "rel");
-                                    if (!rel || weechat_strcasecmp(rel, "alternate") == 0)
-                                    {
-                                        const char *href = xmpp_stanza_get_attribute(lk, "href");
-                                        if (href) return href;
-                                    }
-                                }
-                                return {};
-                            };
+                            const std::string &title    = ae.title;
+                            const std::string &pubdate  = ae.pubdate;
+                            const std::string &link     = ae.link;
+                            const std::string &author   = ae.author;
+                            const std::string &reply_to = ae.reply_to;
 
-                            // XEP-0472 / XEP-0277: extract author name
-                            auto atom_author = [&]() -> std::string {
-                                if (!entry) return {};
-                                xmpp_stanza_t *author_el = xmpp_stanza_get_child_by_name(entry, "author");
-                                if (!author_el) return {};
-                                xmpp_stanza_t *name_el = xmpp_stanza_get_child_by_name(author_el, "name");
-                                if (!name_el) return {};
-                                char *t = xmpp_stanza_get_text(name_el);
-                                if (!t) return {};
-                                std::string s(t);
-                                xmpp_free(account.context, t);
-                                return s;
-                            };
-
-                            // XEP-0472: extract thr:in-reply-to ref attribute
-                            auto atom_reply_to = [&]() -> std::string {
-                                if (!entry) return {};
-                                for (xmpp_stanza_t *el = xmpp_stanza_get_children(entry);
-                                     el; el = xmpp_stanza_get_next(el))
-                                {
-                                    const char *el_name = xmpp_stanza_get_name(el);
-                                    if (!el_name) continue;
-                                    if (weechat_strcasecmp(el_name, "in-reply-to") == 0 ||
-                                        weechat_strcasecmp(el_name, "thr:in-reply-to") == 0)
-                                    {
-                                        const char *ref = xmpp_stanza_get_attribute(el, "ref");
-                                        if (ref) return ref;
-                                        const char *href = xmpp_stanza_get_attribute(el, "href");
-                                        if (href) return href;
-                                    }
-                                }
-                                return {};
-                            };
-
-                            std::string title    = atom_text("title");
-                            std::string summary  = atom_text("summary");
-                            std::string content  = atom_text("content");
-                            std::string pubdate  = atom_text("published");
-                            std::string link     = atom_link();
-                            std::string author   = atom_author();
-                            std::string reply_to = atom_reply_to();
-
-                            if (title.empty() && summary.empty() && content.empty())
+                            if (ae.empty())
                             {
                                 const char *item_id = xmpp_stanza_get_id(item);
                                 weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
@@ -536,8 +481,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                             }
                             else
                             {
-                                const std::string &body = !summary.empty() ? summary
-                                                        : !content.empty() ? content : std::string{};
+                                const std::string &body = ae.body();
                                 const char *pfx  = weechat_prefix("join");
                                 const char *bold = weechat_color("bold");
                                 const char *rst  = weechat_color("reset");
@@ -577,6 +521,9 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                                     weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
                                         "  %s", body.c_str());
                             }
+                            // Mark item as seen for deduplication
+                            if (item_id_raw)
+                                account.feed_item_mark_seen(feed_key, item_id_raw);
                         }
                     }
 
@@ -735,6 +682,32 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                                    "%sFeed subscriptions on %s: fetching %d subscribed node(s)",
                                    weechat_prefix("network"),
                                    feed_service.c_str(), node_count);
+            }
+        }
+    }
+
+    // XEP-0060: PubSub subscribe/unsubscribe result
+    {
+        xmpp_stanza_t *pubsub_res = xmpp_stanza_get_child_by_name_and_ns(
+            stanza, "pubsub", "http://jabber.org/protocol/pubsub");
+        if (pubsub_res && id && type && weechat_strcasecmp(type, "result") == 0)
+        {
+            auto sub_ok_it = account.pubsub_subscribe_queries.find(id);
+            if (sub_ok_it != account.pubsub_subscribe_queries.end())
+            {
+                weechat_printf(account.buffer,
+                    "%sSubscribed to %s",
+                    weechat_prefix("network"), sub_ok_it->second.c_str());
+                account.pubsub_subscribe_queries.erase(sub_ok_it);
+            }
+
+            auto unsub_ok_it = account.pubsub_unsubscribe_queries.find(id);
+            if (unsub_ok_it != account.pubsub_unsubscribe_queries.end())
+            {
+                weechat_printf(account.buffer,
+                    "%sUnsubscribed from %s",
+                    weechat_prefix("network"), unsub_ok_it->second.c_str());
+                account.pubsub_unsubscribe_queries.erase(unsub_ok_it);
             }
         }
     }
@@ -1090,6 +1063,10 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                       weechat_prefix("error"), type ? type : "(null)");
     }
     
+    // XEP-0060: clean up publish tracking on bare <iq type='result'/> (no pubsub child)
+    if (id && type && weechat_strcasecmp(type, "result") == 0)
+        account.pubsub_publish_ids.erase(id);
+
     // XEP-0363: HTTP File Upload - handle upload slot errors
     if (id && type && weechat_strcasecmp(type, "error") == 0)
     {
@@ -1152,6 +1129,68 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                           error_msg.c_str(), error_type ? error_type : "unknown");
             
             account.upload_requests.erase(req_it);
+        }
+
+        // XEP-0060: pubsub publish error — report to the originating buffer.
+        {
+            auto pub_it = account.pubsub_publish_ids.find(id);
+            if (pub_it != account.pubsub_publish_ids.end())
+            {
+                auto &ctx = pub_it->second;
+                xmpp_stanza_t *error_elem = xmpp_stanza_get_child_by_name(stanza, "error");
+                std::string error_cond = "unknown error";
+                if (error_elem)
+                {
+                    // Prefer <text> child, fall back to first non-text child name
+                    xmpp_stanza_t *text_elem = xmpp_stanza_get_child_by_name(error_elem, "text");
+                    if (text_elem)
+                    {
+                        char *t = xmpp_stanza_get_text(text_elem);
+                        if (t) { error_cond = t; xmpp_free(account.context, t); }
+                    }
+                    else
+                    {
+                        for (xmpp_stanza_t *c = xmpp_stanza_get_children(error_elem);
+                             c; c = xmpp_stanza_get_next(c))
+                        {
+                            const char *cname = xmpp_stanza_get_name(c);
+                            if (cname && strcmp(cname, "text") != 0)
+                            { error_cond = cname; break; }
+                        }
+                    }
+                }
+                struct t_gui_buffer *err_buf = ctx.buffer ? ctx.buffer : account.buffer;
+                weechat_printf(err_buf,
+                    "%s%s: publish failed for %s/%s (item %s): %s",
+                    weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
+                    ctx.service.c_str(), ctx.node.c_str(), ctx.item_id.c_str(),
+                    error_cond.c_str());
+                account.pubsub_publish_ids.erase(pub_it);
+            }
+        }
+
+        // XEP-0060: pubsub subscribe/unsubscribe error
+        {
+            auto sub_it = account.pubsub_subscribe_queries.find(id);
+            if (sub_it != account.pubsub_subscribe_queries.end())
+            {
+                weechat_printf(account.buffer,
+                    "%s%s: subscribe to %s failed",
+                    weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
+                    sub_it->second.c_str());
+                account.pubsub_subscribe_queries.erase(sub_it);
+            }
+        }
+        {
+            auto unsub_it = account.pubsub_unsubscribe_queries.find(id);
+            if (unsub_it != account.pubsub_unsubscribe_queries.end())
+            {
+                weechat_printf(account.buffer,
+                    "%s%s: unsubscribe from %s failed",
+                    weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
+                    unsub_it->second.c_str());
+                account.pubsub_unsubscribe_queries.erase(unsub_it);
+            }
         }
     }
     

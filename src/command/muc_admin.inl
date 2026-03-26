@@ -697,15 +697,354 @@ int command__feed(const void *pointer, void *data,
         weechat_printf(buffer,
                        _("%s%s: usage:\n"
                          "  /feed <service-jid> [--all | <node>] [--limit N] [--before <id>]\n"
-                         "  /feed post <service-jid> <node> <text>      — publish a post (XEP-0472)\n"
-                         "  /feed reply <service-jid> <node> <item-id> <text>  — reply to a post\n"
-                         "  /feed retract <service-jid> <node> <item-id>       — retract a post"),
+                         "  /feed post <service-jid> <node> [--open] <text>         — publish a post (XEP-0472)\n"
+                         "  /feed reply <service-jid> <node> <item-id> <text>        — reply to a post\n"
+                         "  /feed repeat <service-jid> <node> <item-id> [comment]   — boost/repeat a post\n"
+                         "  /feed retract <service-jid> <node> <item-id>            — retract a post\n"
+                         "  /feed subscribe <service-jid> <node>                    — subscribe to a node\n"
+                         "  /feed unsubscribe <service-jid> <node>                  — unsubscribe from a node\n"
+                         "  /feed subscriptions <service-jid>                       — list your subscriptions"),
                        weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
         return WEECHAT_RC_OK;
     }
 
     // XEP-0472 write path: post / reply / retract sub-commands
     std::string_view subcmd(argv[1]);
+
+    // ── /feed subscribe <service> <node> ────────────────────────────────────
+    if (subcmd == "subscribe" || subcmd == "unsubscribe")
+    {
+        if (argc < 4)
+        {
+            weechat_printf(buffer,
+                           _("%s%s: usage: /feed %s <service-jid> <node>"),
+                           weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
+                           std::string(subcmd).c_str());
+            return WEECHAT_RC_OK;
+        }
+
+        const std::string svc  = argv[2];
+        const std::string node = argv[3];
+        const std::string feed_key = fmt::format("{}/{}", svc, node);
+
+        xmpp_string_guard bare_g(ptr_account->context,
+                                 xmpp_jid_bare(ptr_account->context,
+                                               ptr_account->jid().data()));
+        const std::string my_jid = bare_g.ptr ? bare_g.ptr : ptr_account->jid().data();
+
+        xmpp_string_guard uid_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+
+        if (subcmd == "subscribe")
+        {
+            // <iq type='set' to='service'>
+            //   <pubsub xmlns='…'><subscribe node='…' jid='…'/></pubsub>
+            // </iq>
+            xmpp_stanza_t *sub_el = stanza__iq_pubsub_subscribe(
+                ptr_account->context, nullptr,
+                with_noop(node.c_str()), with_noop(my_jid.c_str()));
+
+            xmpp_stanza_t *sub_children[2] = {sub_el, nullptr};
+            xmpp_stanza_t *ps_el = stanza__iq_pubsub(
+                ptr_account->context, nullptr, sub_children,
+                with_noop("http://jabber.org/protocol/pubsub"));
+
+            xmpp_stanza_t *iq_children[2] = {ps_el, nullptr};
+            xmpp_stanza_t *iq = stanza__iq(ptr_account->context, nullptr, iq_children,
+                                           nullptr, uid_g.ptr,
+                                           my_jid.c_str(), svc.c_str(), "set");
+
+            if (uid_g.ptr)
+                ptr_account->pubsub_subscribe_queries[uid_g.ptr] = feed_key;
+
+            ptr_account->connection.send(iq);
+            xmpp_stanza_release(iq);
+
+            weechat_printf(buffer, "%sSubscribing to %s/%s…",
+                           weechat_prefix("network"), svc.c_str(), node.c_str());
+        }
+        else  // unsubscribe
+        {
+            // <iq type='set' to='service'>
+            //   <pubsub xmlns='…'><unsubscribe node='…' jid='…'/></pubsub>
+            // </iq>
+            xmpp_stanza_t *unsub_el = xmpp_stanza_new(ptr_account->context);
+            xmpp_stanza_set_name(unsub_el, "unsubscribe");
+            xmpp_stanza_set_attribute(unsub_el, "node", node.c_str());
+            xmpp_stanza_set_attribute(unsub_el, "jid", my_jid.c_str());
+
+            xmpp_stanza_t *unsub_children[2] = {unsub_el, nullptr};
+            xmpp_stanza_t *ps_el = stanza__iq_pubsub(
+                ptr_account->context, nullptr, unsub_children,
+                with_noop("http://jabber.org/protocol/pubsub"));
+
+            xmpp_stanza_t *iq_children[2] = {ps_el, nullptr};
+            xmpp_stanza_t *iq = stanza__iq(ptr_account->context, nullptr, iq_children,
+                                           nullptr, uid_g.ptr,
+                                           my_jid.c_str(), svc.c_str(), "set");
+
+            if (uid_g.ptr)
+                ptr_account->pubsub_unsubscribe_queries[uid_g.ptr] = feed_key;
+
+            ptr_account->connection.send(iq);
+            xmpp_stanza_release(iq);
+
+            weechat_printf(buffer, "%sUnsubscribing from %s/%s…",
+                           weechat_prefix("network"), svc.c_str(), node.c_str());
+        }
+
+        return WEECHAT_RC_OK;
+    }
+
+    // ── /feed subscriptions <service> ───────────────────────────────────────
+    if (subcmd == "subscriptions")
+    {
+        if (argc < 3)
+        {
+            weechat_printf(buffer,
+                           _("%s%s: usage: /feed subscriptions <service-jid>"),
+                           weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
+            return WEECHAT_RC_OK;
+        }
+
+        const std::string svc = argv[2];
+        xmpp_string_guard uid_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+        const char *uid = uid_g.ptr;
+
+        xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "get", uid);
+        xmpp_stanza_set_to(iq, svc.c_str());
+
+        xmpp_stanza_t *pubsub = xmpp_stanza_new(ptr_account->context);
+        xmpp_stanza_set_name(pubsub, "pubsub");
+        xmpp_stanza_set_ns(pubsub, "http://jabber.org/protocol/pubsub");
+
+        xmpp_stanza_t *subs_el = xmpp_stanza_new(ptr_account->context);
+        xmpp_stanza_set_name(subs_el, "subscriptions");
+        xmpp_stanza_add_child(pubsub, subs_el);
+        xmpp_stanza_release(subs_el);
+
+        xmpp_stanza_add_child(iq, pubsub);
+        xmpp_stanza_release(pubsub);
+
+        if (uid)
+            ptr_account->pubsub_subscriptions_queries[uid] = svc;
+
+        ptr_account->connection.send(iq);
+        xmpp_stanza_release(iq);
+
+        weechat_printf(buffer, "%sFetching subscriptions from %s…",
+                       weechat_prefix("network"), svc.c_str());
+
+        return WEECHAT_RC_OK;
+    }
+
+    // ── /feed repeat <service> <node> <item-id> [comment] ───────────────────
+    // XEP-0472 §4.5 boost/repeat: publish a new entry with <link rel='via'>
+    // pointing to the original item. The receiving client fetches the original.
+    if (subcmd == "repeat")
+    {
+        if (argc < 5)
+        {
+            weechat_printf(buffer,
+                           _("%s%s: usage: /feed repeat <service-jid> <node> <item-id> [comment]"),
+                           weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
+            return WEECHAT_RC_OK;
+        }
+
+        const std::string rep_service = argv[2];
+        const std::string rep_node    = argv[3];
+        const std::string rep_item_id = argv[4];
+        const std::string rep_comment = argc > 5 ? argv_eol[5] : "";
+
+        const std::string via_uri = fmt::format(
+            "xmpp:{}?;node={};item={}", rep_service, rep_node, rep_item_id);
+
+        xmpp_string_guard item_uuid_g(ptr_account->context,
+                                      xmpp_uuid_gen(ptr_account->context));
+        const std::string item_uuid = item_uuid_g.ptr ? item_uuid_g.ptr : "repeat";
+
+        char ts_buf[32];
+        {
+            std::time_t now = std::time(nullptr);
+            std::strftime(ts_buf, sizeof(ts_buf), "%Y-%m-%dT%H:%M:%SZ", std::gmtime(&now));
+        }
+
+        xmpp_string_guard domain_g(ptr_account->context,
+                                   xmpp_jid_domain(ptr_account->context,
+                                                   ptr_account->jid().data()));
+        char date_buf[12];
+        {
+            std::time_t now = std::time(nullptr);
+            std::strftime(date_buf, sizeof(date_buf), "%Y-%m-%d", std::gmtime(&now));
+        }
+        const std::string atom_id = fmt::format("tag:{},{};posts/{}",
+                                                domain_g.ptr ? domain_g.ptr : "xmpp",
+                                                date_buf, item_uuid);
+
+        auto make_text_el_r = [&](xmpp_ctx_t *ctx,
+                                  const char *tag,
+                                  const char *text) -> xmpp_stanza_t * {
+            xmpp_stanza_t *el = xmpp_stanza_new(ctx);
+            xmpp_stanza_set_name(el, tag);
+            xmpp_stanza_t *t = xmpp_stanza_new(ctx);
+            xmpp_stanza_set_text(t, text);
+            xmpp_stanza_add_child(el, t);
+            xmpp_stanza_release(t);
+            return el;
+        };
+
+        xmpp_stanza_t *entry = xmpp_stanza_new(ptr_account->context);
+        xmpp_stanza_set_name(entry, "entry");
+        xmpp_stanza_set_ns(entry, "http://www.w3.org/2005/Atom");
+
+        // <title>Shared: item-id [— comment]</title>
+        {
+            std::string repeat_title = rep_comment.empty()
+                ? fmt::format("Shared: {}", rep_item_id)
+                : fmt::format("Shared: {} — {}", rep_item_id, rep_comment);
+            xmpp_stanza_t *title_el = xmpp_stanza_new(ptr_account->context);
+            xmpp_stanza_set_name(title_el, "title");
+            xmpp_stanza_set_attribute(title_el, "type", "text");
+            xmpp_stanza_t *t = xmpp_stanza_new(ptr_account->context);
+            xmpp_stanza_set_text(t, repeat_title.c_str());
+            xmpp_stanza_add_child(title_el, t);
+            xmpp_stanza_release(t);
+            xmpp_stanza_add_child(entry, title_el);
+            xmpp_stanza_release(title_el);
+        }
+
+        {
+            xmpp_stanza_t *id_el = make_text_el_r(ptr_account->context, "id", atom_id.c_str());
+            xmpp_stanza_add_child(entry, id_el);
+            xmpp_stanza_release(id_el);
+            xmpp_stanza_t *pub_el = make_text_el_r(ptr_account->context, "published", ts_buf);
+            xmpp_stanza_add_child(entry, pub_el);
+            xmpp_stanza_release(pub_el);
+            xmpp_stanza_t *upd_el = make_text_el_r(ptr_account->context, "updated", ts_buf);
+            xmpp_stanza_add_child(entry, upd_el);
+            xmpp_stanza_release(upd_el);
+        }
+
+        // <author>
+        {
+            xmpp_string_guard bare_g(ptr_account->context,
+                                     xmpp_jid_bare(ptr_account->context,
+                                                   ptr_account->jid().data()));
+            xmpp_stanza_t *author_el = xmpp_stanza_new(ptr_account->context);
+            xmpp_stanza_set_name(author_el, "author");
+            xmpp_stanza_t *name_el = make_text_el_r(ptr_account->context, "name",
+                bare_g.ptr ? bare_g.ptr : ptr_account->jid().data());
+            xmpp_stanza_add_child(author_el, name_el);
+            xmpp_stanza_release(name_el);
+            std::string xmpp_uri = fmt::format("xmpp:{}", bare_g.ptr ? bare_g.ptr : "");
+            xmpp_stanza_t *uri_el = make_text_el_r(ptr_account->context, "uri", xmpp_uri.c_str());
+            xmpp_stanza_add_child(author_el, uri_el);
+            xmpp_stanza_release(uri_el);
+            xmpp_stanza_add_child(entry, author_el);
+            xmpp_stanza_release(author_el);
+        }
+
+        // <link rel='via' href='xmpp:…'/>  (XEP-0472 §4.5 boost/repeat)
+        {
+            xmpp_stanza_t *via_el = xmpp_stanza_new(ptr_account->context);
+            xmpp_stanza_set_name(via_el, "link");
+            xmpp_stanza_set_attribute(via_el, "rel",  "via");
+            xmpp_stanza_set_attribute(via_el, "href", via_uri.c_str());
+            xmpp_stanza_add_child(entry, via_el);
+            xmpp_stanza_release(via_el);
+        }
+
+        // Optional <content>comment</content>
+        if (!rep_comment.empty())
+        {
+            xmpp_stanza_t *content_el = xmpp_stanza_new(ptr_account->context);
+            xmpp_stanza_set_name(content_el, "content");
+            xmpp_stanza_set_attribute(content_el, "type", "text");
+            xmpp_stanza_t *t = xmpp_stanza_new(ptr_account->context);
+            xmpp_stanza_set_text(t, rep_comment.c_str());
+            xmpp_stanza_add_child(content_el, t);
+            xmpp_stanza_release(t);
+            xmpp_stanza_add_child(entry, content_el);
+            xmpp_stanza_release(content_el);
+        }
+
+        // <generator>
+        {
+            xmpp_stanza_t *gen_el = xmpp_stanza_new(ptr_account->context);
+            xmpp_stanza_set_name(gen_el, "generator");
+            xmpp_stanza_set_attribute(gen_el, "uri",
+                "https://github.com/ekollof/weechat-xmpp-improved");
+            xmpp_stanza_set_attribute(gen_el, "version", WEECHAT_XMPP_PLUGIN_VERSION);
+            xmpp_stanza_t *gt = xmpp_stanza_new(ptr_account->context);
+            xmpp_stanza_set_text(gt, "weechat-xmpp-improved");
+            xmpp_stanza_add_child(gen_el, gt);
+            xmpp_stanza_release(gt);
+            xmpp_stanza_add_child(entry, gen_el);
+            xmpp_stanza_release(gen_el);
+        }
+
+        xmpp_stanza_t *item_children_r[2] = {entry, nullptr};
+        xmpp_stanza_t *item_el_r = stanza__iq_pubsub_publish_item(
+            ptr_account->context, nullptr, item_children_r, with_noop(item_uuid.c_str()));
+
+        xmpp_stanza_t *pub_children_r[2] = {item_el_r, nullptr};
+        xmpp_stanza_t *publish_el_r = stanza__iq_pubsub_publish(
+            ptr_account->context, nullptr, pub_children_r, with_noop(rep_node.c_str()));
+
+        // publish-options (same set as /feed post)
+        xmpp_stanza_t *pub_opts_r = xmpp_stanza_new(ptr_account->context);
+        xmpp_stanza_set_name(pub_opts_r, "publish-options");
+        {
+            xmpp_stanza_t *x = xmpp_stanza_new(ptr_account->context);
+            xmpp_stanza_set_name(x, "x");
+            xmpp_stanza_set_ns(x, "jabber:x:data");
+            xmpp_stanza_set_attribute(x, "type", "submit");
+            auto add_field_r = [&](const char *var, const char *val) {
+                xmpp_stanza_t *f = xmpp_stanza_new(ptr_account->context);
+                xmpp_stanza_set_name(f, "field");
+                xmpp_stanza_set_attribute(f, "var", var);
+                xmpp_stanza_t *v = xmpp_stanza_new(ptr_account->context);
+                xmpp_stanza_set_name(v, "value");
+                xmpp_stanza_t *vt = xmpp_stanza_new(ptr_account->context);
+                xmpp_stanza_set_text(vt, val);
+                xmpp_stanza_add_child(v, vt); xmpp_stanza_release(vt);
+                xmpp_stanza_add_child(f, v);  xmpp_stanza_release(v);
+                xmpp_stanza_add_child(x, f);  xmpp_stanza_release(f);
+            };
+            add_field_r("FORM_TYPE", "http://jabber.org/protocol/pubsub#publish-options");
+            add_field_r("pubsub#persist_items", "true");
+            add_field_r("pubsub#max_items",     "max");
+            add_field_r("pubsub#notify_retract","true");
+            add_field_r("pubsub#send_last_published_item", "never");
+            add_field_r("pubsub#deliver_payloads", "false");
+            add_field_r("pubsub#type", "urn:xmpp:microblog:0");
+            xmpp_stanza_add_child(pub_opts_r, x);
+            xmpp_stanza_release(x);
+        }
+
+        xmpp_stanza_t *ps_r[3] = {publish_el_r, pub_opts_r, nullptr};
+        xmpp_stanza_t *pubsub_el_r = stanza__iq_pubsub(
+            ptr_account->context, nullptr, ps_r,
+            with_noop("http://jabber.org/protocol/pubsub"));
+
+        xmpp_string_guard uid_r(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
+        xmpp_stanza_t *iq_r_children[2] = {pubsub_el_r, nullptr};
+        xmpp_stanza_t *iq_r = stanza__iq(ptr_account->context, nullptr, iq_r_children,
+                                         nullptr, uid_r.ptr,
+                                         ptr_account->jid().data(),
+                                         rep_service.c_str(), "set");
+
+        if (uid_r.ptr)
+            ptr_account->pubsub_publish_ids[uid_r.ptr] = {rep_service, rep_node, item_uuid, buffer};
+
+        ptr_account->connection.send(iq_r);
+        xmpp_stanza_release(iq_r);
+
+        weechat_printf(buffer, "%sRepeated %s/%s item %s (id: %s)",
+                       weechat_prefix("network"),
+                       rep_service.c_str(), rep_node.c_str(),
+                       rep_item_id.c_str(), item_uuid.c_str());
+        return WEECHAT_RC_OK;
+    }
 
     // ── /feed post <service> <node> <text> ──────────────────────────────────
     if (subcmd == "post" || subcmd == "reply" || subcmd == "retract")
@@ -772,16 +1111,32 @@ int command__feed(const void *pointer, void *data,
         // ── /feed post / /feed reply ─────────────────────────────────────
         // For reply: argv[4] = in-reply-to item id, argv_eol[5] = body text
         // For post:  argv_eol[4] = body text
+        // Optional flag: --open  (sets pubsub#access_model=open)
+        bool access_open = false;
         std::string reply_to_id;
         const char *body_raw = nullptr;
         if (subcmd == "reply")
         {
             reply_to_id = argv[4];
-            body_raw    = argv_eol[5];
+            // Check if --open appears before the body text
+            if (argc > 5 && std::string_view(argv[5]) == "--open")
+            {
+                access_open = true;
+                body_raw    = argv_eol[6];
+            }
+            else
+                body_raw    = argv_eol[5];
         }
         else
         {
-            body_raw = argv_eol[4];
+            // Check if --open appears before the body text
+            if (argc > 4 && std::string_view(argv[4]) == "--open")
+            {
+                access_open = true;
+                body_raw    = argv_eol[5];
+            }
+            else
+                body_raw = argv_eol[4];
         }
 
         if (!body_raw || !*body_raw)
@@ -900,6 +1255,23 @@ int command__feed(const void *pointer, void *data,
             xmpp_stanza_release(reply_el);
         }
 
+        // <generator> — identify the client (XEP-0277 / RFC 4287)
+        {
+            xmpp_stanza_t *gen_el = xmpp_stanza_new(ptr_account->context);
+            xmpp_stanza_set_name(gen_el, "generator");
+            xmpp_stanza_set_attribute(gen_el, "uri",
+                "https://github.com/ekollof/weechat-xmpp-improved");
+            xmpp_stanza_set_attribute(gen_el, "version", WEECHAT_XMPP_PLUGIN_VERSION);
+            {
+                xmpp_stanza_t *gt = xmpp_stanza_new(ptr_account->context);
+                xmpp_stanza_set_text(gt, "weechat-xmpp-improved");
+                xmpp_stanza_add_child(gen_el, gt);
+                xmpp_stanza_release(gt);
+            }
+            xmpp_stanza_add_child(entry, gen_el);
+            xmpp_stanza_release(gen_el);
+        }
+
         // Wrap in <item id='uuid'><entry…/></item>
         xmpp_stanza_t *item_children[2] = {entry, nullptr};
         xmpp_stanza_t *item_el = stanza__iq_pubsub_publish_item(
@@ -937,8 +1309,11 @@ int command__feed(const void *pointer, void *data,
             add_field("pubsub#max_items",     "max");
             add_field("pubsub#notify_retract","true");
             add_field("pubsub#send_last_published_item", "never");
+            add_field("pubsub#deliver_payloads", "false");  // XEP-0472 §5.1.1
             // XEP-0472: set pubsub#type to identify this as a social feed
             add_field("pubsub#type", "urn:xmpp:microblog:0");
+            if (access_open)
+                add_field("pubsub#access_model", "open");
 
             xmpp_stanza_add_child(pub_opts, x);
             xmpp_stanza_release(x);
@@ -961,6 +1336,10 @@ int command__feed(const void *pointer, void *data,
 
         ptr_account->connection.send(iq);
         xmpp_stanza_release(iq);
+
+        // Track publish IQ for error reporting
+        if (uid_g.ptr)
+            ptr_account->pubsub_publish_ids[uid_g.ptr] = {pub_service, pub_node, item_uuid, buffer};
 
         if (subcmd == "reply")
             weechat_printf(buffer, "%sPosted reply to %s on %s/%s",

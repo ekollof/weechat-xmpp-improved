@@ -651,13 +651,21 @@ void command__init()
 
     hook = weechat_hook_command(
         "feed",
-        N_("fetch PubSub feeds from a service and display them in dedicated buffers (XEP-0060)"),
-        N_("<service-jid> [--all | <node>] [--limit N] [--before <id>]"),
+        N_("fetch and interact with PubSub feeds (XEP-0060 / XEP-0472 microblogging)"),
+        N_("<service-jid> [--all | <node>] [--limit N] [--before <id>]\n"
+           "  post <service-jid> <node> [--open] <text>\n"
+           "  reply <service-jid> <node> <item-id> <text>\n"
+           "  repeat <service-jid> <node> <item-id> [comment]\n"
+           "  retract <service-jid> <node> <item-id>\n"
+           "  subscribe <service-jid> <node>\n"
+           "  unsubscribe <service-jid> <node>\n"
+           "  subscriptions <service-jid>"),
         N_("service-jid: JID of the PubSub service (e.g. news.movim.eu)\n"
            "      --all: discover all nodes on the service via disco#items\n"
            "       node: node name on the service (e.g. Phoronix)\n"
            "  --limit N: max items to fetch per node (default: 20)\n"
-           "--before <id>: fetch the page of items older than item <id> (XEP-0059 RSM)\n\n"
+           "--before <id>: fetch the page of items older than item <id> (XEP-0059 RSM)\n"
+           "     --open: publish node with access_model=open (public)\n\n"
            "Without --all or a node: fetches your subscribed nodes (XEP-0060 subscriptions).\n"
            "If no subscriptions are found, a suggestion to use --all is shown.\n\n"
            "After a fetch the feed buffer shows a '/feed ... --before <id>' hint for\n"
@@ -668,7 +676,15 @@ void command__init()
            "  /feed news.movim.eu --all --limit 50           (up to 50 items per node)\n"
            "  /feed news.movim.eu Phoronix                   (fetch one specific node)\n"
            "  /feed news.movim.eu Phoronix --limit 5         (5 items only)\n"
-           "  /feed news.movim.eu Phoronix --before abc123   (page back, older items)"),
+           "  /feed news.movim.eu Phoronix --before abc123   (page back, older items)\n"
+           "  /feed post news.movim.eu myblog Hello world    (publish a post)\n"
+           "  /feed post news.movim.eu myblog --open Hello   (publish to a public node)\n"
+           "  /feed reply news.movim.eu myblog abc123 Nice!  (reply to item abc123)\n"
+           "  /feed repeat news.movim.eu myblog abc123       (boost item abc123)\n"
+           "  /feed retract news.movim.eu myblog abc123      (delete item abc123)\n"
+           "  /feed subscribe news.movim.eu Phoronix         (subscribe to node)\n"
+           "  /feed unsubscribe news.movim.eu Phoronix       (unsubscribe from node)\n"
+           "  /feed subscriptions news.movim.eu              (list subscriptions)"),
         NULL, &command__feed, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /feed");

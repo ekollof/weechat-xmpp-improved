@@ -231,6 +231,21 @@ namespace weechat
         // Maps IQ id → service_jid
         std::unordered_map<std::string, std::string> pubsub_subscriptions_queries;
 
+        // XEP-0060: pending publish IQs (/feed post, /feed reply).
+        // Maps IQ id → context used to report errors to the user.
+        struct pubsub_publish_context {
+            std::string service;
+            std::string node;
+            std::string item_id;
+            struct t_gui_buffer *buffer = nullptr;  // buffer for error feedback
+        };
+        std::unordered_map<std::string, pubsub_publish_context> pubsub_publish_ids;
+
+        // XEP-0060: pending subscribe/unsubscribe IQs.
+        // Maps IQ id → "service/node"
+        std::unordered_map<std::string, std::string> pubsub_subscribe_queries;
+        std::unordered_map<std::string, std::string> pubsub_unsubscribe_queries;
+
         // XEP-0191: Blocking Command — pending unblock picker (non-owning; picker owns itself)
         weechat::ui::picker<std::string> *blocklist_picker = nullptr;
 
@@ -295,9 +310,12 @@ namespace weechat
         void mam_cache_load_messages(const std::string& channel_jid, struct t_gui_buffer *buffer);
         void mam_cache_clear_messages(const std::string& channel_jid);
         time_t mam_cache_get_last_timestamp(const std::string& channel_jid);
-        void mam_cache_set_last_timestamp(const std::string& channel_jid, time_t timestamp);
+         void mam_cache_set_last_timestamp(const std::string& channel_jid, time_t timestamp);
         std::string mam_cursor_get(const std::string& key);
         void mam_cursor_set(const std::string& key, const std::string& cursor_id);
+        // Feed item deduplication (stored in cursors LMDB table)
+        bool feed_item_seen(const std::string& feed_key, const std::string& item_id);
+        void feed_item_mark_seen(const std::string& feed_key, const std::string& item_id);
         void send_bookmarks();
         
         // Capability cache methods (XEP-0115)
