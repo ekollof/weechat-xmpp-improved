@@ -82,5 +82,6 @@ namespace weechat
 
         void nicklist_add(weechat::account *account, weechat::channel *channel);
         void nicklist_remove(weechat::account *account, weechat::channel *channel);
+        void nicklist_set_color(weechat::account *account, weechat::channel *channel);
     };
 }

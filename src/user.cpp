@@ -148,6 +148,41 @@ void weechat::user::nicklist_add(weechat::account *account,
                               1);
 }
 
+void weechat::user::nicklist_set_color(weechat::account *account,
+                                       weechat::channel *channel)
+{
+    // Compute the same nick name as nicklist_add uses, then update in-place.
+    const char *name = channel ? this->profile.display_name.c_str() : this->id.c_str();
+    std::string bare_buf, resource_buf;
+    if (!channel)
+    {
+        xmpp_string_guard bare_g(account->context,
+            xmpp_jid_bare(account->context, this->id.c_str()));
+        if (bare_g) { bare_buf = bare_g.str(); name = bare_buf.c_str(); }
+    }
+    {
+        xmpp_string_guard jid_bare_g(account->context,
+            channel ? xmpp_jid_bare(account->context, name) : nullptr);
+        if (channel && jid_bare_g &&
+            weechat_strcasecmp(jid_bare_g.c_str(), channel->id.data()) == 0)
+        {
+            xmpp_string_guard resource_g(account->context,
+                xmpp_jid_resource(account->context, name));
+            if (resource_g) { resource_buf = resource_g.str(); name = resource_buf.c_str(); }
+        }
+    }
+
+    struct t_gui_buffer *ptr_buffer = channel ? channel->buffer : account->buffer;
+    struct t_gui_nick *ptr_nick = weechat_nicklist_search_nick(ptr_buffer, nullptr, name);
+    if (ptr_nick)
+    {
+        const char *color = this->is_away
+            ? "weechat.color.nicklist_away"
+            : get_colour_for_nicklist().data();
+        weechat_nicklist_nick_set(ptr_buffer, ptr_nick, "color", color);
+    }
+}
+
 void weechat::user::nicklist_remove(weechat::account *account,
                                     weechat::channel *channel)
 {
