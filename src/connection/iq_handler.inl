@@ -2066,9 +2066,11 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
             
             // Check if this is a response to upload service discovery
             bool upload_disco = stanza_id && account.upload_disco_queries.count(stanza_id);
+            std::string upload_service_jid; // kept alive for the identity loop below
             if (upload_disco)
             {
-                std::string service_jid = account.upload_disco_queries[stanza_id];
+                upload_service_jid = account.upload_disco_queries[stanza_id];
+                std::string service_jid = upload_service_jid;
                 account.upload_disco_queries.erase(stanza_id);
                 
                 // Check if this service supports HTTP File Upload
@@ -2174,6 +2176,22 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                     auto ptr_channel = account.channels.find(from);
                     if (ptr_channel != account.channels.end())
                         ptr_channel->second.update_name(name.data());
+                }
+
+                // XEP-0060: record pubsub service components discovered at
+                // connect time so /feed discover can list them without the
+                // user having to know the service JID in advance.
+                if (upload_disco && category == "pubsub")
+                {
+                    const std::string &svc_jid = upload_service_jid.empty()
+                        ? (from ? std::string(from) : std::string{})
+                        : upload_service_jid;
+                    if (!svc_jid.empty())
+                    {
+                        auto &kps = account.known_pubsub_services;
+                        if (std::find(kps.begin(), kps.end(), svc_jid) == kps.end())
+                            kps.push_back(svc_jid);
+                    }
                 }
                 // Legacy OMEMO devicelist fetch via hard-coded IQ id ("fetch2")
                 // was removed. It generated request storms from disco identity

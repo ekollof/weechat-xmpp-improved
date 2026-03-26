@@ -652,7 +652,8 @@ void command__init()
     hook = weechat_hook_command(
         "feed",
         N_("fetch and interact with PubSub feeds (XEP-0060 / XEP-0472 microblogging)"),
-        N_("<service-jid> [--all | <node>] [--limit N] [--before <id>]\n"
+        N_("[<service-jid> [--all | <node>] [--limit N] [--before <id>]]\n"
+           "  discover [--all]\n"
            "  post <service-jid> <node> [--open] <text>\n"
            "  reply <service-jid> <node> <item-id> <text>\n"
            "  repeat <service-jid> <node> <item-id> [comment]\n"
@@ -666,11 +667,16 @@ void command__init()
            "  --limit N: max items to fetch per node (default: 20)\n"
            "--before <id>: fetch the page of items older than item <id> (XEP-0059 RSM)\n"
            "     --open: publish node with access_model=open (public)\n\n"
-           "Without --all or a node: fetches your subscribed nodes (XEP-0060 subscriptions).\n"
-           "If no subscriptions are found, a suggestion to use --all is shown.\n\n"
+           "Without arguments: auto-discovers PubSub services on your server and fetches\n"
+           "your subscribed nodes from each one.\n\n"
+           "/feed discover: list PubSub services found on your server at connect time.\n"
+           "  /feed discover --all  fetches every node from every discovered service.\n\n"
            "After a fetch the feed buffer shows a '/feed ... --before <id>' hint for\n"
            "paging to older entries.\n\n"
            "Examples:\n"
+           "  /feed                                          (auto-discover and fetch subscriptions)\n"
+           "  /feed discover                                 (list known pubsub services)\n"
+           "  /feed discover --all                           (fetch all nodes from all services)\n"
            "  /feed news.movim.eu                            (fetch subscribed nodes)\n"
            "  /feed news.movim.eu --all                      (fetch all discovered nodes)\n"
            "  /feed news.movim.eu --all --limit 50           (up to 50 items per node)\n"

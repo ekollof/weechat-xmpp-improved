@@ -246,6 +246,11 @@ namespace weechat
         std::unordered_map<std::string, std::string> pubsub_subscribe_queries;
         std::unordered_map<std::string, std::string> pubsub_unsubscribe_queries;
 
+        // XEP-0060: PubSub service components discovered on our server at connect time.
+        // Populated by the disco#info handler when a server component reports
+        // identity category='pubsub'. Used by /feed discover and /feed (no args).
+        std::vector<std::string> known_pubsub_services;
+
         // XEP-0191: Blocking Command — pending unblock picker (non-owning; picker owns itself)
         weechat::ui::picker<std::string> *blocklist_picker = nullptr;
 

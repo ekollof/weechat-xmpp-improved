@@ -694,22 +694,135 @@ int command__feed(const void *pointer, void *data,
 
     if (argc < 2)
     {
+        // No arguments: behave as /feed discover (list known pubsub services
+        // and fetch subscribed nodes from each one automatically).
+        const auto &kps = ptr_account->known_pubsub_services;
+        if (kps.empty())
+        {
+            weechat_printf(buffer,
+                           _("%s%s: no PubSub services discovered yet.\n"
+                             "  Your server may not have a pubsub component, or you may need to reconnect.\n"
+                             "  To fetch a specific service: /feed <service-jid>"),
+                           weechat_prefix("network"), WEECHAT_XMPP_PLUGIN_NAME);
+            return WEECHAT_RC_OK;
+        }
+
         weechat_printf(buffer,
-                       _("%s%s: usage:\n"
-                         "  /feed <service-jid> [--all | <node>] [--limit N] [--before <id>]\n"
-                         "  /feed post <service-jid> <node> [--open] <text>         — publish a post (XEP-0472)\n"
-                         "  /feed reply <service-jid> <node> <item-id> <text>        — reply to a post\n"
-                         "  /feed repeat <service-jid> <node> <item-id> [comment]   — boost/repeat a post\n"
-                         "  /feed retract <service-jid> <node> <item-id>            — retract a post\n"
-                         "  /feed subscribe <service-jid> <node>                    — subscribe to a node\n"
-                         "  /feed unsubscribe <service-jid> <node>                  — unsubscribe from a node\n"
-                         "  /feed subscriptions <service-jid>                       — list your subscriptions"),
-                       weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
+                       _("%s%s: discovered %zu PubSub service(s). Fetching subscriptions…"),
+                       weechat_prefix("network"), WEECHAT_XMPP_PLUGIN_NAME,
+                       kps.size());
+        for (const auto &svc : kps)
+        {
+            weechat_printf(buffer,
+                           "%sFetching subscribed PubSub feeds from %s…",
+                           weechat_prefix("network"), svc.c_str());
+            xmpp_string_guard uid_g(ptr_account->context,
+                                    xmpp_uuid_gen(ptr_account->context));
+            const char *uid = uid_g.ptr;
+            xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "get", uid);
+            xmpp_stanza_set_to(iq, svc.c_str());
+            xmpp_stanza_t *pubsub = xmpp_stanza_new(ptr_account->context);
+            xmpp_stanza_set_name(pubsub, "pubsub");
+            xmpp_stanza_set_ns(pubsub, "http://jabber.org/protocol/pubsub");
+            xmpp_stanza_t *subs_el = xmpp_stanza_new(ptr_account->context);
+            xmpp_stanza_set_name(subs_el, "subscriptions");
+            xmpp_stanza_add_child(pubsub, subs_el);
+            xmpp_stanza_release(subs_el);
+            xmpp_stanza_add_child(iq, pubsub);
+            xmpp_stanza_release(pubsub);
+            if (uid)
+                ptr_account->pubsub_subscriptions_queries[uid] = svc;
+            ptr_account->connection.send(iq);
+            xmpp_stanza_release(iq);
+        }
         return WEECHAT_RC_OK;
     }
 
     // XEP-0472 write path: post / reply / retract sub-commands
     std::string_view subcmd(argv[1]);
+
+    // ── /feed discover ───────────────────────────────────────────────────────
+    // List PubSub services discovered on our server at connect time and
+    // optionally fetch subscribed nodes from each one.
+    if (subcmd == "discover")
+    {
+        const auto &kps = ptr_account->known_pubsub_services;
+        if (kps.empty())
+        {
+            weechat_printf(buffer,
+                           _("%s%s: no PubSub services discovered yet — "
+                             "reconnect or check that your server has a pubsub component"),
+                           weechat_prefix("network"), WEECHAT_XMPP_PLUGIN_NAME);
+            return WEECHAT_RC_OK;
+        }
+
+        weechat_printf(buffer,
+                       _("%s%s: discovered %zu PubSub service(s) on your server:"),
+                       weechat_prefix("network"), WEECHAT_XMPP_PLUGIN_NAME,
+                       kps.size());
+        for (const auto &svc : kps)
+            weechat_printf(buffer, "  %s  /feed %s",
+                           weechat_color("chat_server"), svc.c_str());
+
+        // If --all flag present, auto-fetch all nodes from every discovered service.
+        bool fetch_all_svcs = false;
+        for (int i = 2; i < argc; ++i)
+            if (std::string_view(argv[i]) == "--all")
+                fetch_all_svcs = true;
+
+        if (fetch_all_svcs)
+        {
+            for (const auto &svc : kps)
+            {
+                weechat_printf(buffer,
+                               "%sDiscovering all PubSub nodes on %s…",
+                               weechat_prefix("network"), svc.c_str());
+                xmpp_string_guard uid_g(ptr_account->context,
+                                        xmpp_uuid_gen(ptr_account->context));
+                const char *uid = uid_g.ptr;
+                xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "get", uid);
+                xmpp_stanza_set_to(iq, svc.c_str());
+                xmpp_stanza_t *query = xmpp_stanza_new(ptr_account->context);
+                xmpp_stanza_set_name(query, "query");
+                xmpp_stanza_set_ns(query, "http://jabber.org/protocol/disco#items");
+                xmpp_stanza_add_child(iq, query);
+                xmpp_stanza_release(query);
+                if (uid)
+                    ptr_account->pubsub_disco_queries[uid] = svc;
+                ptr_account->connection.send(iq);
+                xmpp_stanza_release(iq);
+            }
+        }
+        else
+        {
+            // Default: fetch subscribed nodes from each discovered service.
+            for (const auto &svc : kps)
+            {
+                weechat_printf(buffer,
+                               "%sFetching subscribed PubSub feeds from %s…",
+                               weechat_prefix("network"), svc.c_str());
+                xmpp_string_guard uid_g(ptr_account->context,
+                                        xmpp_uuid_gen(ptr_account->context));
+                const char *uid = uid_g.ptr;
+                xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "get", uid);
+                xmpp_stanza_set_to(iq, svc.c_str());
+                xmpp_stanza_t *pubsub = xmpp_stanza_new(ptr_account->context);
+                xmpp_stanza_set_name(pubsub, "pubsub");
+                xmpp_stanza_set_ns(pubsub, "http://jabber.org/protocol/pubsub");
+                xmpp_stanza_t *subs = xmpp_stanza_new(ptr_account->context);
+                xmpp_stanza_set_name(subs, "subscriptions");
+                xmpp_stanza_add_child(pubsub, subs);
+                xmpp_stanza_release(subs);
+                xmpp_stanza_add_child(iq, pubsub);
+                xmpp_stanza_release(pubsub);
+                if (uid)
+                    ptr_account->pubsub_subscriptions_queries[uid] = svc;
+                ptr_account->connection.send(iq);
+                xmpp_stanza_release(iq);
+            }
+        }
+        return WEECHAT_RC_OK;
+    }
 
     // ── /feed subscribe <service> <node> ────────────────────────────────────
     if (subcmd == "subscribe" || subcmd == "unsubscribe")

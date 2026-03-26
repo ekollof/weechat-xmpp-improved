@@ -124,6 +124,7 @@ comprehensive set of XEPs targeting CCS2022 compliance.
 | Public room search (`/list`) | XEP-0433 |
 | PubSub feed reader (`/feed`) | XEP-0060 |
 | Microblogging post/reply/repeat/retract + subscribe/unsubscribe (`/feed post`, `/feed reply`, `/feed repeat`, `/feed retract`, `/feed subscribe`, `/feed unsubscribe`, `/feed subscriptions`) | XEP-0277 / XEP-0472 |
+| Auto-discover server PubSub components (`/feed discover`, `/feed`) | XEP-0030 / XEP-0060 |
 | Entity Capability caching | XEP-0115 |
 | User Avatar (colored Unicode symbols) | XEP-0084 |
 | MUC status code handling | XEP-0045 |
@@ -677,6 +678,23 @@ are suppressed via LMDB deduplication.
 
 Fetches recent posts from the node and opens a dedicated buffer. Supports
 RSM paging (`--before <id>`, `--limit N`). See the PubSub feed reader section.
+
+**Auto-discovering your server's PubSub services:**
+
+At connect time the plugin queries your server's `disco#items` (XEP-0030) to
+find all components, then queries `disco#info` on each one. Any component
+reporting `identity category='pubsub'` is remembered. You can then use:
+
+```
+/feed                        # fetch subscriptions from all discovered services
+/feed discover               # list discovered services without fetching
+/feed discover --all         # fetch every node from every discovered service
+```
+
+This means that if your server (e.g. `deimos.hackerheaven.org`) runs a pubsub
+gateway component (e.g. `pubsub.deimos.hackerheaven.org`), it will be found
+automatically and `/feed` will pull your subscriptions from it without you
+having to know the component JID in advance.
 
 ---
 
