@@ -103,33 +103,56 @@ atom_entry parse_atom_entry(xmpp_ctx_t *ctx, xmpp_stanza_t *entry,
             e.content = std::move(html_content);
     }
 
-    // <author><name>…</name></author>
+    // <author><name>…</name><uri>…</uri></author>
+    // RFC 4287 §3.2: <author> may contain <name>, <uri>, <email> children.
+    // Some feeds (e.g. atomtopubsub) emit bare text directly in <author>, or
+    // emit a self-closing <author/> followed by a second <author>name</author>.
+    // Iterate all <author> siblings to find the first one with usable content.
+    for (xmpp_stanza_t *child = xmpp_stanza_get_children(entry);
+         child; child = xmpp_stanza_get_next(child))
     {
-        xmpp_stanza_t *author_el = xmpp_stanza_get_child_by_name(entry, "author");
-        if (author_el)
+        const char *child_name = xmpp_stanza_get_name(child);
+        if (!child_name || strcasecmp(child_name, "author") != 0)
+            continue;
+
+        // Try <name> child element first (RFC 4287 canonical form).
+        if (e.author.empty())
         {
-            xmpp_stanza_t *name_el = xmpp_stanza_get_child_by_name(author_el, "name");
+            xmpp_stanza_t *name_el = xmpp_stanza_get_child_by_name(child, "name");
             if (name_el)
             {
                 char *t = xmpp_stanza_get_text(name_el);
-                if (t)
-                {
-                    e.author = t;
-                    xmpp_free(ctx, t);
-                }
+                if (t) { e.author = t; xmpp_free(ctx, t); }
             }
+        }
 
-            xmpp_stanza_t *uri_el = xmpp_stanza_get_child_by_name(author_el, "uri");
+        // Fall back to bare text content of <author> itself.
+        if (e.author.empty())
+        {
+            char *t = xmpp_stanza_get_text(child);
+            if (t)
+            {
+                std::string s(t);
+                xmpp_free(ctx, t);
+                // Reject whitespace-only strings.
+                if (s.find_first_not_of(" \t\r\n") != std::string::npos)
+                    e.author = std::move(s);
+            }
+        }
+
+        // <uri> child — take the first one found.
+        if (e.author_uri.empty())
+        {
+            xmpp_stanza_t *uri_el = xmpp_stanza_get_child_by_name(child, "uri");
             if (uri_el)
             {
                 char *t = xmpp_stanza_get_text(uri_el);
-                if (t)
-                {
-                    e.author_uri = t;
-                    xmpp_free(ctx, t);
-                }
+                if (t) { e.author_uri = t; xmpp_free(ctx, t); }
             }
         }
+
+        if (!e.author.empty() && !e.author_uri.empty())
+            break; // have everything we need
     }
 
     if (e.author.empty() && !e.author_uri.empty())
