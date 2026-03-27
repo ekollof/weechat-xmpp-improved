@@ -680,6 +680,13 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                             continue;
 
                         std::string node_name(node_attr);
+
+                        // XEP-0472 §4.1: skip per-post comment sub-nodes
+                        static constexpr std::string_view comments_prefix =
+                            "urn:xmpp:microblog:0:comments/";
+                        if (node_name.starts_with(comments_prefix))
+                            continue;
+
                         std::string feed_key = fmt::format("{}/{}", feed_service, node_name);
 
                         // Ensure FEED buffer exists
