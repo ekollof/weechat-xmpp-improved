@@ -1328,6 +1328,54 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 account.pubsub_unsubscribe_queries.erase(unsub_it);
             }
         }
+
+        // XEP-0060: pubsub item-fetch error (e.g. forbidden, item-not-found)
+        {
+            auto fetch_it = account.pubsub_fetch_ids.find(id);
+            if (fetch_it != account.pubsub_fetch_ids.end())
+            {
+                const std::string &err_service = fetch_it->second.service;
+                const std::string &err_node    = fetch_it->second.node;
+
+                std::string error_cond = "unknown error";
+                xmpp_stanza_t *error_elem = xmpp_stanza_get_child_by_name(stanza, "error");
+                if (error_elem)
+                {
+                    xmpp_stanza_t *text_el = xmpp_stanza_get_child_by_name(error_elem, "text");
+                    if (text_el)
+                    {
+                        char *t = xmpp_stanza_get_text(text_el);
+                        if (t) { error_cond = t; xmpp_free(account.context, t); }
+                    }
+                    else
+                    {
+                        for (xmpp_stanza_t *c = xmpp_stanza_get_children(error_elem);
+                             c; c = xmpp_stanza_get_next(c))
+                        {
+                            const char *cname = xmpp_stanza_get_name(c);
+                            if (cname && strcmp(cname, "text") != 0)
+                            { error_cond = cname; break; }
+                        }
+                    }
+                }
+
+                // Report the error in the feed buffer if it already exists,
+                // otherwise fall back to the account buffer.
+                std::string feed_key = fmt::format("{}/{}", err_service, err_node);
+                struct t_gui_buffer *err_buf = account.buffer;
+                auto ch_it = account.channels.find(feed_key);
+                if (ch_it != account.channels.end())
+                    err_buf = ch_it->second.buffer;
+
+                weechat_printf(err_buf,
+                    "%s%s: cannot fetch feed %s/%s: %s",
+                    weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
+                    err_service.c_str(), err_node.c_str(),
+                    error_cond.c_str());
+
+                account.pubsub_fetch_ids.erase(fetch_it);
+            }
+        }
     }
     
     // XEP-0191: Blocking Command
