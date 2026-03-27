@@ -667,11 +667,19 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                                     weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
                                         "  %s", link.c_str());
 
-                                // Comments: suppress raw URI — user uses /feed comments #N.
+                                // Comments: suppress raw URI — user uses /feed comments #N or
+                                // /feed comments <item-id> when no alias is assigned yet.
                                 if (!replies_link.empty())
-                                    weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
-                                        "  %sComments:%s /feed comments %s",
-                                        dim, rst, alias_pfx.empty() ? "?" : alias_pfx.c_str());
+                                {
+                                    const std::string &comments_ref =
+                                        alias_pfx.empty()
+                                            ? (item_id_raw ? std::string(item_id_raw) : std::string())
+                                            : alias_pfx;
+                                    if (!comments_ref.empty())
+                                        weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                            "  %sComments:%s /feed comments %s",
+                                            dim, rst, comments_ref.c_str());
+                                }
 
                                 if (!ae.categories.empty())
                                 {
