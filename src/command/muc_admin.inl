@@ -1158,36 +1158,8 @@ int command__feed(const void *pointer, void *data,
         xmpp_stanza_t *publish_el_r = stanza__iq_pubsub_publish(
             ptr_account->context, nullptr, pub_children_r, with_noop(rep_node.c_str()));
 
-        // publish-options (same set as /feed post)
-        xmpp_stanza_t *pub_opts_r = xmpp_stanza_new(ptr_account->context);
-        xmpp_stanza_set_name(pub_opts_r, "publish-options");
-        {
-            xmpp_stanza_t *x = xmpp_stanza_new(ptr_account->context);
-            xmpp_stanza_set_name(x, "x");
-            xmpp_stanza_set_ns(x, "jabber:x:data");
-            xmpp_stanza_set_attribute(x, "type", "submit");
-            auto add_field_r = [&](const char *var, const char *val) {
-                xmpp_stanza_t *f = xmpp_stanza_new(ptr_account->context);
-                xmpp_stanza_set_name(f, "field");
-                xmpp_stanza_set_attribute(f, "var", var);
-                xmpp_stanza_t *v = xmpp_stanza_new(ptr_account->context);
-                xmpp_stanza_set_name(v, "value");
-                xmpp_stanza_t *vt = xmpp_stanza_new(ptr_account->context);
-                xmpp_stanza_set_text(vt, val);
-                xmpp_stanza_add_child(v, vt); xmpp_stanza_release(vt);
-                xmpp_stanza_add_child(f, v);  xmpp_stanza_release(v);
-                xmpp_stanza_add_child(x, f);  xmpp_stanza_release(f);
-            };
-            add_field_r("FORM_TYPE", "http://jabber.org/protocol/pubsub#publish-options");
-            add_field_r("pubsub#persist_items", "true");
-            add_field_r("pubsub#max_items",     "max");
-            add_field_r("pubsub#notify_retract","true");
-            add_field_r("pubsub#type", "urn:xmpp:microblog:0");
-            xmpp_stanza_add_child(pub_opts_r, x);
-            xmpp_stanza_release(x);
-        }
-
-        xmpp_stanza_t *ps_r[3] = {publish_el_r, pub_opts_r, nullptr};
+        // publish-options omitted — see /feed post comment above.
+        xmpp_stanza_t *ps_r[2] = {publish_el_r, nullptr};
         xmpp_stanza_t *pubsub_el_r = stanza__iq_pubsub(
             ptr_account->context, nullptr, ps_r,
             with_noop("http://jabber.org/protocol/pubsub"));
@@ -1898,14 +1870,12 @@ int command__feed(const void *pointer, void *data,
         xmpp_stanza_t *publish_el = stanza__iq_pubsub_publish(
             ptr_account->context, nullptr, pub_children2, with_noop(target_node.c_str()));
 
-        // <publish-options>: assert node config so the server auto-creates the node
-        // correctly for /feed post.  For /feed reply (or /feed post to a comments
-        // node via short form) we publish to a pre-existing comments node whose
-        // exact config we don't know; XEP-0060 §7.1.5 requires every asserted
-        // field to match the node's current config exactly, so we omit
-        // publish-options entirely to avoid precondition-not-met.
+        // publish-options: omitted in the common case because every asserted field
+        // must match the node's existing config exactly (XEP-0060 §7.1.5) and we
+        // cannot know the live config.  The sole exception is --open, which the user
+        // has explicitly asked us to assert so the server sets access_model=open.
         xmpp_stanza_t *pub_opts = nullptr;
-        if (subcmd != "reply" && !is_comments_node)
+        if (access_open)
         {
             pub_opts = xmpp_stanza_new(ptr_account->context);
             xmpp_stanza_set_name(pub_opts, "publish-options");
@@ -1929,12 +1899,7 @@ int command__feed(const void *pointer, void *data,
             };
 
             add_field("FORM_TYPE", "http://jabber.org/protocol/pubsub#publish-options");
-            add_field("pubsub#persist_items", "true");
-            add_field("pubsub#max_items",     "max");
-            add_field("pubsub#notify_retract","true");
-            add_field("pubsub#type", "urn:xmpp:microblog:0");
-            if (access_open)
-                add_field("pubsub#access_model", "open");
+            add_field("pubsub#access_model", "open");
 
             xmpp_stanza_add_child(pub_opts, x);
             xmpp_stanza_release(x);
