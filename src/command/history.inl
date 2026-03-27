@@ -728,102 +728,29 @@ int command__reply(const void *pointer, void *data,
 
     const char *reply_text = argv_eol[1];
 
-    // Find the last message in buffer (not from us)
-    void *lines = weechat_hdata_pointer(weechat_hdata_get("buffer"),
-                                        buffer, "lines");
-    if (!lines)
+    // Find the last non-self message in the buffer using the same hdata walker
+    // used by the picker path — this correctly uses the self_msg tag rather than
+    // a fragile nick-vs-JID comparison which breaks for PMs (full JID vs bare JID).
+    auto messages = collect_buffer_messages(buffer, 500);
+    const msg_entry *target = nullptr;
+    for (auto &m : messages)
     {
-        weechat_printf(buffer, "%sxmpp: no lines found in buffer",
-                      weechat_prefix("error"));
-        return WEECHAT_RC_OK;
-    }
-
-    void *last_line = weechat_hdata_pointer(weechat_hdata_get("lines"),
-                                            lines, "last_line");
-    const char *target_id = NULL;
-    std::string target_id_storage;  // owns the string when using stanza-id
-    std::string target_sender_nick;  // nick_ tag of the message being replied to
-    std::string own_nick = std::string(ptr_account->jid());
-
-    while (last_line)
-    {
-        void *line_data = weechat_hdata_pointer(weechat_hdata_get("line"),
-                                                last_line, "data");
-        if (line_data)
+        if (!m.from_self && !m.id.empty())
         {
-            // Check if this message is not from us
-            int tags_count = weechat_hdata_integer(weechat_hdata_get("line_data"),
-                                                   line_data, "tags_count");
-            bool from_self = false;
-            std::string str_tag;
-            
-            for (int n_tag = 0; n_tag < tags_count; n_tag++)
-            {
-                str_tag = fmt::format("{}|tags_array", n_tag);
-                const char *tag = weechat_hdata_string(weechat_hdata_get("line_data"),
-                                                       line_data, str_tag.c_str());
-                
-                // Check if message is from self
-                if (strlen(tag) > strlen("nick_") &&
-                    strncmp(tag, "nick_", strlen("nick_")) == 0)
-                {
-                    const char *nick = tag + strlen("nick_");
-                    if (weechat_strcasecmp(nick, own_nick.c_str()) == 0)
-                    {
-                        from_self = true;
-                        break;
-                    }
-                }
-            }
-            
-            if (!from_self)
-            {
-                // Found a message not from us - extract its ID, stanza-id, and sender nick
-                std::string msg_id_str;
-                std::string sid_str;
-                std::string sid_by_str;
-                for (int n_tag = 0; n_tag < tags_count; n_tag++)
-                {
-                    str_tag = fmt::format("{}|tags_array", n_tag);
-                    const char *tag = weechat_hdata_string(weechat_hdata_get("line_data"),
-                                                           line_data, str_tag.c_str());
-                    if (!tag) continue;
-                    if (strncmp(tag, "id_", 3) == 0 && msg_id_str.empty())
-                        msg_id_str = tag + 3;
-                    else if (strncmp(tag, "stanza_id_by_", 13) == 0)
-                        sid_by_str = tag + 13;
-                    else if (strncmp(tag, "stanza_id_", 10) == 0)
-                        sid_str = tag + 10;
-                    // Capture the sender nick for building the reply-to JID
-                    if (strncmp(tag, "nick_", 5) == 0 && target_sender_nick.empty())
-                        target_sender_nick = tag + 5;
-                }
-
-                if (!msg_id_str.empty())
-                {
-                    // XEP-0461 §4.1: For groupchat, MUST use MUC-assigned stanza-id.
-                    if (ptr_channel->type == weechat::channel::chat_type::MUC
-                            && !sid_str.empty()
-                            && weechat_strcasecmp(sid_by_str.c_str(), ptr_channel->id.c_str()) == 0)
-                        target_id_storage = sid_str;
-                    else
-                        target_id_storage = msg_id_str;
-                    target_id = target_id_storage.c_str();
-                    break;
-                }
-            }
+            target = &m;
+            break;
         }
-
-        last_line = weechat_hdata_pointer(weechat_hdata_get("line"),
-                                          last_line, "prev_line");
     }
 
-    if (!target_id)
+    if (!target)
     {
         weechat_printf(buffer, "%sxmpp: no message found to reply to",
                       weechat_prefix("error"));
         return WEECHAT_RC_OK;
     }
+
+    std::string target_id_str     = resolve_msg_id(*target, ptr_channel);
+    std::string target_sender_nick = target->nick;
 
     // Send the reply using XEP-0461
     // The message goes to the channel/peer JID (routing destination)
@@ -859,7 +786,7 @@ int command__reply(const void *pointer, void *data,
     xmpp_stanza_t *reply_elem = xmpp_stanza_new(ptr_account->context);
     xmpp_stanza_set_name(reply_elem, "reply");
     xmpp_stanza_set_ns(reply_elem, "urn:xmpp:reply:0");
-    xmpp_stanza_set_attribute(reply_elem, "id", target_id);
+    xmpp_stanza_set_attribute(reply_elem, "id", target_id_str.c_str());
     xmpp_stanza_set_attribute(reply_elem, "to", reply_to_jid.c_str());
     xmpp_stanza_add_child(message, reply_elem);
 
