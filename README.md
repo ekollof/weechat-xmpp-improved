@@ -615,10 +615,14 @@ Use it in place of the full item-id in any write command:
 # Long form
 /feed post movim.eu urn:xmpp:microblog:0 Hello from WeeChat!
 /feed post movim.eu myblog --open My public post     # --open = public node
+/feed post movim.eu myblog --title My Headline -- Body text   # with Atom title
 
 # Short form from a feed buffer (service/node inferred)
 /feed post Hello everyone!
 /feed post -- https://example.com check this out     # '--' avoids JID-like parse
+
+# Compose in $EDITOR (requires feed_compose.py)
+/feed post --edit
 ```
 
 Sends an Atom `<entry>` to the PubSub node with `pubsub#type=urn:xmpp:microblog:0`
@@ -630,6 +634,7 @@ Failed publishes are reported in the buffer with the server error condition.
 ```
 /feed reply movim.eu urn:xmpp:microblog:0 abc123 That's a great point!
 /feed reply #3 That's a great point!    # short form using alias
+/feed reply #3 --edit                   # compose reply in $EDITOR
 ```
 
 Adds a `thr:in-reply-to` element (RFC 4685) referencing the original item.
@@ -875,11 +880,13 @@ file appears only once per message.
 | `/feed subscribe <service> <node>` | Subscribe to a PubSub node |
 | `/feed unsubscribe <service> <node>` | Unsubscribe from a PubSub node |
 | `/feed subscriptions <service>` | List subscribed nodes on a service |
-| `/feed post <service> <node> [--open] <text>` | Publish a microblog Atom entry (XEP-0472) |
-| `/feed post [--open] <text>` | Short form: post from a feed buffer (service/node inferred) |
+| `/feed post <service> <node> [--open] [--title <t>] <text>` | Publish a microblog Atom entry (XEP-0472); `--title` sets Atom `<title>` |
+| `/feed post [--open] [--title <t>] <text>` | Short form: post from a feed buffer (service/node inferred) |
+| `/feed post --edit` | Open `$EDITOR` via `feed_compose.py`; YAML frontmatter for optional title |
 | `/feed post -- <text>` | `--` separator: body starts with JID-like word or URL |
-| `/feed reply <service> <node> <item-id\|#N> <text>` | Reply with `thr:in-reply-to` threading |
+| `/feed reply <service> <node> <item-id\|#N> <text>` | Reply with `thr:in-reply-to` threading (no title) |
 | `/feed reply #N <text>` | Short form reply using item alias |
+| `/feed reply #N --edit` | Compose reply in `$EDITOR` via `feed_compose.py` (no frontmatter) |
 | `/feed repeat <service> <node> <item-id> [comment]` | Boost/repeat a post (XEP-0472 §4.5) |
 | `/feed repeat #N [comment]` | Short form boost using item alias |
 | `/feed retract <service> <node> <item-id>` | Retract (delete) a published post |
@@ -933,8 +940,21 @@ automatically — install the ones you want by hand.
 
 ### feed_compose.py — compose posts in `$EDITOR`
 
-Opens a temporary file in your editor; on save the content is placed in the
-WeeChat input bar as a `/feed post …` command ready to review and send.
+Opens a temporary Markdown file in your editor.  For **posts** the file
+includes a YAML frontmatter block with an optional `title:` field — fill it in
+to set the Atom `<title>` headline, or leave it blank for a body-only post.
+For **replies** the frontmatter is omitted (comments have no titles).  On save
+the content is placed in the WeeChat input bar as a `/feed post …` or
+`/feed reply …` command ready to review and send.
+
+The easiest way to invoke it is with the `--edit` flag:
+
+```
+/feed post --edit          # new post in $EDITOR
+/feed reply #3 --edit      # reply in $EDITOR
+```
+
+Or install and invoke directly:
 
 ```sh
 cp scripts/feed_compose.py ~/.local/share/weechat/python/autoload/
