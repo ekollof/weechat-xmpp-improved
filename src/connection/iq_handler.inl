@@ -511,6 +511,12 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                             if (item_id_raw && !ae.replies_link.empty())
                                 account.feed_replies_link_set(feed_key, item_id_raw, ae.replies_link);
 
+                            // Assign a short #N alias for this item so the user can write
+                            // "/feed reply #3 …" instead of the full service/node/item-id.
+                            int item_alias = -1;
+                            if (item_id_raw && *item_id_raw)
+                                item_alias = account.feed_alias_assign(feed_key, item_id_raw);
+
                             if (ae.empty())
                             {
                                 // No Atom entry — not a microblog post, skip silently.
@@ -540,26 +546,31 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                                     link = fmt::format("xmpp:{}?;node={};item={}",
                                                        feed_service, node_name, item_id_raw);
 
+                                // Short alias prefix shown before the title, e.g. "#3 ".
+                                std::string alias_pfx;
+                                if (item_alias > 0)
+                                    alias_pfx = fmt::format("#{} ", item_alias);
+
                                 if (!author.empty() && !pubdate.empty())
                                     weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
-                                        "%s%s%s%s  [%s%s%s] — %s",
-                                        pfx, bold, title.c_str(), rst,
+                                        "%s%s%s%s%s  [%s%s%s] — %s",
+                                        pfx, dim, alias_pfx.c_str(), bold, title.c_str(), rst,
                                         dim, author.c_str(), rst,
                                         pubdate.c_str());
                                 else if (!author.empty())
                                     weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
-                                        "%s%s%s%s  [%s%s%s]",
-                                        pfx, bold, title.c_str(), rst,
+                                        "%s%s%s%s%s  [%s%s%s]",
+                                        pfx, dim, alias_pfx.c_str(), bold, title.c_str(), rst,
                                         dim, author.c_str(), rst);
                                 else if (!pubdate.empty())
                                     weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
-                                        "%s%s%s%s — %s",
-                                        pfx, bold, title.c_str(), rst,
+                                        "%s%s%s%s%s — %s",
+                                        pfx, dim, alias_pfx.c_str(), bold, title.c_str(), rst,
                                         pubdate.c_str());
                                 else
                                     weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
-                                        "%s%s%s%s",
-                                        pfx, bold, title.c_str(), rst);
+                                        "%s%s%s%s%s",
+                                        pfx, dim, alias_pfx.c_str(), bold, title.c_str(), rst);
 
                                 if (!reply_to.empty())
                                     weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",

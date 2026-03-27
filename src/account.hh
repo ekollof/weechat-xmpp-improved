@@ -257,6 +257,15 @@ namespace weechat
         // Runtime cache: map "feed_key + item_id" to replies XMPP URI so
         // /feed comments can open/fetch the comments node for a post.
         std::unordered_map<std::string, std::string> feed_replies_links;
+        // Short alias system: each displayed feed item gets a short #N label so
+        // users can write "/feed reply #3 text" instead of spelling out the full
+        // service/node/item-id triple.
+        // alias_fwd: "feed_key\nN" → item_id_raw
+        // alias_rev: "feed_key\nitem_id_raw" → N  (for display and round-trip)
+        // alias_ctr: "feed_key" → next integer to assign
+        std::unordered_map<std::string, std::string> feed_alias_fwd;
+        std::unordered_map<std::string, std::string> feed_alias_rev;
+        std::unordered_map<std::string, int>         feed_alias_ctr;
 
         // XEP-0191: Blocking Command — pending unblock picker (non-owning; picker owns itself)
         weechat::ui::picker<std::string> *blocklist_picker = nullptr;
@@ -351,6 +360,31 @@ namespace weechat
         {
             auto it = feed_replies_links.find(feed_key + "\n" + item_id);
             return it != feed_replies_links.end() ? it->second : std::string();
+        }
+        // Assign a short #N alias for an item and return N.
+        // If the item already has an alias in this feed, return the existing one.
+        int feed_alias_assign(const std::string& feed_key, const std::string& item_id)
+        {
+            if (feed_key.empty() || item_id.empty()) return -1;
+            auto rev_key = feed_key + "\n" + item_id;
+            auto rev_it = feed_alias_rev.find(rev_key);
+            if (rev_it != feed_alias_rev.end())
+                return std::stoi(rev_it->second);
+            int n = ++feed_alias_ctr[feed_key];
+            std::string ns = std::to_string(n);
+            feed_alias_fwd[feed_key + "\n" + ns] = item_id;
+            feed_alias_rev[rev_key] = ns;
+            return n;
+        }
+        // Resolve a short alias N (as string or "#N") for a feed_key → item_id.
+        // Returns empty string if not found.
+        std::string feed_alias_resolve(const std::string& feed_key, std::string_view alias) const
+        {
+            // Strip leading '#' if present.
+            if (!alias.empty() && alias[0] == '#')
+                alias.remove_prefix(1);
+            auto it = feed_alias_fwd.find(feed_key + "\n" + std::string(alias));
+            return it != feed_alias_fwd.end() ? it->second : std::string();
         }
         void send_bookmarks();
         
