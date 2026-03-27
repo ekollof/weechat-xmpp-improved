@@ -1420,8 +1420,10 @@ int command__feed(const void *pointer, void *data,
             // ── /feed retract <service> <node> <item-id> ──────────────────
             const std::string retract_id = argv[4];
 
+            xmpp_string_guard retract_uid_g(ptr_account->context,
+                                            xmpp_uuid_gen(ptr_account->context));
             xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "set",
-                                             xmpp_uuid_gen(ptr_account->context));
+                                             retract_uid_g.ptr);
             xmpp_stanza_set_to(iq, pub_service.c_str());
             xmpp_stanza_set_from(iq, ptr_account->jid().data());
 
@@ -1444,6 +1446,12 @@ int command__feed(const void *pointer, void *data,
             xmpp_stanza_release(retract_el);
             xmpp_stanza_add_child(iq, pubsub);
             xmpp_stanza_release(pubsub);
+
+            // Track the IQ so the error handler can report server-side failures
+            // (e.g. item-not-found, forbidden) instead of silently dropping them.
+            if (retract_uid_g.ptr)
+                ptr_account->pubsub_publish_ids[retract_uid_g.ptr] = {
+                    pub_service, pub_node, retract_id, buffer};
 
             ptr_account->connection.send(iq);
             xmpp_stanza_release(iq);
