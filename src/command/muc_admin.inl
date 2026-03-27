@@ -1681,13 +1681,44 @@ int command__feed(const void *pointer, void *data,
             }
         }
 
-        if (!body_raw || !*body_raw)
-        {
-            weechat_printf(buffer, _("%s%s: post text must not be empty"),
-                           weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
-            return WEECHAT_RC_OK;
-        }
-        const std::string body(body_raw);
+         if (!body_raw || !*body_raw)
+         {
+             weechat_printf(buffer, _("%s%s: post text must not be empty"),
+                            weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
+             return WEECHAT_RC_OK;
+         }
+
+         // Parse optional --title <value> -- prefix from body_raw.
+         // feed_compose.py emits: --title My Title -- Body text
+         // The title is everything between "--title " and the first " -- ".
+         // Falls back to the first line of the body when absent.
+         std::string post_title;
+         std::string_view body_sv(body_raw);
+         constexpr std::string_view kTitleFlag = "--title ";
+         if (body_sv.substr(0, kTitleFlag.size()) == kTitleFlag)
+         {
+             auto rest      = body_sv.substr(kTitleFlag.size());
+             auto sep_pos   = rest.find(" -- ");
+             if (sep_pos != std::string_view::npos)
+             {
+                 post_title = std::string(rest.substr(0, sep_pos));
+                 body_raw   = body_raw
+                              + kTitleFlag.size()  // skip "--title "
+                              + sep_pos            // skip title value
+                              + 4;                 // skip " -- "
+             }
+         }
+         const std::string body(body_raw);
+
+         // Derive title: explicit --title wins; otherwise first non-empty line.
+         if (post_title.empty())
+         {
+             for (const char *p = body_raw; *p; ++p)
+             {
+                 if (*p == '\n') break;
+                 post_title += *p;
+             }
+         }
 
         // Generate a stable UUID for the item
         xmpp_string_guard item_uuid_g(ptr_account->context,
@@ -1731,13 +1762,13 @@ int command__feed(const void *pointer, void *data,
         xmpp_stanza_set_name(entry, "entry");
         xmpp_stanza_set_ns(entry, "http://www.w3.org/2005/Atom");
 
-        // <title type='text'>body</title>
+        // <title type='text'>…</title>
         xmpp_stanza_t *title_el = xmpp_stanza_new(ptr_account->context);
         xmpp_stanza_set_name(title_el, "title");
         xmpp_stanza_set_attribute(title_el, "type", "text");
         {
             xmpp_stanza_t *t = xmpp_stanza_new(ptr_account->context);
-            xmpp_stanza_set_text(t, body.c_str());
+            xmpp_stanza_set_text(t, post_title.c_str());
             xmpp_stanza_add_child(title_el, t);
             xmpp_stanza_release(t);
         }

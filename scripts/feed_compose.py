@@ -8,6 +8,18 @@
 # Usage:   /feed-compose [--reply <alias>] [initial text]
 # Alias:   /alias add fc /feed-compose
 #
+# The temp file is pre-filled with YAML frontmatter:
+#
+#   ---
+#   title: My Post Title
+#   ---
+#
+#   Body text here…
+#
+# Set title: to control the Atom <title> element.  Leave it blank or delete
+# the frontmatter entirely to fall back to the first line of the body.
+# The frontmatter block is stripped before the body is sent.
+#
 # Config (set via /set plugins.var.python.feed_compose.<option> <value>):
 #   editor         — editor command; falls back to $EDITOR env var, then "vi"
 #   run_externally — "true" to use weechat.hook_process (GUI/tmux editors);
@@ -17,6 +29,7 @@
 
 import json
 import os
+import re
 import subprocess
 import tempfile
 
@@ -24,7 +37,7 @@ import weechat
 
 SCRIPT_NAME = "feed_compose"
 SCRIPT_AUTHOR = "weechat-xmpp"
-SCRIPT_VERSION = "1.1.0"
+SCRIPT_VERSION = "1.2.0"
 SCRIPT_LICENSE = "MIT"
 SCRIPT_DESC = "Compose /feed posts and replies in $EDITOR, then populate the input bar"
 
@@ -32,6 +45,9 @@ DEFAULTS = {
     "editor": "",  # falls back to $EDITOR, then vi
     "run_externally": "false",  # true = hook_process (GUI editors)
 }
+
+_FRONTMATTER_RE = re.compile(r"^\s*---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
+_TITLE_RE = re.compile(r"^title\s*:\s*(.*)$", re.MULTILINE)
 
 
 # ---------------------------------------------------------------------------
@@ -58,28 +74,69 @@ def _mouse_enabled() -> bool:
     return bool(opt) and weechat.config_boolean(opt) != 0
 
 
-def _build_input(buf: str, text: str, reply_id: str = "") -> str:
+def _initial_content(initial_body: str = "") -> str:
+    """Return the template written to the temp file."""
+    title = ""
+    body = initial_body
+    return f"---\ntitle: {title}\n---\n\n{body}"
+
+
+def _parse_content(raw: str) -> tuple[str, str]:
+    """
+    Parse raw editor content into (title, body).
+
+    Strips YAML frontmatter if present and extracts the `title:` field.
+    Falls back to the first non-empty line of body as title when the
+    frontmatter title is empty or absent.
+    Returns (title, body) both stripped of leading/trailing whitespace.
+    """
+    title = ""
+    body = raw
+
+    m = _FRONTMATTER_RE.match(raw)
+    if m:
+        fm_block = m.group(1)
+        body = raw[m.end() :]
+        tm = _TITLE_RE.search(fm_block)
+        if tm:
+            title = tm.group(1).strip()
+
+    body = body.strip()
+
+    if not title:
+        # Fall back: first non-empty line of body
+        for line in body.splitlines():
+            stripped = line.strip()
+            if stripped:
+                title = stripped
+                break
+
+    return title, body
+
+
+def _build_input(buf: str, title: str, body: str, reply_id: str = "") -> str:
     """Return the full string to place in the input bar."""
     buf_type = weechat.buffer_get_string(buf, "localvar_type")
     remote_jid = weechat.buffer_get_string(buf, "localvar_remote_jid")
 
+    # Encode title for embedding in the command line.
+    # We pass it as: --title <title> --
+    # The C++ parser reads everything between --title and -- as the title.
+    title_flag = f"--title {title} " if title else ""
+
     if reply_id:
-        # /feed reply — short form when in a feed buffer, long form otherwise
         if buf_type == "feed" and remote_jid:
-            return f"/feed reply {reply_id} -- {text}"
-        # Outside a feed buffer: include service/node from remote_jid if available
+            return f"/feed reply {reply_id} {title_flag}-- {body}"
         if remote_jid:
             service, _, node = remote_jid.partition("/")
-            return f"/feed reply {service} {node} {reply_id} -- {text}"
-        return f"/feed reply {reply_id} -- {text}"
+            return f"/feed reply {service} {node} {reply_id} {title_flag}-- {body}"
+        return f"/feed reply {reply_id} {title_flag}-- {body}"
 
     if buf_type == "feed" and remote_jid:
-        # remote_jid is "service/node" for FEED buffers
         service, _, node = remote_jid.partition("/")
-        return f"/feed post {service} {node} -- {text}"
+        return f"/feed post {service} {node} {title_flag}-- {body}"
 
-    # Not a FEED buffer — let the user fill in service/node themselves
-    return f"/feed post -- {text}"
+    return f"/feed post {title_flag}-- {body}"
 
 
 def _finish(buf: str, path: str, reply_id: str, mouse_was_on: bool) -> None:
@@ -89,7 +146,7 @@ def _finish(buf: str, path: str, reply_id: str, mouse_was_on: bool) -> None:
 
     try:
         with open(path, "r", encoding="utf-8") as fh:
-            text = fh.read().rstrip()
+            raw = fh.read()
     except OSError as exc:
         weechat.prnt(buf, f"{SCRIPT_NAME}: error reading temp file: {exc}")
         return
@@ -99,11 +156,13 @@ def _finish(buf: str, path: str, reply_id: str, mouse_was_on: bool) -> None:
         except OSError:
             pass
 
-    if not text:
+    title, body = _parse_content(raw)
+
+    if not body:
         weechat.prnt(buf, f"{SCRIPT_NAME}: empty content, cancelled")
         return
 
-    cmd = _build_input(buf, text, reply_id)
+    cmd = _build_input(buf, title, body, reply_id)
     weechat.buffer_set(buf, "input", cmd)
     weechat.buffer_set(buf, "input_pos", str(len(cmd)))
     weechat.command(buf, "/window refresh")
@@ -136,19 +195,17 @@ def _cmd_feed_compose(_data: str, buf: str, args: str) -> int:
     tokens = args.split()
     if len(tokens) >= 2 and tokens[0] == "--reply":
         reply_id = tokens[1]
-        # Remaining tokens are initial body text (may be empty)
-        initial = " ".join(tokens[2:])
+        initial_body = " ".join(tokens[2:])
     else:
-        initial = args.strip()
+        initial_body = args.strip()
 
     editor = _editor_cmd()
 
-    # Write initial content (from args or empty) to a temp file
+    # Write frontmatter + initial body to a temp file
     try:
         fd, path = tempfile.mkstemp(suffix=".md", prefix="weechat-feed-")
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            if initial:
-                fh.write(initial + "\n")
+            fh.write(_initial_content(initial_body))
     except OSError as exc:
         weechat.prnt(buf, f"{SCRIPT_NAME}: cannot create temp file: {exc}")
         return weechat.WEECHAT_RC_ERROR
@@ -157,8 +214,6 @@ def _cmd_feed_compose(_data: str, buf: str, args: str) -> int:
     mouse_was_on = _mouse_enabled()
 
     if run_externally:
-        # Non-blocking: suitable for GUI editors or "tmux new-window vim …"
-        # Mouse state is not disturbed for GUI editors.
         full_cmd = f"{editor} {path}"
         data_str = json.dumps(
             {
@@ -170,10 +225,6 @@ def _cmd_feed_compose(_data: str, buf: str, args: str) -> int:
         )
         weechat.hook_process(full_cmd, 0, "_process_cb", data_str)
     else:
-        # Blocking: suitable for terminal editors (vim, nano, …).
-        # Disable mouse before handing the terminal to the editor so that
-        # vim/nvim receive plain mouse events and WeeChat's click handlers
-        # don't interfere. Re-enable in _finish() once the editor exits.
         if mouse_was_on:
             weechat.command(buf, "/mouse disable")
         try:
@@ -208,21 +259,25 @@ if weechat.register(
         "Compose a /feed post or reply in $EDITOR, then populate the input bar",
         "[--reply <alias>] [initial text]",
         (
-            "Opens $EDITOR (or the configured editor) with a temporary file.\n"
-            "On save+quit the content is placed in the WeeChat input bar\n"
-            "as a ready-to-send /feed command.\n\n"
-            "  --reply <alias>  Compose a reply to item <alias> (e.g. #3).\n"
-            "                   Produces /feed reply <alias> -- <text>.\n\n"
+            "Opens $EDITOR (or the configured editor) with a temporary Markdown\n"
+            "file pre-filled with YAML frontmatter:\n\n"
+            "  ---\n"
+            "  title: My Post Title\n"
+            "  ---\n\n"
+            "  Body text here…\n\n"
+            "Set title: to control the Atom <title>.  Leave it blank to use\n"
+            "the first line of the body as title (Movim default behaviour).\n"
+            "The frontmatter block is stripped before the body is sent.\n\n"
+            "  --reply <alias>  Compose a reply to item <alias> (e.g. #3).\n\n"
             "Mouse support is automatically disabled before launching a\n"
-            "blocking terminal editor and re-enabled afterwards, so that\n"
-            "vim/nvim receive mouse events correctly.\n\n"
+            "blocking terminal editor and re-enabled afterwards.\n\n"
             "Options (set with /set plugins.var.python.feed_compose.<opt>):\n"
             "  editor         — editor binary; falls back to $EDITOR, then vi\n"
             "  run_externally — 'true' for GUI/tmux editors (non-blocking)\n\n"
             "Example alias: /alias add fc /feed-compose\n"
             "Example key:   /key bind meta-e /feed-compose"
         ),
-        "",  # no completions
+        "",
         "_cmd_feed_compose",
         "",
     )
