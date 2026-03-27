@@ -714,7 +714,9 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                 std::string_view node_sv          = items_node ? std::string_view(items_node) : std::string_view{};
                 // XEP-0472/XEP-0277: urn:xmpp:microblog:0 is the PEP microblog node — treat it
                 // as a social feed even though it starts with "urn:".
-                bool node_is_microblog = (node_sv == "urn:xmpp:microblog:0");
+                // urn:xmpp:microblog:0:comments/<uuid> are comment thread nodes — also feeds.
+                bool node_is_microblog = (node_sv == "urn:xmpp:microblog:0")
+                    || (node_sv.rfind("urn:xmpp:microblog:0:comments/", 0) == 0);
                 bool node_is_uri = !node_sv.empty() && !node_is_microblog && (
                     node_sv.find("://") != std::string_view::npos ||
                     node_sv.substr(0, 4) == "urn:");
