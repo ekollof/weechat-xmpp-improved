@@ -248,6 +248,13 @@ int command__upload(const void *pointer, void *data,
     else
     {
         filename = argv[1];
+        // Expand leading '~' to the user's home directory.
+        if (!filename.empty() && filename[0] == '~')
+        {
+            const char *home = getenv("HOME");
+            if (home)
+                filename = std::string(home) + filename.substr(1);
+        }
     }
     
     // Check if file exists and is readable
