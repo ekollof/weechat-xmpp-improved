@@ -134,6 +134,7 @@ SRCS=src/plugin.cpp \
 	 src/xmpp/iq.cpp \
 	 src/xmpp/node.cpp \
 	 src/xmpp/atom.cpp \
+	 src/xmpp/xhtml.cpp \
 	 src/ui/picker.cpp \
 
 DEPS=deps/diff/libdiff.a \
