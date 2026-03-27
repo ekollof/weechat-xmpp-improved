@@ -886,18 +886,22 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
             auto sub_ok_it = account.pubsub_subscribe_queries.find(id);
             if (sub_ok_it != account.pubsub_subscribe_queries.end())
             {
-                weechat_printf(account.buffer,
+                struct t_gui_buffer *fb = sub_ok_it->second.buffer
+                                         ? sub_ok_it->second.buffer : account.buffer;
+                weechat_printf(fb,
                     "%sSubscribed to %s",
-                    weechat_prefix("network"), sub_ok_it->second.c_str());
+                    weechat_prefix("network"), sub_ok_it->second.feed_key.c_str());
                 account.pubsub_subscribe_queries.erase(sub_ok_it);
             }
 
             auto unsub_ok_it = account.pubsub_unsubscribe_queries.find(id);
             if (unsub_ok_it != account.pubsub_unsubscribe_queries.end())
             {
-                weechat_printf(account.buffer,
+                struct t_gui_buffer *fb = unsub_ok_it->second.buffer
+                                         ? unsub_ok_it->second.buffer : account.buffer;
+                weechat_printf(fb,
                     "%sUnsubscribed from %s",
-                    weechat_prefix("network"), unsub_ok_it->second.c_str());
+                    weechat_prefix("network"), unsub_ok_it->second.feed_key.c_str());
                 account.pubsub_unsubscribe_queries.erase(unsub_ok_it);
             }
         }
@@ -1366,10 +1370,33 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
             auto sub_it = account.pubsub_subscribe_queries.find(id);
             if (sub_it != account.pubsub_subscribe_queries.end())
             {
-                weechat_printf(account.buffer,
-                    "%s%s: subscribe to %s failed",
+                std::string error_cond = "unknown error";
+                xmpp_stanza_t *error_elem = xmpp_stanza_get_child_by_name(stanza, "error");
+                if (error_elem)
+                {
+                    xmpp_stanza_t *text_el = xmpp_stanza_get_child_by_name(error_elem, "text");
+                    if (text_el)
+                    {
+                        char *t = xmpp_stanza_get_text(text_el);
+                        if (t) { error_cond = t; xmpp_free(account.context, t); }
+                    }
+                    else
+                    {
+                        for (xmpp_stanza_t *c = xmpp_stanza_get_children(error_elem);
+                             c; c = xmpp_stanza_get_next(c))
+                        {
+                            const char *cname = xmpp_stanza_get_name(c);
+                            if (cname && strcmp(cname, "text") != 0)
+                            { error_cond = cname; break; }
+                        }
+                    }
+                }
+                struct t_gui_buffer *fb = sub_it->second.buffer
+                                         ? sub_it->second.buffer : account.buffer;
+                weechat_printf(fb,
+                    "%s%s: subscribe to %s failed: %s",
                     weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
-                    sub_it->second.c_str());
+                    sub_it->second.feed_key.c_str(), error_cond.c_str());
                 account.pubsub_subscribe_queries.erase(sub_it);
             }
         }
@@ -1377,10 +1404,33 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
             auto unsub_it = account.pubsub_unsubscribe_queries.find(id);
             if (unsub_it != account.pubsub_unsubscribe_queries.end())
             {
-                weechat_printf(account.buffer,
-                    "%s%s: unsubscribe from %s failed",
+                std::string error_cond = "unknown error";
+                xmpp_stanza_t *error_elem = xmpp_stanza_get_child_by_name(stanza, "error");
+                if (error_elem)
+                {
+                    xmpp_stanza_t *text_el = xmpp_stanza_get_child_by_name(error_elem, "text");
+                    if (text_el)
+                    {
+                        char *t = xmpp_stanza_get_text(text_el);
+                        if (t) { error_cond = t; xmpp_free(account.context, t); }
+                    }
+                    else
+                    {
+                        for (xmpp_stanza_t *c = xmpp_stanza_get_children(error_elem);
+                             c; c = xmpp_stanza_get_next(c))
+                        {
+                            const char *cname = xmpp_stanza_get_name(c);
+                            if (cname && strcmp(cname, "text") != 0)
+                            { error_cond = cname; break; }
+                        }
+                    }
+                }
+                struct t_gui_buffer *fb = unsub_it->second.buffer
+                                         ? unsub_it->second.buffer : account.buffer;
+                weechat_printf(fb,
+                    "%s%s: unsubscribe from %s failed: %s",
                     weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
-                    unsub_it->second.c_str());
+                    unsub_it->second.feed_key.c_str(), error_cond.c_str());
                 account.pubsub_unsubscribe_queries.erase(unsub_it);
             }
         }

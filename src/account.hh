@@ -242,9 +242,13 @@ namespace weechat
         std::unordered_map<std::string, pubsub_publish_context> pubsub_publish_ids;
 
         // XEP-0060: pending subscribe/unsubscribe IQs.
-        // Maps IQ id → "service/node"
-        std::unordered_map<std::string, std::string> pubsub_subscribe_queries;
-        std::unordered_map<std::string, std::string> pubsub_unsubscribe_queries;
+        // Maps IQ id → {feed_key, originating_buffer}
+        struct pubsub_subscribe_context {
+            std::string feed_key;
+            struct t_gui_buffer *buffer = nullptr;  // buffer for feedback (falls back to account.buffer)
+        };
+        std::unordered_map<std::string, pubsub_subscribe_context> pubsub_subscribe_queries;
+        std::unordered_map<std::string, pubsub_subscribe_context> pubsub_unsubscribe_queries;
 
         // XEP-0060: PubSub service components discovered on our server at connect time.
         // Populated by the disco#info handler when a server component reports

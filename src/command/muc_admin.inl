@@ -867,7 +867,7 @@ int command__feed(const void *pointer, void *data,
                                            my_jid.c_str(), svc.c_str(), "set");
 
             if (uid_g.ptr)
-                ptr_account->pubsub_subscribe_queries[uid_g.ptr] = feed_key;
+                ptr_account->pubsub_subscribe_queries[uid_g.ptr] = {feed_key, buffer};
 
             ptr_account->connection.send(iq);
             xmpp_stanza_release(iq);
@@ -896,7 +896,7 @@ int command__feed(const void *pointer, void *data,
                                            my_jid.c_str(), svc.c_str(), "set");
 
             if (uid_g.ptr)
-                ptr_account->pubsub_unsubscribe_queries[uid_g.ptr] = feed_key;
+                ptr_account->pubsub_unsubscribe_queries[uid_g.ptr] = {feed_key, buffer};
 
             ptr_account->connection.send(iq);
             xmpp_stanza_release(iq);
