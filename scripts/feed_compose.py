@@ -8,17 +8,20 @@
 # Usage:   /feed-compose [--reply <alias>] [initial text]
 # Alias:   /alias add fc /feed-compose
 #
-# The temp file is pre-filled with YAML frontmatter:
+# For posts the temp file is pre-filled with YAML frontmatter:
 #
 #   ---
-#   title: My Post Title
+#   title:
 #   ---
 #
 #   Body text here…
 #
-# Set title: to control the Atom <title> element.  Leave it blank or delete
-# the frontmatter entirely to fall back to the first line of the body.
-# The frontmatter block is stripped before the body is sent.
+# Fill in a title to add an Atom <title> headline.  Leave it blank (or delete
+# the frontmatter entirely) to publish body-only — the text goes into
+# <content type='text'> with no separate headline, which is the correct format
+# for Movim social/microblog posts.
+#
+# For replies the frontmatter is omitted — comments don't have headlines.
 #
 # Config (set via /set plugins.var.python.feed_compose.<option> <value>):
 #   editor         — editor command; falls back to $EDITOR env var, then "vi"
@@ -37,7 +40,7 @@ import weechat
 
 SCRIPT_NAME = "feed_compose"
 SCRIPT_AUTHOR = "weechat-xmpp"
-SCRIPT_VERSION = "1.2.0"
+SCRIPT_VERSION = "1.3.0"
 SCRIPT_LICENSE = "MIT"
 SCRIPT_DESC = "Compose /feed posts and replies in $EDITOR, then populate the input bar"
 
@@ -74,11 +77,15 @@ def _mouse_enabled() -> bool:
     return bool(opt) and weechat.config_boolean(opt) != 0
 
 
-def _initial_content(initial_body: str = "") -> str:
-    """Return the template written to the temp file."""
-    title = ""
-    body = initial_body
-    return f"---\ntitle: {title}\n---\n\n{body}"
+def _initial_content(initial_body: str = "", is_reply: bool = False) -> str:
+    """Return the template written to the temp file.
+
+    For replies the title frontmatter block is omitted entirely — comments
+    don't have headlines, and showing the field would only confuse the user.
+    """
+    if is_reply:
+        return initial_body if initial_body else ""
+    return f"---\ntitle: \n---\n\n{initial_body}"
 
 
 def _parse_content(raw: str) -> tuple[str, str]:
@@ -86,9 +93,8 @@ def _parse_content(raw: str) -> tuple[str, str]:
     Parse raw editor content into (title, body).
 
     Strips YAML frontmatter if present and extracts the `title:` field.
-    Falls back to the first non-empty line of body as title when the
-    frontmatter title is empty or absent.
     Returns (title, body) both stripped of leading/trailing whitespace.
+    An empty or absent title means no <title> element will be emitted.
     """
     title = ""
     body = raw
@@ -102,15 +108,6 @@ def _parse_content(raw: str) -> tuple[str, str]:
             title = tm.group(1).strip()
 
     body = body.strip()
-
-    if not title:
-        # Fall back: first non-empty line of body
-        for line in body.splitlines():
-            stripped = line.strip()
-            if stripped:
-                title = stripped
-                break
-
     return title, body
 
 
@@ -205,7 +202,7 @@ def _cmd_feed_compose(_data: str, buf: str, args: str) -> int:
     try:
         fd, path = tempfile.mkstemp(suffix=".md", prefix="weechat-feed-")
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(_initial_content(initial_body))
+            fh.write(_initial_content(initial_body, is_reply=bool(reply_id)))
     except OSError as exc:
         weechat.prnt(buf, f"{SCRIPT_NAME}: cannot create temp file: {exc}")
         return weechat.WEECHAT_RC_ERROR
@@ -260,14 +257,17 @@ if weechat.register(
         "[--reply <alias>] [initial text]",
         (
             "Opens $EDITOR (or the configured editor) with a temporary Markdown\n"
-            "file pre-filled with YAML frontmatter:\n\n"
+            "file pre-filled with YAML frontmatter (posts only):\n\n"
             "  ---\n"
-            "  title: My Post Title\n"
+            "  title: \n"
             "  ---\n\n"
             "  Body text here…\n\n"
-            "Set title: to control the Atom <title>.  Leave it blank to use\n"
-            "the first line of the body as title (Movim default behaviour).\n"
-            "The frontmatter block is stripped before the body is sent.\n\n"
+            "Set title: to add an Atom <title> headline to the post.  Leave it\n"
+            "blank (or delete the frontmatter) to publish without a headline —\n"
+            "the body goes into <content> directly, which is what Movim expects\n"
+            "for social/microblog posts.\n\n"
+            "For replies (--reply) the frontmatter is omitted — comments don't\n"
+            "have headlines.\n\n"
             "  --reply <alias>  Compose a reply to item <alias> (e.g. #3).\n\n"
             "Mouse support is automatically disabled before launching a\n"
             "blocking terminal editor and re-enabled afterwards.\n\n"
