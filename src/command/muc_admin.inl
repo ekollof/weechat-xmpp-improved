@@ -953,20 +953,70 @@ int command__feed(const void *pointer, void *data,
     // ── /feed repeat <service> <node> <item-id> [comment] ───────────────────
     // XEP-0472 §4.5 boost/repeat: publish a new entry with <link rel='via'>
     // pointing to the original item. The receiving client fetches the original.
+    //
+    // Short form: /feed repeat #N [comment]   (from a FEED buffer; resolves alias)
+    // Long  form: /feed repeat <service> <node> <item-id> [comment]
     if (subcmd == "repeat")
     {
-        if (argc < 5)
+        // Short-form detection: "/feed repeat #N [comment]" or "/feed repeat N [comment]"
+        bool repeat_short_form = (argc >= 3)
+            && (argv[2][0] == '#' || std::isdigit((unsigned char)argv[2][0]));
+
+        int repeat_min_argc = repeat_short_form ? 3 : 5;
+        if (argc < repeat_min_argc)
         {
             weechat_printf(buffer,
-                           _("%s%s: usage: /feed repeat <service-jid> <node> <item-id> [comment]"),
+                           _("%s%s: usage: /feed repeat <service-jid> <node> <item-id> [comment]\n"
+                             "           or: /feed repeat #N [comment]  (from a feed buffer)"),
                            weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
             return WEECHAT_RC_OK;
         }
 
-        const std::string rep_service = argv[2];
-        const std::string rep_node    = argv[3];
-        const std::string rep_item_id = argv[4];
-        const std::string rep_comment = argc > 5 ? argv_eol[5] : "";
+        std::string rep_service;
+        std::string rep_node;
+        std::string rep_item_id;
+        std::string rep_comment;
+
+        if (repeat_short_form)
+        {
+            // Infer feed from current FEED buffer.
+            if (!ptr_channel || ptr_channel->type != weechat::channel::chat_type::FEED)
+            {
+                weechat_printf(buffer,
+                               _("%s%s: /feed repeat short form requires running from a feed buffer"),
+                               weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
+                return WEECHAT_RC_OK;
+            }
+            const std::string &fk = ptr_channel->name;
+            auto slash = fk.find('/');
+            if (slash == std::string::npos)
+            {
+                weechat_printf(buffer, _("%s%s: cannot parse feed key '%s'"),
+                               weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
+                               fk.c_str());
+                return WEECHAT_RC_OK;
+            }
+            rep_service = fk.substr(0, slash);
+            rep_node    = fk.substr(slash + 1);
+
+            std::string_view alias_arg(argv[2]);
+            rep_item_id = ptr_account->feed_alias_resolve(fk, alias_arg);
+            if (rep_item_id.empty())
+            {
+                weechat_printf(buffer, _("%s%s: unknown alias %s in feed %s"),
+                               weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
+                               argv[2], fk.c_str());
+                return WEECHAT_RC_OK;
+            }
+            rep_comment = argc > 3 ? argv_eol[3] : "";
+        }
+        else
+        {
+            rep_service = argv[2];
+            rep_node    = argv[3];
+            rep_item_id = argv[4];
+            rep_comment = argc > 5 ? argv_eol[5] : "";
+        }
 
         const std::string via_uri = fmt::format(
             "xmpp:{}?;node={};item={}", rep_service, rep_node, rep_item_id);
