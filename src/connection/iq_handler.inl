@@ -452,10 +452,20 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                             if (!item || weechat_strcasecmp(xmpp_stanza_get_name(item), "item") != 0)
                                 continue;
 
-                            // Deduplication: skip items already rendered for this feed
                             const char *item_id_raw = xmpp_stanza_get_id(item);
-                            if (item_id_raw && account.feed_item_seen(feed_key, item_id_raw))
-                                continue;
+
+                            // Skip non-Atom items stored in the node (e.g. avatar metadata
+                            // published by Prosody into the blog node).  These are not
+                            // microblog posts and have no <entry xmlns="…Atom"> child.
+                            // Check by looking for a well-known non-post item id namespace.
+                            if (item_id_raw)
+                            {
+                                std::string_view iid(item_id_raw);
+                                if (iid.starts_with("urn:xmpp:avatar:")
+                                    || iid.starts_with("urn:xmpp:omemo:")
+                                    || iid.starts_with("urn:xmpp:bookmarks:"))
+                                    continue;
+                            }
 
                             xmpp_stanza_t *entry = xmpp_stanza_get_child_by_name_and_ns(
                                 item, "entry", "http://www.w3.org/2005/Atom");
@@ -464,23 +474,19 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
 
                             atom_entry ae = parse_atom_entry(account.context, entry);
 
-                            const std::string &title    = ae.title;
-                            const std::string &pubdate  = ae.pubdate;
-                            const std::string &link     = ae.link;
-                            const std::string &author   = ae.author;
-                            const std::string &reply_to = ae.reply_to;
-
                             if (ae.empty())
                             {
-                                const char *item_id = xmpp_stanza_get_id(item);
-                                weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
-                                    "%s[%s] Item: %s",
-                                    weechat_prefix("network"),
-                                    node_name.c_str(),
-                                    item_id ? item_id : "(no id)");
+                                // No Atom entry — not a microblog post, skip silently.
+                                // (Non-Atom items with unknown id prefixes land here.)
+                                continue;
                             }
-                            else
+
                             {
+                                const std::string &title    = ae.title;
+                                const std::string &pubdate  = ae.pubdate;
+                                const std::string &link     = ae.link;
+                                const std::string &author   = ae.author;
+                                const std::string &reply_to = ae.reply_to;
                                 const std::string &body = ae.body();
                                 const char *pfx  = weechat_prefix("join");
                                 const char *bold = weechat_color("bold");
@@ -521,9 +527,6 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                                     weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
                                         "  %s", body.c_str());
                             }
-                            // Mark item as seen for deduplication
-                            if (item_id_raw)
-                                account.feed_item_mark_seen(feed_key, item_id_raw);
                         }
                     }
 
@@ -1443,6 +1446,18 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 if (node_attr)
                 {
                     std::string node_name(node_attr);
+
+                    // XEP-0472 §4.1: skip comment sub-nodes — they are per-post
+                    // threads, not independent feeds, and are always empty at the
+                    // top-level disco level.
+                    static constexpr std::string_view comments_prefix =
+                        "urn:xmpp:microblog:0:comments/";
+                    if (node_name.starts_with(comments_prefix))
+                    {
+                        disco_item = xmpp_stanza_get_next(disco_item);
+                        continue;
+                    }
+
                     std::string feed_key = fmt::format("{}/{}", feed_service, node_name);
 
                     // Ensure FEED buffer exists
