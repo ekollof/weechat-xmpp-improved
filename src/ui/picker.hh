@@ -199,9 +199,10 @@ public:
         if (selected_ >= 0 && selected_ < static_cast<int>(entries_.size())
                 && entries_[selected_].selectable) {
             auto selected_data = entries_[selected_].data;  // copy before close
-            close_picker();
-            if (on_select_)
-                on_select_(selected_data);
+            auto cb = std::move(on_select_);  // move out before close_picker() deletes this
+            close_picker();   // deletes this via s_close_cb
+            if (cb)
+                cb(selected_data);  // safe: cb lives on the stack, not in the deleted object
         } else {
             close_picker();
         }

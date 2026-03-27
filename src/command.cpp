@@ -333,14 +333,16 @@ void command__init()
 
     hook = weechat_hook_command(
         "edit",
-        N_("pick one of your recent messages to edit (XEP-0308)"),
-        N_(""),
-        N_("Opens an interactive picker of the last 20 messages you sent.\n"
-           "Select a message with arrows and press Enter.\n"
+        N_("edit one of your recent messages (XEP-0308)"),
+        N_("[text]"),
+        N_("text: new message body — corrects the last message you sent immediately.\n\n"
+           "Without arguments, opens an interactive picker of the last 20 messages\n"
+           "you sent. Select a message with arrows and press Enter.\n"
            "The input bar is pre-filled with /edit-to <id> <original text>.\n"
-           "Edit the text and press Enter to send the correction.\n"
+           "Edit the text and press Enter to send the correction.\n\n"
            "Examples:\n"
-           "  /edit"),
+           "  /edit                    open picker to choose which message to edit\n"
+           "  /edit corrected text     immediately replace your last message"),
         NULL, &command__edit, NULL, NULL);
     if (!hook)
         weechat_printf(NULL, "Failed to setup command /edit");

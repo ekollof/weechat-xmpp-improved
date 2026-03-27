@@ -107,9 +107,14 @@ collect_own_messages(struct t_gui_buffer *buffer, int max = 20)
     return result;
 }
 
-// /edit — open a picker of the last 20 own non-retracted messages.
-// On selection, pre-fill the input bar with "/edit-to <id> <original body>"
-// so the user can modify the text before pressing Enter.
+// /edit [text] — XEP-0308 message correction.
+//
+// /edit          — open a picker of the last 20 own non-retracted messages;
+//                  on selection pre-fill the input bar with "/edit-to <id> <body>"
+//                  so the user can tweak the text before pressing Enter.
+// /edit <text>   — immediately correct the last own non-retracted message with
+//                  <text> as the new body (no picker).
+//
 // The actual correction stanza is sent by command__edit_to (below).
 int command__edit(const void *pointer, void *data,
                   struct t_gui_buffer *buffer, int argc,
@@ -120,9 +125,7 @@ int command__edit(const void *pointer, void *data,
 
     (void) pointer;
     (void) data;
-    (void) argc;
-    (void) argv;
-    (void) argv_eol;
+    (void) argv;  // only argv_eol and argc are used
 
     buffer__get_account_and_channel(buffer, &ptr_account, &ptr_channel);
 
@@ -143,7 +146,27 @@ int command__edit(const void *pointer, void *data,
         return WEECHAT_RC_OK;
     }
 
-    // Collect last own non-retracted messages for picker
+    // /edit <text> — fast path: correct the last own message immediately.
+    if (argc >= 2)
+    {
+        auto own_messages = collect_own_messages(buffer, 1);
+        if (own_messages.empty())
+        {
+            weechat_printf(buffer, "%sxmpp: no message found to edit",
+                          weechat_prefix("error"));
+            return WEECHAT_RC_OK;
+        }
+
+        // Delegate to /edit-to by pre-filling the input bar so the user sees
+        // what happened, then executing immediately via weechat_command.
+        // Simpler and avoids duplicating stanza construction here.
+        std::string resolved_id = resolve_msg_id(own_messages[0], ptr_channel);
+        std::string cmd = fmt::format("/edit-to {} {}", resolved_id, argv_eol[1]);
+        weechat_command(buffer, cmd.c_str());
+        return WEECHAT_RC_OK;
+    }
+
+    // /edit (no args) — picker path.
     auto own_messages = collect_own_messages(buffer);
 
     if (own_messages.empty())
