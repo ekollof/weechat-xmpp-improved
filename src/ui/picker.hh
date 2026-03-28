@@ -46,6 +46,9 @@ public:
 // Lifetime: the picker owns itself — it is deleted inside cancel()/confirm()
 // after calling the user callbacks and closing the WeeChat buffer.
 // Callers should release() the unique_ptr after construction and not touch it.
+//
+// Search: the input bar is live — typing filters entries fzf-style
+// (case-insensitive substring match across label + sublabel).
 // ---------------------------------------------------------------------------
 template <typename T>
 class picker final : public picker_base
@@ -98,6 +101,7 @@ public:
                 return la < lb;
             });
         }
+
         buf_ = weechat_buffer_new(
             std::string(buf_name).c_str(),
             &picker::s_input_cb, this, nullptr,
@@ -119,19 +123,25 @@ public:
         weechat_buffer_set(buf_, "key_bind_q",         "/xmpp-picker-nav quit");
         weechat_buffer_set(buf_, "key_bind_ctrl-[",    "/xmpp-picker-nav quit");
 
+        // Hook input_text_changed signal for live search filtering.
+        signal_hook_ = weechat_hook_signal("input_text_changed",
+                                           &picker::s_signal_cb, this, nullptr);
+
         // Register as the active picker (replaces any previous one).
         picker_base::s_active = this;
 
-        // Move selection to first selectable entry.
-        selected_ = first_selectable(0);
-
-        redraw();
+        // Build initial visible set (all entries) and set selection.
+        refilter();
 
         weechat_buffer_set(buf_, "display", "1");
     }
 
     ~picker() override
     {
+        if (signal_hook_) {
+            weechat_unhook(signal_hook_);
+            signal_hook_ = nullptr;
+        }
         if (picker_base::s_active == this)
             picker_base::s_active = nullptr;
     }
@@ -140,9 +150,7 @@ public:
     void add_entry(entry e)
     {
         entries_.push_back(std::move(e));
-        if (selected_ < 0)
-            selected_ = first_selectable(0);
-        redraw();
+        refilter();
     }
 
     // Redraw the entire buffer from scratch.
@@ -152,18 +160,35 @@ public:
 
         weechat_buffer_clear(buf_);
 
-        // Row 0: header / instructions
-        weechat_printf_y(buf_, 0,
-            "%s%s%s  %s[Enter=select  ↑↓=navigate  q=cancel]%s",
-            weechat_color("bold"),
-            title_.c_str(),
-            weechat_color("reset"),
-            weechat_color("darkgray"),
-            weechat_color("reset"));
+        // Row 0: header / instructions / current filter
+        std::string header;
+        header += weechat_color("bold");
+        header += title_;
+        header += weechat_color("reset");
+        if (!filter_.empty()) {
+            header += "  ";
+            header += weechat_color("yellow");
+            header += "[search: ";
+            header += filter_;
+            header += "]";
+            header += weechat_color("reset");
+        }
+        header += "  ";
+        header += weechat_color("darkgray");
+        header += "[Enter=select  ↑↓=navigate  q=cancel  type to search]";
+        header += weechat_color("reset");
+        weechat_printf_y(buf_, 0, "%s", header.c_str());
 
-        for (int i = 0; i < static_cast<int>(entries_.size()); ++i) {
-            const auto &e = entries_[i];
-            bool is_sel = (i == selected_) && e.selectable;
+        if (visible_.empty()) {
+            weechat_printf_y(buf_, 1,
+                "  %s(no matches)%s",
+                weechat_color("darkgray"), weechat_color("reset"));
+            return;
+        }
+
+        for (int row = 0; row < static_cast<int>(visible_.size()); ++row) {
+            const auto &e = entries_[visible_[row]];
+            bool is_sel = (row == selected_vis_) && e.selectable;
 
             std::string line;
             if (is_sel)
@@ -176,18 +201,27 @@ public:
                 line += weechat_color("reset");
             } else {
                 line += "  ";
-                line += e.label;
+                // Highlight matching portion in the label if filtering.
+                if (!filter_.empty()) {
+                    line += highlight_match(e.label, filter_, is_sel);
+                } else {
+                    line += e.label;
+                }
                 if (!e.sublabel.empty()) {
                     line += "  ";
                     line += weechat_color("darkgray");
-                    line += e.sublabel;
+                    if (!filter_.empty()) {
+                        line += highlight_match(e.sublabel, filter_, false);
+                    } else {
+                        line += e.sublabel;
+                    }
                     line += weechat_color("reset");
                 }
                 if (is_sel)
                     line += weechat_color("reset");
             }
 
-            weechat_printf_y(buf_, i + 1, "%s", line.c_str());
+            weechat_printf_y(buf_, row + 1, "%s", line.c_str());
         }
     }
 
@@ -197,28 +231,27 @@ public:
 
     void navigate(int delta) override
     {
-        if (entries_.empty()) return;
-        int n = static_cast<int>(entries_.size());
-        int next = selected_;
-        // Keep stepping until we land on a selectable entry (or wrap around once)
+        if (visible_.empty()) return;
+        int n = static_cast<int>(visible_.size());
+        int next = selected_vis_;
         for (int steps = 0; steps < n; ++steps) {
             next = (next + delta + n) % n;
-            if (entries_[next].selectable)
+            if (entries_[visible_[next]].selectable)
                 break;
         }
-        selected_ = next;
+        selected_vis_ = next;
         redraw();
     }
 
     void confirm() override
     {
-        if (selected_ >= 0 && selected_ < static_cast<int>(entries_.size())
-                && entries_[selected_].selectable) {
-            auto selected_data = entries_[selected_].data;  // copy before close
-            auto cb = std::move(on_select_);  // move out before close_picker() deletes this
-            close_picker();   // deletes this via s_close_cb
+        if (selected_vis_ >= 0 && selected_vis_ < static_cast<int>(visible_.size())
+                && entries_[visible_[selected_vis_]].selectable) {
+            auto selected_data = entries_[visible_[selected_vis_]].data;
+            auto cb = std::move(on_select_);
+            close_picker();
             if (cb)
-                cb(selected_data);  // safe: cb lives on the stack, not in the deleted object
+                cb(selected_data);
         } else {
             close_picker();
         }
@@ -232,19 +265,98 @@ public:
 private:
     struct t_gui_buffer  *buf_       = nullptr;
     struct t_gui_buffer  *origin_buf_ = nullptr;
+    struct t_hook        *signal_hook_ = nullptr;
     std::vector<entry>    entries_;
+    std::vector<int>      visible_;   // indices into entries_ that match filter_
     std::string           title_;
-    int                   selected_  = -1;
+    std::string           filter_;
+    int                   selected_vis_ = -1;  // index into visible_
     action_cb             on_select_;
     close_cb              on_close_;
 
-    // Find the index of the first selectable entry at or after `start`.
-    int first_selectable(int start) const
+    // Rebuild visible_ from entries_ using the current filter_.
+    // Tries to keep the currently selected entry selected; otherwise resets
+    // to the first selectable visible entry.
+    void refilter()
     {
-        for (int i = start; i < static_cast<int>(entries_.size()); ++i)
-            if (entries_[i].selectable)
-                return i;
+        // Remember what entry was selected so we can try to keep it.
+        int prev_entry_idx = (selected_vis_ >= 0 && selected_vis_ < static_cast<int>(visible_.size()))
+            ? visible_[selected_vis_] : -1;
+
+        visible_.clear();
+
+        std::string filter_lc = filter_;
+        std::ranges::transform(filter_lc, filter_lc.begin(), ::tolower);
+
+        for (int i = 0; i < static_cast<int>(entries_.size()); ++i) {
+            const auto &e = entries_[i];
+            if (filter_lc.empty() || !e.selectable) {
+                // Always show non-selectable headers; show all when no filter.
+                visible_.push_back(i);
+            } else {
+                // Case-insensitive substring match against label + sublabel.
+                std::string label_lc = e.label;
+                std::string sub_lc   = e.sublabel;
+                std::ranges::transform(label_lc, label_lc.begin(), ::tolower);
+                std::ranges::transform(sub_lc,   sub_lc.begin(),   ::tolower);
+                if (label_lc.find(filter_lc) != std::string::npos ||
+                    sub_lc.find(filter_lc)   != std::string::npos)
+                    visible_.push_back(i);
+            }
+        }
+
+        // Try to restore the same entry; otherwise pick first selectable.
+        selected_vis_ = -1;
+        if (prev_entry_idx >= 0) {
+            for (int r = 0; r < static_cast<int>(visible_.size()); ++r) {
+                if (visible_[r] == prev_entry_idx) {
+                    selected_vis_ = r;
+                    break;
+                }
+            }
+        }
+        if (selected_vis_ < 0)
+            selected_vis_ = first_selectable_vis(0);
+
+        redraw();
+    }
+
+    // Find first selectable row in visible_ at or after `start`.
+    int first_selectable_vis(int start) const
+    {
+        for (int r = start; r < static_cast<int>(visible_.size()); ++r)
+            if (entries_[visible_[r]].selectable)
+                return r;
         return -1;
+    }
+
+    // Return `text` with the first case-insensitive occurrence of `needle`
+    // wrapped in yellow colour codes. Falls back to plain text if no match.
+    static std::string highlight_match(const std::string &text,
+                                       const std::string &needle,
+                                       bool is_selected)
+    {
+        if (needle.empty()) return text;
+
+        std::string text_lc = text;
+        std::string needle_lc = needle;
+        std::ranges::transform(text_lc,   text_lc.begin(),   ::tolower);
+        std::ranges::transform(needle_lc, needle_lc.begin(), ::tolower);
+
+        auto pos = text_lc.find(needle_lc);
+        if (pos == std::string::npos) return text;
+
+        // Temporarily suspend reverse video so the highlight colour is visible.
+        std::string result;
+        result += text.substr(0, pos);
+        if (is_selected) result += weechat_color("reset");
+        result += weechat_color("yellow");
+        result += weechat_color("bold");
+        result += text.substr(pos, needle.size());
+        result += weechat_color("reset");
+        if (is_selected) result += weechat_color("reverse");
+        result += text.substr(pos + needle.size());
+        return result;
     }
 
     void close_picker()
@@ -258,6 +370,11 @@ private:
         buf_ = nullptr;
         picker_base::s_active = nullptr;
 
+        if (signal_hook_) {
+            weechat_unhook(signal_hook_);
+            signal_hook_ = nullptr;
+        }
+
         if (on_close_)
             on_close_();
 
@@ -267,12 +384,36 @@ private:
         // 'this' is now deleted by s_close_cb.
     }
 
-    // WeeChat input callback — we don't use the input bar but WeeChat requires it.
+    // WeeChat input callback — called when the user presses Enter in the
+    // input bar. We handle confirmation via the key binding instead, so
+    // this is a no-op (but must exist for buffer_new).
     static int s_input_cb(const void *ptr, void * /*data*/,
                           struct t_gui_buffer * /*buf*/,
                           const char * /*input_data*/)
     {
         (void) ptr;
+        return WEECHAT_RC_OK;
+    }
+
+    // WeeChat signal callback — fires on every keystroke in the input bar
+    // (input_text_changed). Read the current input text and refilter.
+    static int s_signal_cb(const void *ptr, void * /*data*/,
+                           const char * /*signal*/, const char * /*type_data*/,
+                           void * /*signal_data*/)
+    {
+        auto *self = static_cast<picker *>(const_cast<void *>(ptr));
+        if (!self || !self->buf_) return WEECHAT_RC_OK;
+
+        // Only act when the picker buffer is the current buffer.
+        if (weechat_current_buffer() != self->buf_) return WEECHAT_RC_OK;
+
+        const char *input = weechat_buffer_get_string(self->buf_, "input");
+        std::string new_filter = input ? input : "";
+
+        if (new_filter != self->filter_) {
+            self->filter_ = std::move(new_filter);
+            self->refilter();
+        }
         return WEECHAT_RC_OK;
     }
 
