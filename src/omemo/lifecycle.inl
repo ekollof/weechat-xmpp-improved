@@ -54,9 +54,8 @@ xmpp_stanza_t *weechat::xmpp::omemo::get_bundle(xmpp_ctx_t *context, char *from,
         return nullptr;
     }
 
-    weechat_printf(nullptr,
-                   "%somemo: publishing bundle for device %u with %zu prekeys",
-                   weechat_prefix("network"), device_id, bundle->prekeys.size());
+    XDEBUG("omemo: publishing bundle for device {} with {} prekeys",
+           device_id, bundle->prekeys.size());
 
     xmpp_stanza_t *text = nullptr;
     xmpp_stanza_t *spk = nullptr;
@@ -205,9 +204,8 @@ xmpp_stanza_t *weechat::xmpp::omemo::get_legacy_bundle(xmpp_ctx_t *context, char
         return nullptr;
     }
 
-    weechat_printf(nullptr,
-                   "%somemo: publishing legacy bundle for device %u with %zu prekeys",
-                   weechat_prefix("network"), device_id, bundle->prekeys.size());
+    XDEBUG("omemo: publishing legacy bundle for device {} with {} prekeys",
+           device_id, bundle->prekeys.size());
 
     auto make_text_node = [&](const char *name, const std::string &text,
                               const char *attr_name = nullptr,

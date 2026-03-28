@@ -505,11 +505,9 @@ void ensure_prekeys(omemo &self, xmpp_ctx_t *context)
         return false;
     }
 
-    weechat_printf(nullptr,
-                   "%somemo: building session for %.*s/%u using spk=%u pk=%u (bundle prekeys=%zu)",
-                   weechat_prefix("network"),
-                   static_cast<int>(jid.size()), jid.data(), remote_device_id,
-                   signed_pre_key_id, pre_key_id, bundle->prekeys.size());
+    XDEBUG("omemo: building session for {}/{} using spk={} pk={} (bundle prekeys={})",
+           std::string_view(jid.data(), jid.size()), remote_device_id,
+           signed_pre_key_id, pre_key_id, bundle->prekeys.size());
 
     auto address = make_signal_address(jid, static_cast<std::int32_t>(remote_device_id));
     const std::uint32_t bundle_registration_id = remote_device_id;
@@ -538,10 +536,8 @@ void ensure_prekeys(omemo &self, xmpp_ctx_t *context)
                        ex.what());
         return false;
     }
-    weechat_printf(nullptr,
-                   "%somemo: session bootstrap succeeded for %.*s/%u",
-                   weechat_prefix("network"),
-                   static_cast<int>(jid.size()), jid.data(), remote_device_id);
+    XDEBUG("omemo: session bootstrap succeeded for {}/{}",
+           std::string_view(jid.data(), jid.size()), remote_device_id);
     return true;
 }
 
@@ -902,16 +898,15 @@ void remove_prefixed_keys(omemo &self, std::string_view prefix)
         const char *name = xmpp_stanza_get_name(device);
         if (!name || weechat_strcasecmp(name, "device") != 0)
         {
-            weechat_printf(nullptr, "%somemo: child %d has name '%s' (skipping, expected 'device')",
-                           weechat_prefix("network"), total_children, name ? name : "(null)");
+            XDEBUG("omemo: child {} has name '{}' (skipping, expected 'device')",
+                   total_children, name ? name : "(null)");
             continue;
         }
 
         const char *id = xmpp_stanza_get_id(device);
         if (!id || !*id)
         {
-            weechat_printf(nullptr, "%somemo: child %d is <device> but has no id attribute",
-                           weechat_prefix("network"), total_children);
+            XDEBUG("omemo: child {} is <device> but has no id attribute", total_children);
             continue;
         }
 
@@ -926,13 +921,12 @@ void remove_prefixed_keys(omemo &self, std::string_view prefix)
         }
 
         valid_devices++;
-        weechat_printf(nullptr, "%somemo: extracted device %s (valid_count=%d)",
-                       weechat_prefix("network"), id, valid_devices);
+        XDEBUG("omemo: extracted device {} (valid_count={})", id, valid_devices);
         device_ids.emplace_back(id);
     }
 
-    weechat_printf(nullptr, "%somemo: stanza had %d total children, %d valid devices extracted",
-                   weechat_prefix("network"), total_children, valid_devices);
+    XDEBUG("omemo: stanza had {} total children, {} valid devices extracted",
+           total_children, valid_devices);
 
     std::sort(device_ids.begin(), device_ids.end());
     device_ids.erase(std::unique(device_ids.begin(), device_ids.end()), device_ids.end());

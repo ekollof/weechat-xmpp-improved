@@ -354,9 +354,10 @@ void weechat::xmpp::omemo::handle_devicelist(weechat::account *account,
 
     missing_omemo2_devicelist.erase(bare_jid);
     
-    weechat_printf(nullptr, "%somemo: handle_devicelist for %s: storing %zu device(s) [%s]",
-                   weechat_prefix("network"), bare_jid.c_str(), devices.size(),
-                   devicelist_str.empty() ? "(empty)" : devicelist_str.c_str());
+    XDEBUG("omemo: handle_devicelist for {}: storing {} device(s) [{}]",
+           bare_jid,
+           devices.size(),
+           devicelist_str.empty() ? "(empty)" : devicelist_str);
     
     store_string(*this, key_for_devicelist(bare_jid), devicelist_str);
     for (const auto &dev : devices)
@@ -460,12 +461,10 @@ void weechat::xmpp::omemo::handle_legacy_devicelist(weechat::account *account,
         store_device_mode(*this, bare_jid, *remote_device_id, peer_mode::legacy);
     }
 
-    weechat_printf(nullptr,
-                   "%somemo: handle_legacy_devicelist for %s: storing %zu device(s) [%s]",
-                   weechat_prefix("network"),
-                   bare_jid.c_str(),
-                   devices.size(),
-                   devicelist_str.empty() ? "(empty)" : devicelist_str.c_str());
+    XDEBUG("omemo: handle_legacy_devicelist for {}: storing {} device(s) [{}]",
+           bare_jid,
+           devices.size(),
+           devicelist_str.empty() ? "(empty)" : devicelist_str);
 
     if (!account)
         return;
@@ -1051,10 +1050,8 @@ void weechat::xmpp::omemo::process_postponed_key_transports(weechat::account &ac
     if (postponed_key_transports.empty())
         return;
 
-    weechat_printf(account.buffer,
-                   "%somemo: MAM catchup complete \xe2\x80\x94 sending %zu deferred key-transport(s)",
-                   weechat_prefix("network"),
-                   postponed_key_transports.size());
+    XDEBUG("omemo: MAM catchup complete \xe2\x80\x94 sending {} deferred key-transport(s)",
+           postponed_key_transports.size());
 
     for (const auto &[bare_jid, device_id] : postponed_key_transports)
     {

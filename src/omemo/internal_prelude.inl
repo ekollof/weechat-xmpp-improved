@@ -173,18 +173,16 @@ void request_bundle(weechat::account &account, std::string_view jid, std::uint32
     const bool is_own_jid = weechat_strcasecmp(target_jid.c_str(), own_bare_jid.c_str()) == 0;
     if (!is_own_jid && !account.omemo.has_peer_traffic(account.context, target_jid))
     {
-        weechat_printf(account.buffer,
-                       "%somemo: deferring OMEMO:2 bundle request for %s/%u until PM/MAM traffic is observed",
-                       weechat_prefix("network"), target_jid.c_str(), device_id);
+        XDEBUG("omemo: deferring OMEMO:2 bundle request for {}/{} until PM/MAM traffic is observed",
+               target_jid, device_id);
         return;
     }
 
     const auto key = std::make_pair(target_jid, device_id);
     if (account.omemo.pending_bundle_fetch.count(key))
     {
-        weechat_printf(account.buffer,
-                       "%somemo: bundle request for %s/%u already pending (skipping duplicate)",
-                       weechat_prefix("network"), target_jid.c_str(), device_id);
+        XDEBUG("omemo: bundle request for {}/{} already pending (skipping duplicate)",
+               target_jid, device_id);
         return;
     }
 
@@ -210,9 +208,8 @@ void request_bundle(weechat::account &account, std::string_view jid, std::uint32
         account.omemo.pending_iq_jid[uuid] = target_jid;
     account.omemo.pending_bundle_fetch.insert(key);
 
-    weechat_printf(account.buffer,
-                   "%somemo: sent bundle request for %s/%u (uuid=%s)",
-                   weechat_prefix("network"), target_jid.c_str(), device_id, uuid ? uuid : "?");
+    XDEBUG("omemo: sent bundle request for {}/{} (uuid={})",
+           target_jid, device_id, uuid ? uuid : "?");
 
     account.connection.send(iq_stanza);
     xmpp_stanza_release(iq_stanza);
@@ -492,9 +489,7 @@ void request_legacy_devicelist(weechat::account &account, std::string_view jid)
     if (uuid)
         account.omemo.pending_iq_jid[uuid] = target_jid;
 
-    weechat_printf(account.buffer,
-                   "%somemo: requesting legacy device list for %s",
-                   weechat_prefix("network"), target_jid.c_str());
+    XDEBUG("omemo: requesting legacy device list for {}", target_jid);
 
     account.connection.send(children[0]);
     xmpp_stanza_release(children[0]);
@@ -509,18 +504,16 @@ void request_legacy_bundle(weechat::account &account, std::string_view jid, std:
     const bool is_own_jid = weechat_strcasecmp(target_jid.c_str(), own_bare_jid.c_str()) == 0;
     if (!is_own_jid && !account.omemo.has_peer_traffic(account.context, target_jid))
     {
-        weechat_printf(account.buffer,
-                       "%somemo: deferring legacy bundle request for %s/%u until PM/MAM traffic is observed",
-                       weechat_prefix("network"), target_jid.c_str(), device_id);
+        XDEBUG("omemo: deferring legacy bundle request for {}/{} until PM/MAM traffic is observed",
+               target_jid, device_id);
         return;
     }
 
     const auto key = std::make_pair(target_jid, device_id);
     if (account.omemo.pending_bundle_fetch.count(key))
     {
-        weechat_printf(account.buffer,
-                       "%somemo: legacy bundle request for %s/%u already pending (skipping)",
-                       weechat_prefix("network"), target_jid.c_str(), device_id);
+        XDEBUG("omemo: legacy bundle request for {}/{} already pending (skipping)",
+               target_jid, device_id);
         return;
     }
 
@@ -543,9 +536,8 @@ void request_legacy_bundle(weechat::account &account, std::string_view jid, std:
         account.omemo.pending_iq_jid[uuid] = target_jid;
     account.omemo.pending_bundle_fetch.insert(key);
 
-    weechat_printf(account.buffer,
-                   "%somemo: requesting legacy bundle for %s/%u (node=%s)",
-                   weechat_prefix("network"), target_jid.c_str(), device_id, bundle_node.c_str());
+    XDEBUG("omemo: requesting legacy bundle for {}/{} (node={})",
+           target_jid, device_id, bundle_node);
 
     account.connection.send(iq_stanza);
     xmpp_stanza_release(iq_stanza);
