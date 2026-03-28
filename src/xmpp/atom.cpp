@@ -192,7 +192,27 @@ atom_entry parse_atom_entry(xmpp_ctx_t *ctx, xmpp_stanza_t *entry,
             else if (strcasecmp(rel, "replies") == 0)
             {
                 if (e.replies_link.empty())
+                {
                     e.replies_link = href;
+                    // RFC 4685: thr:count and thr:updated sit on this same element.
+                    // Namespace http://purl.org/syndication/thread/1.0 (prefix "thr:").
+                    // libstrophe exposes both "thr:count" (prefixed) and plain "count"
+                    // depending on how the server serialised the namespace — try both.
+                    const char *thr_count = xmpp_stanza_get_attribute(child, "thr:count");
+                    if (!thr_count)
+                        thr_count = xmpp_stanza_get_attribute(child, "count");
+                    if (thr_count && *thr_count)
+                    {
+                        int n = std::atoi(thr_count);
+                        if (n >= 0)
+                            e.comments_count = n;
+                    }
+                    const char *thr_updated = xmpp_stanza_get_attribute(child, "thr:updated");
+                    if (!thr_updated)
+                        thr_updated = xmpp_stanza_get_attribute(child, "updated");
+                    if (thr_updated && *thr_updated)
+                        e.comments_updated = thr_updated;
+                }
             }
             else if (strcasecmp(rel, "enclosure") == 0)
             {

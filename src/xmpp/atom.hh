@@ -20,6 +20,8 @@ struct atom_entry
     std::string link;           // <link rel='alternate' href='...'/>
     std::string via_link;       // <link rel='via' href='...'/>  (XEP-0472 boost/repeat)
     std::string replies_link;   // <link rel='replies' href='...'/>  (XEP-0277 comments)
+    int         comments_count = -1;    // thr:count from <link rel='replies'>; -1 = not present
+    std::string comments_updated;       // thr:updated from <link rel='replies'> (advisory)
     std::string author;         // <author><name>…</name></author>
     std::string author_uri;     // <author><uri>…</uri></author>
     std::string reply_to;       // <thr:in-reply-to ref|href='…'>
