@@ -393,6 +393,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                     const char *from_jid = from ? from : account.jid().data();
 
                     struct t_gui_buffer *target_buf = account.buffer;
+                    bool is_whois4 = false;
                     if (id)
                     {
                         auto it = account.whois_queries.find(id);
@@ -400,6 +401,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         {
                             target_buf = it->second.buffer;
                             account.whois_queries.erase(it);
+                            is_whois4 = true;
                         }
                     }
 
@@ -410,8 +412,11 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                             item, "vcard", NS_VCARD4);
                         if (vcard4)
                         {
-                            weechat_printf(target_buf, "%svCard4 for %s:",
-                                           weechat_prefix("network"), from_jid);
+                            if (is_whois4)
+                                weechat_printf(target_buf, "%svCard4 for %s:",
+                                               weechat_prefix("network"), from_jid);
+                            else
+                                XDEBUG("vCard4 auto-fetched for {}", from_jid);
 
                             // Helper: get text of first child matching name inside parent
                             auto vc4_text = [&](xmpp_stanza_t *p, const char *name) -> std::string {
@@ -453,16 +458,19 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                             // org: <org><text>…</text></org>
                             std::string org_v4 = vc4_text(vcard4, "org");
 
-                            print_vc4("Full name:",    fn);
-                            print_vc4("Nickname:",     nickname);
-                            print_vc4("Birthday:",     bday);
-                            print_vc4("Organisation:", org_v4);
-                            print_vc4("Title:",        title);
-                            print_vc4("Role:",         role_vc4);
-                            print_vc4("Email:",        email_v4);
-                            print_vc4("Phone:",        tel_v4);
-                            print_vc4("URL:",          url);
-                            print_vc4("Note:",         note);
+                            if (is_whois4)
+                            {
+                                print_vc4("Full name:",    fn);
+                                print_vc4("Nickname:",     nickname);
+                                print_vc4("Birthday:",     bday);
+                                print_vc4("Organisation:", org_v4);
+                                print_vc4("Title:",        title);
+                                print_vc4("Role:",         role_vc4);
+                                print_vc4("Email:",        email_v4);
+                                print_vc4("Phone:",        tel_v4);
+                                print_vc4("URL:",          url);
+                                print_vc4("Note:",         note);
+                            }
 
                             return true;
                         }
