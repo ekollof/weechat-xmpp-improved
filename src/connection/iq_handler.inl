@@ -487,6 +487,8 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                     weechat::channel::chat_type::FEED,
                     feed_key,
                     feed_key);
+                if (inserted)
+                    account.feed_open_register(feed_key);
                 {
                     weechat::channel &feed_ch = ch_it->second;
 
@@ -851,12 +853,14 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         std::string feed_key = fmt::format("{}/{}", feed_service, node_name);
 
                         // Ensure FEED buffer exists
-                        account.channels.try_emplace(
+                        auto [sub_ch_it, sub_inserted] = account.channels.try_emplace(
                             feed_key,
                             account,
                             weechat::channel::chat_type::FEED,
                             feed_key,
                             feed_key);
+                        if (sub_inserted)
+                            account.feed_open_register(feed_key);
 
                         // Fetch items for this subscribed node (with RSM <set> for paging)
                         std::array<xmpp_stanza_t *, 3> children = {nullptr, nullptr, nullptr};
@@ -1801,12 +1805,14 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                     std::string feed_key = fmt::format("{}/{}", feed_service, node_name);
 
                     // Ensure FEED buffer exists
-                    account.channels.try_emplace(
+                    auto [disco_ch_it, disco_inserted] = account.channels.try_emplace(
                         feed_key,
                         account,
                         weechat::channel::chat_type::FEED,
                         feed_key,
                         feed_key);
+                    if (disco_inserted)
+                        account.feed_open_register(feed_key);
 
                     // Fetch items for this node (with RSM <set> for paging)
                     std::array<xmpp_stanza_t *, 3> children = {nullptr, nullptr, nullptr};

@@ -251,6 +251,15 @@ int buffer__close_cb(const void *pointer, void *data,
             }
         }
     }
+    else if (weechat_strcasecmp(type, "feed") == 0)
+    {
+        if (ptr_account && ptr_channel)
+        {
+            // Remove from LMDB feed-open registry so it is not restored on reconnect
+            ptr_account->feed_open_unregister(std::string(ptr_channel->name));
+            ptr_account->channels.erase(ptr_channel->name);
+        }
+    }
     else
     {
     }

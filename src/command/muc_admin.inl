@@ -1333,6 +1333,7 @@ int command__feed(const void *pointer, void *data,
             weechat::channel::chat_type::FEED,
             comments_feed_key,
             comments_feed_key);
+        ptr_account->feed_open_register(comments_feed_key);
 
         std::array<xmpp_stanza_t *, 3> pub_children = {nullptr, nullptr, nullptr};
         pub_children[0] = stanza__iq_pubsub_items(ptr_account->context, nullptr,
@@ -2047,6 +2048,7 @@ int command__feed(const void *pointer, void *data,
             weechat::channel::chat_type::FEED,
             feed_key,
             feed_key);
+        ptr_account->feed_open_register(feed_key);
 
         weechat_printf(buffer, "%sFetching PubSub feed %s from %s (XEP-0060)…",
                        weechat_prefix("network"), node_name.c_str(), service_jid.c_str());

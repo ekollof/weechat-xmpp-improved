@@ -342,6 +342,10 @@ namespace weechat
         // Feed item deduplication (stored in cursors LMDB table)
         bool feed_item_seen(const std::string& feed_key, const std::string& item_id);
         void feed_item_mark_seen(const std::string& feed_key, const std::string& item_id);
+        // Feed buffer persistence across restarts (stored in cursors LMDB table)
+        void feed_open_register(const std::string& feed_key);
+        void feed_open_unregister(const std::string& feed_key);
+        std::vector<std::string> feed_open_list();
         void feed_atom_id_set(const std::string& feed_key, const std::string& item_id,
                               const std::string& atom_id)
         {

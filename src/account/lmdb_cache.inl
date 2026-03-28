@@ -406,6 +406,79 @@ void weechat::account::feed_item_mark_seen(const std::string& feed_key, const st
     }
 }
 
+void weechat::account::feed_open_register(const std::string& feed_key)
+{
+    if (!mam_db_env || feed_key.empty()) return;
+
+    std::string key = fmt::format("feed_open:{}", feed_key);
+    static const char *val_str = "1";
+    try {
+        lmdb::txn parentTransaction{nullptr};
+        lmdb::txn txn = lmdb::txn::begin(mam_db_env, parentTransaction, 0);
+        MDB_val k = {key.size(), (void*)key.data()};
+        MDB_val v = {1, (void*)val_str};
+        mdb_put(txn.handle(), mam_dbi.cursors.handle(), &k, &v, 0);
+        txn.commit();
+    } catch (const lmdb::error&) {
+        // Silently ignore write errors
+    }
+}
+
+void weechat::account::feed_open_unregister(const std::string& feed_key)
+{
+    if (!mam_db_env || feed_key.empty()) return;
+
+    std::string key = fmt::format("feed_open:{}", feed_key);
+    try {
+        lmdb::txn parentTransaction{nullptr};
+        lmdb::txn txn = lmdb::txn::begin(mam_db_env, parentTransaction, 0);
+        MDB_val k = {key.size(), (void*)key.data()};
+        mdb_del(txn.handle(), mam_dbi.cursors.handle(), &k, nullptr);
+        txn.commit();
+    } catch (const lmdb::error&) {
+        // Silently ignore delete errors
+    }
+}
+
+std::vector<std::string> weechat::account::feed_open_list()
+{
+    std::vector<std::string> result;
+    if (!mam_db_env) return result;
+
+    static constexpr std::string_view prefix = "feed_open:";
+    try {
+        lmdb::txn parentTransaction{nullptr};
+        lmdb::txn txn = lmdb::txn::begin(mam_db_env, parentTransaction, MDB_RDONLY);
+
+        MDB_cursor *cursor = nullptr;
+        if (mdb_cursor_open(txn.handle(), mam_dbi.cursors.handle(), &cursor) != 0)
+        {
+            txn.abort();
+            return result;
+        }
+
+        // Position cursor at the first key >= "feed_open:"
+        MDB_val k = {prefix.size(), (void*)prefix.data()};
+        MDB_val v;
+        int rc = mdb_cursor_get(cursor, &k, &v, MDB_SET_RANGE);
+        while (rc == 0)
+        {
+            std::string_view kv(static_cast<const char*>(k.mv_data), k.mv_size);
+            if (!kv.starts_with(prefix))
+                break;
+            result.emplace_back(kv.substr(prefix.size()));
+            rc = mdb_cursor_get(cursor, &k, &v, MDB_NEXT);
+        }
+
+        mdb_cursor_close(cursor);
+        txn.abort();
+    } catch (const lmdb::error&) {
+        // Return whatever we got
+    }
+
+    return result;
+}
+
 void weechat::account::send_bookmarks()
 {
     // XEP-0402: PEP Native Bookmarks (preferred)

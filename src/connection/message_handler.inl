@@ -749,6 +749,8 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                         feed_key,
                         feed_key);
                     weechat::channel &feed_ch = ch_it->second;
+                    if (inserted)
+                        account.feed_open_register(feed_key);
 
                     bool has_item    = false;
                     bool has_retract = false;
