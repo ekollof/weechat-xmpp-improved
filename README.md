@@ -924,14 +924,81 @@ arguments. Picker key bindings:
 
 ---
 
-## OMEMO log correlation
+## Debugging
 
-When diagnosing key transport or session bootstrap issues, correlate WeeChat
-log events with raw XML:
+Three complementary mechanisms are available for diagnosing protocol issues.
+All are opt-in and off by default so normal users see no extra noise.
+
+### Verbose protocol log — `xmpp.look.debug`
+
+Routes internal protocol messages (PEP events, avatar updates, vCard
+auto-fetches, OMEMO device lists and session bootstrap, stream management,
+client state, upload service discovery) to a dedicated **`xmpp.debug`** buffer
+(`xmpp.debug` in WeeChat buffer notation) instead of cluttering account
+buffers.
+
+```
+/set xmpp.look.debug on
+```
+
+The buffer is created lazily on first use. Each line carries a dim
+`[file:line]` source prefix so you can trace back to the exact code path.
+
+To jump to the debug buffer:
+
+```
+/buffer xmpp.debug
+```
+
+To turn it off again (messages stop appearing; buffer remains open):
+
+```
+/set xmpp.look.debug off
+```
+
+### Raw XML stanza log — `xmpp.look.raw_xml_log`
+
+Appends every inbound (`RECV`) and outbound (`SEND`) XML stanza to a
+per-account log file on disk. Useful when you need the full wire-level picture
+for protocol analysis or when filing bug reports.
+
+```
+/set xmpp.look.raw_xml_log on
+```
+
+Log files are written to:
+
+```
+~/.local/share/weechat/xmpp/raw_xml_<account>.log
+```
+
+Each entry is formatted as:
+
+```
+[YYYY-MM-DD HH:MM:SS] SEND|RECV <stanza-name>
+<full xml text>
+
+```
+
+Turn off to stop writing (existing log file is kept):
+
+```
+/set xmpp.look.raw_xml_log off
+```
+
+### OMEMO log correlation helper
+
+When diagnosing OMEMO key transport or session bootstrap issues, the
+`correlate_omemo_xml.sh` helper cross-references WeeChat log events with raw
+XML stanzas so you can see what the plugin received at the exact moment an
+error occurred:
 
 ```sh
 tools/correlate_omemo_xml.sh --account <account>
 ```
+
+This is most useful when `xmpp.look.raw_xml_log` is also enabled, since the
+helper reads from `raw_xml_<account>.log`.
 
 ---
 

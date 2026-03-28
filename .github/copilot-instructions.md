@@ -262,12 +262,71 @@ Skip autojoin for IRC gateway rooms (causes connection issues):
 
 - **Main logs directory**: `~/.local/share/weechat/logs/`
 - **XMPP plugin logs**: `~/.local/share/weechat/logs/xmpp.account.<account>.weechatlog`
-- **Raw XML log**: `~/.local/share/weechat/xmpp/raw_xml_<account>.log`
+- **Raw XML log**: `~/.local/share/weechat/xmpp/raw_xml_<account>.log` (only written when `xmpp.look.raw_xml_log on`)
 - **OMEMO correlation helper**: `tools/correlate_omemo_xml.sh`
 - For OMEMO log debugging, always run `tools/correlate_omemo_xml.sh --account <account>` first to correlate event logs with raw XML before proposing protocol-level fixes.
 - Example: `tail -n 300 ~/.local/share/weechat/logs/xmpp.account.andrath.weechatlog`
 - Filter logs: `grep "OMEMO\|bundle\|devicelist" ~/.local/share/weechat/logs/xmpp.account.*.weechatlog`
 - **Note**: Plugin must be restarted (WeeChat closed/reopened) after code changes to test - cannot safely reload in-place
+
+### Debug Options (agents must know these)
+
+The plugin has two independent opt-in debug modes, both off by default.
+**Agents investigating protocol issues should enable both before inspecting logs.**
+
+#### `xmpp.look.debug` — verbose protocol buffer
+
+Routes internal protocol messages (PEP, avatar, vCard, OMEMO, stream
+management, CSI, upload service, devicelists) to the `xmpp.debug` WeeChat
+buffer instead of the account buffer.  Each line has a `[file:line]` prefix.
+
+Enable via the debug socket:
+```bash
+bash ~/Code/weechat-export/weechat-cmd.sh '/set xmpp.look.debug on'
+```
+Or directly inside WeeChat:
+```
+/set xmpp.look.debug on
+```
+View the buffer:
+```
+/buffer xmpp.debug
+```
+
+#### `xmpp.look.raw_xml_log` — wire-level XML file
+
+Appends every SEND and RECV XML stanza to a per-account log file:
+```
+~/.local/share/weechat/xmpp/raw_xml_<account>.log
+```
+
+Enable:
+```bash
+bash ~/Code/weechat-export/weechat-cmd.sh '/set xmpp.look.raw_xml_log on'
+```
+Or inside WeeChat:
+```
+/set xmpp.look.raw_xml_log on
+```
+
+Read recent entries:
+```bash
+tail -n 100 ~/.local/share/weechat/xmpp/raw_xml_<account>.log
+```
+
+Search for a specific stanza:
+```bash
+grep -A 20 "RECV iq" ~/.local/share/weechat/xmpp/raw_xml_<account>.log | head -60
+```
+
+#### Workflow for protocol debugging
+
+1. Enable both options (via debug socket or FIFO so WeeChat stays running).
+2. Reproduce the issue.
+3. Read `xmpp.debug` buffer for high-level protocol event sequence.
+4. Cross-reference with `raw_xml_<account>.log` for exact wire content.
+5. For OMEMO issues: run `tools/correlate_omemo_xml.sh --account <account>`.
+6. Disable both options when done to restore normal behaviour.
 
 ### Interacting with a Running WeeChat Instance
 
