@@ -71,6 +71,10 @@ namespace weechat::debug
 // xmpp.look.debug option is enabled.
 bool xmpp_debug_is_on();
 
+// xmpp_raw_xml_log_is_on() — defined in config.cpp; returns true when
+// xmpp.look.raw_xml_log option is enabled.
+bool xmpp_raw_xml_log_is_on();
+
 // XDEBUG(fmt, ...) — print to the debug buffer when debug mode is on.
 // Usage: XDEBUG("PEP event from {}: {}", from, node);
 #define XDEBUG(fmt_str, ...) \

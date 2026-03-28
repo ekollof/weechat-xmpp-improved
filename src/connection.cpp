@@ -84,6 +84,9 @@ void append_raw_xml_trace(weechat::account &account,
     if (!stanza)
         return;
 
+    if (!xmpp_raw_xml_log_is_on())
+        return;
+
     const auto path = raw_xml_trace_path(account);
     if (path.empty())
         return;
@@ -160,7 +163,7 @@ bool weechat::connection::version_handler(xmpp_stanza_t *stanza)
     const char *weechat_name = "weechat";
     std::unique_ptr<char, decltype(&free)> weechat_version(weechat_info_get("version", NULL), free);
 
-    weechat_printf(NULL, "Received version request from %s", xmpp_stanza_get_from(stanza));
+    XDEBUG("Received version request from {}", xmpp_stanza_get_from(stanza));
 
     auto reply = libstrophe::stanza::reply(stanza)
         .set_type("result");
@@ -189,7 +192,7 @@ bool weechat::connection::version_handler(xmpp_stanza_t *stanza)
 
 bool weechat::connection::time_handler(xmpp_stanza_t *stanza)
 {
-    weechat_printf(NULL, "Received time request from %s", xmpp_stanza_get_from(stanza));
+    XDEBUG("Received time request from {}", xmpp_stanza_get_from(stanza));
 
     auto reply = libstrophe::stanza::reply(stanza)
         .set_type("result");

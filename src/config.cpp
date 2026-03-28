@@ -142,6 +142,12 @@ weechat::config::config()
                 nullptr, 0, 0,
                 "off", nullptr, false,
                 {}, {}, {}},
+            .raw_xml_log{file, section_look, "raw_xml_log", "boolean",
+                "log all raw inbound and outbound XML stanzas to a per-account file "
+                "($weechat_data_dir/xmpp/raw_xml_<account>.log); useful for protocol debugging",
+                nullptr, 0, 0,
+                "off", nullptr, false,
+                {}, {}, {}},
             .nick_completion_smart{file, section_look, "nick_completion_smart", "integer",
                 ("smart completion for nicks (completes first with last speakers): "
                  "speakers = all speakers (including highlights), "
@@ -192,4 +198,11 @@ bool xmpp_debug_is_on()
     if (!weechat::config::instance)
         return false;
     return weechat_config_boolean(weechat::config::instance->look.debug);
+}
+
+bool xmpp_raw_xml_log_is_on()
+{
+    if (!weechat::config::instance)
+        return false;
+    return weechat_config_boolean(weechat::config::instance->look.raw_xml_log);
 }
