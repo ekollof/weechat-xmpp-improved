@@ -217,11 +217,14 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                     const char *debug_to = xmpp_stanza_get_to(message);
                     const char *debug_type = xmpp_stanza_get_type(message);
                     
-                    // For global MAM queries, create PM channels based on conversation partners
-                    // Since we can't reliably get the query ID from individual result messages,
-                    // we'll create channels for all 1-on-1 conversations (non-MUC)
-                    if ((!debug_type || weechat_strcasecmp(debug_type, "groupchat") != 0)
-                        && stanza_has_user_message_payload(message))
+                    // For global MAM queries, create PM channels based on conversation partners.
+                    // We create the channel for any non-groupchat stanza (including receipts,
+                    // chat-states, and reactions) — not just messages with a body — so that
+                    // contacts whose most-recent archived stanza had no payload (e.g. a read
+                    // receipt) still get their buffer restored on reconnect.
+                    // Payloadless OMEMO key-transport stanzas are already dropped at the top
+                    // of this function (lines ~76-77) before reaching here.
+                    if (!debug_type || weechat_strcasecmp(debug_type, "groupchat") != 0)
                     {
                         const char *from_bare = debug_from ? xmpp_jid_bare(account.context, debug_from) : NULL;
                         const char *to_bare = debug_to ? xmpp_jid_bare(account.context, debug_to) : NULL;
@@ -2143,13 +2146,20 @@ message_handler_after_omemo:
         weechat_string_dyn_concat(dyn_tags, ",origin_id_", -1);
         weechat_string_dyn_concat(dyn_tags, origin_id, -1);
     }
-    // Store stanza-id metadata if present
-    if (stanza_id && stanza_id_by)
+    // Store stanza-id metadata if present.
+    // The stanza_id_ tag is written whenever the server provides a stanza-id so
+    // that the MAM dedup logic (lines ~297-354) can suppress the replayed copy of
+    // a message that was already shown via live delivery.  stanza_id_by_ is
+    // supplementary and only written when the server also supplies the by= attribute.
+    if (stanza_id)
     {
         weechat_string_dyn_concat(dyn_tags, ",stanza_id_", -1);
         weechat_string_dyn_concat(dyn_tags, stanza_id, -1);
-        weechat_string_dyn_concat(dyn_tags, ",stanza_id_by_", -1);
-        weechat_string_dyn_concat(dyn_tags, stanza_id_by, -1);
+        if (stanza_id_by)
+        {
+            weechat_string_dyn_concat(dyn_tags, ",stanza_id_by_", -1);
+            weechat_string_dyn_concat(dyn_tags, stanza_id_by, -1);
+        }
     }
     // XEP-0380: Store encryption method if advertised
     if (eme_namespace)
