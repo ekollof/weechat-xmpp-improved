@@ -398,32 +398,17 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
             // Clear any stale cursor so reconnect always fetches the latest page
             account.mam_cursor_clear(fmt::format("pubsub:{}", feed_key));
 
-            // Build pubsub items IQ with RSM empty <before/> to get the latest page.
+            // Build pubsub items IQ using only max_items (XEP-0060 §6.5.7).
+            // Omit RSM entirely: news.movim.eu ignores empty <before/> last-page
+            // semantics and returns the oldest page instead. Plain max_items causes
+            // the server to return the N most recently published items.
             const int max_items = 20;
-            std::array<xmpp_stanza_t *, 3> pub_children = {nullptr, nullptr, nullptr};
+            std::array<xmpp_stanza_t *, 2> pub_children = {nullptr, nullptr};
             pub_children[0] = stanza__iq_pubsub_items(account.context, nullptr,
                                                        node_name.c_str(), max_items);
 
-            xmpp_stanza_t *rset = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_name(rset, "set");
-            xmpp_stanza_set_ns(rset, "http://jabber.org/protocol/rsm");
-
-            xmpp_stanza_t *max_el = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_name(max_el, "max");
-            xmpp_stanza_t *max_t = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_text(max_t, std::to_string(max_items).c_str());
-            xmpp_stanza_add_child(max_el, max_t); xmpp_stanza_release(max_t);
-            xmpp_stanza_add_child(rset, max_el); xmpp_stanza_release(max_el);
-
-            // Empty <before/> means "last page" per XEP-0059 §2.5
-            xmpp_stanza_t *before_el = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_name(before_el, "before");
-            xmpp_stanza_add_child(rset, before_el); xmpp_stanza_release(before_el);
-            pub_children[1] = rset;
-
             pub_children[0] = stanza__iq_pubsub(account.context, nullptr, pub_children.data(),
                                                 with_noop("http://jabber.org/protocol/pubsub"));
-            pub_children[1] = nullptr;
 
             xmpp_string_guard uid_g(account.context, xmpp_uuid_gen(account.context));
             const char *uid = uid_g.ptr;

@@ -887,43 +887,15 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         if (sub_inserted)
                             account.feed_open_register(feed_key);
 
-                        // Fetch items for this subscribed node (with RSM <set> for paging)
-                        std::array<xmpp_stanza_t *, 3> children = {nullptr, nullptr, nullptr};
+                        // Fetch items for this subscribed node using only max_items (XEP-0060 §6.5.7).
+                        // RSM <before/> is omitted: news.movim.eu ignores empty <before/> last-page
+                        // semantics and returns the oldest page. Plain max_items returns the most
+                        // recently published items on compliant servers.
+                        std::array<xmpp_stanza_t *, 2> children = {nullptr, nullptr};
                         children[0] = stanza__iq_pubsub_items(account.context, nullptr, node_name.c_str(), 20);
-
-                        // RSM <set><max>20</max><before/></set>
-                        {
-                            xmpp_stanza_t *rset = xmpp_stanza_new(account.context);
-                            xmpp_stanza_set_name(rset, "set");
-                            xmpp_stanza_set_ns(rset, "http://jabber.org/protocol/rsm");
-
-                            xmpp_stanza_t *max_el = xmpp_stanza_new(account.context);
-                            xmpp_stanza_set_name(max_el, "max");
-                            xmpp_stanza_t *max_t = xmpp_stanza_new(account.context);
-                            xmpp_stanza_set_text(max_t, "20");
-                            xmpp_stanza_add_child(max_el, max_t); xmpp_stanza_release(max_t);
-                            xmpp_stanza_add_child(rset, max_el); xmpp_stanza_release(max_el);
-
-                            xmpp_stanza_t *before_el = xmpp_stanza_new(account.context);
-                            xmpp_stanza_set_name(before_el, "before");
-                            // Check LMDB for a saved cursor for this feed
-                            std::string cursor_key = fmt::format("pubsub:{}", feed_key);
-                            std::string saved_cursor = account.mam_cursor_get(cursor_key);
-                            if (!saved_cursor.empty())
-                            {
-                                xmpp_stanza_t *before_t = xmpp_stanza_new(account.context);
-                                xmpp_stanza_set_text(before_t, saved_cursor.c_str());
-                                xmpp_stanza_add_child(before_el, before_t);
-                                xmpp_stanza_release(before_t);
-                            }
-                            xmpp_stanza_add_child(rset, before_el); xmpp_stanza_release(before_el);
-
-                            children[1] = rset;
-                        }
 
                         children[0] = stanza__iq_pubsub(account.context, nullptr, children.data(),
                                                         with_noop("http://jabber.org/protocol/pubsub"));
-                        children[1] = nullptr;
 
                         xmpp_string_guard uid_g(account.context, xmpp_uuid_gen(account.context));
                         const char *uid = uid_g.ptr;
