@@ -245,7 +245,12 @@ std::optional<std::string> weechat::xmpp::pgp::verify(struct t_gui_buffer *buffe
         err = gpgme_get_key(this->gpgme, result->c_str(), &key, false);
         if (err) {
             const char *keyids[2] = { result->c_str(), nullptr };
-            err = gpgme_op_receive_keys(this->gpgme, keyids);
+            // Attempt to fetch the key from a keyserver; if it fails (e.g.
+            // GPG_ERR_NO_DATA from Dirmngr), clear the error silently —
+            // a keyserver miss is not user-actionable.
+            gpgme_error_t fetch_err = gpgme_op_receive_keys(this->gpgme, keyids);
+            if (fetch_err)
+                err = GPG_ERR_NO_ERROR;
         } else {
             gpgme_key_release(key);
         }
