@@ -1878,9 +1878,18 @@ int command__feed(const void *pointer, void *data,
         // <thr:in-reply-to> for replies (XEP-0472 §4.2)
         if (!reply_to_id.empty())
         {
-            const std::string reply_feed_key = fmt::format("{}/{}", pub_service, pub_node);
+            // The ref/href must point at the parent *article* on the blog node,
+            // not at the comments node itself.  When posting from a comments buffer,
+            // pub_node is "urn:xmpp:microblog:0:comments/<id>" — use the bare
+            // microblog node instead so the URI resolves to the original post.
+            static constexpr std::string_view kCommentsPfx2 = "urn:xmpp:microblog:0:comments/";
+            const std::string reply_ref_node =
+                (pub_node.rfind(kCommentsPfx2, 0) == 0)
+                ? "urn:xmpp:microblog:0"
+                : pub_node;
+            const std::string reply_feed_key = fmt::format("{}/{}", pub_service, reply_ref_node);
             const std::string reply_xmpp_uri = fmt::format(
-                "xmpp:{}?;node={};item={}", pub_service, pub_node, reply_to_id);
+                "xmpp:{}?;node={};item={}", pub_service, reply_ref_node, reply_to_id);
             const std::string reply_atom_id = ptr_account->feed_atom_id_get(reply_feed_key, reply_to_id);
             xmpp_stanza_t *reply_el = xmpp_stanza_new(ptr_account->context);
             xmpp_stanza_set_name(reply_el, "thr:in-reply-to");
