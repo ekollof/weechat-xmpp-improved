@@ -2443,8 +2443,14 @@ message_handler_after_omemo:
                                     }
                                 }
 
-                                // Create prefix showing what message this is replying to (max 40 chars)
-                                std::string excerpt = (strlen(clean_text) > 40)
+                                // Count newlines in the original to decide whether to truncate.
+                                // If the original has more than 5 newlines it is a long multi-line
+                                // message: show a 40-char excerpt.  Otherwise show the full text.
+                                int newline_count = 0;
+                                for (const char *p = clean_text; *p; ++p)
+                                    if (*p == '\n') ++newline_count;
+
+                                std::string excerpt = (newline_count > 5 && strlen(clean_text) > 40)
                                     ? std::string(clean_text, 40) + "..."
                                     : std::string(clean_text);
 
