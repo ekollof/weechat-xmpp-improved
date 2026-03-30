@@ -517,8 +517,132 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 {
                     weechat::channel &feed_ch = ch_it->second;
 
+                    // XEP-0059 RSM: read <set> metadata BEFORE rendering items so we
+                    // can detect a stale oldest-page result and skip rendering it.
+                    // The <set> is a child of <pubsub>, not <items>.
+                    bool stale_page = false;
+                    int  rsm_total_count = -1;
+                    {
+                        xmpp_stanza_t *rsm_set = xmpp_stanza_get_child_by_name_and_ns(
+                            pubsub_feed, "set", "http://jabber.org/protocol/rsm");
+                        if (rsm_set && max_items_req > 0)
+                        {
+                            xmpp_stanza_t *count_el  = xmpp_stanza_get_child_by_name(rsm_set, "count");
+                            char          *count_text = count_el ? xmpp_stanza_get_text(count_el) : nullptr;
+                            rsm_total_count = count_text ? std::atoi(count_text) : -1;
+                            if (count_text) xmpp_free(account.context, count_text);
+
+                            xmpp_stanza_t *first_el   = xmpp_stanza_get_child_by_name(rsm_set, "first");
+                            char          *first_text  = first_el ? xmpp_stanza_get_text(first_el) : nullptr;
+
+                            // Detect stale page: the server returned the oldest-first page
+                            // (index=0) even though there are more items than max_items.
+                            // Heuristic: if the first item's ID parses as a timestamp older
+                            // than 30 days AND the node has more items than we requested,
+                            // this is a stale result (e.g. gadgeteerza-tech-blog on
+                            // news.movim.eu which sorts oldest-first).
+                            if (first_text && rsm_total_count > max_items_req)
+                            {
+                                // Try to parse the item-id as an ISO 8601 timestamp.
+                                // news.movim.eu uses timestamps as item IDs.
+                                struct tm tm_first = {};
+                                bool parsed = false;
+                                // Try full timestamp with fractional seconds: 2023-11-09T10:52:18.590034Z
+                                // strptime doesn't handle sub-seconds; truncate at '.'.
+                                std::string id_str(first_text);
+                                auto dot = id_str.find('.');
+                                if (dot != std::string::npos)
+                                    id_str.resize(dot);
+                                // Also remove trailing Z if present after truncation
+                                if (!id_str.empty() && id_str.back() == 'Z')
+                                    id_str.pop_back();
+                                if (strptime(id_str.c_str(), "%Y-%m-%dT%H:%M:%S", &tm_first) != nullptr)
+                                {
+                                    tm_first.tm_isdst = -1;
+                                    time_t t_first = mktime(&tm_first);
+                                    time_t now = time(nullptr);
+                                    // Treat as stale if oldest-in-page is more than 30 days old
+                                    if (t_first > 0 && (now - t_first) > 30 * 24 * 3600)
+                                        stale_page = true;
+                                    parsed = true;
+                                }
+                                // If the item-id doesn't look like a timestamp, fall back:
+                                // treat as stale if index == 0 and count >> max_items
+                                // (conservative: only trigger if count is at least 10x max_items)
+                                if (!parsed)
+                                {
+                                    const char *index_attr = first_el
+                                        ? xmpp_stanza_get_attribute(first_el, "index")
+                                        : nullptr;
+                                    int first_index = index_attr ? std::atoi(index_attr) : -1;
+                                    if (first_index == 0 && rsm_total_count > max_items_req * 10)
+                                        stale_page = true;
+                                }
+                            }
+
+                            if (stale_page)
+                            {
+                                // Discard this response silently and re-fetch from the end
+                                // of the node using RSM <index>. Structure:
+                                //   <pubsub>
+                                //     <items node="..." max_items="N"/>
+                                //     <set xmlns="rsm"><max>N</max><index>count-N</index></set>
+                                //   </pubsub>
+                                int start_index = std::max(0, rsm_total_count - max_items_req);
+                                std::string idx_str = std::to_string(start_index);
+                                std::string max_str = std::to_string(max_items_req);
+
+                                // Build RSM <set> element
+                                xmpp_stanza_t *rset2 = xmpp_stanza_new(account.context);
+                                xmpp_stanza_set_name(rset2, "set");
+                                xmpp_stanza_set_ns(rset2, "http://jabber.org/protocol/rsm");
+
+                                xmpp_stanza_t *max2_el = xmpp_stanza_new(account.context);
+                                xmpp_stanza_set_name(max2_el, "max");
+                                xmpp_stanza_t *max2_t = xmpp_stanza_new(account.context);
+                                xmpp_stanza_set_text(max2_t, max_str.c_str());
+                                xmpp_stanza_add_child(max2_el, max2_t); xmpp_stanza_release(max2_t);
+                                xmpp_stanza_add_child(rset2, max2_el); xmpp_stanza_release(max2_el);
+
+                                xmpp_stanza_t *idx_el = xmpp_stanza_new(account.context);
+                                xmpp_stanza_set_name(idx_el, "index");
+                                xmpp_stanza_t *idx_t = xmpp_stanza_new(account.context);
+                                xmpp_stanza_set_text(idx_t, idx_str.c_str());
+                                xmpp_stanza_add_child(idx_el, idx_t); xmpp_stanza_release(idx_t);
+                                xmpp_stanza_add_child(rset2, idx_el); xmpp_stanza_release(idx_el);
+
+                                // Build <pubsub> with both <items> and <set> as children
+                                std::array<xmpp_stanza_t *, 3> pub_ch = {nullptr, nullptr, nullptr};
+                                pub_ch[0] = stanza__iq_pubsub_items(account.context, nullptr,
+                                                                     node_name.c_str(), max_items_req);
+                                pub_ch[1] = rset2;  // released by stanza__iq_pubsub
+
+                                std::array<xmpp_stanza_t *, 2> iq_ch = {nullptr, nullptr};
+                                iq_ch[0] = stanza__iq_pubsub(account.context, nullptr, pub_ch.data(),
+                                    with_noop("http://jabber.org/protocol/pubsub"));
+
+                                xmpp_string_guard uid2_g(account.context, xmpp_uuid_gen(account.context));
+                                const char *uid2 = uid2_g.ptr;
+
+                                iq_ch[0] = stanza__iq(account.context, nullptr, iq_ch.data(),
+                                    nullptr, uid2,
+                                    account.jid().data(),
+                                    feed_service.c_str(),
+                                    "get");
+
+                                if (uid2)
+                                    account.pubsub_fetch_ids[uid2] = {feed_service, node_name, {}, max_items_req};
+
+                                account.connection.send(iq_ch[0]);
+                                xmpp_stanza_release(iq_ch[0]);
+                            }
+
+                            if (first_text) xmpp_free(account.context, first_text);
+                        }
+                    }
+
                     xmpp_stanza_t *items = xmpp_stanza_get_child_by_name(pubsub_feed, "items");
-                    if (items)
+                    if (items && !stale_page)
                     {
                         for (xmpp_stanza_t *item = xmpp_stanza_get_children(items);
                              item; item = xmpp_stanza_get_next(item))
@@ -796,38 +920,32 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         }
                     }
 
-                    // XEP-0059 RSM: read <set> metadata from the result.
-                    // The <set> is a child of <pubsub>, not <items>.
-                    xmpp_stanza_t *rsm_set = xmpp_stanza_get_child_by_name_and_ns(
-                        pubsub_feed, "set", "http://jabber.org/protocol/rsm");
-                    if (rsm_set && max_items_req > 0)
+                    // XEP-0059 RSM paging hint (only shown for non-stale pages).
+                    // rsm_total_count was already populated in the pre-check above.
+                    if (!stale_page && max_items_req > 0)
                     {
-                        // <first index="N">item-id</first> is the oldest item in this page.
-                        xmpp_stanza_t *first_el = xmpp_stanza_get_child_by_name(rsm_set, "first");
-                        char *first_text = first_el ? xmpp_stanza_get_text(first_el) : nullptr;
-
-                        xmpp_stanza_t *count_el = xmpp_stanza_get_child_by_name(rsm_set, "count");
-                        char *count_text = count_el ? xmpp_stanza_get_text(count_el) : nullptr;
-                        int total_count = count_text ? std::atoi(count_text) : -1;
-                        if (count_text) xmpp_free(account.context, count_text);
-
-                        if (first_text)
+                        xmpp_stanza_t *rsm_set2 = xmpp_stanza_get_child_by_name_and_ns(
+                            pubsub_feed, "set", "http://jabber.org/protocol/rsm");
+                        if (rsm_set2)
                         {
-                            // Print a paging hint to load older entries manually
-                            std::string hint = fmt::format(
-                                "/feed {} {} --before {}",
-                                feed_service, node_name, first_text);
-                            if (total_count > 0)
-                                weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed,notify_none",
-                                    "%s%d item(s) total — for older entries: %s",
-                                    weechat_prefix("network"),
-                                    total_count, hint.c_str());
-                            else
-                                weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed,notify_none",
-                                    "%sFor older entries: %s",
-                                    weechat_prefix("network"), hint.c_str());
-
-                            xmpp_free(account.context, first_text);
+                            xmpp_stanza_t *first_el2  = xmpp_stanza_get_child_by_name(rsm_set2, "first");
+                            char          *first_text2 = first_el2 ? xmpp_stanza_get_text(first_el2) : nullptr;
+                            if (first_text2)
+                            {
+                                std::string hint = fmt::format(
+                                    "/feed {} {} --before {}",
+                                    feed_service, node_name, first_text2);
+                                if (rsm_total_count > 0)
+                                    weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed,notify_none",
+                                        "%s%d item(s) total — for older entries: %s",
+                                        weechat_prefix("network"),
+                                        rsm_total_count, hint.c_str());
+                                else
+                                    weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed,notify_none",
+                                        "%sFor older entries: %s",
+                                        weechat_prefix("network"), hint.c_str());
+                                xmpp_free(account.context, first_text2);
+                            }
                         }
                     }
                     (void)before_cursor; // used at send time; not needed in result handler
