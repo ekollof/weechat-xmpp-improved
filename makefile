@@ -172,7 +172,11 @@ sexp/sexp.a: sexp/parser.o sexp/lexer.o sexp/driver.o
 
 sexp/parser.o: sexp/parser.yy
 	cd sexp && bison -t -d -v parser.yy
+ifneq ($(IS_CLANG),)
+	$(CXX) $(CPPFLAGS) -fvisibility=default -Wno-unused-variable -c sexp/parser.tab.cc -o $@
+else
 	$(CXX) $(CPPFLAGS) -fvisibility=default -Wno-unused-but-set-variable -c sexp/parser.tab.cc -o $@
+endif
 
 sexp/lexer.o: sexp/lexer.l
 	cd sexp && flex -d --outfile=lexer.yy.cc lexer.l

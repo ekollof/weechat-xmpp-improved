@@ -6,7 +6,6 @@
 #include <sys/types.h>
 #include <fstream>
 #include <string>
-#include <openssl/sha.h>
 #include <openssl/evp.h>
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
@@ -22,12 +21,13 @@
 
 std::string weechat::avatar::calculate_hash(const std::vector<uint8_t>& data)
 {
-    unsigned char hash[SHA_DIGEST_LENGTH];
-    SHA1(data.data(), data.size(), hash);
-    
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int hash_len = 0;
+    EVP_Digest(data.data(), data.size(), hash, &hash_len, EVP_sha1(), nullptr);
+
     std::string hex;
-    hex.reserve(SHA_DIGEST_LENGTH * 2);
-    for (int i = 0; i < SHA_DIGEST_LENGTH; i++)
+    hex.reserve(hash_len * 2);
+    for (unsigned int i = 0; i < hash_len; i++)
         hex += fmt::format("{:02x}", hash[i]);
     
     return hex;

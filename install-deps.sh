@@ -162,6 +162,7 @@ case "$OS" in
             libxml2 \
             lmdb \
             libsignal-protocol-c \
+            libomemo-c \
             gpgme \
             libfmt \
             curl \

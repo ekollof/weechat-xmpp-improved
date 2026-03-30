@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
-#include <openssl/sha.h>
+#include <openssl/evp.h>
 
 #include "color.hh"
 
@@ -16,8 +16,9 @@ namespace weechat {
 // Generate a hue angle from a string using SHA-1
 static double generate_angle(const std::string& input)
 {
-    unsigned char hash[SHA_DIGEST_LENGTH];
-    SHA1(reinterpret_cast<const unsigned char*>(input.c_str()), input.length(), hash);
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int hash_len = 0;
+    EVP_Digest(input.c_str(), input.length(), hash, &hash_len, EVP_sha1(), nullptr);
     
     // Extract least-significant 16 bits (first two bytes, little-endian)
     uint16_t value = hash[0] | (hash[1] << 8);
