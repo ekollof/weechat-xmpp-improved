@@ -526,17 +526,40 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                     }
                 }
                 
-                // XEP-0402: PEP Native Bookmarks  
+                // XEP-0402: PEP Native Bookmarks — incremental push notification.
+                // The server sends individual <item> or <retract> events; this is
+                // NOT a full dump, so we MUST NOT clear the bookmarks map here.
                 if (items_node
                     && weechat_strcasecmp(items_node, "urn:xmpp:bookmarks:1") == 0)
                 {
-                    // Clear existing bookmarks before loading from PEP
-                    account.bookmarks.clear();
-                    
                     for (item = xmpp_stanza_get_children(items);
                          item; item = xmpp_stanza_get_next(item))
                     {
                         const char *item_name = xmpp_stanza_get_name(item);
+                        if (!item_name)
+                            continue;
+
+                        // XEP-0402 §4: on <retract> notification, leave the room
+                        // immediately and remove the bookmark from the local map.
+                        if (weechat_strcasecmp(item_name, "retract") == 0)
+                        {
+                            const char *retract_id = xmpp_stanza_get_id(item);
+                            if (!retract_id)
+                                continue;
+
+                            account.bookmarks.erase(retract_id);
+
+                            auto ch_it = account.channels.find(retract_id);
+                            if (ch_it != account.channels.end() && ch_it->second.buffer)
+                            {
+                                weechat_printf(ch_it->second.buffer,
+                                               "%sBookmark removed — leaving room",
+                                               weechat_prefix("network"));
+                                weechat_buffer_close(ch_it->second.buffer);
+                            }
+                            continue;
+                        }
+
                         if (weechat_strcasecmp(item_name, "item") != 0)
                             continue;
                         
@@ -564,14 +587,16 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                         char *nick_text = NULL;
                         if (nick_elem)
                             nick_text = xmpp_stanza_get_text(nick_elem);
+
+                        bool do_autojoin = autojoin &&
+                            (weechat_strcasecmp(autojoin, "true") == 0 ||
+                             weechat_strcasecmp(autojoin, "1") == 0);
                         
-                        // Store bookmark
+                        // Upsert bookmark
                         account.bookmarks[item_id].jid = item_id;
                         account.bookmarks[item_id].name = name ? name : "";
                         account.bookmarks[item_id].nick = nick_text ? nick_text : "";
-                        account.bookmarks[item_id].autojoin = autojoin && 
-                            (weechat_strcasecmp(autojoin, "true") == 0 || 
-                             weechat_strcasecmp(autojoin, "1") == 0);
+                        account.bookmarks[item_id].autojoin = do_autojoin;
                         
                         if (nick_text)
                             xmpp_free(account.context, nick_text);
@@ -587,10 +612,10 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                                     .build(account.context)
                                     .get());
                         
-                        // Autojoin if enabled
-                        if (account.bookmarks[item_id].autojoin)
+                        if (do_autojoin)
                         {
-                            // Skip biboumi (IRC gateway) rooms
+                            // XEP-0402 §4: join immediately on autojoin=true notification.
+                            // Skip biboumi (IRC gateway) rooms.
                             bool is_biboumi = (strchr(item_id, '%') != NULL) ||
                                             (strstr(item_id, "biboumi") != NULL) ||
                                             (strstr(item_id, "@irc.") != NULL);
@@ -600,10 +625,11 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                                 char **command = weechat_string_dyn_alloc(256);
                                 weechat_string_dyn_concat(command, "/enter ", -1);
                                 weechat_string_dyn_concat(command, item_id, -1);
-                                if (nick_text && strlen(nick_text) > 0)
+                                const char *nick_sv = account.bookmarks[item_id].nick.c_str();
+                                if (nick_sv && nick_sv[0])
                                 {
                                     weechat_string_dyn_concat(command, "/", -1);
-                                    weechat_string_dyn_concat(command, nick_text, -1);
+                                    weechat_string_dyn_concat(command, nick_sv, -1);
                                 }
                                 weechat_command(account.buffer, *command);
                                 weechat_string_dyn_free(command, 1);
@@ -615,9 +641,22 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                                               weechat_prefix("network"), item_id);
                             }
                         }
+                        else
+                        {
+                            // XEP-0402 §4 (v1.2.0): autojoin is false (or absent) —
+                            // leave the room immediately if we are currently in it.
+                            auto ch_it = account.channels.find(item_id);
+                            if (ch_it != account.channels.end() && ch_it->second.buffer)
+                            {
+                                weechat_printf(ch_it->second.buffer,
+                                               "%sBookmark autojoin disabled — leaving room",
+                                               weechat_prefix("network"));
+                                weechat_buffer_close(ch_it->second.buffer);
+                            }
+                        }
                     }
                     
-                    XDEBUG("Loaded {} bookmarks from PEP", account.bookmarks.size());
+                    XDEBUG("Processed bookmark PEP push; {} bookmarks total", account.bookmarks.size());
                 }
 
                 // XEP-0490: Message Displayed Synchronization
