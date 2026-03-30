@@ -50,16 +50,16 @@ std::string channel_short_name(weechat::channel::chat_type type, std::string_vie
 
         // Well-known PEP node → append a readable hint.
         if (node == "urn:xmpp:microblog:0")
-            return fmt::format("{} (blog)", local);
+            return fmt::format("={} (blog)", local);
 
         // Named node (no ':' in it, e.g. "lunduke") → use the node name directly.
         if (node.find(':') == std::string_view::npos)
-            return std::string(node);
+            return fmt::format("={}", node);
 
         // Generic URN node → use the last ':'-delimited segment.
         auto colon = node.rfind(':');
         std::string_view suffix = node.substr(colon + 1);
-        return fmt::format("{} ({})", local, suffix);
+        return fmt::format("={} ({})", local, suffix);
     }
 
     const char prefix =
