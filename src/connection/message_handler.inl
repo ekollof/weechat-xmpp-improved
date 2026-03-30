@@ -2404,11 +2404,51 @@ message_handler_after_omemo:
                                     msg_text++; // Skip the tab
                                 else
                                     msg_text = orig_message;
-                                
+
+                                // Strip embedded color codes so we get plain text
+                                char *plain_text = weechat_string_remove_color(msg_text, nullptr);
+                                const char *clean_text = plain_text ? plain_text : msg_text;
+
+                                // Skip any leading reply prefix(es) (↪ …) from a prior reply chain.
+                                // UTF-8 encoding of ↪ is 3 bytes: e2 86 aa.
+                                // The rendered prefix format is "↪ <excerpt> " so we find the last
+                                // ↪ in the string and jump past it and its excerpt word(s).
+                                // Simpler: repeatedly consume "↪ <everything up to next ↪ or end>"
+                                // by scanning forward for the next ↪ occurrence.
+                                {
+                                    const char arrow[] = "\xE2\x86\xAA"; // ↪
+                                    const char *next = strstr(clean_text, arrow);
+                                    while (next)
+                                    {
+                                        // advance past this ↪ and look for another one
+                                        const char *after = next + 3;
+                                        while (*after == ' ') after++;
+                                        const char *further = strstr(after, arrow);
+                                        if (further)
+                                        {
+                                            // there is another ↪ ahead — skip to it
+                                            clean_text = further;
+                                            next = further;
+                                        }
+                                        else
+                                        {
+                                            // this was the last ↪; skip past its excerpt to the real body
+                                            // The excerpt ends at the space before the actual message.
+                                            // Our format: "↪ <excerpt> <body>" — excerpt has no trailing ↪.
+                                            // We can't reliably split excerpt from body here, so just
+                                            // use `after` as the start of content (skips "↪ ").
+                                            clean_text = after;
+                                            break;
+                                        }
+                                    }
+                                }
+
                                 // Create prefix showing what message this is replying to (max 40 chars)
-                                std::string excerpt = (strlen(msg_text) > 40)
-                                    ? std::string(msg_text, 40) + "..."
-                                    : std::string(msg_text);
+                                std::string excerpt = (strlen(clean_text) > 40)
+                                    ? std::string(clean_text, 40) + "..."
+                                    : std::string(clean_text);
+
+                                if (plain_text) free(plain_text);
                                 
                                 reply_prefix = std::string(weechat_color("cyan")) + 
                                              "↪ " + excerpt + " " +
