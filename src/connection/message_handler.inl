@@ -1326,11 +1326,6 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                 })).first->second;
     }
 
-    if (account.omemo && channel && channel->type == weechat::channel::chat_type::PM)
-    {
-        account.omemo.note_peer_traffic(account.context, channel->id);
-    }
-
     // XEP-0333 §5 Business Rules: MUST NOT send Displayed Markers for outgoing
     // messages we sent (received back via carbons or MAM).
     if (id && (markable || request) && !is_self_outbound_copy)
@@ -1442,7 +1437,19 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
         encrypted = xmpp_stanza_get_child_by_name_and_ns(
             stanza, "encrypted", "eu.siacs.conversations.axolotl");
     }
-    
+
+    // Record that this peer actively speaks OMEMO — but only for genuine
+    // inbound encrypted messages (not self-outbound copies or plaintext).
+    // This gate controls whether we will proactively fetch their devicelist
+    // and establish a session; widening it caused spurious OMEMO initiation
+    // toward contacts who send plaintext (the session was bootstrapped from
+    // MAM traffic rather than from an actual inbound OMEMO message).
+    if (account.omemo && encrypted && !is_self_outbound_copy
+        && channel && channel->type == weechat::channel::chat_type::PM)
+    {
+        account.omemo.note_peer_traffic(account.context, channel->id);
+    }
+
     x = xmpp_stanza_get_child_by_name_and_ns(stanza, "x", "jabber:x:encrypted");
     
     // XEP-0380: Explicit Message Encryption
