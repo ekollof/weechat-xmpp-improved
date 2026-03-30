@@ -2,226 +2,14 @@
 
 ![Xepher logo](assets/xepher.png)
 
-A WeeChat plugin written in C/C++23 that adds full XMPP support, including a
-comprehensive set of XEPs targeting CCS2022 compliance.
+Xepher is a WeeChat plugin written in C++23 that adds full XMPP support to
+WeeChat. It targets [XMPP Compliance Suite 2022 (XEP-0459)](https://xmpp.org/extensions/xep-0459.html)
+and implements a broad set of modern XEPs — including OMEMO encryption, Message
+Archive Management, HTTP file upload, microblogging via PubSub, and more.
 
 > **Fork of [bqv/weechat-xmpp](https://github.com/bqv/weechat-xmpp)**  
 > Original author: **Tony Olagbaiye** &lt;bqv@fron.io&gt;  
-> This fork is maintained at
-> [github.com/ekollof/xepher](https://github.com/ekollof/xepher)
-> and carries critical bug fixes, new XEP implementations, and ongoing
-> refactoring not yet merged upstream.
-
----
-
-## What's different in this fork
-
-### Bug fixes
-
-- **`/edit` in MUC rooms**: The picker showed "no message found to edit" even
-  immediately after sending a message. MUC messages are displayed when the
-  server echoes them back; the incoming message handler was not tagging those
-  lines with `self_msg`, so the picker could never find them. Fixed by
-  detecting the sender nick against `account.nickname()` in the receive path
-  and adding the tag there.
-- **Memory corruption**: Fixed `xmlDocDumpFormatMemory` misuse and unaligned
-  allocations that caused crashes.
-- **Segfault prevention**: Added comprehensive destructor safety checks to
-  prevent crashes on WeeChat exit.
-- **WeeChat 4.3.0+ compatibility**: Updated base64 API calls for newer WeeChat
-  while retaining backwards compatibility.
-- **MAM (Message Archive Management)**:
-  - Fixed IQ routing: PM queries were sent to the bare server domain instead of
-    the user's own bare JID, causing `<service-unavailable/>` errors on every
-    PM catchup.
-  - Fixed UTC timestamp parsing: `strptime` fills a UTC `struct tm` but
-    `mktime` was interpreting it as local time, shifting all timestamps.
-  - Fixed multi-page MAM results: the global discovery query stalled after the
-    first RSM page and never fetched newer messages.
-  - Fixed single-page / empty `<fin>` handling: a server-sent
-    `<fin complete='true'/>` with no `<set>` child left the query dangling.
-  - Fixed channel re-open suppression: a `-1` sentinel in LMDB prevented
-    auto-recreation of closed buffers, so MAM never ran for those channels.
-  - Enabled automatic MAM retrieval on connect (7-day history for PM channels).
-  - Full message caching with LMDB — instant display from cache, then fetch new
-    messages.
-  - RSM cursor is persisted across reconnects so re-fetching the same 7-day
-    history is skipped on reconnect.
-  - MAM deduplication guard prevents messages already shown live from appearing
-    again when MAM results arrive.
-- **Channel type detection**: Fixed PM vs MUC detection for proper message
-  handling.
-- **MUC occupant display**:
-  - Occupant `display_name` was always set to the full JID due to a pointer
-    comparison bug; now correctly shows the room nickname.
-  - Messages from MUC occupants always use the resource nick, never the full JID,
-    even when JID casing differs between presence and message stanzas.
-  - PM buffer opened from a MUC nick-click no longer shows MUC room history.
-  - Clicking a MUC nick to start a PM no longer triggers a Nickname Conflict
-    error (XEP-0045 §7.5).
-- **Reconnect stability**:
-  - Exponential backoff for reconnect attempts prevents hammering the server
-    after a disconnect.
-  - Resource is regenerated on `<conflict/>` to avoid infinite reconnect storms.
-  - OMEMO devicelist publish storm suppressed when sibling clients are present.
-
-### Display improvements
-
-- Messages show sender's bare JID instead of client resource (e.g.
-  `user@domain.org` instead of `Conversations.xxxx`).
-- Typing indicators show bare JID instead of resource in both the buffer and
-  the bar.
-- Encryption status indicator in the status bar (OMEMO / PGP / plaintext).
-- Message styling (XEP-0393): renders **bold**, _italic_, `code`,
-  ~~strikethrough~~, and quotes.
-- Reduced logging noise: debug-level log spam disabled by default.
-- OMEMO PM noise cleanup: high-frequency per-device status messages removed
-  while preserving actionable queue/error output.
-- Buffer sidebar prefixes: MUC room buffers are prefixed with `#` and PM
-  buffers with `@` so they can be distinguished at a glance in the buffer list.
-
-### OMEMO interoperability
-
-- Publishes both OMEMO:2 and legacy OMEMO:1 (axolotl) devicelist/bundle nodes
-  on connect and republish.
-- Per-device mode resolution (OMEMO:2 vs legacy) for bundle bootstrap and key
-  transport.
-- Suppresses repeated "no key for our device" spam once bootstrap is pending.
-- Prevents payloadless OMEMO key-transport stanzas from creating PM buffers.
-
-### New features
-
-| Feature | XEP |
-|---------|-----|
-| Stream Management | XEP-0198 |
-| Blocking Command (`/block`, `/unblock`, `/blocklist`) | XEP-0191 |
-| MUC Self-Ping (`/selfping`) | XEP-0410 |
-| Personal Eventing Protocol | XEP-0163 |
-| Direct MUC Invitations (`/invite`) | XEP-0249 |
-| The `/me` Command | XEP-0245 |
-| vcard-temp (`/whois`, `/setvcard`) | XEP-0054 |
-| vCard4 retrieval (`/whois`) | XEP-0292 |
-| MUC leave on `/close` | XEP-0045 |
-| XMPP Ping (`/ping`) | XEP-0199 |
-| Message Correction (`/edit` picker + `/edit-to`) | XEP-0308 |
-| Message Retraction (`/retract`) | XEP-0424 |
-| Message Moderation (`/moderate`) | XEP-0425 |
-| Message Styling | XEP-0393 |
-| Message Reactions (`/react`) | XEP-0444 |
-| Message Replies (`/reply`) | XEP-0461 |
-| Unique and Stable Stanza IDs | XEP-0359 |
-| Message Processing Hints | XEP-0334 |
-| Enhanced Chat State Notifications | XEP-0085 |
-| HTTP File Upload (`/upload`) | XEP-0363 |
-| File Metadata with image dimensions | XEP-0446 |
-| Stateless File Sharing (inline previews for Conversations / Dino / Gajim) | XEP-0447 |
-| User Mood (`/mood`) | XEP-0107 |
-| User Activity (`/activity`) | XEP-0108 |
-| PEP Native Bookmarks (`/bookmark`) | XEP-0402 |
-| In-Band Registration (`/account register`, `unregister`, `password`) | XEP-0077 |
-| PGP key persistence | — |
-| Encryption status bar item | — |
-| Buffer sidebar prefixes (`#` MUC / `@` PM) | — |
-| Roster management (`/roster`) | RFC 6121 |
-| Public room search (`/list`) | XEP-0433 |
-| PubSub feed reader (`/feed`) | XEP-0060 |
-| Microblogging post/reply/repeat/retract + subscribe/unsubscribe + comments (`/feed post`, `/feed reply`, `/feed repeat`, `/feed retract`, `/feed subscribe`, `/feed unsubscribe`, `/feed subscriptions`, `/feed comments`) | XEP-0277 / XEP-0472 |
-| Auto-discover server PubSub components (`/feed discover`, `/feed`) | XEP-0030 / XEP-0060 |
-| Entity Capability caching | XEP-0115 |
-| User Avatar (colored Unicode symbols) | XEP-0084 |
-| MUC status code handling | XEP-0045 |
-| Ad-hoc Commands (`/adhoc`) | XEP-0050 |
-| XHTML-IM rendering | XEP-0071 |
-| Message Displayed Synchronization | XEP-0490 / XEP-0283 |
-| References (`@mentions`) | XEP-0372 |
-| Message status glyphs (⌛ ✓ ✓✓) | XEP-0184 / XEP-0333 |
-| Link Metadata / previews | XEP-0511 |
-
-> **Known limitation:** Plugin reload while WeeChat is running is not
-> supported due to fundamental race conditions with timer hooks. Always
-> restart WeeChat instead of reloading the plugin.
-
----
-
-## XMPP Compliance (XEP-0459: CCS2022)
-
-### Core IM
-
-- ✅ XEP-0030: Service Discovery
-- ✅ XEP-0045: Multi-User Chat (core features)
-- ✅ XEP-0054: vcard-temp (retrieval via `/whois`, publishing via `/setvcard`)
-- ✅ XEP-0077: In-Band Registration (`/account register`, `unregister`, `password`)
-- ✅ XEP-0115: Entity Capabilities (persistent caching)
-- ✅ XEP-0163: Personal Eventing Protocol
-- ✅ XEP-0191: Blocking Command
-- ✅ XEP-0198: Stream Management
-
-### Advanced IM
-
-- ✅ XEP-0245: The `/me` Command
-- ✅ XEP-0249: Direct MUC Invitations
-- ✅ XEP-0308: Last Message Correction
-- ✅ XEP-0363: HTTP File Upload
-- ✅ XEP-0393: Message Styling
-- ✅ XEP-0410: MUC Self-Ping
-- ✅ XEP-0424: Message Retraction
-- ✅ XEP-0425: Message Moderation
-- ✅ XEP-0444: Message Reactions
-- ✅ XEP-0461: Message Replies
-
-### Additional implemented XEPs
-
-- ✅ XEP-0004: Data Forms (rendered in-buffer for Ad-Hoc Commands)
-- ✅ XEP-0048: Bookmark Storage (Private XML)
-- ✅ XEP-0049: Private XML Storage
-- ✅ XEP-0050: Ad-Hoc Commands
-- ✅ XEP-0059: Result Set Management (MAM paging)
-- ✅ XEP-0066: Out of Band Data
-- ✅ XEP-0071: XHTML-IM (bold, italic, underline, code, blockquotes, links, CSS colors)
-- ✅ XEP-0085: Chat State Notifications (all 5 states)
-- ✅ XEP-0092: Software Version
-- ✅ XEP-0107: User Mood
-- ✅ XEP-0108: User Activity
-- ✅ XEP-0153: vCard-Based Avatars (receive; publishing not yet implemented)
-- ✅ XEP-0172: User Nickname
-- ✅ XEP-0184: Message Delivery Receipts
-- ✅ XEP-0199: XMPP Ping
-- ✅ XEP-0202: Entity Time
-- ✅ XEP-0203: Delayed Delivery
-- ✅ XEP-0223: Persistent Storage of Private Data via PubSub
-- ✅ XEP-0224: Attention
-- ✅ XEP-0280: Message Carbons
-- ✅ XEP-0283: Moved (account migration notices)
-- ✅ XEP-0292: vCard4 Over XMPP (fetch via `/whois`; no publish support yet)
-- ✅ XEP-0297: Forwarded Messages
-- ✅ XEP-0300: Cryptographic Hash Functions
-- ✅ XEP-0313: Message Archive Management (with LMDB caching)
-- ✅ XEP-0319: Last User Interaction in Presence
-- ✅ XEP-0333: Chat Markers
-- ✅ XEP-0334: Message Processing Hints
-- ✅ XEP-0352: Client State Indication
-- ✅ XEP-0359: Unique and Stable Stanza IDs
-- ✅ XEP-0372: References
-- ✅ XEP-0380: Explicit Message Encryption
-- ✅ XEP-0382: Spoiler Messages
-- ✅ XEP-0384: OMEMO Encryption
-- ✅ XEP-0385: Stateless Inline Media Sharing
-- ✅ XEP-0392: Consistent Color Generation
-- ✅ XEP-0402: PEP Native Bookmarks
-- ✅ XEP-0422: Message Fastening
-- ✅ XEP-0428: Fallback Indication
-- ✅ XEP-0446: File Metadata Element (image dimensions sent with uploads)
-- ✅ XEP-0447: Stateless File Sharing (inline previews for Conversations/Dino/Gajim)
-- ✅ XEP-0490: Message Displayed Synchronization
-- ✅ XEP-0511: Link Metadata (incoming previews + outgoing OpenGraph)
-- ⚡ XEP-0277: Microblogging over XMPP (Deferred — publish/reply/retract via `/feed post|reply|retract`; receive PEP microblog push events; Atom metadata: title, author, categories, enclosures, geolocation, replies links; `/feed comments` fetches comments nodes)
-- ⚡ XEP-0472: Pubsub Social Feed (Experimental — publishes `pubsub#type=urn:xmpp:microblog:0`, advertises `urn:xmpp:pubsub-social-feed:1` in caps; `thr:in-reply-to@ref` uses real Atom entry IRI; feed-level `<feed>` metadata items rendered; XHTML/HTML Atom content properly rendered)
-- ⚡ XEP-0433: Extended Channel Search (Searcher role; Search Service role not implemented)
-
-### Planned
-
-- ⏳ XEP-0153: vCard-Based Avatars (publishing own avatar)
-- ⏳ XEP-0398: Avatar Conversion
+> Maintained at [github.com/ekollof/xepher](https://github.com/ekollof/xepher)
 
 ---
 
@@ -587,7 +375,7 @@ moderation stanza.
 
 ---
 
-### Microblogging — `/feed post`, `/feed reply`, `/feed repeat`, `/feed retract`, `/feed subscribe`, `/feed comments` (XEP-0277 / XEP-0472)
+### Microblogging — `/feed` (XEP-0277 / XEP-0472)
 
 Publish and interact with microblog posts on PubSub services such as
 [Movim](https://movim.eu/) and [Libervia/Salut-à-Toi](https://libervia.org/).
@@ -719,11 +507,6 @@ reporting `identity category='pubsub'` is remembered. You can then use:
 /feed discover               # list discovered services without fetching
 /feed discover --all         # fetch every node from every discovered service
 ```
-
-This means that if your server (e.g. `deimos.hackerheaven.org`) runs a pubsub
-gateway component (e.g. `pubsub.deimos.hackerheaven.org`), it will be found
-automatically and `/feed` will pull your subscriptions from it without you
-having to know the component JID in advance.
 
 ---
 
@@ -1044,6 +827,94 @@ See [`scripts/README.md`](scripts/README.md) for full configuration options.
 
 Pull requests and issues are welcome.  
 Please keep to the existing indentation style (C++23, clang-format enforced).
+
+---
+
+## XMPP Compliance (XEP-0459: CCS2022)
+
+### Core IM
+
+- ✅ XEP-0030: Service Discovery
+- ✅ XEP-0045: Multi-User Chat (core features)
+- ✅ XEP-0054: vcard-temp (retrieval via `/whois`, publishing via `/setvcard`)
+- ✅ XEP-0077: In-Band Registration (`/account register`, `unregister`, `password`)
+- ✅ XEP-0115: Entity Capabilities (persistent caching)
+- ✅ XEP-0163: Personal Eventing Protocol
+- ✅ XEP-0191: Blocking Command
+- ✅ XEP-0198: Stream Management
+
+### Advanced IM
+
+- ✅ XEP-0245: The `/me` Command
+- ✅ XEP-0249: Direct MUC Invitations
+- ✅ XEP-0308: Last Message Correction
+- ✅ XEP-0363: HTTP File Upload
+- ✅ XEP-0393: Message Styling
+- ✅ XEP-0410: MUC Self-Ping
+- ✅ XEP-0424: Message Retraction
+- ✅ XEP-0425: Message Moderation
+- ✅ XEP-0444: Message Reactions
+- ✅ XEP-0461: Message Replies
+
+### Additional implemented XEPs
+
+- ✅ XEP-0004: Data Forms (rendered in-buffer for Ad-Hoc Commands)
+- ✅ XEP-0048: Bookmark Storage (Private XML)
+- ✅ XEP-0049: Private XML Storage
+- ✅ XEP-0050: Ad-Hoc Commands
+- ✅ XEP-0059: Result Set Management (MAM paging)
+- ✅ XEP-0066: Out of Band Data
+- ✅ XEP-0071: XHTML-IM (bold, italic, underline, code, blockquotes, links, CSS colors)
+- ✅ XEP-0085: Chat State Notifications (all 5 states)
+- ✅ XEP-0092: Software Version
+- ✅ XEP-0107: User Mood
+- ✅ XEP-0108: User Activity
+- ✅ XEP-0153: vCard-Based Avatars (receive; publishing not yet implemented)
+- ✅ XEP-0172: User Nickname
+- ✅ XEP-0184: Message Delivery Receipts
+- ✅ XEP-0199: XMPP Ping
+- ✅ XEP-0202: Entity Time
+- ✅ XEP-0203: Delayed Delivery
+- ✅ XEP-0223: Persistent Storage of Private Data via PubSub
+- ✅ XEP-0224: Attention
+- ✅ XEP-0280: Message Carbons
+- ✅ XEP-0283: Moved (account migration notices)
+- ✅ XEP-0292: vCard4 Over XMPP (fetch via `/whois`; no publish support yet)
+- ✅ XEP-0297: Forwarded Messages
+- ✅ XEP-0300: Cryptographic Hash Functions
+- ✅ XEP-0313: Message Archive Management (with LMDB caching)
+- ✅ XEP-0319: Last User Interaction in Presence
+- ✅ XEP-0333: Chat Markers
+- ✅ XEP-0334: Message Processing Hints
+- ✅ XEP-0352: Client State Indication
+- ✅ XEP-0359: Unique and Stable Stanza IDs
+- ✅ XEP-0372: References
+- ✅ XEP-0380: Explicit Message Encryption
+- ✅ XEP-0382: Spoiler Messages
+- ✅ XEP-0384: OMEMO Encryption
+- ✅ XEP-0385: Stateless Inline Media Sharing
+- ✅ XEP-0392: Consistent Color Generation
+- ✅ XEP-0402: PEP Native Bookmarks
+- ✅ XEP-0422: Message Fastening
+- ✅ XEP-0428: Fallback Indication
+- ✅ XEP-0446: File Metadata Element (image dimensions sent with uploads)
+- ✅ XEP-0447: Stateless File Sharing (inline previews for Conversations/Dino/Gajim)
+- ✅ XEP-0490: Message Displayed Synchronization
+- ✅ XEP-0511: Link Metadata (incoming previews + outgoing OpenGraph)
+- ⚡ XEP-0277: Microblogging over XMPP (Deferred — publish/reply/retract via `/feed post|reply|retract`; receive PEP microblog push events; Atom metadata: title, author, categories, enclosures, geolocation, replies links; `/feed comments` fetches comments nodes)
+- ⚡ XEP-0472: Pubsub Social Feed (Experimental — publishes `pubsub#type=urn:xmpp:microblog:0`, advertises `urn:xmpp:pubsub-social-feed:1` in caps; `thr:in-reply-to@ref` uses real Atom entry IRI; feed-level `<feed>` metadata items rendered; XHTML/HTML Atom content properly rendered)
+- ⚡ XEP-0433: Extended Channel Search (Searcher role; Search Service role not implemented)
+
+### Planned
+
+- ⏳ XEP-0153: vCard-Based Avatars (publishing own avatar)
+- ⏳ XEP-0398: Avatar Conversion
+
+---
+
+> **Known limitation:** Plugin reload while WeeChat is running is not
+> supported due to fundamental race conditions with timer hooks. Always
+> restart WeeChat instead of reloading the plugin.
 
 ---
 
