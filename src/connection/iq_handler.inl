@@ -812,13 +812,20 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         int total_count = count_text ? std::atoi(count_text) : -1;
                         if (count_text) xmpp_free(account.context, count_text);
 
+                        // <last> is the newest item in this page; persist as reconnect
+                        // cursor so on the next session we fetch items after it (newer).
+                        xmpp_stanza_t *last_el = xmpp_stanza_get_child_by_name(rsm_set, "last");
+                        char *last_text = last_el ? xmpp_stanza_get_text(last_el) : nullptr;
+                        if (last_text)
+                        {
+                            std::string cursor_key = fmt::format("pubsub:{}", feed_key);
+                            account.mam_cursor_set(cursor_key, last_text);
+                            xmpp_free(account.context, last_text);
+                        }
+
                         if (first_text)
                         {
-                            // Persist cursor in LMDB so it survives reconnects
-                            std::string cursor_key = fmt::format("pubsub:{}", feed_key);
-                            account.mam_cursor_set(cursor_key, first_text);
-
-                            // Print a paging hint to the feed buffer
+                            // Print a paging hint to load older entries manually
                             std::string hint = fmt::format(
                                 "/feed {} {} --before {}",
                                 feed_service, node_name, first_text);

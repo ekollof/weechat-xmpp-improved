@@ -399,7 +399,10 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
             std::string cursor_key    = fmt::format("pubsub:{}", feed_key);
             std::string before_cursor = account.mam_cursor_get(cursor_key);
 
-            // Build pubsub items IQ with RSM <before> (mirrors command__feed logic)
+            // Build pubsub items IQ with RSM.
+            // If we have a saved cursor (= last seen item ID), use <after> to
+            // fetch only items newer than what we already have.
+            // If no cursor, use an empty <before/> to get the latest page.
             const int max_items = 20;
             std::array<xmpp_stanza_t *, 3> pub_children = {nullptr, nullptr, nullptr};
             pub_children[0] = stanza__iq_pubsub_items(account.context, nullptr,
@@ -416,16 +419,24 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
             xmpp_stanza_add_child(max_el, max_t); xmpp_stanza_release(max_t);
             xmpp_stanza_add_child(rset, max_el); xmpp_stanza_release(max_el);
 
-            xmpp_stanza_t *before_el = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_name(before_el, "before");
             if (!before_cursor.empty())
             {
-                xmpp_stanza_t *before_t = xmpp_stanza_new(account.context);
-                xmpp_stanza_set_text(before_t, before_cursor.c_str());
-                xmpp_stanza_add_child(before_el, before_t);
-                xmpp_stanza_release(before_t);
+                // Cursor present: fetch items newer than the last seen one
+                xmpp_stanza_t *after_el = xmpp_stanza_new(account.context);
+                xmpp_stanza_set_name(after_el, "after");
+                xmpp_stanza_t *after_t = xmpp_stanza_new(account.context);
+                xmpp_stanza_set_text(after_t, before_cursor.c_str());
+                xmpp_stanza_add_child(after_el, after_t);
+                xmpp_stanza_release(after_t);
+                xmpp_stanza_add_child(rset, after_el); xmpp_stanza_release(after_el);
             }
-            xmpp_stanza_add_child(rset, before_el); xmpp_stanza_release(before_el);
+            else
+            {
+                // No cursor: empty <before/> means "last page" (latest items)
+                xmpp_stanza_t *before_el = xmpp_stanza_new(account.context);
+                xmpp_stanza_set_name(before_el, "before");
+                xmpp_stanza_add_child(rset, before_el); xmpp_stanza_release(before_el);
+            }
             pub_children[1] = rset;
 
             pub_children[0] = stanza__iq_pubsub(account.context, nullptr, pub_children.data(),

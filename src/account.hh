@@ -218,7 +218,7 @@ namespace weechat
         struct pubsub_fetch_info {
             std::string service;       // pubsub service JID
             std::string node;          // node name
-            std::string before_cursor; // RSM <before> value ("" = latest page)
+            std::string before_cursor; // RSM cursor at send time (informational only; not used in result handler)
             int         max_items = 0; // max_items requested (0 = server default)
         };
         std::unordered_map<std::string, pubsub_fetch_info> pubsub_fetch_ids;
