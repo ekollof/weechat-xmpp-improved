@@ -293,9 +293,21 @@ int weechat::account::upload_fd_cb(const void *pointer, void *data, int fd)
         meta.filename     = ctx->filename;
         meta.content_type = ctx->content_type;
         meta.size         = ctx->file_size;
-        meta.sha256_hash  = ctx->sha256_hash;
+        meta.sha256_hash  = ctx->sha256_hash;  // plaintext hash (always computed)
         meta.width        = ctx->image_width;
         meta.height       = ctx->image_height;
+
+        // XEP-0448: attach encrypted file sharing info when available.
+        if (ctx->encrypted)
+        {
+            meta.esfs = weechat::channel::file_metadata::esfs_info{
+                ctx->esfs_key_b64,
+                ctx->esfs_iv_b64,
+                ctx->esfs_cipher_hash_b64,
+            };
+            // For encrypted uploads, use the original plaintext size in the <file> element.
+            meta.size = ctx->original_file_size;
+        }
 
         channel_it->second.send_message(
             channel_it->second.id,

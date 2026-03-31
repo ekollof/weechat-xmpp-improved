@@ -186,6 +186,16 @@ struct urn {
         struct domain_based_name { struct _1 : public xmlns { _1() : xmlns("urn:xmpp:domain-based-name:1") {} }; };
         struct dox { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:dox:0") {} }; };
         struct ephemeral { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:ephemeral:0") {} }; };
+        struct esfs { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:esfs:0") {} }; };
+        struct file {
+            struct metadata : public xmlns { metadata() : xmlns("urn:xmpp:file:metadata:0") {} };
+        };
+        struct sfs { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:sfs:0") {} }; };
+        struct ciphers {
+            struct aes_256_gcm_nopadding : public xmlns {
+                aes_256_gcm_nopadding() : xmlns("urn:xmpp:ciphers:aes-256-gcm-nopadding:0") {}
+            };
+        };
         struct eventlog : public xmlns { eventlog() : xmlns("urn:xmpp:eventlog") {} };
         struct extdisco { struct _2 : public xmlns { _2() : xmlns("urn:xmpp:extdisco:2") {} }; };
         struct features {

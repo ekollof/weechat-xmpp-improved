@@ -981,12 +981,78 @@ int weechat::channel::send_message(std::string to, std::string body,
         xmpp_stanza_t *sfs_sources = xmpp_stanza_new(account.context);
         xmpp_stanza_set_name(sfs_sources, "sources");
 
-        xmpp_stanza_t *url_data = xmpp_stanza_new(account.context);
-        xmpp_stanza_set_name(url_data, "url-data");
-        xmpp_stanza_set_ns(url_data, "http://jabber.org/protocol/url-data");
-        xmpp_stanza_set_attribute(url_data, "target", oob->c_str());
-        xmpp_stanza_add_child(sfs_sources, url_data);
-        xmpp_stanza_release(url_data);
+        if (file_meta->esfs)
+        {
+            // XEP-0448: Encrypted File Sharing — wrap the <url-data> inside
+            // <encrypted xmlns='urn:xmpp:esfs:0' cipher='urn:xmpp:ciphers:aes-256-gcm-nopadding:0'>
+            //   <key>…</key><iv>…</iv>
+            //   <hash xmlns='urn:xmpp:hashes:2' algo='sha-256'>…</hash>
+            //   <sources><url-data …/></sources>
+            // </encrypted>
+            xmpp_stanza_t *enc = xmpp_stanza_new(account.context);
+            xmpp_stanza_set_name(enc, "encrypted");
+            xmpp_stanza_set_ns(enc, "urn:xmpp:esfs:0");
+            xmpp_stanza_set_attribute(enc, "cipher",
+                "urn:xmpp:ciphers:aes-256-gcm-nopadding:0");
+
+            auto make_text_child = [&](xmpp_stanza_t *parent, const char *elem_name,
+                                       const char *ns, const char *text)
+            {
+                xmpp_stanza_t *el = xmpp_stanza_new(account.context);
+                xmpp_stanza_set_name(el, elem_name);
+                if (ns) xmpp_stanza_set_ns(el, ns);
+                xmpp_stanza_t *tx = xmpp_stanza_new(account.context);
+                xmpp_stanza_set_text(tx, text);
+                xmpp_stanza_add_child(el, tx);
+                xmpp_stanza_release(tx);
+                xmpp_stanza_add_child(parent, el);
+                xmpp_stanza_release(el);
+            };
+
+            make_text_child(enc, "key", nullptr,
+                            file_meta->esfs->key_b64.c_str());
+            make_text_child(enc, "iv",  nullptr,
+                            file_meta->esfs->iv_b64.c_str());
+
+            // <hash xmlns='urn:xmpp:hashes:2' algo='sha-256'>…</hash>
+            {
+                xmpp_stanza_t *hash_el = xmpp_stanza_new(account.context);
+                xmpp_stanza_set_name(hash_el, "hash");
+                xmpp_stanza_set_ns(hash_el, "urn:xmpp:hashes:2");
+                xmpp_stanza_set_attribute(hash_el, "algo", "sha-256");
+                xmpp_stanza_t *hash_tx = xmpp_stanza_new(account.context);
+                xmpp_stanza_set_text(hash_tx,
+                    file_meta->esfs->cipher_hash_b64.c_str());
+                xmpp_stanza_add_child(hash_el, hash_tx);
+                xmpp_stanza_release(hash_tx);
+                xmpp_stanza_add_child(enc, hash_el);
+                xmpp_stanza_release(hash_el);
+            }
+
+            // Inner <sources><url-data .../></sources>
+            xmpp_stanza_t *inner_sources = xmpp_stanza_new(account.context);
+            xmpp_stanza_set_name(inner_sources, "sources");
+            xmpp_stanza_t *url_data = xmpp_stanza_new(account.context);
+            xmpp_stanza_set_name(url_data, "url-data");
+            xmpp_stanza_set_ns(url_data, "http://jabber.org/protocol/url-data");
+            xmpp_stanza_set_attribute(url_data, "target", oob->c_str());
+            xmpp_stanza_add_child(inner_sources, url_data);
+            xmpp_stanza_release(url_data);
+            xmpp_stanza_add_child(enc, inner_sources);
+            xmpp_stanza_release(inner_sources);
+
+            xmpp_stanza_add_child(sfs_sources, enc);
+            xmpp_stanza_release(enc);
+        }
+        else
+        {
+            xmpp_stanza_t *url_data = xmpp_stanza_new(account.context);
+            xmpp_stanza_set_name(url_data, "url-data");
+            xmpp_stanza_set_ns(url_data, "http://jabber.org/protocol/url-data");
+            xmpp_stanza_set_attribute(url_data, "target", oob->c_str());
+            xmpp_stanza_add_child(sfs_sources, url_data);
+            xmpp_stanza_release(url_data);
+        }
 
         xmpp_stanza_add_child(file_sharing, sfs_sources);
         xmpp_stanza_release(sfs_sources);

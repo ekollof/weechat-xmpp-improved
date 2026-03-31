@@ -3069,13 +3069,55 @@ message_handler_after_omemo:
         // <sources><url-data xmlns='http://jabber.org/protocol/url-data' target='https://...'/>
         xmpp_stanza_t *sources = xmpp_stanza_get_child_by_name(fs, "sources");
         std::string sfs_url;
+        bool sfs_encrypted = false; // true when source is XEP-0448 encrypted
         if (sources)
         {
             for (xmpp_stanza_t *src = xmpp_stanza_get_children(sources);
-                 src && sfs_url.empty(); src = xmpp_stanza_get_next(src))
+                 src; src = xmpp_stanza_get_next(src))
             {
                 const char *sname = xmpp_stanza_get_name(src);
+                const char *sns   = xmpp_stanza_get_ns(src);
                 if (!sname) continue;
+
+                // XEP-0448: <encrypted xmlns='urn:xmpp:esfs:0'>
+                if (strcmp(sname, "encrypted") == 0 && sns
+                    && strcmp(sns, "urn:xmpp:esfs:0") == 0)
+                {
+                    // Extract key, iv, and inner url-data target.
+                    std::string esfs_key, esfs_iv, esfs_ct_url;
+                    xmpp_stanza_t *key_el = xmpp_stanza_get_child_by_name(src, "key");
+                    xmpp_stanza_t *iv_el  = xmpp_stanza_get_child_by_name(src, "iv");
+                    if (key_el) { char *t = xmpp_stanza_get_text(key_el); if (t) { esfs_key = t; xmpp_free(account.context, t); } }
+                    if (iv_el)  { char *t = xmpp_stanza_get_text(iv_el);  if (t) { esfs_iv  = t; xmpp_free(account.context, t); } }
+
+                    xmpp_stanza_t *inner_sources = xmpp_stanza_get_child_by_name(src, "sources");
+                    if (inner_sources)
+                    {
+                        for (xmpp_stanza_t *isrc = xmpp_stanza_get_children(inner_sources);
+                             isrc && esfs_ct_url.empty(); isrc = xmpp_stanza_get_next(isrc))
+                        {
+                            const char *iname = xmpp_stanza_get_name(isrc);
+                            if (iname && strcmp(iname, "url-data") == 0)
+                            {
+                                const char *target = xmpp_stanza_get_attribute(isrc, "target");
+                                if (target) esfs_ct_url = target;
+                            }
+                        }
+                    }
+
+                    if (!esfs_key.empty() && !esfs_iv.empty() && !esfs_ct_url.empty())
+                    {
+                        // Kick off background download + decrypt.
+                        esfs_start_download(esfs_ct_url, sfs_name, esfs_key, esfs_iv,
+                                            channel ? channel->buffer : account.buffer);
+                        sfs_encrypted = true;
+                        sfs_url = esfs_ct_url; // use ciphertext URL for dedup check
+                    }
+                    break; // prefer encrypted source
+                }
+
+                if (!sfs_url.empty()) continue; // already have a plain URL
+
                 if (strcmp(sname, "url-data") == 0)
                 {
                     const char *target = xmpp_stanza_get_attribute(src, "target");
@@ -3102,33 +3144,53 @@ message_handler_after_omemo:
 
         if (!sfs_url.empty())
         {
-            sims_suffix += std::string("\n") + weechat_color("cyan") + "[File: ";
-            if (!sfs_name.empty())
-                sims_suffix += sfs_name;
-            else
-                sims_suffix += sfs_url;
-
-            if (!sfs_mime.empty() || !sfs_size_str.empty())
+            if (sfs_encrypted)
             {
-                sims_suffix += " (";
-                if (!sfs_mime.empty())
-                    sims_suffix += sfs_mime;
-                if (!sfs_mime.empty() && !sfs_size_str.empty())
-                    sims_suffix += ", ";
+                // XEP-0448: show that we're downloading the encrypted file in the background.
+                sims_suffix += std::string("\n") + weechat_color("cyan") + "[Encrypted file: ";
+                sims_suffix += sfs_name.empty() ? "(unnamed)" : sfs_name;
                 if (!sfs_size_str.empty())
                 {
                     long long sz = std::stoll(sfs_size_str);
                     if (sz >= 1024 * 1024)
-                        sims_suffix += fmt::format("{:.1f} MB", sz / 1048576.0);
+                        sims_suffix += fmt::format(" ({:.1f} MB)", sz / 1048576.0);
                     else if (sz >= 1024)
-                        sims_suffix += fmt::format("{:.1f} KB", sz / 1024.0);
+                        sims_suffix += fmt::format(" ({:.1f} KB)", sz / 1024.0);
                     else
-                        sims_suffix += fmt::format("{} B", sz);
+                        sims_suffix += fmt::format(" ({} B)", sz);
                 }
-                sims_suffix += ")";
+                sims_suffix += " — downloading…]" + std::string(weechat_color("resetcolor"));
             }
-            sims_suffix += " " + sfs_url;
-            sims_suffix += "]" + std::string(weechat_color("resetcolor"));
+            else
+            {
+                sims_suffix += std::string("\n") + weechat_color("cyan") + "[File: ";
+                if (!sfs_name.empty())
+                    sims_suffix += sfs_name;
+                else
+                    sims_suffix += sfs_url;
+
+                if (!sfs_mime.empty() || !sfs_size_str.empty())
+                {
+                    sims_suffix += " (";
+                    if (!sfs_mime.empty())
+                        sims_suffix += sfs_mime;
+                    if (!sfs_mime.empty() && !sfs_size_str.empty())
+                        sims_suffix += ", ";
+                    if (!sfs_size_str.empty())
+                    {
+                        long long sz = std::stoll(sfs_size_str);
+                        if (sz >= 1024 * 1024)
+                            sims_suffix += fmt::format("{:.1f} MB", sz / 1048576.0);
+                        else if (sz >= 1024)
+                            sims_suffix += fmt::format("{:.1f} KB", sz / 1024.0);
+                        else
+                            sims_suffix += fmt::format("{} B", sz);
+                    }
+                    sims_suffix += ")";
+                }
+                sims_suffix += " " + sfs_url;
+                sims_suffix += "]" + std::string(weechat_color("resetcolor"));
+            }
         }
     }
 
@@ -3433,6 +3495,8 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash, 
         "urn:xmpp:order-by:1",
         // XEP-0466: Ephemeral Messages
         "urn:xmpp:ephemeral:0",
+        // XEP-0448: Encrypted File Sharing
+        "urn:xmpp:esfs:0",
     };
 
     std::vector<std::string> sorted_features;

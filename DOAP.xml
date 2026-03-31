@@ -654,6 +654,15 @@
 
     <implements>
       <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0448.html' />
+        <xmpp:status>partial</xmpp:status>
+        <xmpp:version>0.3.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Encrypted File Sharing (Experimental) - send: when uploading (/upload) to an OMEMO-enabled channel the file is AES-256-GCM encrypted before HTTP PUT; the XMPP message carries &lt;file-sharing xmlns='urn:xmpp:sfs:0'&gt;&lt;sources&gt;&lt;encrypted xmlns='urn:xmpp:esfs:0' cipher='urn:xmpp:ciphers:aes-256-gcm-nopadding:0'&gt;&lt;key&gt;…&lt;/key&gt;&lt;iv&gt;…&lt;/iv&gt;&lt;hash&gt;…&lt;/hash&gt;&lt;sources&gt;&lt;url-data/&gt;&lt;/sources&gt;&lt;/encrypted&gt;&lt;/sources&gt;&lt;/file-sharing&gt;; receive: &lt;encrypted xmlns='urn:xmpp:esfs:0'&gt; detected, ciphertext downloaded in background thread via libcurl, AES-256-GCM decrypted, saved to ~/Downloads; urn:xmpp:esfs:0 advertised in caps</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0277.html' />
         <xmpp:status>partial</xmpp:status>
         <xmpp:version>0.6.5</xmpp:version>

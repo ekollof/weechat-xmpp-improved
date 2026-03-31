@@ -1320,6 +1320,14 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 ctx->content_type  = content_type;
                 ctx->pipe_write_fd = pipe_fds[1];
 
+                // XEP-0448: If the destination channel has OMEMO active, encrypt the file
+                // before uploading so it arrives as an Encrypted File Share stanza.
+                {
+                    auto ch_it = account.channels.find(ctx->channel_id);
+                    if (ch_it != account.channels.end() && ch_it->second.omemo.enabled)
+                        ctx->encrypted = true;
+                }
+
                 // If this upload was triggered by an embed tag in a pending feed post,
                 // mark the context so upload_fd_cb routes to the feed-post path.
                 if (account.pending_feed_posts.count(id))
@@ -1491,15 +1499,190 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         }
                     } // dim_file closed here
 
-                    // Open a fresh handle for upload (avoids any seek/EOF state issues).
-                    upload_file_guard.reset(fopen(filepath_copy.c_str(), "rb"));
-                    upload_file = upload_file_guard.get();
-                    if (!upload_file)
+                    // XEP-0448: AES-256-GCM encryption for OMEMO-enabled channels.
+                    // When active: encrypt the plaintext file into a tmpfile, then
+                    // upload the ciphertext (+ 16-byte GCM auth tag) in its place.
+                    // The key, IV, and ciphertext hash are stored in the context for
+                    // the callback to embed in the <encrypted xmlns='urn:xmpp:esfs:0'> stanza.
+                    std::string esfs_tmpfile_path; // track tmp path for deletion
+                    if (c.encrypted)
                     {
-                        c.success    = false;
-                        c.curl_error = "failed to reopen file for upload";
-                        ::write(c.pipe_write_fd, "x", 1);
-                        return;
+                        c.original_file_size = static_cast<size_t>(file_size);
+
+                        // Generate 256-bit key and 96-bit (12-byte) IV.
+                        unsigned char aes_key[32] = {};
+                        unsigned char aes_iv[12]  = {};
+                        if (RAND_bytes(aes_key, sizeof(aes_key)) != 1
+                            || RAND_bytes(aes_iv, sizeof(aes_iv)) != 1)
+                        {
+                            c.success    = false;
+                            c.curl_error = "esfs: RAND_bytes failed for key/IV generation";
+                            ::write(c.pipe_write_fd, "x", 1);
+                            return;
+                        }
+
+                        // Base64-encode key and IV using OpenSSL BIO chain (RAII).
+                        auto b64_encode = [](const unsigned char *data, int len) -> std::string
+                        {
+                            std::unique_ptr<BIO, decltype(&BIO_free_all)>
+                                b(BIO_push(BIO_new(BIO_f_base64()),
+                                           BIO_new(BIO_s_mem())), BIO_free_all);
+                            BIO_set_flags(b.get(), BIO_FLAGS_BASE64_NO_NL);
+                            BIO_write(b.get(), data, len);
+                            BIO_flush(b.get());
+                            BUF_MEM *bptr;
+                            BIO_get_mem_ptr(b.get(), &bptr);
+                            return std::string(bptr->data, bptr->length);
+                        };
+                        c.esfs_key_b64 = b64_encode(aes_key, sizeof(aes_key));
+                        c.esfs_iv_b64  = b64_encode(aes_iv, sizeof(aes_iv));
+
+                        // Open plaintext source.
+                        auto file_deleter_enc = [](FILE *f) { if (f) fclose(f); };
+                        std::unique_ptr<FILE, decltype(file_deleter_enc)>
+                            pt_guard(fopen(filepath_copy.c_str(), "rb"), file_deleter_enc);
+                        if (!pt_guard)
+                        {
+                            c.success    = false;
+                            c.curl_error = "esfs: failed to open plaintext for encryption";
+                            ::write(c.pipe_write_fd, "x", 1);
+                            return;
+                        }
+
+                        // Create a secure temporary file for ciphertext.
+                        char tmp_tmpl[] = "/tmp/xepher-esfs-XXXXXX";
+                        int tmp_fd = mkstemp(tmp_tmpl);
+                        if (tmp_fd < 0)
+                        {
+                            c.success    = false;
+                            c.curl_error = "esfs: mkstemp failed";
+                            ::write(c.pipe_write_fd, "x", 1);
+                            return;
+                        }
+                        esfs_tmpfile_path = tmp_tmpl;
+
+                        // Wrap the raw fd in a FILE* (RAII via unique_ptr).
+                        std::unique_ptr<FILE, decltype(file_deleter_enc)>
+                            ct_guard(fdopen(tmp_fd, "wb"), file_deleter_enc);
+                        if (!ct_guard)
+                        {
+                            close(tmp_fd);
+                            ::unlink(esfs_tmpfile_path.c_str());
+                            c.success    = false;
+                            c.curl_error = "esfs: fdopen failed on tmpfile";
+                            ::write(c.pipe_write_fd, "x", 1);
+                            return;
+                        }
+
+                        // AES-256-GCM encryption using OpenSSL EVP.
+                        std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>
+                            enc_ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
+                        if (!enc_ctx
+                            || EVP_EncryptInit_ex(enc_ctx.get(), EVP_aes_256_gcm(),
+                                                  nullptr, nullptr, nullptr) != 1
+                            || EVP_CIPHER_CTX_ctrl(enc_ctx.get(), EVP_CTRL_GCM_SET_IVLEN,
+                                                   12, nullptr) != 1
+                            || EVP_EncryptInit_ex(enc_ctx.get(), nullptr,
+                                                  nullptr, aes_key, aes_iv) != 1)
+                        {
+                            ::unlink(esfs_tmpfile_path.c_str());
+                            c.success    = false;
+                            c.curl_error = "esfs: EVP init failed";
+                            ::write(c.pipe_write_fd, "x", 1);
+                            return;
+                        }
+
+                        // Initialize SHA-256 over ciphertext for later hash field.
+                        std::unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)>
+                            ct_sha_ctx(EVP_MD_CTX_new(), EVP_MD_CTX_free);
+                        EVP_DigestInit_ex(ct_sha_ctx.get(), EVP_sha256(), nullptr);
+
+                        unsigned char in_buf[8192];
+                        unsigned char out_buf[8192 + 16]; // EVP may expand by block size
+                        long ciphertext_len = 0;
+                        bool enc_ok = true;
+                        while (!feof(pt_guard.get()) && !ferror(pt_guard.get()))
+                        {
+                            size_t n = fread(in_buf, 1, sizeof(in_buf), pt_guard.get());
+                            if (n == 0) break;
+                            int out_len = 0;
+                            if (EVP_EncryptUpdate(enc_ctx.get(), out_buf, &out_len,
+                                                  in_buf, static_cast<int>(n)) != 1)
+                            {
+                                enc_ok = false;
+                                break;
+                            }
+                            if (out_len > 0)
+                            {
+                                EVP_DigestUpdate(ct_sha_ctx.get(), out_buf,
+                                                 static_cast<size_t>(out_len));
+                                fwrite(out_buf, 1, static_cast<size_t>(out_len), ct_guard.get());
+                                ciphertext_len += out_len;
+                            }
+                        }
+                        if (!enc_ok)
+                        {
+                            ::unlink(esfs_tmpfile_path.c_str());
+                            c.success    = false;
+                            c.curl_error = "esfs: EVP_EncryptUpdate failed";
+                            ::write(c.pipe_write_fd, "x", 1);
+                            return;
+                        }
+
+                        // Finalize encryption (no output for GCM).
+                        int final_len = 0;
+                        EVP_EncryptFinal_ex(enc_ctx.get(), out_buf, &final_len);
+                        if (final_len > 0)
+                        {
+                            EVP_DigestUpdate(ct_sha_ctx.get(), out_buf,
+                                             static_cast<size_t>(final_len));
+                            fwrite(out_buf, 1, static_cast<size_t>(final_len), ct_guard.get());
+                            ciphertext_len += final_len;
+                        }
+
+                        // Append 16-byte GCM authentication tag.
+                        unsigned char tag[16] = {};
+                        EVP_CIPHER_CTX_ctrl(enc_ctx.get(), EVP_CTRL_GCM_GET_TAG, 16, tag);
+                        EVP_DigestUpdate(ct_sha_ctx.get(), tag, sizeof(tag));
+                        fwrite(tag, 1, sizeof(tag), ct_guard.get());
+                        ciphertext_len += 16;
+
+                        // Hash of ciphertext (including tag).
+                        unsigned char ct_hash[EVP_MAX_MD_SIZE];
+                        unsigned int  ct_hash_len = 0;
+                        EVP_DigestFinal_ex(ct_sha_ctx.get(), ct_hash, &ct_hash_len);
+                        c.esfs_cipher_hash_b64 = b64_encode(ct_hash, static_cast<int>(ct_hash_len));
+
+                        // Flush + close tmp write handle; fopen again for reading.
+                        ct_guard.reset(); // closes fdopen'd FILE* (which closes tmp_fd)
+
+                        file_size = ciphertext_len;
+                        // Replace upload_file_guard with a read handle on the tmpfile.
+                        upload_file_guard.reset(fopen(esfs_tmpfile_path.c_str(), "rb"));
+                        upload_file = upload_file_guard.get();
+                        if (!upload_file)
+                        {
+                            ::unlink(esfs_tmpfile_path.c_str());
+                            c.success    = false;
+                            c.curl_error = "esfs: failed to reopen tmpfile for upload";
+                            ::write(c.pipe_write_fd, "x", 1);
+                            return;
+                        }
+                        // Update file_size in context for <file> metadata (ciphertext size).
+                        c.file_size = static_cast<size_t>(file_size);
+                    }
+                    else
+                    {
+                        // Open a fresh handle for upload (avoids any seek/EOF state issues).
+                        upload_file_guard.reset(fopen(filepath_copy.c_str(), "rb"));
+                        upload_file = upload_file_guard.get();
+                        if (!upload_file)
+                        {
+                            c.success    = false;
+                            c.curl_error = "failed to reopen file for upload";
+                            ::write(c.pipe_write_fd, "x", 1);
+                            return;
+                        }
                     }
 
                     // Initialize curl
@@ -1535,6 +1718,10 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                     curl_slist_free_all(headers);
                     curl_easy_cleanup(curl);
                     // upload_file_guard closes the file on scope exit; no manual fclose needed
+
+                    // XEP-0448: remove temporary ciphertext file after upload.
+                    if (!esfs_tmpfile_path.empty())
+                        ::unlink(esfs_tmpfile_path.c_str());
 
                     c.http_code = http_code;
                     c.get_url   = get_url_copy;

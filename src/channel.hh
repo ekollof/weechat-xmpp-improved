@@ -33,9 +33,20 @@ namespace weechat
             std::string filename;
             std::string content_type;
             size_t size;
-            std::string sha256_hash;  // Base64-encoded SHA-256
+            std::string sha256_hash;  // Base64-encoded SHA-256 of plaintext
             size_t width  = 0;        // Image width  in pixels (0 = unknown/non-image)
             size_t height = 0;        // Image height in pixels (0 = unknown/non-image)
+
+            // XEP-0448: Encrypted File Sharing — set when the upload was AES-256-GCM encrypted.
+            // When present, the <sources> element will contain an <encrypted xmlns='urn:xmpp:esfs:0'>
+            // child instead of a plain <url-data>.
+            struct esfs_info
+            {
+                std::string key_b64;          // Base64(32-byte AES-256-GCM key)
+                std::string iv_b64;           // Base64(12-byte GCM IV)
+                std::string cipher_hash_b64;  // Base64(SHA-256 of ciphertext incl. tag)
+            };
+            std::optional<esfs_info> esfs;    // non-empty iff encrypted upload
         };
 
         static const char *transport_name(enum transport transport)

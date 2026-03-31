@@ -118,6 +118,12 @@ namespace weechat
             // Non-empty when this upload belongs to a pending feed post (embed tag).
             // Set to the upload slot IQ id that originated this upload.
             std::string feed_post_upload_id;
+            // XEP-0448: Encrypted File Sharing fields (set when channel has OMEMO active)
+            bool encrypted = false;            // true when upload was AES-256-GCM encrypted
+            std::string esfs_key_b64;          // Base64(32-byte AES-256 key)
+            std::string esfs_iv_b64;           // Base64(12-byte GCM IV)
+            std::string esfs_cipher_hash_b64;  // Base64(SHA-256 of ciphertext)
+            size_t original_file_size = 0;     // plaintext file size for <file> metadata
         };
         // fd (read end) -> completion context
         std::unordered_map<int, std::shared_ptr<upload_completion>> pending_uploads;
