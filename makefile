@@ -4,6 +4,11 @@
 UNAME_S := $(shell uname -s)
 IS_CLANG := $(shell $(CXX) --version 2>/dev/null | grep -i clang)
 
+ifeq ($(UNAME_S),Darwin)
+HOMEBREW_PREFIX := $(shell brew --prefix 2>/dev/null || echo /opt/homebrew)
+export PKG_CONFIG_PATH := $(HOMEBREW_PREFIX)/lib/pkgconfig:$(PKG_CONFIG_PATH)
+endif
+
 ifdef DEBUG
 	DBGCFLAGS=-DDEBUG -fno-omit-frame-pointer -fsanitize=address #-fsanitize=undefined -fsanitize=leak
 ifeq ($(UNAME_S),Linux)
@@ -17,21 +22,29 @@ SHELL = /bin/sh
 RM ?= rm -f
 FIND ?= find
 
-INCLUDES=-Ilibstrophe -Ideps/lmdbxx -Ideps -Isrc -I. -I/usr/include/omemo/ \
+INCLUDES=-Ilibstrophe -Ideps/lmdbxx -Ideps -Isrc -I. \
 	 $(shell xml2-config --cflags) \
 	 $(shell pkg-config --cflags gpgme) \
 	 $(shell pkg-config --cflags libsignal-protocol-c) \
-		 $(shell pkg-config --cflags libomemo-c)
+	 $(shell pkg-config --cflags libomemo-c)
+ifeq ($(UNAME_S),Darwin)
+DWARF_FLAG := -g
+else
+DWARF_FLAG := -gdwarf-4
+endif
+
 CFLAGS+=$(DBGCFLAGS) \
 	-fno-omit-frame-pointer -fPIC \
 	-fvisibility=hidden -fvisibility-inlines-hidden \
 	-fdebug-prefix-map=.=$(CURDIR) \
-	-std=gnu99 -gdwarf-4 \
+	-std=gnu99 $(DWARF_FLAG) \
 	-Wall -Wextra -pedantic -Werror\
 	-Werror-implicit-function-declaration \
 	-Wno-missing-field-initializers \
-	-D_XOPEN_SOURCE=700 \
 	$(INCLUDES)
+ifeq ($(UNAME_S),Linux)
+CFLAGS+=-D_XOPEN_SOURCE=700
+endif
 ifeq ($(CC),clang)
 	CFLAGS+=
 else
@@ -40,7 +53,7 @@ endif
 CPPFLAGS+=$(DBGCFLAGS) \
 	  -fno-omit-frame-pointer -fPIC \
 	  -fvisibility=hidden -fvisibility-inlines-hidden \
-	  -std=c++23 -gdwarf-4 \
+	  -std=c++23 $(DWARF_FLAG) \
 	  -Wall -Wextra -pedantic -Werror \
 	  -Wno-missing-field-initializers \
 	  -Wno-variadic-macros \
@@ -56,7 +69,7 @@ else
 endif
 	 #-fuse-ld=mold
 LDFLAGS+=$(DBGLDFLAGS) \
-	 -std=c++23 -gdwarf-4 \
+	 -std=c++23 $(DWARF_FLAG) \
 	 $(DBGCFLAGS)
 LDLIBS=-lstrophe \
 	   -lpthread \
@@ -77,6 +90,12 @@ ifeq ($(UNAME_S),Linux)
 AS_NEEDED := -Wl,--as-needed
 else
 AS_NEEDED :=
+endif
+
+ifeq ($(UNAME_S),Darwin)
+SHARED_FLAG := -dynamiclib
+else
+SHARED_FLAG := -shared
 endif
 
 HDRS=src/plugin.hh \
@@ -163,7 +182,7 @@ all: depend
 weechat-xmpp: $(DEPS) xmpp.so
 
 xmpp.so: $(DEPS) $(OBJS) $(HDRS)
-	$(CXX) -shared $(LDFLAGS) -o $@ $(AS_NEEDED) $(OBJS) $(DEPS) $(LDLIBS)
+	$(CXX) $(SHARED_FLAG) $(LDFLAGS) -o $@ $(AS_NEEDED) $(OBJS) $(DEPS) $(LDLIBS)
 ifneq ($(OBJCOPY),)
 	git ls-files | xargs ls -d | xargs tar cz | $(OBJCOPY) --add-section .source=/dev/stdin xmpp.so
 endif

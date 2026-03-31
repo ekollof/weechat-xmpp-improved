@@ -1,17 +1,30 @@
 #!/usr/bin/env -S gmake test coverage
 # vim: set noexpandtab:
 
+ifeq ($(UNAME_S),Darwin)
+TEST_LDFLAGS := -Wl,-undefined,dynamic_lookup -Wl,-rpath,$(PWD)
+else
+TEST_LDFLAGS := -Wl,--allow-shlib-undefined -Wl,-rpath,$$PWD
+endif
+
 .PHONY: debug
+ifeq ($(UNAME_S),Darwin)
+debug: xmpp.so
+	@echo "debug target: use lldb on macOS"
+	env DYLD_INSERT_LIBRARIES=$(DEBUG) lldb -- \
+		weechat -a -P 'alias,buflist,exec,irc,relay' -r '/plugin load ./xmpp.so'
+else
 debug: xmpp.so
 	env LD_PRELOAD=$(DEBUG) gdb -ex "handle SIGPIPE nostop noprint pass" --args \
 		weechat -a -P 'alias,buflist,exec,irc,relay' -r '/plugin load ./xmpp.so'
+endif
 
 tests/xmpp.cov.so: $(COVS) $(DEPS) $(HDRS)
-	$(CXX) --coverage -shared $(LDFLAGS) -o tests/xmpp.cov.so $(AS_NEEDED) $(COVS) $(DEPS) $(LDLIBS)
+	$(CXX) --coverage $(SHARED_FLAG) $(LDFLAGS) -o tests/xmpp.cov.so $(AS_NEEDED) $(COVS) $(DEPS) $(LDLIBS)
 
 tests/run: $(COVS) tests/main.cc tests/xmpp.cov.so $(wildcard tests/*.inl)
 	cd tests && $(CXX) $(CPPFLAGS) $(LDFLAGS) -o run main.cc $(patsubst %,../%,$(DEPS)) $(LDLIBS) \
-		-Wl,--allow-shlib-undefined -Wl,-rpath,$$PWD $$PWD/xmpp.cov.so
+		$(TEST_LDFLAGS) $(PWD)/xmpp.cov.so
 
 .PHONY: test
 test: tests/run

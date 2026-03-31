@@ -206,6 +206,31 @@ case "$OS" in
         echo "Note: libsignal-protocol-c may need to be built from source on NetBSD."
         ;;
 
+    darwin)
+        echo "Installing dependencies for macOS (Homebrew)..."
+        brew install \
+            llvm \
+            make \
+            bison \
+            flex \
+            libstrophe \
+            libxml2 \
+            lmdb \
+            gpgme \
+            fmt \
+            curl \
+            openssl \
+            weechat
+        echo ""
+        echo "Note: libsignal-protocol-c and libomemo-c are not in Homebrew core."
+        echo "      Build them from source:"
+        echo "        https://github.com/signalapp/libsignal-protocol-c"
+        echo "        https://github.com/gkdr/libomemo-c"
+        echo ""
+        echo "After building and installing both libraries, run:"
+        echo "  gmake (or: make -f makefile)"
+        ;;
+
     *)
         echo "Unknown or unsupported distribution: $OS"
         echo ""
