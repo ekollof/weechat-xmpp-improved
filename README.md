@@ -383,6 +383,11 @@ XMPP microblogging is XMPP's equivalent of a federated social timeline — posts
 are Atom entries stored on PubSub nodes; contacts who subscribe to your
 `urn:xmpp:microblog:0` PEP node receive your posts in real-time.
 
+Feed content is rendered with full visual formatting: XHTML via the XEP-0071
+renderer, HTML stripped to plain text, and plain-text entries processed through
+a lightweight Markdown renderer (headings, bold, italic, inline code, fenced
+blocks, blockquotes, lists, links, images, strikethrough, horizontal rules).
+
 > **Note:** XEP-0277 is Deferred and XEP-0472 is Experimental. Server support
 > varies. Movim and Libervia implement the full stack; ejabberd supports the
 > underlying XEP-0060 mechanics.
