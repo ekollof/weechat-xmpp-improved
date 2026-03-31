@@ -201,6 +201,102 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
             return 1;
         }
 
+        // XEP-0452: MUC Mention Notifications
+        // The server sends a <message> containing:
+        //   <addresses xmlns='http://jabber.org/protocol/address'>
+        //     <address type='mentioned' jid='room@muc.example.com'/>
+        //   </addresses>
+        //   <forwarded xmlns='urn:xmpp:forward:0'>...the original groupchat message...</forwarded>
+        // Render the forwarded body to the MUC buffer with notify_highlight.
+        {
+            xmpp_stanza_t *mmn_addrs = xmpp_stanza_get_child_by_name_and_ns(
+                stanza, "addresses", "http://jabber.org/protocol/address");
+            if (mmn_addrs)
+            {
+                // Find <address type='mentioned'> child
+                std::string muc_jid;
+                for (xmpp_stanza_t *addr = xmpp_stanza_get_children(mmn_addrs);
+                     addr; addr = xmpp_stanza_get_next(addr))
+                {
+                    const char *addr_name = xmpp_stanza_get_name(addr);
+                    if (!addr_name || weechat_strcasecmp(addr_name, "address") != 0)
+                        continue;
+                    const char *addr_type = xmpp_stanza_get_attribute(addr, "type");
+                    if (!addr_type || weechat_strcasecmp(addr_type, "mentioned") != 0)
+                        continue;
+                    const char *addr_jid = xmpp_stanza_get_attribute(addr, "jid");
+                    if (addr_jid && *addr_jid)
+                    {
+                        muc_jid = addr_jid;
+                        break;
+                    }
+                }
+
+                if (!muc_jid.empty())
+                {
+                    xmpp_stanza_t *mmn_fwd = xmpp_stanza_get_child_by_name_and_ns(
+                        stanza, "forwarded", "urn:xmpp:forward:0");
+                    if (mmn_fwd)
+                    {
+                        xmpp_stanza_t *mmn_msg = xmpp_stanza_get_child_by_name(mmn_fwd, "message");
+                        xmpp_stanza_t *mmn_delay = xmpp_stanza_get_child_by_name_and_ns(
+                            mmn_fwd, "delay", "urn:xmpp:delay");
+                        if (mmn_msg)
+                        {
+                            // Ensure MUC channel exists (may not be joined)
+                            if (!account.channels.contains(muc_jid))
+                                account.channels.emplace(
+                                    std::make_pair(muc_jid, weechat::channel{
+                                        account, weechat::channel::chat_type::MUC,
+                                        muc_jid, muc_jid}));
+
+                            weechat::channel *muc_ch = &account.channels.at(muc_jid);
+                            struct t_gui_buffer *muc_buf = muc_ch->buffer;
+
+                            xmpp_stanza_t *mmn_body =
+                                xmpp_stanza_get_child_by_name(mmn_msg, "body");
+                            xmpp_string_guard mmn_body_text_g(account.context,
+                                mmn_body ? xmpp_stanza_get_text(mmn_body) : nullptr);
+                            const char *mmn_text = mmn_body_text_g.ptr;
+
+                            const char *mmn_from = xmpp_stanza_get_from(mmn_msg);
+                            xmpp_string_guard mmn_nick_g(account.context,
+                                mmn_from ? xmpp_jid_resource(account.context, mmn_from)
+                                         : nullptr);
+                            const char *mmn_nick = mmn_nick_g.ptr
+                                ? mmn_nick_g.ptr : "(unknown)";
+
+                            // Parse timestamp from <delay> if present
+                            time_t mmn_ts = 0;
+                            if (mmn_delay)
+                            {
+                                const char *stamp =
+                                    xmpp_stanza_get_attribute(mmn_delay, "stamp");
+                                if (stamp)
+                                {
+                                    struct tm mmn_tm = {};
+                                    strptime(stamp, "%FT%T", &mmn_tm);
+                                    mmn_ts = timegm(&mmn_tm);
+                                }
+                            }
+
+                            if (mmn_text && *mmn_text)
+                            {
+                                weechat_printf_date_tags(
+                                    muc_buf, mmn_ts,
+                                    "xmpp_message,notify_highlight,log1",
+                                    "%s%s\t%s",
+                                    weechat_prefix("action"),
+                                    mmn_nick,
+                                    mmn_text);
+                            }
+                        }
+                    }
+                    return 1;
+                }
+            }
+        }
+
         result = xmpp_stanza_get_child_by_name_and_ns(
             stanza, "result", "urn:xmpp:mam:2");
         if (result)

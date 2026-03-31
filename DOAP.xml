@@ -609,6 +609,15 @@
 
     <implements>
       <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0452.html' />
+        <xmpp:status>partial</xmpp:status>
+        <xmpp:version>0.1.1</xmpp:version>
+        <xmpp:note xml:lang='en'>MUC Mention Notifications (Experimental) - receive side: detects incoming notification messages containing &lt;addresses xmlns='http://jabber.org/protocol/address'&gt;&lt;address type='mentioned' jid='room@...'&gt;; extracts forwarded groupchat message and renders its body to the MUC buffer with notify_highlight so missed mentions are surfaced even when not present in the room; opt-in publish not yet implemented</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0277.html' />
         <xmpp:status>partial</xmpp:status>
         <xmpp:version>0.6.5</xmpp:version>
