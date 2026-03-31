@@ -19,8 +19,8 @@ int command__enter(const void *pointer, void *data,
                    struct t_gui_buffer *buffer, int argc,
                    char **argv, char **argv_eol)
 {
-    weechat::account *ptr_account = NULL;
-    weechat::channel *ptr_channel = NULL;
+    weechat::account *ptr_account = nullptr;
+    weechat::channel *ptr_channel = nullptr;
     const char *jid, *pres_jid, *text;
 
     (void) pointer;
@@ -43,7 +43,7 @@ int command__enter(const void *pointer, void *data,
     if (argc > 1)
     {
         int n_jid = 0;
-        char **jids = weechat_string_split(argv[1], ",", NULL, 0, 0, &n_jid);
+        char **jids = weechat_string_split(argv[1], ",", nullptr, 0, 0, &n_jid);
         for (int i = 0; i < n_jid; i++)
         {
             xmpp_string_guard jid_bare_g(ptr_account->context,
@@ -147,8 +147,8 @@ int command__open(const void *pointer, void *data,
                   struct t_gui_buffer *buffer, int argc,
                   char **argv, char **argv_eol)
 {
-    weechat::account *ptr_account = NULL;
-    weechat::channel *ptr_channel = NULL;
+    weechat::account *ptr_account = nullptr;
+    weechat::channel *ptr_channel = nullptr;
     xmpp_stanza_t *pres;
     char *jid, *text;
 
@@ -172,7 +172,7 @@ int command__open(const void *pointer, void *data,
     if (argc > 1)
     {
         int n_jid = 0;
-        char **jids = weechat_string_split(argv[1], ",", NULL, 0, 0, &n_jid);
+        char **jids = weechat_string_split(argv[1], ",", nullptr, 0, 0, &n_jid);
         for (int i = 0; i < n_jid; i++)
         {
             xmpp_string_guard bare_g(ptr_account->context,

@@ -12,7 +12,6 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstdint>
-#include <cstring>
 #include <ctime>
 #include <csignal>
 #include <exception>
@@ -29,6 +28,7 @@
 #include "buffer.hh"
 #include "completion.hh"
 #include "debug.hh"
+#include <fmt/core.h>
 
 #define WEECHAT_TIMER_INTERVAL_SEC 0.01
 #define WEECHAT_TIMER_SECONDS(IVL) (WEECHAT_TIMER_INTERVAL_SEC * IVL)
@@ -115,9 +115,8 @@ int nick_color_config_cb(const void *, void *, const char *, const char *)
                 for (int i = 0; i < tags_count; ++i)
                 {
                     // tags_array is a char** — index via "NNN|tags_array"
-                    char index_key[32];
-                    snprintf(index_key, sizeof(index_key), "%d|tags_array", i);
-                    const char *tag = weechat_hdata_string(hdata_ldata, ldata, index_key);
+                    auto index_key = fmt::format("{}|tags_array", i);
+                    const char *tag = weechat_hdata_string(hdata_ldata, ldata, index_key.c_str());
                     if (tag && std::string_view(tag).starts_with("nick_") && tag[5] != '\0')
                     {
                         nick_name = tag + 5;
@@ -261,7 +260,7 @@ void weechat::plugin::init(int argc, char *argv[])
     // lines tagged with xmpp_smart_filter.  Users can toggle it with
     //   /filter enable|disable xmpp_smart_filter_default
     // or remove it with /filter del xmpp_smart_filter_default
-    weechat_command(NULL,
+    weechat_command(nullptr,
                     "/filter add xmpp_smart_filter_default * xmpp_smart_filter *");
 }
 

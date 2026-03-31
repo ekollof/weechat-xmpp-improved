@@ -2,8 +2,8 @@ int command__mam(const void *pointer, void *data,
                  struct t_gui_buffer *buffer, int argc,
                  char **argv, char **argv_eol)
 {
-    weechat::account *ptr_account = NULL;
-    weechat::channel *ptr_channel = NULL;
+    weechat::account *ptr_account = nullptr;
+    weechat::channel *ptr_channel = nullptr;
     int days;
 
     (void) pointer;
@@ -122,7 +122,7 @@ int command__mam(const void *pointer, void *data,
     if (argc > 1)
     {
         errno = 0;
-        days = strtol(argv[1], NULL, 10);
+        days = strtol(argv[1], nullptr, 10);
 
         if (errno != 0)
         {
@@ -137,12 +137,12 @@ int command__mam(const void *pointer, void *data,
         days = MAM_DEFAULT_DAYS;
     
     // Calculate time range: (now - days) to now
-    end = time(NULL);
+    end = time(nullptr);
     start = end - (days * 24 * 60 * 60);
     
     xmpp_string_guard mam_uuid_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
     const char *mam_uuid = mam_uuid_g.ptr;
-    ptr_channel->fetch_mam(mam_uuid, &start, &end, NULL);
+    ptr_channel->fetch_mam(mam_uuid, &start, &end, nullptr);
     // freed by mam_uuid_g
 
     return WEECHAT_RC_OK;

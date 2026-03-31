@@ -61,8 +61,8 @@ int completion__channel_nicks_cb(const void *pointer, void *data,
     (void) data;
     (void) completion_item;
 
-    ptr_account = NULL;
-    ptr_channel = NULL;
+    ptr_account = nullptr;
+    ptr_channel = nullptr;
     buffer__get_account_and_channel(buffer, &ptr_account, &ptr_channel);
 
     if (ptr_channel)
@@ -132,12 +132,12 @@ void completion__init()
     weechat_hook_completion("nick",
                             N_("nicks of current buffer"),
                             &completion__channel_nicks_cb,
-                            NULL, NULL);
+                            nullptr, nullptr);
 
     weechat_hook_completion("xmpp_account",
                             N_("xmpp accounts"),
                             &completion__accounts_cb,
-                            NULL, NULL);
+                            nullptr, nullptr);
 
     option = weechat_config_get("weechat.completion.default_template");
     default_template = weechat_config_string(option);

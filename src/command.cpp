@@ -14,6 +14,9 @@
 #include <algorithm>
 #include <optional>
 #include <memory>
+#include <array>
+#include <fmt/core.h>
+#include <fmt/chrono.h>
 #include <weechat/weechat-plugin.h>
 
 #include "plugin.hh"
@@ -85,18 +88,18 @@ void command__init()
         " || disconnect %(xmpp_account)"
         " || reconnect %(xmpp_account)"
         " || delete %(xmpp_account)",
-        &command__account, NULL, NULL);
+        &command__account, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /account");
+        weechat_printf(nullptr, "Failed to setup command /account");
 
     hook = weechat_hook_command(
         "enter",
         N_("enter an xmpp multi-user-chat (muc)"),
         N_("<jid>"),
         N_("jid: muc to enter"),
-        NULL, &command__enter, NULL, NULL);
+        nullptr, &command__enter, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /enter");
+        weechat_printf(nullptr, "Failed to setup command /enter");
 
     // IRC-style alias for /enter
     hook = weechat_hook_command(
@@ -104,18 +107,18 @@ void command__init()
         N_("join an xmpp multi-user-chat (muc) - IRC alias for /enter"),
         N_("<jid>"),
         N_("jid: muc to join"),
-        NULL, &command__enter, NULL, NULL);
+        nullptr, &command__enter, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /join");
+        weechat_printf(nullptr, "Failed to setup command /join");
 
     hook = weechat_hook_command(
         "open",
         N_("open a direct xmpp chat"),
         N_("<jid>"),
         N_("jid: jid to target, or nick from the current muc"),
-        NULL, &command__open, NULL, NULL);
+        nullptr, &command__open, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /open");
+        weechat_printf(nullptr, "Failed to setup command /open");
 
     // IRC-style alias for /open
     hook = weechat_hook_command(
@@ -123,27 +126,27 @@ void command__init()
         N_("open a direct xmpp chat - IRC alias for /open"),
         N_("<jid> [<message>]"),
         N_("   jid: jid to target\nmessage: optional initial message"),
-        NULL, &command__open, NULL, NULL);
+        nullptr, &command__open, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /query");
+        weechat_printf(nullptr, "Failed to setup command /query");
 
     hook = weechat_hook_command(
         "msg",
         N_("send a xmpp message to the current buffer"),
         N_("<message>"),
         N_("message: message to send"),
-        NULL, &command__msg, NULL, NULL);
+        nullptr, &command__msg, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /msg");
+        weechat_printf(nullptr, "Failed to setup command /msg");
 
     hook = weechat_hook_command(
         "me",
         N_("send a xmpp action to the current buffer"),
         N_("<message>"),
         N_("message: message to send"),
-        NULL, &command__me, NULL, NULL);
+        nullptr, &command__me, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /me");
+        weechat_printf(nullptr, "Failed to setup command /me");
 
     hook = weechat_hook_command(
         "ephemeral",
@@ -151,9 +154,9 @@ void command__init()
         N_("<seconds> <message>"),
         N_("seconds: time in seconds before the message must be deleted\n"
            "message: message text to send"),
-        NULL, &command__ephemeral, NULL, NULL);
+        nullptr, &command__ephemeral, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /ephemeral");
+        weechat_printf(nullptr, "Failed to setup command /ephemeral");
 
     hook = weechat_hook_command(
         "notify",
@@ -164,27 +167,27 @@ void command__init()
            "\n"
            "Without arguments, shows the current setting for this buffer.\n"
            "Saves the preference into the XEP-0402 bookmark <extensions>."),
-        NULL, &command__notify, NULL, NULL);
+        nullptr, &command__notify, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /notify");
+        weechat_printf(nullptr, "Failed to setup command /notify");
 
     hook = weechat_hook_command(
         "invite",
         N_("invite a user to the current MUC room (XEP-0249)"),
         N_("<jid> [<reason>]"),
         N_("    jid: user to invite\n reason: optional invitation message"),
-        NULL, &command__invite, NULL, NULL);
+        nullptr, &command__invite, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /invite");
+        weechat_printf(nullptr, "Failed to setup command /invite");
 
     hook = weechat_hook_command(
         "selfping",
         N_("send a self-ping to verify MUC membership (XEP-0410)"),
         N_(""),
         N_("Send a ping to your own MUC nickname to verify you are still in the room"),
-        NULL, &command__selfping, NULL, NULL);
+        nullptr, &command__selfping, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /selfping");
+        weechat_printf(nullptr, "Failed to setup command /selfping");
 
     hook = weechat_hook_command(
         "mam",
@@ -203,9 +206,9 @@ void command__init()
         " || prefs default roster"
         " || prefs always %(jabber_jids)"
         " || prefs never %(jabber_jids)",
-        &command__mam, NULL, NULL);
+        &command__mam, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /mam");
+        weechat_printf(nullptr, "Failed to setup command /mam");
 
     hook = weechat_hook_command(
         "omemo",
@@ -244,9 +247,9 @@ void command__init()
         " || trust %(jabber_jids)"
           " || devices %(jabber_jids)"
           " || fetch %(jabber_jids)"
-          " || kex %(jabber_jids)", &command__omemo, NULL, NULL);
+          " || kex %(jabber_jids)", &command__omemo, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /omemo");
+        weechat_printf(nullptr, "Failed to setup command /omemo");
 
     hook = weechat_hook_command(
         "pgp",
@@ -255,81 +258,81 @@ void command__init()
         N_("keyid: recipient keyid (add key)\n"
            "status: show configured PGP keys\n"
            "reset: remove all configured PGP keys"),
-        "status || reset", &command__pgp, NULL, NULL);
+        "status || reset", &command__pgp, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /pgp");
+        weechat_printf(nullptr, "Failed to setup command /pgp");
 
     hook = weechat_hook_command(
         "plain",
         N_("set the current buffer to use no encryption"),
         N_(""),
         N_(""),
-        NULL, &command__plain, NULL, NULL);
+        nullptr, &command__plain, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /plain");
+        weechat_printf(nullptr, "Failed to setup command /plain");
 
     hook = weechat_hook_command(
         "block",
         N_("block one or more JIDs"),
         N_("<jid> [<jid>...]"),
         N_("jid: JID to block"),
-        NULL, &command__block, NULL, NULL);
+        nullptr, &command__block, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /block");
+        weechat_printf(nullptr, "Failed to setup command /block");
 
     hook = weechat_hook_command(
         "unblock",
         N_("unblock one or more JIDs (or all if no JID specified)"),
         N_("[<jid> [<jid>...]]"),
         N_("jid: JID to unblock (omit to unblock all)"),
-        NULL, &command__unblock, NULL, NULL);
+        nullptr, &command__unblock, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /unblock");
+        weechat_printf(nullptr, "Failed to setup command /unblock");
 
     hook = weechat_hook_command(
         "blocklist",
         N_("list all blocked JIDs"),
         N_(""),
         N_(""),
-        NULL, &command__blocklist, NULL, NULL);
+        nullptr, &command__blocklist, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /blocklist");
+        weechat_printf(nullptr, "Failed to setup command /blocklist");
 
     hook = weechat_hook_command(
         "xml",
         N_("send a raw xml stanza"),
         N_("<stanza>"),
         N_("stanza: xml to send"),
-        NULL, &command__xml, NULL, NULL);
+        nullptr, &command__xml, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /xml");
+        weechat_printf(nullptr, "Failed to setup command /xml");
 
     hook = weechat_hook_command(
         "xmpp",
         N_("get xmpp plugin version (see /help for general help)"),
         N_(""),
         N_(""),
-        NULL, &command__xmpp, NULL, NULL);
+        nullptr, &command__xmpp, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /xmpp");
+        weechat_printf(nullptr, "Failed to setup command /xmpp");
 
     hook = weechat_hook_command(
         "trap",
         N_("debug trap (int3)"),
         N_(""),
         N_(""),
-        NULL, &command__trap, NULL, NULL);
+        nullptr, &command__trap, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /trap");
+        weechat_printf(nullptr, "Failed to setup command /trap");
 
     hook = weechat_hook_command(
         "ping",
         N_("send an xmpp ping"),
         N_("[jid]"),
         N_("jid: optional target jid (defaults to current channel or server)"),
-        NULL, &command__ping, NULL, NULL);
+        nullptr, &command__ping, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /ping");
+        weechat_printf(nullptr, "Failed to setup command /ping");
 
     hook = weechat_hook_command(
         "mood",
@@ -343,9 +346,9 @@ void command__init()
            "  /mood excited Working on a cool project!\n"
            "  /mood tired\n"
            "  /mood (clears mood)"),
-        NULL, &command__mood, NULL, NULL);
+        nullptr, &command__mood, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /mood");
+        weechat_printf(nullptr, "Failed to setup command /mood");
 
     hook = weechat_hook_command(
         "activity",
@@ -364,9 +367,9 @@ void command__init()
            "  /activity (clears activity)\n\n"
            "Categories: doing_chores, drinking, eating, exercising, grooming,\n"
            "            having_appointment, inactive, relaxing, talking, traveling, working"),
-        NULL, &command__activity, NULL, NULL);
+        nullptr, &command__activity, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /activity");
+        weechat_printf(nullptr, "Failed to setup command /activity");
 
     hook = weechat_hook_command(
         "edit",
@@ -380,9 +383,9 @@ void command__init()
            "Examples:\n"
            "  /edit                    open picker to choose which message to edit\n"
            "  /edit corrected text     immediately replace your last message"),
-        NULL, &command__edit, NULL, NULL);
+        nullptr, &command__edit, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /edit");
+        weechat_printf(nullptr, "Failed to setup command /edit");
 
     hook = weechat_hook_command(
         "edit-to",
@@ -392,9 +395,9 @@ void command__init()
            "message: new message text\n\n"
            "This command is used internally by the /edit picker.\n"
            "You can also use it directly if you know the message ID."),
-        NULL, &command__edit_to, NULL, NULL);
+        nullptr, &command__edit_to, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /edit-to");
+        weechat_printf(nullptr, "Failed to setup command /edit-to");
 
     hook = weechat_hook_command(
         "retract",
@@ -403,9 +406,9 @@ void command__init()
         N_("Retracts the last message you sent in the current buffer.\n"
            "This sends a retraction request to all recipients.\n"
            "Note: Recipients may have already seen the message."),
-        NULL, &command__retract, NULL, NULL);
+        nullptr, &command__retract, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /retract");
+        weechat_printf(nullptr, "Failed to setup command /retract");
 
     hook = weechat_hook_command(
         "react",
@@ -417,9 +420,9 @@ void command__init()
            "  /react 👍\n"
            "  /react ❤️\n"
            "  /react 😂"),
-        NULL, &command__react, NULL, NULL);
+        nullptr, &command__react, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /react");
+        weechat_printf(nullptr, "Failed to setup command /react");
 
     hook = weechat_hook_command(
         "reply",
@@ -433,9 +436,9 @@ void command__init()
            "  /reply                : open picker\n"
            "  /reply Thanks!\n"
            "  /reply I agree with that"),
-        NULL, &command__reply, NULL, NULL);
+        nullptr, &command__reply, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /reply");
+        weechat_printf(nullptr, "Failed to setup command /reply");
 
     hook = weechat_hook_command(
         "reply-to",
@@ -445,9 +448,9 @@ void command__init()
            "message: your reply text\n\n"
            "This command is used internally by the /reply picker.\n"
            "You can also use it directly if you know the message ID."),
-        NULL, &command__reply_to, NULL, NULL);
+        nullptr, &command__reply_to, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /reply-to");
+        weechat_printf(nullptr, "Failed to setup command /reply-to");
 
     hook = weechat_hook_command(
         "moderate",
@@ -462,9 +465,9 @@ void command__init()
            "  /moderate\n"
            "  /moderate Spam message\n"
            "  /moderate Violates community guidelines"),
-        NULL, &command__moderate, NULL, NULL);
+        nullptr, &command__moderate, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /moderate");
+        weechat_printf(nullptr, "Failed to setup command /moderate");
 
     hook = weechat_hook_command(
         "disco",
@@ -478,9 +481,9 @@ void command__init()
            "  /disco conference.example.org - query a specific service\n"
            "  /disco items                  - list items/nodes on server\n"
            "  /disco items pubsub.example.org - list PubSub nodes on a service"),
-        "items", &command__disco, NULL, NULL);
+        "items", &command__disco, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /disco");
+        weechat_printf(nullptr, "Failed to setup command /disco");
 
     hook = weechat_hook_command(
         "roster",
@@ -491,9 +494,9 @@ void command__init()
            "  del : remove contact from roster (also: delete, remove)\n"
            "  jid : Jabber ID of the contact\n"
            " name : optional display name for the contact"),
-        "add|del|delete|remove", &command__roster, NULL, NULL);
+        "add|del|delete|remove", &command__roster, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /roster");
+        weechat_printf(nullptr, "Failed to setup command /roster");
     
     hook = weechat_hook_command(
         "bookmark",
@@ -512,9 +515,9 @@ void command__init()
            "  /bookmark add room@conference.example.com My Room\n"
            "  /bookmark del room@conference.example.com\n"
            "  /bookmark autojoin room@conference.example.com on"),
-        "add|del|delete|remove|autojoin", &command__bookmark, NULL, NULL);
+        "add|del|delete|remove|autojoin", &command__bookmark, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /bookmark");
+        weechat_printf(nullptr, "Failed to setup command /bookmark");
     
     hook = weechat_hook_command(
         "list",
@@ -531,9 +534,9 @@ void command__init()
            "  /list xmpp                       : search for rooms about XMPP\n"
            "  /list linux gaming               : search for linux gaming rooms\n"
            "  /list api@search.jabber.network xmpp : use specific search service"),
-        NULL, &command__list, NULL, NULL);
+        nullptr, &command__list, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /list");
+        weechat_printf(nullptr, "Failed to setup command /list");
 
     hook = weechat_hook_command(
         "upload",
@@ -544,18 +547,18 @@ void command__init()
            "The picker tries GUI dialogs (zenity/kdialog) when X11/Wayland is detected,\n"
            "falls back to fzf in terminal, or prompts for manual entry.\n\n"
            "The file will be uploaded to the server and a URL will be sent in the chat."),
-        "%(filename)", &command__upload, NULL, NULL);
+        "%(filename)", &command__upload, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /upload");
+        weechat_printf(nullptr, "Failed to setup command /upload");
 
     hook = weechat_hook_command(
         "whois",
         N_("get vCard information about an XMPP user (XEP-0054)"),
         N_("[<jid>]"),
         N_("jid: user JID to query (uses current PM channel if not specified)"),
-        NULL, &command__whois, NULL, NULL);
+        nullptr, &command__whois, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /whois");
+        weechat_printf(nullptr, "Failed to setup command /whois");
 
     hook = weechat_hook_command(
         "setvcard",
@@ -569,9 +572,9 @@ void command__init()
            "Note: only the specified field is sent; other fields are unaffected on\n"
            "      the server only if the server merges — most servers replace the\n"
            "      entire vCard, so run /whois on yourself first to see current values."),
-        "fn|nickname|email|url|desc|org|title|tel|bday|note", &command__setvcard, NULL, NULL);
+        "fn|nickname|email|url|desc|org|title|tel|bday|note", &command__setvcard, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /setvcard");
+        weechat_printf(nullptr, "Failed to setup command /setvcard");
 
     hook = weechat_hook_command(
         "setavatar",
@@ -584,9 +587,9 @@ void command__init()
            "Example:\n"
            "  /setavatar /home/alice/photo.png\n"
            "  /setavatar ~/pictures/avatar.jpg"),
-        NULL, &command__setavatar, NULL, NULL);
+        nullptr, &command__setavatar, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /setavatar");
+        weechat_printf(nullptr, "Failed to setup command /setavatar");
 
     hook = weechat_hook_command(
         "buzz",
@@ -595,9 +598,9 @@ void command__init()
         N_("Sends an attention request to the contact in the current PM channel.\n"
            "This is the XMPP equivalent of a 'buzz' or 'nudge'.\n"
            "Note: can only be used in PM channels, not MUC rooms."),
-        NULL, &command__buzz, NULL, NULL);
+        nullptr, &command__buzz, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /buzz");
+        weechat_printf(nullptr, "Failed to setup command /buzz");
 
     hook = weechat_hook_command(
         "spoiler",
@@ -611,9 +614,9 @@ void command__init()
            "  /spoiler The butler did it.\n"
            "  /spoiler Movie ending: The hero sacrifices himself.\n"
            "  /spoiler TW: violence: The scene is quite graphic."),
-        NULL, &command__spoiler, NULL, NULL);
+        nullptr, &command__spoiler, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /spoiler");
+        weechat_printf(nullptr, "Failed to setup command /spoiler");
 
     hook = weechat_hook_command(
         "adhoc",
@@ -633,9 +636,9 @@ void command__init()
            "  /adhoc example.com http://jabber.org/protocol/admin#get-active-users\n"
            "  /adhoc example.com http://jabber.org/protocol/admin#change-user-password"
            " abc123 username=bob password=newpass"),
-        NULL, &command__adhoc, NULL, NULL);
+        nullptr, &command__adhoc, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /adhoc");
+        weechat_printf(nullptr, "Failed to setup command /adhoc");
 
     hook = weechat_hook_command(
         "kick",
@@ -647,9 +650,9 @@ void command__init()
            "Examples:\n"
            "  /kick annoyinguser\n"
            "  /kick spammer Repeatedly posting spam"),
-        NULL, &command__kick, NULL, NULL);
+        nullptr, &command__kick, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /kick");
+        weechat_printf(nullptr, "Failed to setup command /kick");
 
     hook = weechat_hook_command(
         "ban",
@@ -661,9 +664,9 @@ void command__init()
            "Examples:\n"
            "  /ban bad@example.com\n"
            "  /ban troll@example.com Persistent harassment"),
-        NULL, &command__ban, NULL, NULL);
+        nullptr, &command__ban, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /ban");
+        weechat_printf(nullptr, "Failed to setup command /ban");
 
     hook = weechat_hook_command(
         "topic",
@@ -673,9 +676,9 @@ void command__init()
            "Examples:\n"
            "  /topic Welcome to #general!\n"
            "  /topic"),
-        NULL, &command__topic, NULL, NULL);
+        nullptr, &command__topic, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /topic");
+        weechat_printf(nullptr, "Failed to setup command /topic");
 
     hook = weechat_hook_command(
         "nick",
@@ -684,9 +687,9 @@ void command__init()
         N_("newnick: new nickname to use (shows current nick if omitted)\n\n"
            "Examples:\n"
            "  /nick mynewnick"),
-        NULL, &command__muc_nick, NULL, NULL);
+        nullptr, &command__muc_nick, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /nick");
+        weechat_printf(nullptr, "Failed to setup command /nick");
 
     hook = weechat_hook_command(
         "feed",
@@ -755,9 +758,9 @@ void command__init()
            "  /feed unsubscribe news.movim.eu Phoronix       (unsubscribe from node)\n"
            "  /feed subscriptions news.movim.eu              (list subscriptions)"),
         "discover||post||reply||comments||repeat||retract||subscribe||unsubscribe||subscriptions",
-        &command__feed, NULL, NULL);
+        &command__feed, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /feed");
+        weechat_printf(nullptr, "Failed to setup command /feed");
 
     // Internal hidden command used by picker key bindings.
     // Not listed in /help — the leading space makes WeeChat treat it as internal.
@@ -768,7 +771,7 @@ void command__init()
         N_("Internal command dispatched by per-buffer key bindings in the picker UI.\n"
            "Not intended for direct user invocation."),
         "up|down|enter|quit",
-        &weechat::ui::picker_nav_cb, NULL, NULL);
+        &weechat::ui::picker_nav_cb, nullptr, nullptr);
     if (!hook)
-        weechat_printf(NULL, "Failed to setup command /xmpp-picker-nav");
+        weechat_printf(nullptr, "Failed to setup command /xmpp-picker-nav");
 }

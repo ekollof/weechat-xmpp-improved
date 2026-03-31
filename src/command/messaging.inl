@@ -2,8 +2,8 @@ int command__msg(const void *pointer, void *data,
                  struct t_gui_buffer *buffer, int argc,
                  char **argv, char **argv_eol)
 {
-    weechat::account *ptr_account = NULL;
-    weechat::channel *ptr_channel = NULL;
+    weechat::account *ptr_account = nullptr;
+    weechat::channel *ptr_channel = nullptr;
     xmpp_stanza_t *message;
     char *text;
 
@@ -39,7 +39,7 @@ int command__msg(const void *pointer, void *data,
 
         message = xmpp_message_new(ptr_account->context,
                                    ptr_channel->type == weechat::channel::chat_type::MUC ? "groupchat" : "chat",
-                                   ptr_channel->name.data(), NULL);
+                                   ptr_channel->name.data(), nullptr);
         xmpp_message_set_body(message, text);
         ptr_account->connection.send( message);
         xmpp_stanza_release(message);
@@ -58,8 +58,8 @@ int command__me(const void *pointer, void *data,
                 struct t_gui_buffer *buffer, int argc,
                 char **argv, char **argv_eol)
 {
-    weechat::account *ptr_account = NULL;
-    weechat::channel *ptr_channel = NULL;
+    weechat::account *ptr_account = nullptr;
+    weechat::channel *ptr_channel = nullptr;
 
     (void) pointer;
     (void) data;
@@ -100,8 +100,8 @@ int command__invite(const void *pointer, void *data,
                     struct t_gui_buffer *buffer, int argc,
                     char **argv, char **argv_eol)
 {
-    weechat::account *ptr_account = NULL;
-    weechat::channel *ptr_channel = NULL;
+    weechat::account *ptr_account = nullptr;
+    weechat::channel *ptr_channel = nullptr;
 
     (void) pointer;
     (void) data;
@@ -141,7 +141,7 @@ int command__invite(const void *pointer, void *data,
     const char *reason = argc > 2 ? argv_eol[2] : nullptr;
 
     // Build invitation message using XEP-0249
-    xmpp_stanza_t *message = xmpp_message_new(ptr_account->context, NULL, invitee_jid, NULL);
+    xmpp_stanza_t *message = xmpp_message_new(ptr_account->context, nullptr, invitee_jid, nullptr);
     
     xmpp_stanza_t *x = xmpp_stanza_new(ptr_account->context);
     xmpp_stanza_set_name(x, "x");

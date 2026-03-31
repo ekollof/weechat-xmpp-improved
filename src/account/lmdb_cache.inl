@@ -5,7 +5,7 @@ void weechat::account::mam_cache_init()
             std::shared_ptr<char> eval_path(
                 weechat_string_eval_expression(
                     fmt::format("${{weechat_data_dir}}/xmpp/mam_{}.db", name.data()).data(),
-                    NULL, NULL, NULL),
+                    nullptr, nullptr, nullptr),
                 &free);
             mam_db_path = eval_path.get();
         }
@@ -32,7 +32,7 @@ void weechat::account::mam_cache_init()
         // Load capability cache from database
         caps_cache_load();
     } catch (const lmdb::error& ex) {
-        weechat_printf(NULL, "%sxmpp: MAM cache init failed - %s",
+        weechat_printf(nullptr, "%sxmpp: MAM cache init failed - %s",
                       weechat_prefix("error"), ex.what());
     }
 }
@@ -48,7 +48,7 @@ void weechat::account::mam_cache_cleanup()
             mam_db_env = nullptr;
         }
     } catch (const lmdb::error& ex) {
-        weechat_printf(NULL, "%sxmpp: MAM cache cleanup failed - %s",
+        weechat_printf(nullptr, "%sxmpp: MAM cache cleanup failed - %s",
                       weechat_prefix("error"), ex.what());
     }
 }
@@ -94,7 +94,7 @@ void weechat::account::mam_cache_retract_message(const std::string& channel_jid,
         std::string key = fmt::format("{}:{}", channel_jid, message_id);
         
         // Value: just a marker (timestamp when retracted)
-        time_t now = time(NULL);
+        time_t now = time(nullptr);
         
         MDB_val k = {key.size(), (void*)key.data()};
         MDB_val v = {sizeof(now), &now};

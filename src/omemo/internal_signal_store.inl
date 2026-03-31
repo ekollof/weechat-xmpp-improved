@@ -886,7 +886,7 @@ void remove_prefixed_keys(omemo &self, std::string_view prefix)
     std::vector<std::string> device_ids;
     if (!items)
     {
-        weechat_printf(nullptr, "%somemo: extract_devices: items stanza is NULL", weechat_prefix("error"));
+        weechat_printf(nullptr, "%somemo: extract_devices: items stanza is nullptr", weechat_prefix("error"));
         return device_ids;
     }
 

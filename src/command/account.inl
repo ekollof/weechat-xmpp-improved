@@ -510,15 +510,14 @@ static void ibr_register(const char *account_name, const char *jid, const char *
 
     // Drive the event loop from a periodic WeeChat timer (10 ms ticks).
     // Transfer ownership to the timer callback — it will delete st when done.
-    ibr_state *st_raw = st.release();
-    st_raw->timer_hook = weechat_hook_timer(10, 0, 0, ibr_timer_cb, st_raw, nullptr);
-    if (!st_raw->timer_hook) {
+    st->timer_hook = weechat_hook_timer(10, 0, 0, ibr_timer_cb, st.get(), nullptr);
+    if (!st->timer_hook) {
         weechat_printf(buffer,
                        _("%s%s: IBR: failed to register timer hook"),
                        weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
-        delete st_raw;
-        return;
+        return; // st destroyed by unique_ptr on scope exit
     }
+    st.release(); // ownership transferred to timer callback
 }
 
 void command__account_register(struct t_gui_buffer *buffer, int argc, char **argv)

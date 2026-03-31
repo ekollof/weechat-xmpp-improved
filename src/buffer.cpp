@@ -62,8 +62,8 @@ char *buffer__encryption_bar_cb(const void *pointer, void *data,
     (void) window;
     (void) extra_info;
 
-    account = NULL;
-    channel = NULL;
+    account = nullptr;
+    channel = nullptr;
 
     buffer__get_account_and_channel(buffer, &account, &channel);
 
@@ -173,7 +173,7 @@ int buffer__nickcmp_cb(const void *pointer, void *data,
     if (pointer)
         account = (weechat::account *)pointer;
     else
-        buffer__get_account_and_channel(buffer, &account, NULL);
+        buffer__get_account_and_channel(buffer, &account, nullptr);
 
     if (account)
     {
@@ -188,9 +188,9 @@ int buffer__nickcmp_cb(const void *pointer, void *data,
 int buffer__close_cb(const void *pointer, void *data,
                      struct t_gui_buffer *buffer)
 {
-    struct t_weechat_plugin *buffer_plugin = NULL;
-    weechat::account *ptr_account = NULL;
-    weechat::channel *ptr_channel = NULL;
+    struct t_weechat_plugin *buffer_plugin = nullptr;
+    weechat::account *ptr_account = nullptr;
+    weechat::channel *ptr_channel = nullptr;
 
     (void) pointer;
     (void) data;
@@ -215,7 +215,7 @@ int buffer__close_cb(const void *pointer, void *data,
                 ptr_account->disconnect(0);
             }
 
-            ptr_account->buffer = NULL;
+            ptr_account->buffer = nullptr;
         }
     }
     else if (weechat_strcasecmp(type, "channel") == 0)

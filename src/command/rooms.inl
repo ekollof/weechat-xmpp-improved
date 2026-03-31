@@ -142,16 +142,16 @@ std::optional<std::string> pick_file_interactive()
         FILE *fp = popen("zenity --file-selection --title='Select file to upload' 2>/dev/null", "r");
         if (fp)
         {
-            char path[4096] = {0};
-            if (fgets(path, sizeof(path), fp))
+            std::array<char, 4096> path = {};
+            if (fgets(path.data(), path.size(), fp))
             {
                 pclose(fp);
                 // Remove trailing newline
-                size_t len = std::string_view(path).size();
+                size_t len = std::string_view(path.data()).size();
                 if (len > 0 && path[len-1] == '\n')
                     path[len-1] = '\0';
                 if (path[0])
-                    return std::string(path);
+                    return std::string(path.data());
             }
             pclose(fp);
         }
@@ -160,15 +160,15 @@ std::optional<std::string> pick_file_interactive()
         fp = popen("kdialog --getopenfilename ~ 2>/dev/null", "r");
         if (fp)
         {
-            char path[4096] = {0};
-            if (fgets(path, sizeof(path), fp))
+            std::array<char, 4096> path = {};
+            if (fgets(path.data(), path.size(), fp))
             {
                 pclose(fp);
-                size_t len = std::string_view(path).size();
+                size_t len = std::string_view(path.data()).size();
                 if (len > 0 && path[len-1] == '\n')
                     path[len-1] = '\0';
                 if (path[0])
-                    return std::string(path);
+                    return std::string(path.data());
             }
             pclose(fp);
         }
@@ -178,15 +178,15 @@ std::optional<std::string> pick_file_interactive()
     FILE *fp = popen("fzf --prompt='Select file to upload: ' --preview='file {}' 2>/dev/null", "r");
     if (fp)
     {
-        char path[4096] = {0};
-        if (fgets(path, sizeof(path), fp))
+        std::array<char, 4096> path = {};
+        if (fgets(path.data(), path.size(), fp))
         {
             pclose(fp);
-            size_t len = std::string_view(path).size();
+            size_t len = std::string_view(path.data()).size();
             if (len > 0 && path[len-1] == '\n')
                 path[len-1] = '\0';
             if (path[0])
-                return std::string(path);
+                return std::string(path.data());
         }
         pclose(fp);
     }

@@ -74,7 +74,7 @@ namespace {
     std::shared_ptr<char> eval_path(
         weechat_string_eval_expression(
             fmt::format("${{weechat_data_dir}}/xmpp/raw_xml_{}.log", account.name).c_str(),
-            NULL, NULL, NULL),
+            nullptr, nullptr, nullptr),
         &free);
     return eval_path ? std::string(eval_path.get()) : std::string {};
 }
@@ -116,7 +116,7 @@ void append_raw_xml_trace(weechat::account &account,
     if (!fp)
         return;
 
-    time_t now = time(NULL);
+    time_t now = time(nullptr);
     struct tm local_tm = {0};
     localtime_r(&now, &local_tm);
     std::string timestamp = fmt::format("{:%Y-%m-%d %H:%M:%S}", local_tm);
@@ -134,7 +134,7 @@ void append_raw_xml_trace(weechat::account &account,
 
 void weechat::connection::init()
 {
-    srand(time(NULL));
+    srand(time(nullptr));
     libstrophe::initialize();
 }
 
@@ -163,7 +163,7 @@ void weechat::connection::send(xmpp_stanza_t *stanza)
 bool weechat::connection::version_handler(xmpp_stanza_t *stanza)
 {
     const char *weechat_name = "weechat";
-    std::unique_ptr<char, decltype(&free)> weechat_version(weechat_info_get("version", NULL), free);
+    std::unique_ptr<char, decltype(&free)> weechat_version(weechat_info_get("version", nullptr), free);
 
     XDEBUG("Received version request from {}", xmpp_stanza_get_from(stanza));
 
@@ -206,7 +206,7 @@ bool weechat::connection::time_handler(xmpp_stanza_t *stanza)
     }
 
     // Get current time
-    time_t now = time(NULL);
+    time_t now = time(nullptr);
     struct tm *tm_utc = gmtime(&now);
     struct tm *tm_local = localtime(&now);
 

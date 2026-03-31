@@ -79,7 +79,7 @@ bool account_read_cb(weechat::config_section& /* section */,
         {
             account->load_pgp_keys();
             bool ac_global = std::stoul(std::unique_ptr<char, decltype(free)*>(
-                                            weechat_info_get("auto_connect", NULL), &free).get());
+                                            weechat_info_get("auto_connect", nullptr), &free).get());
             bool ac_local = account->autoconnect();
             if (ac_local && ac_global)
                 account->connect();
@@ -88,7 +88,7 @@ bool account_read_cb(weechat::config_section& /* section */,
     else
     {
         weechat_printf(
-            NULL,
+            nullptr,
             _("%s%s: error adding account \"%s\""),
             weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
             account_name.data());
@@ -97,7 +97,7 @@ bool account_read_cb(weechat::config_section& /* section */,
     if (!rc)
     {
         weechat_printf(
-            NULL,
+            nullptr,
             _("%s%s: error creating account option \"%s\""),
             weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME, option_name);
     }
@@ -106,7 +106,7 @@ bool account_read_cb(weechat::config_section& /* section */,
 
 bool account_write_cb(weechat::config_section& section, const char *section_name)
 {
-    if (!weechat_config_write_line(section.file, section_name, NULL))
+    if (!weechat_config_write_line(section.file, section_name, nullptr))
         return WEECHAT_CONFIG_WRITE_ERROR;
 
     for (auto& account : weechat::accounts)

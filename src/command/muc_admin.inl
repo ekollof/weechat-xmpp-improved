@@ -1026,20 +1026,13 @@ int command__feed(const void *pointer, void *data,
                                       xmpp_uuid_gen(ptr_account->context));
         const std::string item_uuid = item_uuid_g.ptr ? item_uuid_g.ptr : "repeat";
 
-        char ts_buf[32];
-        {
-            std::time_t now = std::time(nullptr);
-            std::strftime(ts_buf, sizeof(ts_buf), "%Y-%m-%dT%H:%M:%SZ", std::gmtime(&now));
-        }
+        std::time_t now_ts = std::time(nullptr);
+        const std::string ts_buf = fmt::format("{:%Y-%m-%dT%H:%M:%SZ}", fmt::gmtime(now_ts));
 
         xmpp_string_guard domain_g(ptr_account->context,
                                    xmpp_jid_domain(ptr_account->context,
                                                    ptr_account->jid().data()));
-        char date_buf[12];
-        {
-            std::time_t now = std::time(nullptr);
-            std::strftime(date_buf, sizeof(date_buf), "%Y-%m-%d", std::gmtime(&now));
-        }
+        const std::string date_buf = fmt::format("{:%Y-%m-%d}", fmt::gmtime(now_ts));
         const std::string atom_id = fmt::format("tag:{},{};posts/{}",
                                                 domain_g.ptr ? domain_g.ptr : "xmpp",
                                                 date_buf, item_uuid);
@@ -1080,10 +1073,10 @@ int command__feed(const void *pointer, void *data,
             xmpp_stanza_t *id_el = make_text_el_r(ptr_account->context, "id", atom_id.c_str());
             xmpp_stanza_add_child(entry, id_el);
             xmpp_stanza_release(id_el);
-            xmpp_stanza_t *pub_el = make_text_el_r(ptr_account->context, "published", ts_buf);
+            xmpp_stanza_t *pub_el = make_text_el_r(ptr_account->context, "published", ts_buf.c_str());
             xmpp_stanza_add_child(entry, pub_el);
             xmpp_stanza_release(pub_el);
-            xmpp_stanza_t *upd_el = make_text_el_r(ptr_account->context, "updated", ts_buf);
+            xmpp_stanza_t *upd_el = make_text_el_r(ptr_account->context, "updated", ts_buf.c_str());
             xmpp_stanza_add_child(entry, upd_el);
             xmpp_stanza_release(upd_el);
         }
@@ -1783,21 +1776,14 @@ int command__feed(const void *pointer, void *data,
         const std::string item_uuid = item_uuid_g.ptr ? item_uuid_g.ptr : "post";
 
         // ISO-8601 timestamp (UTC)
-        char ts_buf[32];
-        {
-            std::time_t now = std::time(nullptr);
-            std::strftime(ts_buf, sizeof(ts_buf), "%Y-%m-%dT%H:%M:%SZ", std::gmtime(&now));
-        }
+        std::time_t now_ts = std::time(nullptr);
+        const std::string ts_buf = fmt::format("{:%Y-%m-%dT%H:%M:%SZ}", fmt::gmtime(now_ts));
 
         // Atom tag URI: tag:<domain>,<date>:posts/<uuid>
         xmpp_string_guard domain_g(ptr_account->context,
                                    xmpp_jid_domain(ptr_account->context,
                                                    ptr_account->jid().data()));
-        char date_buf[12];
-        {
-            std::time_t now = std::time(nullptr);
-            std::strftime(date_buf, sizeof(date_buf), "%Y-%m-%d", std::gmtime(&now));
-        }
+        const std::string date_buf = fmt::format("{:%Y-%m-%d}", fmt::gmtime(now_ts));
         const std::string atom_id = fmt::format("tag:{},{};posts/{}",
                                                 domain_g.ptr ? domain_g.ptr : "xmpp",
                                                 date_buf, item_uuid);

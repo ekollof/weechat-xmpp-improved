@@ -131,7 +131,7 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool top_level
                         // in channel.cpp so we recover missed messages on reconnect.
                         if (channel->type == weechat::channel::chat_type::MUC)
                         {
-                            time_t now = time(NULL);
+                            time_t now = time(nullptr);
                             time_t start;
 
                             // Load persisted last-fetch timestamp from LMDB.

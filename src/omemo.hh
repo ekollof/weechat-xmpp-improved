@@ -194,7 +194,7 @@ namespace weechat {
             void show_devices(struct t_gui_buffer *buffer, const char *jid);
 
             // Show full OMEMO status: own fingerprint, device ID, pre-key count,
-            // SPK ID and age.  channel_name may be NULL.
+            // SPK ID and age.  channel_name may be nullptr.
             void show_status(struct t_gui_buffer *buffer, const char *account_name,
                              const char *channel_name, int channel_omemo_enabled);
 

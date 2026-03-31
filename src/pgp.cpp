@@ -69,7 +69,7 @@ weechat::xmpp::pgp::pgp()
     gpgme_error_t err;
   //gpgme_data_t keydata;
 
-    gpgme_check_version(NULL);
+    gpgme_check_version(nullptr);
 
     err = gpgme_new(&this->gpgme);
     if (err) {

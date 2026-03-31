@@ -2,8 +2,8 @@ int command__omemo(const void *pointer, void *data,
                    struct t_gui_buffer *buffer, int argc,
                    char **argv, char **argv_eol)
 {
-    weechat::account *ptr_account = NULL;
-    weechat::channel *ptr_channel = NULL;
+    weechat::account *ptr_account = nullptr;
+    weechat::channel *ptr_channel = nullptr;
 
     (void) pointer;
     (void) data;
@@ -75,7 +75,7 @@ int command__omemo(const void *pointer, void *data,
             // Publish bundle
             std::string from_s(ptr_account->jid());
             xmpp_stanza_t *bundle_stanza = ptr_account->omemo.get_bundle(
-                ptr_account->context, from_s.data(), NULL);
+                ptr_account->context, from_s.data(), nullptr);
             if (bundle_stanza)
             {
                 ptr_account->connection.send(bundle_stanza);
@@ -103,7 +103,7 @@ int command__omemo(const void *pointer, void *data,
             }
 
             xmpp_stanza_t *legacy_bundle_stanza = ptr_account->omemo.get_legacy_bundle(
-                ptr_account->context, from_s.data(), NULL);
+                ptr_account->context, from_s.data(), nullptr);
             if (legacy_bundle_stanza)
             {
                 ptr_account->connection.send(legacy_bundle_stanza);
@@ -310,8 +310,8 @@ int command__pgp(const void *pointer, void *data,
                  struct t_gui_buffer *buffer, int argc,
                  char **argv, char **argv_eol)
 {
-    weechat::account *ptr_account = NULL;
-    weechat::channel *ptr_channel = NULL;
+    weechat::account *ptr_account = nullptr;
+    weechat::channel *ptr_channel = nullptr;
     char *keyid;
 
     (void) pointer;
@@ -416,8 +416,8 @@ int command__plain(const void *pointer, void *data,
                    struct t_gui_buffer *buffer, int argc,
                    char **argv, char **argv_eol)
 {
-    weechat::account *ptr_account = NULL;
-    weechat::channel *ptr_channel = NULL;
+    weechat::account *ptr_account = nullptr;
+    weechat::channel *ptr_channel = nullptr;
 
     (void) pointer;
     (void) data;
@@ -453,8 +453,8 @@ int command__xml(const void *pointer, void *data,
                  struct t_gui_buffer *buffer, int argc,
                  char **argv, char **argv_eol)
 {
-    weechat::account *ptr_account = NULL;
-    weechat::channel *ptr_channel = NULL;
+    weechat::account *ptr_account = nullptr;
+    weechat::channel *ptr_channel = nullptr;
     xmpp_stanza_t *stanza;
 
     (void) pointer;
@@ -546,8 +546,8 @@ int command__trap(const void *pointer, void *data,
     (void) argv;
     (void) argv_eol;
 
-    weechat::account *account = NULL;
-    weechat::channel *channel = NULL;
+    weechat::account *account = nullptr;
+    weechat::channel *channel = nullptr;
 
     buffer__get_account_and_channel(buffer, &account, &channel);
     weechat::user::search(account, account->jid_device().data());

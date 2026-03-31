@@ -16,8 +16,8 @@
 
 int input__data(struct t_gui_buffer *buffer, const char *text)
 {
-    weechat::account *account = NULL;
-    weechat::channel *channel = NULL;
+    weechat::account *account = nullptr;
+    weechat::channel *channel = nullptr;
 
     buffer__get_account_and_channel(buffer, &account, &channel);
 
@@ -62,8 +62,8 @@ int input__data_cb(const void *pointer, void *data,
 
 int input__typing(struct t_gui_buffer *buffer)
 {
-    weechat::account *account = NULL;
-    weechat::channel *channel = NULL;
+    weechat::account *account = nullptr;
+    weechat::channel *channel = nullptr;
 
     buffer__get_account_and_channel(buffer, &account, &channel);
 

@@ -99,7 +99,7 @@ void weechat::channel::set_transport(enum weechat::channel::transport transport,
     if (this->transport != transport)
     {
         this->transport = transport;
-        weechat_printf_date_tags(buffer, 0, NULL, "%s%sTransport: %s",
+        weechat_printf_date_tags(buffer, 0, nullptr, "%s%sTransport: %s",
                                  weechat_prefix("network"), weechat_color("gray"),
                                  weechat::channel::transport_name(this->transport));
     }
@@ -142,7 +142,7 @@ struct t_gui_buffer *weechat::channel::search_buffer(weechat::channel::chat_type
         ptr_buffer = (struct t_gui_buffer*)weechat_hdata_move(hdata_buffer, ptr_buffer, 1);
     }
 
-    return NULL;
+    return nullptr;
 }
 
 struct t_gui_buffer *weechat::channel::create_buffer(weechat::channel::chat_type type,
@@ -150,7 +150,7 @@ struct t_gui_buffer *weechat::channel::create_buffer(weechat::channel::chat_type
 {
     struct t_gui_buffer *ptr_buffer;
     int buffer_created;
-    const char *short_name = NULL, *localvar_remote_jid = NULL;
+    const char *short_name = nullptr, *localvar_remote_jid = nullptr;
 
     buffer_created = 0;
 
@@ -164,10 +164,10 @@ struct t_gui_buffer *weechat::channel::create_buffer(weechat::channel::chat_type
     else
     {
         ptr_buffer = weechat_buffer_new(buffer_name.data(),
-                                        &input__data_cb, NULL, NULL,
-                                        &buffer__close_cb, NULL, NULL);
+                                        &input__data_cb, nullptr, nullptr,
+                                        &buffer__close_cb, nullptr, nullptr);
         if (!ptr_buffer)
-            return NULL;
+            return nullptr;
 
         buffer_created = 1;
     }
@@ -270,21 +270,21 @@ void weechat::channel::add_nicklist_groups()
     static constexpr int k_nick_sort_novoice = 6;
     static constexpr int k_nick_sort_norole  = 999;
 
-    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", k_nick_sort_owner,   "~").data(),
+    weechat_nicklist_add_group(buffer, nullptr, fmt::format("%03d|%s", k_nick_sort_owner,   "~").data(),
                                "weechat.color.nicklist_group", 1);
-    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", k_nick_sort_admin,   "&").data(),
+    weechat_nicklist_add_group(buffer, nullptr, fmt::format("%03d|%s", k_nick_sort_admin,   "&").data(),
                                "weechat.color.nicklist_group", 1);
-    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", k_nick_sort_op,      "@").data(),
+    weechat_nicklist_add_group(buffer, nullptr, fmt::format("%03d|%s", k_nick_sort_op,      "@").data(),
                                "weechat.color.nicklist_group", 1);
-    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", k_nick_sort_halfop,  "%").data(),
+    weechat_nicklist_add_group(buffer, nullptr, fmt::format("%03d|%s", k_nick_sort_halfop,  "%").data(),
                                "weechat.color.nicklist_group", 1);
-    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", k_nick_sort_voice,   "+").data(),
+    weechat_nicklist_add_group(buffer, nullptr, fmt::format("%03d|%s", k_nick_sort_voice,   "+").data(),
                                "weechat.color.nicklist_group", 1);
-    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", k_nick_sort_unknown, "?").data(),
+    weechat_nicklist_add_group(buffer, nullptr, fmt::format("%03d|%s", k_nick_sort_unknown, "?").data(),
                                "weechat.color.nicklist_group", 1);
-    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", k_nick_sort_novoice, "!").data(),
+    weechat_nicklist_add_group(buffer, nullptr, fmt::format("%03d|%s", k_nick_sort_novoice, "!").data(),
                                "weechat.color.nicklist_group", 1);
-    weechat_nicklist_add_group(buffer, NULL, fmt::format("%03d|%s", k_nick_sort_norole,  ".").data(),
+    weechat_nicklist_add_group(buffer, nullptr, fmt::format("%03d|%s", k_nick_sort_norole,  ".").data(),
                                "weechat.color.nicklist_group", 1);
 }
 
@@ -341,7 +341,7 @@ weechat::channel::channel(weechat::account& account,
             send_active(self_user);
         }
 
-        time_t now = time(NULL);
+        time_t now = time(nullptr);
         time_t start;
 
         // MAM fetch is only for PM channels; FEED buffers are read-only pubsub
@@ -398,7 +398,7 @@ void weechat::channel::member_speaking_add_to_list(const char *nick, int highlig
 
     /* add nick in list */
     weechat_list_add(members_speaking[highlight], nick,
-                     WEECHAT_LIST_POS_END, NULL);
+                     WEECHAT_LIST_POS_END, nullptr);
 
     /* reduce list size if it's too big */
     size = weechat_list_size(members_speaking[highlight]);
@@ -522,7 +522,7 @@ int weechat::channel::self_typing_cb(const void *pointer, void *data, int remain
 
     weechat::channel *channel = (weechat::channel *)pointer;
 
-    now = time(NULL);
+    now = time(nullptr);
 
     for (auto ptr_typing = channel->self_typings.begin();
          ptr_typing != channel->self_typings.end();)
@@ -867,7 +867,7 @@ int weechat::channel::send_message(std::string to, std::string body,
     xmpp_stanza_t *message = xmpp_message_new(account.context,
                     type == weechat::channel::chat_type::MUC
                     ? "groupchat" : "chat",
-                    to.data(), NULL);
+                    to.data(), nullptr);
 
     char *id = xmpp_uuid_gen(account.context);
     xmpp_stanza_set_id(message, id);
@@ -1330,7 +1330,7 @@ int weechat::channel::send_message(std::string_view to, std::string_view body, b
     xmpp_stanza_t *message = xmpp_message_new(account.context,
                     type == weechat::channel::chat_type::MUC
                     ? "groupchat" : "chat",
-                    to_str.c_str(), NULL);
+                    to_str.c_str(), nullptr);
 
     char *id = xmpp_uuid_gen(account.context);
     xmpp_stanza_set_id(message, id);
@@ -1486,7 +1486,7 @@ int weechat::channel::send_message(std::string_view to, std::string_view body, b
         do {
             struct t_hashtable *options = weechat_hashtable_new(8,
                     WEECHAT_HASHTABLE_STRING, WEECHAT_HASHTABLE_STRING,
-                    NULL, NULL);
+                    nullptr, nullptr);
             if (!options) { return WEECHAT_RC_ERROR; };
             weechat_hashtable_set(options, "header", "1");
             weechat_hashtable_set(options, "nobody", "1");
@@ -1689,7 +1689,7 @@ void weechat::channel::send_link_preview(const std::string& to, const std::strin
 {
     struct t_hashtable *options = weechat_hashtable_new(8,
             WEECHAT_HASHTABLE_STRING, WEECHAT_HASHTABLE_STRING,
-            NULL, NULL);
+            nullptr, nullptr);
     if (!options) return;
     weechat_hashtable_set(options, "header", "1");
     // Full GET so we receive the HTML body for OpenGraph parsing
@@ -1799,7 +1799,7 @@ void weechat::channel::send_link_preview(const std::string& to, const std::strin
             xmpp_stanza_t *msg = xmpp_message_new(ctx,
                     task->channel.type == weechat::channel::chat_type::MUC
                     ? "groupchat" : "chat",
-                    task->to.data(), NULL);
+                    task->to.data(), nullptr);
 
             char *preview_id = xmpp_uuid_gen(ctx);
             xmpp_stanza_set_id(msg, preview_id);
@@ -1904,7 +1904,7 @@ void weechat::channel::send_reads()
         const char *marker_type = (this->type == weechat::channel::chat_type::MUC)
                                    ? "groupchat" : "chat";
         xmpp_stanza_t *message = xmpp_message_new(account.context, marker_type,
-                                                    id.data(), NULL);
+                                                    id.data(), nullptr);
 
         xmpp_stanza_t *message__displayed = xmpp_stanza_new(account.context);
         xmpp_stanza_set_name(message__displayed, "displayed");
@@ -2064,7 +2064,7 @@ void weechat::channel::send_chat_state(weechat::user *user, const char *state)
     xmpp_stanza_t *message = xmpp_message_new(account.context,
                                               type == weechat::channel::chat_type::MUC
                                               ? "groupchat" : "chat",
-                                              (user ? user->id : id).data(), NULL);
+                                              (user ? user->id : id).data(), nullptr);
 
     xmpp_stanza_t *state_stanza = xmpp_stanza_new(account.context);
     xmpp_stanza_set_name(state_stanza, state);

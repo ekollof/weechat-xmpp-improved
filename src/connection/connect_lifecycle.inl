@@ -101,7 +101,7 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         }
 
         /* Send initial <presence/> so that we appear online to contacts */
-        /* children layout: [0]=<c/> [1]=<status/> [2]=<x vcard-temp:x:update/> [3]=<x pgp/> [4]=NULL */
+        /* children layout: [0]=<c/> [1]=<status/> [2]=<x vcard-temp:x:update/> [3]=<x pgp/> [4]=nullptr */
         auto children = std::make_unique<xmpp_stanza_t*[]>(4 + 1);
 
         pres__c = xmpp_stanza_new(account.context);
@@ -154,7 +154,7 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
             children[2] = vcard_x;
         }
 
-        children[3] = NULL;
+        children[3] = nullptr;
 
         if (!account.pgp_keyid().empty())
         {
@@ -169,7 +169,7 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
             xmpp_stanza_release(pres__x__text);
 
             children[3] = pres__x;
-            children[4] = NULL;
+            children[4] = nullptr;
         }
 
         {
@@ -218,18 +218,18 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
                     .build(account.context)
                     .get());
 
-        children[1] = NULL;
+        children[1] = nullptr;
 
         auto fetch_devicelist = [&](const char *node) {
             children[0] =
-            stanza__iq_pubsub_items(account.context, NULL, node);
+            stanza__iq_pubsub_items(account.context, nullptr, node);
             children[0] =
-            stanza__iq_pubsub(account.context, NULL, children.get(),
+            stanza__iq_pubsub(account.context, nullptr, children.get(),
                               with_noop("http://jabber.org/protocol/pubsub"));
             xmpp_string_guard uid_g(account.context, xmpp_uuid_gen(account.context));
             const char *uid = uid_g.ptr;
             children[0] =
-            stanza__iq(account.context, NULL, children.get(), NULL, uid,
+            stanza__iq(account.context, nullptr, children.get(), nullptr, uid,
                        account.jid().data(), account.jid().data(),
                        "get");
             if (uid && account.omemo)
@@ -252,7 +252,7 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
             // Publish our bundle unconditionally on connect so remote clients
             // always have fresh pre-keys for our device.
             children[0] =
-            account.omemo.get_bundle(account.context, jid_str.data(), NULL);
+            account.omemo.get_bundle(account.context, jid_str.data(), nullptr);
             if (children[0])
             {
                 this->send(children[0]);
@@ -262,7 +262,7 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
             // Also publish the legacy bundle node so OMEMO:1 clients can
             // target our current device id during first-contact bootstrap.
             children[0] =
-            account.omemo.get_legacy_bundle(account.context, jid_str.data(), NULL);
+            account.omemo.get_legacy_bundle(account.context, jid_str.data(), nullptr);
             if (children[0])
             {
                 this->send(children[0]);
@@ -303,7 +303,7 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         // If we have a persisted RSM cursor from a previous session, use it as
         // an <after> token so we only fetch messages we haven't seen yet.
         // Otherwise fall back to the last 7 days.
-        time_t now = time(NULL);
+        time_t now = time(nullptr);
         time_t start = now - (7 * 86400);  // Last 7 days (fallback)
         std::string global_mam_cursor = account.mam_cursor_get("global");
         const bool has_cursor = !global_mam_cursor.empty();
@@ -560,7 +560,7 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         }
 
         // Initialize Client State Indication (XEP-0352)
-        account.last_activity = time(NULL);
+        account.last_activity = time(nullptr);
         account.csi_active = true;
         
         // Send initial active state
@@ -706,7 +706,7 @@ int weechat::connection::connect(std::string jid, std::string password, weechat:
     }
     {
         std::unique_ptr<char, decltype(&free)> evaled_pass(
-            weechat_string_eval_expression(password.data(), NULL, NULL, NULL), free);
+            weechat_string_eval_expression(password.data(), nullptr, nullptr, nullptr), free);
         m_conn.set_pass(evaled_pass.get());
     }
 
@@ -729,8 +729,8 @@ int weechat::connection::connect(std::string jid, std::string password, weechat:
     m_conn.set_flags(flags);
 
     // Register a certfail handler so that TLS certificate verification failures
-    // are surfaced as warnings rather than silently leaving conn->tls == NULL.
-    // A NULL conn->tls with a TLS write interface still set causes a crash in
+    // are surfaced as warnings rather than silently leaving conn->tls == nullptr.
+    // A nullptr conn->tls with a TLS write interface still set causes a crash in
     // libstrophe's tls_write() when xmpp_run_once() flushes the send queue.
     // Accepting the cert here keeps conn->tls valid; the user sees a clear
     // warning and can use tls_policy::trust to suppress it intentionally.
@@ -753,7 +753,7 @@ int weechat::connection::connect(std::string jid, std::string password, weechat:
             host     ? host     : "(unknown host)",
             notafter ? notafter : "?",
             errormsg ? errormsg : "(no details)");
-        return 1; // accept cert, keep conn->tls valid, avoid NULL-deref crash
+        return 1; // accept cert, keep conn->tls valid, avoid nullptr-deref crash
     });
 
     if (!connect_client(

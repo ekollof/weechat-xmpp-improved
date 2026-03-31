@@ -10,7 +10,7 @@ int weechat::account::idle_timer_cb(const void *pointer, void *data, int remaini
     if (!account || !account->connection || !xmpp_conn_is_connected(account->connection))
         return WEECHAT_RC_OK;
 
-    time_t now = time(NULL);
+    time_t now = time(nullptr);
     time_t idle_time = now - account->last_activity;
 
     // If idle for more than 5 minutes and currently active, send inactive
@@ -44,7 +44,7 @@ int weechat::account::activity_cb(const void *pointer, void *data,
         return WEECHAT_RC_OK;
 
     // Update last activity timestamp
-    account->last_activity = time(NULL);
+    account->last_activity = time(nullptr);
 
     // If currently inactive, send active
     if (!account->csi_active)

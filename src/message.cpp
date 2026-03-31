@@ -158,18 +158,18 @@ std::string message__decode(weechat::account *account,
     int rc;
     regex_t reg;
     regmatch_t groups[max_groups];
-    char msgbuf[100];
     const char *cursor;
     size_t offset;
 
     if ((rc = regcomp(&reg, format_regex, REG_EXTENDED)))
     {
-        regerror(rc, &reg, msgbuf, sizeof(msgbuf));
+        std::string msgbuf(100, '\0');
+        regerror(rc, &reg, msgbuf.data(), msgbuf.size());
         weechat_printf(
             account->buffer,
             _("%s%s: error compiling message formatting regex: %s"),
             weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME,
-            msgbuf);
+            msgbuf.c_str());
         return std::string(text);
     }
 

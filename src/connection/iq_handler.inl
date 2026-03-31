@@ -90,7 +90,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
         if (stanza_id && account.user_ping_queries.count(stanza_id))
         {
             time_t start_time = account.user_ping_queries[stanza_id];
-            time_t now = time(NULL);
+            time_t now = time(nullptr);
             long rtt_ms = (now - start_time) * 1000;  // Convert to milliseconds
             
             account.user_ping_queries.erase(stanza_id);
@@ -1245,8 +1245,8 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
             xmpp_stanza_t *put_elem = xmpp_stanza_get_child_by_name(slot, "put");
             xmpp_stanza_t *get_elem = xmpp_stanza_get_child_by_name(slot, "get");
             
-            const char *put_url = put_elem ? xmpp_stanza_get_attribute(put_elem, "url") : NULL;
-            const char *get_url = get_elem ? xmpp_stanza_get_attribute(get_elem, "url") : NULL;
+            const char *put_url = put_elem ? xmpp_stanza_get_attribute(put_elem, "url") : nullptr;
+            const char *get_url = get_elem ? xmpp_stanza_get_attribute(get_elem, "url") : nullptr;
             
             XDEBUG("PUT URL: {}", put_url ? put_url : "(null)");
             XDEBUG("GET URL: {}", get_url ? get_url : "(null)");
@@ -1796,7 +1796,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
         if (req_it != account.upload_requests.end())
         {
             xmpp_stanza_t *error_elem = xmpp_stanza_get_child_by_name(stanza, "error");
-            const char *error_type = error_elem ? xmpp_stanza_get_attribute(error_elem, "type") : NULL;
+            const char *error_type = error_elem ? xmpp_stanza_get_attribute(error_elem, "type") : nullptr;
             
             // Try to get error text
             std::string error_msg = "Upload slot request failed";
@@ -2365,7 +2365,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 if (form_type && std::string_view(form_type) == "result")
                 {
                     // Display result form (read-only)
-                    render_data_form(adhoc_buf, x_form, from_jid, cmd_node, NULL);
+                    render_data_form(adhoc_buf, x_form, from_jid, cmd_node, nullptr);
                 }
                 else
                 {
@@ -2377,7 +2377,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
             {
                 // Command completed with no form — check for <note>
                 xmpp_stanza_t *note = xmpp_stanza_get_child_by_name(adhoc_command, "note");
-                const char *note_text = note ? xmpp_stanza_get_text_ptr(note) : NULL;
+                const char *note_text = note ? xmpp_stanza_get_text_ptr(note) : nullptr;
                 weechat_printf_date_tags(adhoc_buf, 0, "xmpp_adhoc,notify_none",
                                          "%s[adhoc] Command %s completed%s%s",
                                          weechat_prefix("network"),
@@ -2412,8 +2412,8 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
             {
                 // Try to extract a human-readable error
                 xmpp_stanza_t *error_el = xmpp_stanza_get_child_by_name(stanza, "error");
-                const char *err_text = NULL;
-                const char *err_condition = NULL;
+                const char *err_text = nullptr;
+                const char *err_condition = nullptr;
                 if (error_el)
                 {
                     xmpp_stanza_t *text_el = xmpp_stanza_get_child_by_name(error_el, "text");
@@ -2576,12 +2576,12 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         xmpp_stanza_t *service_type_el = xmpp_stanza_get_child_by_name(item, "service-type");
                         xmpp_stanza_t *anonymity_el = xmpp_stanza_get_child_by_name(item, "anonymity-mode");
 
-                        const char *name_raw    = name_el  ? xmpp_stanza_get_text_ptr(name_el)   : NULL;
-                        const char *nusers_raw  = nusers_el ? xmpp_stanza_get_text_ptr(nusers_el) : NULL;
-                        const char *desc_raw    = desc_el  ? xmpp_stanza_get_text_ptr(desc_el)   : NULL;
-                        const char *language_raw = language_el ? xmpp_stanza_get_text_ptr(language_el) : NULL;
-                        const char *service_type_raw = service_type_el ? xmpp_stanza_get_text_ptr(service_type_el) : NULL;
-                        const char *anonymity_raw = anonymity_el ? xmpp_stanza_get_text_ptr(anonymity_el) : NULL;
+                        const char *name_raw    = name_el  ? xmpp_stanza_get_text_ptr(name_el)   : nullptr;
+                        const char *nusers_raw  = nusers_el ? xmpp_stanza_get_text_ptr(nusers_el) : nullptr;
+                        const char *desc_raw    = desc_el  ? xmpp_stanza_get_text_ptr(desc_el)   : nullptr;
+                        const char *language_raw = language_el ? xmpp_stanza_get_text_ptr(language_el) : nullptr;
+                        const char *service_type_raw = service_type_el ? xmpp_stanza_get_text_ptr(service_type_el) : nullptr;
+                        const char *anonymity_raw = anonymity_el ? xmpp_stanza_get_text_ptr(anonymity_el) : nullptr;
 
                         std::string display = address;
                         if (name_raw && name_raw[0])
@@ -2842,7 +2842,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
         if (weechat_strcasecmp(type, "get") == 0)
         {
             const char *requested_node = xmpp_stanza_get_attribute(query, "node");
-            reply = get_caps(xmpp_stanza_reply(stanza), NULL, requested_node);
+            reply = get_caps(xmpp_stanza_reply(stanza), nullptr, requested_node);
 
             account.connection.send(reply);
             xmpp_stanza_release(reply);
@@ -2919,7 +2919,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                                     char *value_text = xmpp_stanza_get_text(value);
                                     if (value_text)
                                     {
-                                        max_size = strtoull(value_text, NULL, 10);
+                                        max_size = strtoull(value_text, nullptr, 10);
                                         xmpp_free(account.context, value_text);
                                     }
                                 }
@@ -3226,7 +3226,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
         stanza, "query", "jabber:iq:private");
     // BUG 1 fix: only process jabber:iq:private results, not gets/sets/errors.
     // An <iq type='error'> from a server that doesn't support XEP-0049 would
-    // otherwise clear our bookmarks and crash on the autojoin NULL deref below.
+    // otherwise clear our bookmarks and crash on the autojoin nullptr deref below.
     if (query && type && weechat_strcasecmp(type, "result") == 0)
     {
         storage = xmpp_stanza_get_child_by_name_and_ns(
@@ -3254,12 +3254,12 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 const char *autojoin = xmpp_stanza_get_attribute(conference, "autojoin");
                 name = xmpp_stanza_get_attribute(conference, "name");
                 nick = xmpp_stanza_get_child_by_name(conference, "nick");
-                char *intext = NULL;
+                char *intext = nullptr;
                 if (nick)
                 {
                     text = xmpp_stanza_get_children(nick);
-                    // BUG 3 fix: text may be NULL if <nick/> element is empty
-                    intext = text ? xmpp_stanza_get_text(text) : NULL;
+                    // BUG 3 fix: text may be nullptr if <nick/> element is empty
+                    intext = text ? xmpp_stanza_get_text(text) : nullptr;
                 }
 
                 if (!jid)
@@ -3280,7 +3280,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                             .query()
                             .build(account.context)
                             .get());
-                // BUG 2 fix: autojoin attr may be absent (NULL); use the already
+                // BUG 2 fix: autojoin attr may be absent (nullptr); use the already
                 // computed bookmarks[jid].autojoin flag which is null-safe.
                 if (account.bookmarks[jid].autojoin)
                 {
@@ -3303,7 +3303,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         char **command = weechat_string_dyn_alloc(256);
                         weechat_string_dyn_concat(command, "/enter ", -1);
                         weechat_string_dyn_concat(command, jid, -1);
-                        // BUG 3 fix: only append nick if intext is non-NULL and non-empty
+                        // BUG 3 fix: only append nick if intext is non-nullptr and non-empty
                         if (intext && intext[0])
                         {
                             weechat_string_dyn_concat(command, "/", -1);
@@ -3313,7 +3313,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         auto ptr_channel = account.channels.find(jid);
                         struct t_gui_buffer *ptr_buffer =
                             ptr_channel != account.channels.end()
-                            ? ptr_channel->second.buffer : NULL;
+                            ? ptr_channel->second.buffer : nullptr;
                         if (ptr_buffer)
                             ptr_channel->second.update_name(name);
                         weechat_string_dyn_free(command, 1);
@@ -3768,23 +3768,23 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                                 device_count++;
 
                                 xmpp_stanza_t *item_stanza =
-                                    stanza__iq_pubsub_items_item(account.context, NULL, with_noop(device_id));
+                                    stanza__iq_pubsub_items_item(account.context, nullptr, with_noop(device_id));
                                 xmpp_stanza_t *items_stanza =
-                                    stanza__iq_pubsub_items(account.context, NULL,
+                                    stanza__iq_pubsub_items(account.context, nullptr,
                                                             "urn:xmpp:omemo:2:bundles");
                                 // item must be a child of items, not a sibling
                                 xmpp_stanza_add_child(items_stanza, item_stanza);
                                 xmpp_stanza_release(item_stanza);
-                                xmpp_stanza_t *pubsub_children[] = {items_stanza, NULL};
+                                xmpp_stanza_t *pubsub_children[] = {items_stanza, nullptr};
                                 xmpp_stanza_t *pubsub_stanza =
-                                    stanza__iq_pubsub(account.context, NULL, pubsub_children,
+                                    stanza__iq_pubsub(account.context, nullptr, pubsub_children,
                                                       with_noop("http://jabber.org/protocol/pubsub"));
                                 xmpp_string_guard uuid_g(account.context, xmpp_uuid_gen(account.context));
                                 const char *uuid = uuid_g.ptr;
                                 // Fetch from the node owner (contact), not from ourselves.
-                                xmpp_stanza_t *iq_children[] = {pubsub_stanza, NULL};
+                                xmpp_stanza_t *iq_children[] = {pubsub_stanza, nullptr};
                                 xmpp_stanza_t *iq_stanza =
-                                    stanza__iq(account.context, NULL, iq_children, NULL, uuid,
+                                    stanza__iq(account.context, nullptr, iq_children, nullptr, uuid,
                                                account.jid().data(), node_owner, "get");
                                 // Register IQ id → target JID so the result handler
                                 // can recover the correct JID even if `from` is server domain.
@@ -4038,16 +4038,16 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                             "eu.siacs.conversations.axolotl.bundles:{}",
                             *parsed_did);
                         xmpp_stanza_t *items_stanza =
-                            stanza__iq_pubsub_items(account.context, NULL, bundle_node.c_str());
-                        xmpp_stanza_t *pubsub_children[] = {items_stanza, NULL};
+                            stanza__iq_pubsub_items(account.context, nullptr, bundle_node.c_str());
+                        xmpp_stanza_t *pubsub_children[] = {items_stanza, nullptr};
                         xmpp_stanza_t *pubsub_stanza =
-                            stanza__iq_pubsub(account.context, NULL, pubsub_children,
+                            stanza__iq_pubsub(account.context, nullptr, pubsub_children,
                                               with_noop("http://jabber.org/protocol/pubsub"));
                         xmpp_string_guard uuid_g(account.context, xmpp_uuid_gen(account.context));
                         const char *uuid = uuid_g.ptr;
-                        xmpp_stanza_t *iq_children[] = {pubsub_stanza, NULL};
+                        xmpp_stanza_t *iq_children[] = {pubsub_stanza, nullptr};
                         xmpp_stanza_t *iq_stanza =
-                            stanza__iq(account.context, NULL, iq_children, NULL, uuid,
+                            stanza__iq(account.context, nullptr, iq_children, nullptr, uuid,
                                        account.jid().data(), node_owner_str.c_str(), "get");
                         if (uuid)
                             account.omemo.pending_iq_jid[uuid] = node_owner_str;
@@ -4214,7 +4214,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
 
             set__last = set ? xmpp_stanza_get_child_by_name(set, "last") : nullptr;
             set__last__text = set__last
-                ? xmpp_stanza_get_text(set__last) : NULL;
+                ? xmpp_stanza_get_text(set__last) : nullptr;
 
             if (channel != account.channels.end())
             {
@@ -4231,7 +4231,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 else
                 {
                     // MAM fetch complete, update last fetch timestamp
-                    channel->second.last_mam_fetch = time(NULL);
+                    channel->second.last_mam_fetch = time(nullptr);
                     account.mam_cache_set_last_timestamp(channel->second.id, channel->second.last_mam_fetch);
                     account.mam_query_remove(mam_query.id);
                 }
@@ -4287,10 +4287,9 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         xmpp_stanza_t *v = xmpp_stanza_new(account.context);
                         xmpp_stanza_set_name(v, "value");
                         xmpp_stanza_t *t = xmpp_stanza_new(account.context);
-                        char tbuf[256];
                         time_t tval = *mam_query.start;
-                        strftime(tbuf, sizeof(tbuf), "%Y-%m-%dT%H:%M:%SZ", gmtime(&tval));
-                        xmpp_stanza_set_text(t, tbuf);
+                        std::string tbuf = fmt::format("{:%Y-%m-%dT%H:%M:%SZ}", fmt::gmtime(tval));
+                        xmpp_stanza_set_text(t, tbuf.c_str());
                         xmpp_stanza_add_child(v, t); xmpp_stanza_release(t);
                         xmpp_stanza_add_child(f, v); xmpp_stanza_release(v);
                         xmpp_stanza_add_child(nx, f); xmpp_stanza_release(f);

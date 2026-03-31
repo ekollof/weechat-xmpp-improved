@@ -130,7 +130,7 @@ bool weechat::connection::sm_handler(xmpp_stanza_t *stanza)
             
             // Only log if there were unacked stanzas or if it's been a while
             static time_t last_ack_log = 0;
-            time_t now = time(NULL);
+            time_t now = time(nullptr);
             if (unacked > 0 || (now - last_ack_log) > 300)  // Log every 5 minutes if quiet
             {
                 XDEBUG("Received ack: h={} (sent={}, unacked={})",

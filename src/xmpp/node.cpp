@@ -18,7 +18,7 @@ std::string stanza::uuid(xmpp_ctx_t *context) {
 }
 
 XMPP_TEST_EXPORT std::string get_name(xmpp_stanza_t *stanza) {
-    const char *result = NULL;
+    const char *result = nullptr;
     result = xmpp_stanza_get_name(stanza);
     if (result)
         return result;
@@ -27,7 +27,7 @@ XMPP_TEST_EXPORT std::string get_name(xmpp_stanza_t *stanza) {
 }
 
 XMPP_TEST_EXPORT std::optional<std::string> get_attribute(xmpp_stanza_t *stanza, const char *name) {
-    const char *result = NULL;
+    const char *result = nullptr;
     result = xmpp_stanza_get_attribute(stanza, name);
     if (result)
         return result;
@@ -36,7 +36,7 @@ XMPP_TEST_EXPORT std::optional<std::string> get_attribute(xmpp_stanza_t *stanza,
 }
 
 XMPP_TEST_EXPORT std::string get_text(xmpp_stanza_t *stanza) {
-    const char *result = NULL;
+    const char *result = nullptr;
     result = xmpp_stanza_get_text_ptr(stanza);
     if (result)
         return result;
