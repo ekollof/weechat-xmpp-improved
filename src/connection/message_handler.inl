@@ -1592,7 +1592,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                     const char *bare = xmpp_jid_bare(account.context, receipt_from);
                     weechat::channel *ch = account.channels.contains(bare)
                         ? &account.channels.find(bare)->second : nullptr;
-                    if (ch)
+                    if (ch && ch->type != weechat::channel::chat_type::MUC)
                     {
                         // Find the sent message line tagged id_<acked_id> and update glyph ⌛→✓
                         update_line_glyph(ch, acked_id, " ✓");
@@ -1619,7 +1619,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                     const char *bare = xmpp_jid_bare(account.context, marker_from);
                     weechat::channel *ch = account.channels.contains(bare)
                         ? &account.channels.find(bare)->second : nullptr;
-                    if (ch)
+                    if (ch && ch->type != weechat::channel::chat_type::MUC)
                     {
                         // Find the sent message line tagged id_<acked_id> and update glyph ⌛/✓→✓✓
                         update_line_glyph(ch, acked_id, " ✓✓");
@@ -1727,7 +1727,10 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
 
     // XEP-0333 §5 Business Rules: MUST NOT send Displayed Markers for outgoing
     // messages we sent (received back via carbons or MAM).
-    if (id && (markable || request) && !is_self_outbound_copy)
+    // XEP-0333 §4.1: SHOULD NOT send Chat Markers to a MUC room; they reveal
+    // presence to all participants and serve no useful purpose in group chat.
+    const bool is_muc_channel = channel && channel->type == weechat::channel::chat_type::MUC;
+    if (id && (markable || request) && !is_self_outbound_copy && !is_muc_channel)
     {
         weechat::channel::unread unread_val;
         unread_val.id = id;

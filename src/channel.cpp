@@ -1868,6 +1868,15 @@ void weechat::channel::send_link_preview(const std::string& to, const std::strin
 
 void weechat::channel::send_reads()
 {
+    // XEP-0333 §4.1: SHOULD NOT send Chat Markers to a MUC room.
+    // Markers in MUC reveal presence to all participants and have no useful
+    // effect.  Flush unreads silently so the queue doesn't grow unbounded.
+    if (type == weechat::channel::chat_type::MUC)
+    {
+        unreads.clear();
+        return;
+    }
+
     auto i = std::begin(unreads);
 
     // Capture the last unread entry for XEP-0490 MDS PEP publish below
