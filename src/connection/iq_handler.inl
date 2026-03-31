@@ -2668,7 +2668,104 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                     }
                 }
             }
-            
+
+            // XEP-0442: handle MAM-support discovery response for a pubsub service.
+            bool pubsub_mam_disco = stanza_id
+                && account.pubsub_mam_disco_queries.count(stanza_id);
+            if (pubsub_mam_disco)
+            {
+                std::string svc_jid = account.pubsub_mam_disco_queries[stanza_id];
+                account.pubsub_mam_disco_queries.erase(stanza_id);
+
+                // Check whether this service advertises urn:xmpp:mam:2
+                bool has_mam = false;
+                for (const auto &feat : features)
+                {
+                    if (feat == "urn:xmpp:mam:2") { has_mam = true; break; }
+                }
+
+                if (has_mam)
+                    account.pubsub_mam_services.insert(svc_jid);
+
+                // Flush deferred feed restores for this service.
+                auto def_it = account.pubsub_mam_deferred_feeds.find(svc_jid);
+                if (def_it != account.pubsub_mam_deferred_feeds.end())
+                {
+                    const int max_items = 20;
+                    for (const auto &feed_key : def_it->second)
+                    {
+                        auto slash = feed_key.find('/');
+                        if (slash == std::string::npos) continue;
+                        std::string node_name = feed_key.substr(slash + 1);
+
+                        if (has_mam)
+                        {
+                            // XEP-0442 + XEP-0413: MAM query with Order-By
+                            xmpp_string_guard uid_g(account.context, xmpp_uuid_gen(account.context));
+                            const char *uid = uid_g.ptr;
+                            if (!uid) continue;
+
+                            xmpp_stanza_t *miq = xmpp_iq_new(account.context, "set", uid);
+                            xmpp_stanza_set_to(miq, svc_jid.c_str());
+                            xmpp_stanza_set_from(miq, account.jid().data());
+
+                            xmpp_stanza_t *mq = xmpp_stanza_new(account.context);
+                            xmpp_stanza_set_name(mq, "query");
+                            xmpp_stanza_set_ns(mq, "urn:xmpp:mam:2");
+                            xmpp_stanza_set_attribute(mq, "node", node_name.c_str());
+
+                            // XEP-0413 Order-By: newest first
+                            xmpp_stanza_t *morder = xmpp_stanza_new(account.context);
+                            xmpp_stanza_set_name(morder, "order");
+                            xmpp_stanza_set_ns(morder, "urn:xmpp:order-by:1");
+                            xmpp_stanza_set_attribute(morder, "field", "creation-date");
+                            xmpp_stanza_add_child(mq, morder);
+                            xmpp_stanza_release(morder);
+
+                            // RSM <set><max>
+                            xmpp_stanza_t *mrset = xmpp_stanza_new(account.context);
+                            xmpp_stanza_set_name(mrset, "set");
+                            xmpp_stanza_set_ns(mrset, "http://jabber.org/protocol/rsm");
+                            xmpp_stanza_t *mmax = xmpp_stanza_new(account.context);
+                            xmpp_stanza_set_name(mmax, "max");
+                            xmpp_stanza_t *mmax_t = xmpp_stanza_new(account.context);
+                            std::string mmax_str = std::to_string(max_items);
+                            xmpp_stanza_set_text(mmax_t, mmax_str.c_str());
+                            xmpp_stanza_add_child(mmax, mmax_t); xmpp_stanza_release(mmax_t);
+                            xmpp_stanza_add_child(mrset, mmax);  xmpp_stanza_release(mmax);
+                            xmpp_stanza_add_child(mq, mrset);    xmpp_stanza_release(mrset);
+
+                            xmpp_stanza_add_child(miq, mq);
+                            xmpp_stanza_release(mq);
+
+                            account.pubsub_mam_queries[uid] = {svc_jid, node_name, {}, max_items};
+                            account.connection.send(miq);
+                            xmpp_stanza_release(miq);
+                        }
+                        else
+                        {
+                            // Fallback: plain XEP-0060 pubsub items IQ
+                            std::array<xmpp_stanza_t *, 2> pub_ch = {nullptr, nullptr};
+                            pub_ch[0] = stanza__iq_pubsub_items(account.context, nullptr,
+                                                                 node_name.c_str(), max_items);
+                            pub_ch[0] = stanza__iq_pubsub(account.context, nullptr, pub_ch.data(),
+                                with_noop("http://jabber.org/protocol/pubsub"));
+
+                            xmpp_string_guard fuid_g(account.context, xmpp_uuid_gen(account.context));
+                            const char *fuid = fuid_g.ptr;
+                            pub_ch[0] = stanza__iq(account.context, nullptr, pub_ch.data(),
+                                nullptr, fuid,
+                                account.jid().data(), svc_jid.c_str(), "get");
+                            if (fuid)
+                                account.pubsub_fetch_ids[fuid] = {svc_jid, node_name, {}, max_items};
+                            account.connection.send(pub_ch[0]);
+                            xmpp_stanza_release(pub_ch[0]);
+                        }
+                    }
+                    account.pubsub_mam_deferred_feeds.erase(def_it);
+                }
+            }
+
             if (user_initiated)
             {
                 account.user_disco_queries.erase(stanza_id);
@@ -3747,6 +3844,43 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                                    weechat_prefix("error"),
                                    bundle_jid.c_str(), bundle_device_id);
                 }
+            }
+        }
+    }
+
+    // XEP-0442: PubSub MAM <fin> — marks end of a pubsub node MAM query.
+    // The <fin> arrives as a child of the IQ result with id= matching our query IQ.
+    {
+        xmpp_stanza_t *pmam_fin = xmpp_stanza_get_child_by_name_and_ns(
+            stanza, "fin", "urn:xmpp:mam:2");
+        if (pmam_fin && id && type && weechat_strcasecmp(type, "result") == 0)
+        {
+            auto pq_it = account.pubsub_mam_queries.find(id);
+            if (pq_it != account.pubsub_mam_queries.end())
+            {
+                std::string svc_jid   = pq_it->second.service;
+                std::string node_name = pq_it->second.node;
+                account.pubsub_mam_queries.erase(pq_it);
+
+                std::string feed_key = fmt::format("{}/{}", svc_jid, node_name);
+
+                // Persist RSM <last> cursor so next reconnect can resume.
+                xmpp_stanza_t *prsm = xmpp_stanza_get_child_by_name_and_ns(
+                    pmam_fin, "set", "http://jabber.org/protocol/rsm");
+                if (prsm)
+                {
+                    xmpp_stanza_t *plast = xmpp_stanza_get_child_by_name(prsm, "last");
+                    if (plast)
+                    {
+                        xmpp_string_guard plast_text_g(account.context,
+                            xmpp_stanza_get_text(plast));
+                        if (plast_text_g.ptr)
+                            account.mam_cursor_set(
+                                fmt::format("pubsub:{}", feed_key),
+                                plast_text_g.ptr);
+                    }
+                }
+                return true;
             }
         }
     }

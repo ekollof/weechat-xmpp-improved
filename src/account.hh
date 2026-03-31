@@ -227,6 +227,23 @@ namespace weechat
         };
         std::unordered_map<std::string, pubsub_fetch_info> pubsub_fetch_ids;
 
+        // XEP-0442: Pubsub MAM — set of pubsub service JIDs known to support urn:xmpp:mam:2.
+        // Populated by the disco#info handler when a pubsub service advertises the MAM feature.
+        std::unordered_set<std::string> pubsub_mam_services;
+
+        // XEP-0442: pending MAM queries against a pubsub node.
+        // Maps IQ id → pubsub_fetch_info (same fields; service+node+max_items).
+        std::unordered_map<std::string, pubsub_fetch_info> pubsub_mam_queries;
+
+        // XEP-0442: disco#info queries sent to discover MAM support on pubsub services.
+        // Maps IQ id → service_jid.  When the result arrives we record in pubsub_mam_services
+        // and (if a feed restore was deferred) re-trigger restore_feed for that service.
+        std::unordered_map<std::string, std::string> pubsub_mam_disco_queries;
+
+        // XEP-0442: feed_keys deferred pending MAM-support disco for their pubsub service.
+        // Maps service_jid → list of feed_keys ("service/node") waiting for the result.
+        std::unordered_map<std::string, std::vector<std::string>> pubsub_mam_deferred_feeds;
+
         // XEP-0060: pending disco#items queries for PubSub node enumeration (/feed <service> --all).
         // Maps IQ id → service_jid
         std::unordered_map<std::string, std::string> pubsub_disco_queries;

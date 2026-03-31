@@ -933,8 +933,10 @@ Please keep to the existing indentation style (C++23, clang-format enforced).
 - ✅ XEP-0447: Stateless File Sharing (inline previews for Conversations/Dino/Gajim)
 - ✅ XEP-0490: Message Displayed Synchronization
 - ✅ XEP-0511: Link Metadata (incoming previews + outgoing OpenGraph)
-- ⚡ XEP-0277: Microblogging over XMPP (Deferred — publish/reply/retract via `/feed post|reply|retract`; receive PEP microblog push events; Atom metadata: title, author, categories, enclosures, geolocation, replies links; `/feed comments` fetches comments nodes)
-- ⚡ XEP-0472: Pubsub Social Feed (Experimental — publishes `pubsub#type=urn:xmpp:microblog:0`, advertises `urn:xmpp:pubsub-social-feed:1` in caps; `thr:in-reply-to@ref` uses real Atom entry IRI; feed-level `<feed>` metadata items rendered; XHTML/HTML Atom content properly rendered)
+ - ⚡ XEP-0277: Microblogging over XMPP (Deferred — publish/reply/retract via `/feed post|reply|retract`; receive PEP microblog push events; Atom metadata: title, author, categories, enclosures, geolocation, replies links; `/feed comments` fetches comments nodes)
+ - ⚡ XEP-0413: Order-By for MAM (Experimental — `urn:xmpp:order-by:1 field='creation-date'` included in XEP-0442 pubsub MAM queries for newest-first ordering; advertised in caps)
+ - ⚡ XEP-0442: Pubsub MAM (Experimental — on reconnect, disco#info probes each pubsub service; if `urn:xmpp:mam:2` is supported, fetches feed history via MAM with `node=` filter and XEP-0413 Order-By; falls back to XEP-0060 `max_items` for servers without pubsub MAM support; Atom entries extracted from forwarded MAM result messages and rendered to the feed buffer with dedup and alias assignment; RSM cursor persisted to LMDB)
+ - ⚡ XEP-0472: Pubsub Social Feed (Experimental — publishes `pubsub#type=urn:xmpp:microblog:0`, advertises `urn:xmpp:pubsub-social-feed:1` in caps; `thr:in-reply-to@ref` uses real Atom entry IRI; feed-level `<feed>` metadata items rendered; XHTML/HTML Atom content properly rendered)
 - ⚡ XEP-0433: Extended Channel Search (Searcher role; Search Service role not implemented)
 
 ### Planned

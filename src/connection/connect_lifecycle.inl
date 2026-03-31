@@ -375,9 +375,64 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         xmpp_stanza_release(iq);
         // freed by global_mam_id_g
 
+        // Helper: send a XEP-0442 MAM query against a pubsub node.
+        // Uses XEP-0413 Order-By (creation date descending) so we get the newest items.
+        // The result arrives as a sequence of forwarded <message> stanzas followed by
+        // a <fin> IQ result, handled in iq_handler.inl's pubsub MAM fin block.
+        auto send_pubsub_mam_query = [&](const std::string &service_jid,
+                                         const std::string &node_name,
+                                         int max_items)
+        {
+            xmpp_string_guard uid_g(account.context, xmpp_uuid_gen(account.context));
+            const char *uid = uid_g.ptr;
+            if (!uid) return;
+
+            xmpp_stanza_t *iq = xmpp_iq_new(account.context, "set", uid);
+            xmpp_stanza_set_to(iq, service_jid.c_str());
+            xmpp_stanza_set_from(iq, account.jid().data());
+
+            // <query xmlns='urn:xmpp:mam:2' node='node_name'>
+            xmpp_stanza_t *query = xmpp_stanza_new(account.context);
+            xmpp_stanza_set_name(query, "query");
+            xmpp_stanza_set_ns(query, "urn:xmpp:mam:2");
+            xmpp_stanza_set_attribute(query, "node", node_name.c_str());
+
+            // <order xmlns='urn:xmpp:order-by:1'> (XEP-0413)
+            // Request newest-first so the RSM <max> limit gives us the most recent items.
+            xmpp_stanza_t *order = xmpp_stanza_new(account.context);
+            xmpp_stanza_set_name(order, "order");
+            xmpp_stanza_set_ns(order, "urn:xmpp:order-by:1");
+            xmpp_stanza_set_attribute(order, "field", "creation-date");
+            xmpp_stanza_add_child(query, order);
+            xmpp_stanza_release(order);
+
+            // RSM <set> to limit to max_items
+            xmpp_stanza_t *rset = xmpp_stanza_new(account.context);
+            xmpp_stanza_set_name(rset, "set");
+            xmpp_stanza_set_ns(rset, "http://jabber.org/protocol/rsm");
+            xmpp_stanza_t *max_el = xmpp_stanza_new(account.context);
+            xmpp_stanza_set_name(max_el, "max");
+            xmpp_stanza_t *max_t = xmpp_stanza_new(account.context);
+            std::string max_str = std::to_string(max_items);
+            xmpp_stanza_set_text(max_t, max_str.c_str());
+            xmpp_stanza_add_child(max_el, max_t); xmpp_stanza_release(max_t);
+            xmpp_stanza_add_child(rset, max_el);  xmpp_stanza_release(max_el);
+            xmpp_stanza_add_child(query, rset);   xmpp_stanza_release(rset);
+
+            xmpp_stanza_add_child(iq, query);
+            xmpp_stanza_release(query);
+
+            account.pubsub_mam_queries[uid] = {service_jid, node_name, {}, max_items};
+
+            this->send(iq);
+            xmpp_stanza_release(iq);
+        };
+
         // Helper: restore one feed buffer by its feed_key ("service/node").
         // Creates the in-memory channel, re-fetches the last page of items.
         // Safe to call multiple times for the same key (try_emplace is idempotent).
+        // If MAM support on the service is not yet known, defers the fetch until
+        // the disco#info response for the service arrives.
         auto restore_feed = [&](const std::string &feed_key)
         {
             if (feed_key.empty()) return;
@@ -398,32 +453,48 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
             // Clear any stale cursor so reconnect always fetches the latest page
             account.mam_cursor_clear(fmt::format("pubsub:{}", feed_key));
 
-            // Build pubsub items IQ using only max_items (XEP-0060 §6.5.7).
-            // Omit RSM entirely: news.movim.eu ignores empty <before/> last-page
-            // semantics and returns the oldest page instead. Plain max_items causes
-            // the server to return the N most recently published items.
             const int max_items = 20;
-            std::array<xmpp_stanza_t *, 2> pub_children = {nullptr, nullptr};
-            pub_children[0] = stanza__iq_pubsub_items(account.context, nullptr,
-                                                       node_name.c_str(), max_items);
 
-            pub_children[0] = stanza__iq_pubsub(account.context, nullptr, pub_children.data(),
-                                                with_noop("http://jabber.org/protocol/pubsub"));
+            // XEP-0442: if the service is known to support MAM, query via MAM.
+            if (account.pubsub_mam_services.count(service_jid))
+            {
+                send_pubsub_mam_query(service_jid, node_name, max_items);
+                return;
+            }
 
-            xmpp_string_guard uid_g(account.context, xmpp_uuid_gen(account.context));
-            const char *uid = uid_g.ptr;
+            // The disco#items response handler already queries disco#info for every
+            // server component and records upload services. We piggyback on the same
+            // disco#info round-trip: check if a MAM-discovery query for this service
+            // is already in flight (keyed by service_jid in pubsub_mam_disco_queries).
+            bool disco_in_flight = false;
+            for (const auto &[disco_id, svc] : account.pubsub_mam_disco_queries)
+            {
+                if (svc == service_jid) { disco_in_flight = true; break; }
+            }
 
-            pub_children[0] = stanza__iq(account.context, nullptr, pub_children.data(),
-                                         nullptr, uid,
-                                         account.jid().data(),
-                                         service_jid.c_str(),
-                                         "get");
+            if (!disco_in_flight)
+            {
+                // Send a fresh disco#info to learn whether this service supports MAM.
+                xmpp_string_guard disco_id_g(account.context, xmpp_uuid_gen(account.context));
+                const char *disco_id = disco_id_g.ptr;
+                if (disco_id)
+                {
+                    account.pubsub_mam_disco_queries[disco_id] = service_jid;
 
-            if (uid)
-                account.pubsub_fetch_ids[uid] = {service_jid, node_name, {}, max_items};
+                    account.connection.send(stanza::iq()
+                                .from(account.jid())
+                                .to(service_jid)
+                                .type("get")
+                                .id(disco_id)
+                                .xep0030()
+                                .query()
+                                .build(account.context)
+                                .get());
+                }
+            }
 
-            this->send(pub_children[0]);
-            xmpp_stanza_release(pub_children[0]);
+            // Defer the actual fetch until the disco#info result arrives.
+            account.pubsub_mam_deferred_feeds[service_jid].push_back(feed_key);
         };
 
         // Track which feed_keys have been scheduled for restore to avoid

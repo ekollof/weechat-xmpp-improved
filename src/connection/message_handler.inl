@@ -205,6 +205,230 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
             stanza, "result", "urn:xmpp:mam:2");
         if (result)
         {
+            // XEP-0442: pubsub MAM result — forwarded stanza contains a pubsub
+            // <event> with the original item payload. Process it here so we can
+            // build the correct feed_key from the query context (service JID from
+            // our IQ) rather than from the inner message's from= attribute.
+            const char *queryid = xmpp_stanza_get_attribute(result, "queryid");
+            if (queryid && account.pubsub_mam_queries.count(queryid))
+            {
+                const auto &pq = account.pubsub_mam_queries.at(queryid);
+                std::string feed_service = pq.service;
+                std::string node_name    = pq.node;
+                std::string feed_key     = fmt::format("{}/{}", feed_service, node_name);
+
+                auto [ch_it, inserted] = account.channels.try_emplace(
+                    feed_key,
+                    account, weechat::channel::chat_type::FEED,
+                    feed_key, feed_key);
+                if (inserted)
+                    account.feed_open_register(feed_key);
+                weechat::channel &feed_ch = ch_it->second;
+
+                forwarded = xmpp_stanza_get_child_by_name_and_ns(
+                    result, "forwarded", "urn:xmpp:forward:0");
+                if (forwarded)
+                {
+                    xmpp_stanza_t *fwd_msg = xmpp_stanza_get_child_by_name(forwarded, "message");
+                    if (fwd_msg)
+                    {
+                        // Find the <event> or direct <item> child
+                        xmpp_stanza_t *fwd_event = xmpp_stanza_get_child_by_name_and_ns(
+                            fwd_msg, "event", "http://jabber.org/protocol/pubsub#event");
+                        xmpp_stanza_t *fwd_items = fwd_event
+                            ? xmpp_stanza_get_child_by_name(fwd_event, "items") : nullptr;
+
+                        if (fwd_items)
+                        {
+                            // Extract the publisher (from= of the inner message or publisher= on item)
+                            const char *publisher_jid = xmpp_stanza_get_from(fwd_msg);
+
+                            for (xmpp_stanza_t *fwd_item = xmpp_stanza_get_children(fwd_items);
+                                 fwd_item; fwd_item = xmpp_stanza_get_next(fwd_item))
+                            {
+                                const char *child_name = xmpp_stanza_get_name(fwd_item);
+                                if (!child_name || weechat_strcasecmp(child_name, "item") != 0)
+                                    continue;
+
+                                const char *item_id_raw = xmpp_stanza_get_id(fwd_item);
+                                if (item_id_raw && account.feed_item_seen(feed_key, item_id_raw))
+                                    continue;
+
+                                xmpp_stanza_t *entry = xmpp_stanza_get_child_by_name_and_ns(
+                                    fwd_item, "entry", "http://www.w3.org/2005/Atom");
+                                if (!entry)
+                                    entry = xmpp_stanza_get_child_by_name(fwd_item, "entry");
+                                if (!entry) continue;
+
+                                const char *pub = xmpp_stanza_get_attribute(fwd_item, "publisher");
+                                if (!pub) pub = publisher_jid;
+
+                                atom_entry ae = parse_atom_entry(account.context, entry, pub);
+                                if (item_id_raw && !ae.item_id.empty())
+                                    account.feed_atom_id_set(feed_key, item_id_raw, ae.item_id);
+                                if (item_id_raw && !ae.replies_link.empty())
+                                    account.feed_replies_link_set(feed_key, item_id_raw, ae.replies_link);
+
+                                int item_alias = -1;
+                                if (item_id_raw && *item_id_raw)
+                                    item_alias = account.feed_alias_assign(feed_key, item_id_raw);
+
+                                if (ae.empty()) continue;
+
+                                const std::string &title    = ae.title;
+                                const std::string &pubdate  = ae.pubdate;
+                                const std::string &author   = ae.author;
+                                const std::string &reply_to = ae.reply_to;
+                                const std::string &via_link = ae.via_link;
+                                const std::string &body     = ae.body();
+                                const char *pfx  = weechat_prefix("join");
+                                const char *bold = weechat_color("bold");
+                                const char *rst  = weechat_color("reset");
+                                const char *dim  = weechat_color("darkgray");
+                                const char *grn  = weechat_color("green");
+
+                                std::string link = ae.link;
+                                if (link.empty() && item_id_raw && *item_id_raw)
+                                    link = fmt::format("xmpp:{}?;node={};item={}",
+                                                       feed_service, node_name, item_id_raw);
+
+                                std::string alias_pfx;
+                                if (item_alias > 0)
+                                    alias_pfx = fmt::format("#{}", item_alias);
+
+                                if (!title.empty())
+                                {
+                                    if (!author.empty() && !pubdate.empty())
+                                        weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                            "%s%s%s%s %s%s%s  [%s%s%s] — %s",
+                                            pfx,
+                                            alias_pfx.empty() ? "" : grn,
+                                            alias_pfx.c_str(),
+                                            alias_pfx.empty() ? "" : rst,
+                                            bold, title.c_str(), rst,
+                                            dim, author.c_str(), rst,
+                                            pubdate.c_str());
+                                    else if (!author.empty())
+                                        weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                            "%s%s%s%s %s%s%s  [%s%s%s]",
+                                            pfx,
+                                            alias_pfx.empty() ? "" : grn,
+                                            alias_pfx.c_str(),
+                                            alias_pfx.empty() ? "" : rst,
+                                            bold, title.c_str(), rst,
+                                            dim, author.c_str(), rst);
+                                    else if (!pubdate.empty())
+                                        weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                            "%s%s%s%s %s%s%s — %s",
+                                            pfx,
+                                            alias_pfx.empty() ? "" : grn,
+                                            alias_pfx.c_str(),
+                                            alias_pfx.empty() ? "" : rst,
+                                            bold, title.c_str(), rst,
+                                            pubdate.c_str());
+                                    else
+                                        weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                            "%s%s%s%s %s%s%s",
+                                            pfx,
+                                            alias_pfx.empty() ? "" : grn,
+                                            alias_pfx.c_str(),
+                                            alias_pfx.empty() ? "" : rst,
+                                            bold, title.c_str(), rst);
+                                }
+                                else
+                                {
+                                    if (!author.empty() && !pubdate.empty())
+                                        weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                            "%s%s%s%s  [%s%s%s] — %s",
+                                            pfx,
+                                            alias_pfx.empty() ? "" : grn,
+                                            alias_pfx.c_str(),
+                                            alias_pfx.empty() ? "" : rst,
+                                            dim, author.c_str(), rst,
+                                            pubdate.c_str());
+                                    else if (!author.empty())
+                                        weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                            "%s%s%s%s  [%s%s%s]",
+                                            pfx,
+                                            alias_pfx.empty() ? "" : grn,
+                                            alias_pfx.c_str(),
+                                            alias_pfx.empty() ? "" : rst,
+                                            dim, author.c_str(), rst);
+                                    else if (!pubdate.empty())
+                                        weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                            "%s%s%s%s  — %s",
+                                            pfx,
+                                            alias_pfx.empty() ? "" : grn,
+                                            alias_pfx.c_str(),
+                                            alias_pfx.empty() ? "" : rst,
+                                            pubdate.c_str());
+                                }
+
+                                if (!reply_to.empty())
+                                {
+                                    std::string reply_label;
+                                    auto item_eq = reply_to.rfind("item=");
+                                    if (item_eq != std::string::npos)
+                                    {
+                                        std::string reply_uuid = reply_to.substr(item_eq + 5);
+                                        int ralias = account.feed_alias_lookup(feed_key, reply_uuid);
+                                        if (ralias > 0)
+                                            reply_label = fmt::format("#{}", ralias);
+                                        else
+                                            reply_label = reply_uuid;
+                                    }
+                                    else
+                                        reply_label = reply_to;
+                                    weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                        "  %sIn reply to:%s %s", dim, rst, reply_label.c_str());
+                                }
+
+                                if (!via_link.empty())
+                                    weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                        "  %sRepeated from:%s %s", dim, rst, via_link.c_str());
+
+                                if (!link.empty())
+                                    weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                        "  %s", link.c_str());
+
+                                if (!ae.replies_link.empty())
+                                {
+                                    const std::string &comments_ref =
+                                        alias_pfx.empty()
+                                            ? (item_id_raw ? std::string(item_id_raw) : std::string())
+                                            : alias_pfx;
+                                    if (!comments_ref.empty())
+                                    {
+                                        if (ae.comments_count >= 0)
+                                            weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                                "  %sComments (%d):%s /feed comments %s",
+                                                dim, ae.comments_count, rst, comments_ref.c_str());
+                                        else
+                                            weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                                "  %sComments:%s /feed comments %s",
+                                                dim, rst, comments_ref.c_str());
+                                    }
+                                }
+
+                                if (!body.empty())
+                                {
+                                    weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                        "  %s\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500%s",
+                                        dim, rst);
+                                    weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                        "  %s", body.c_str());
+                                }
+
+                                if (item_id_raw)
+                                    account.feed_item_mark_seen(feed_key, item_id_raw);
+                            }
+                        }
+                    }
+                }
+                return 1;
+            }
+
+            // Regular MAM result (chat/MUC message archive)
             forwarded = xmpp_stanza_get_child_by_name_and_ns(
                 result, "forwarded", "urn:xmpp:forward:0");
             if (forwarded != nullptr)
@@ -3035,6 +3259,10 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash, 
         "urn:xmpp:pubsub-social-feed:1",
         // XEP-0277: receive microblog PEP push events from contacts
         "urn:xmpp:microblog:0+notify",
+        // XEP-0442: Pubsub Message Archive Management
+        "urn:xmpp:mam:2#pubsub",
+        // XEP-0413: Order-By for MAM queries
+        "urn:xmpp:order-by:1",
     };
 
     std::vector<std::string> sorted_features;
