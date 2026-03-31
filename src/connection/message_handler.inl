@@ -2859,7 +2859,8 @@ message_handler_after_omemo:
     // XEP-0461: Message Replies - extract reply context
     xmpp_stanza_t *reply_elem = xmpp_stanza_get_child_by_name_and_ns(stanza, "reply", "urn:xmpp:reply:0");
     const char *reply_to_id = reply_elem ? xmpp_stanza_get_attribute(reply_elem, "id") : nullptr;
-    std::string reply_prefix;
+    std::string reply_prefix;      // the excerpt text for the quote line
+    std::string reply_quote_nick;  // nick of the message being replied to
     
     if (reply_to_id)
     {
@@ -2969,10 +2970,21 @@ message_handler_after_omemo:
                                     : std::string(clean_text);
 
                                 if (plain_text) free(plain_text);
-                                
-                                reply_prefix = std::string(weechat_color("cyan")) + 
-                                             "↪ " + excerpt + " " +
-                                             weechat_color("resetcolor");
+
+                                // Extract the original sender's nick from the line tags.
+                                for (int nn = 0; nn < tags_count; nn++)
+                                {
+                                    str_tag = fmt::format("{}|tags_array", nn);
+                                    const char *ntag = weechat_hdata_string(
+                                        weechat_hdata_get("line_data"), line_data, str_tag.c_str());
+                                    if (ntag && strncmp(ntag, "nick_", 5) == 0)
+                                    {
+                                        reply_quote_nick = ntag + 5;
+                                        break;
+                                    }
+                                }
+
+                                reply_prefix = excerpt;
                             }
                             break;
                         }
@@ -2987,9 +2999,7 @@ message_handler_after_omemo:
         // If we didn't find the original, just show reply indicator
         if (reply_prefix.empty())
         {
-            reply_prefix = std::string(weechat_color("cyan")) + 
-                         "↪ [reply] " +
-                         weechat_color("resetcolor");
+            reply_prefix = "[reply]";
         }
     }
     
@@ -3392,13 +3402,23 @@ message_handler_after_omemo:
     {
         display_text = difftext.c_str();
     }
-    
-    // Prepend reply context if this is a reply
-    std::string final_text;
+
+    std::string final_text; // used by spoiler / ephemeral / oob suffix blocks below
+
+    // XEP-0461: emit reply context as a separate quote line above the message.
+    // Format:  (action-prefix)  │ nick: excerpt
+    // Using notify_none,no_log so it doesn't trigger highlights or log duplication.
     if (!reply_prefix.empty())
     {
-        final_text = reply_prefix + (display_text ? display_text : "");
-        display_text = final_text.c_str();
+        std::string quote_line = std::string(weechat_color("darkgray"))
+            + "│ "
+            + weechat_color("cyan");
+        if (!reply_quote_nick.empty())
+            quote_line += reply_quote_nick + weechat_color("darkgray") + ": ";
+        quote_line += weechat_color("darkgray") + reply_prefix + weechat_color("resetcolor");
+        weechat_printf_date_tags(channel->buffer, date,
+            "notify_none,no_log,xmpp_reply_quote",
+            "%s\t%s", weechat_prefix("action"), quote_line.c_str());
     }
 
     // XEP-0382: Spoiler Messages — prepend spoiler warning before the body
