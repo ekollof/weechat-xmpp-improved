@@ -27,8 +27,9 @@ struct atom_entry
 {
     std::string title;          // <title>
     std::string summary;        // <summary>
-    std::string content;        // <content> body text (XHTML stripped to plain text if needed)
+    std::string content;        // <content> body text (rendered to WeeChat codes if needed)
     bool        content_is_xhtml = false; // true when <content type='xhtml'>
+    std::string content_type;   // winning <content> type attr: "text", "xhtml", or "html"
     std::string pubdate;        // <published>
     std::string updated;        // <updated>
     std::string link;           // <link rel='alternate' href='...'/>

@@ -4,6 +4,7 @@
 
 #include "atom.hh"
 #include "xhtml.hh"
+#include "util.hh"
 
 #include <cstdlib>
 #include <strings.h>  // strcasecmp (POSIX)
@@ -97,11 +98,25 @@ atom_entry parse_atom_entry(xmpp_ctx_t *ctx, xmpp_stanza_t *entry,
 
         // Preference order: plain text > XHTML rendered > HTML stripped
         if (found_text)
-            e.content = std::move(text_content);
+        {
+            e.content      = std::move(text_content);
+            e.content_type = "text";
+        }
         else if (found_xhtml)
-            e.content = std::move(xhtml_content);
+        {
+            e.content      = std::move(xhtml_content);
+            e.content_type = "xhtml";
+        }
         else if (found_html)
-            e.content = std::move(html_content);
+        {
+            e.content      = std::move(html_content);
+            e.content_type = "html";
+        }
+
+        // Apply Markdown renderer for plain-text content so that authors who
+        // write Markdown in their microblog posts get visual formatting in WeeChat.
+        if (e.content_type == "text" || e.content_type.empty())
+            e.content = apply_markdown_to_weechat(e.content);
     }
 
     // <author><name>…</name><uri>…</uri></author>

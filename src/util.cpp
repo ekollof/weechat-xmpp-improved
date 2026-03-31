@@ -369,3 +369,303 @@ std::string apply_xep394_markup(xmpp_stanza_t *stanza, const std::string &plain_
 
     return result;
 }
+
+// Markdown renderer for Atom feed plain-text content.
+//
+// Handles a barebones subset of Markdown and maps it to WeeChat colour/
+// attribute codes so that plain-text microblog posts authored in Markdown
+// (Movim, Libervia, etc.) are displayed with visual formatting in WeeChat.
+//
+// Block-level constructs are identified at the start of each line.
+// Inline spans are processed left-to-right within non-code lines.
+// Images are matched before links because the pattern is longer.
+// No support for nested lists, tables, footnotes, or raw HTML pass-through.
+std::string apply_markdown_to_weechat(const std::string &text)
+{
+    if (text.empty()) return text;
+
+    // Split input into lines (preserving trailing newline awareness).
+    std::vector<std::string> lines;
+    {
+        std::istringstream ss(text);
+        std::string line;
+        while (std::getline(ss, line))
+            lines.push_back(line);
+    }
+
+    std::string result;
+    result.reserve(text.size() * 2);
+
+    const char *bold       = weechat_color("bold");
+    const char *bold_off   = weechat_color("-bold");
+    const char *italic     = weechat_color("italic");
+    const char *italic_off = weechat_color("-italic");
+    const char *gray       = weechat_color("gray");
+    const char *darkgray   = weechat_color("darkgray");
+    const char *green      = weechat_color("green");
+    const char *blue       = weechat_color("blue");
+    const char *dim        = weechat_color("darkgray");
+    const char *rst        = weechat_color("resetcolor");
+
+    // Helper: apply inline spans to a single line of text.
+    // Processes: images, links, **bold**/__bold__, *italic*/_italic_,
+    // `code`, ~~strikethrough~~.
+    // `in_code_block` suppresses inline processing inside fenced blocks.
+    auto apply_inline = [&](const std::string &ln) -> std::string
+    {
+        std::string out;
+        out.reserve(ln.size() * 2);
+        size_t i = 0;
+        const size_t n = ln.size();
+
+        while (i < n)
+        {
+            // ![alt](url) — image (must come before link check)
+            if (i + 1 < n && ln[i] == '!' && ln[i+1] == '[')
+            {
+                size_t alt_start = i + 2;
+                size_t alt_end   = ln.find(']', alt_start);
+                if (alt_end != std::string::npos && alt_end + 1 < n && ln[alt_end+1] == '(')
+                {
+                    size_t url_start = alt_end + 2;
+                    size_t url_end   = ln.find(')', url_start);
+                    if (url_end != std::string::npos)
+                    {
+                        std::string alt = ln.substr(alt_start, alt_end - alt_start);
+                        out += dim;
+                        out += alt.empty() ? "[Image]" : "[Image: " + alt + "]";
+                        out += rst;
+                        i = url_end + 1;
+                        continue;
+                    }
+                }
+            }
+
+            // [text](url) — link
+            if (ln[i] == '[')
+            {
+                size_t text_start = i + 1;
+                size_t text_end   = ln.find(']', text_start);
+                if (text_end != std::string::npos && text_end + 1 < n && ln[text_end+1] == '(')
+                {
+                    size_t url_start = text_end + 2;
+                    size_t url_end   = ln.find(')', url_start);
+                    if (url_end != std::string::npos)
+                    {
+                        std::string link_text = ln.substr(text_start, text_end - text_start);
+                        std::string url       = ln.substr(url_start, url_end - url_start);
+                        out += link_text;
+                        out += " (";
+                        out += blue;
+                        out += url;
+                        out += rst;
+                        out += ")";
+                        i = url_end + 1;
+                        continue;
+                    }
+                }
+            }
+
+            // **bold** or __bold__
+            if (i + 1 < n && ((ln[i] == '*' && ln[i+1] == '*') ||
+                               (ln[i] == '_' && ln[i+1] == '_')))
+            {
+                char marker = ln[i];
+                size_t end = ln.find({marker, marker}, i + 2);
+                if (end != std::string::npos)
+                {
+                    out += bold;
+                    out += ln.substr(i + 2, end - (i + 2));
+                    out += bold_off;
+                    i = end + 2;
+                    continue;
+                }
+            }
+
+            // ~~strikethrough~~
+            if (i + 1 < n && ln[i] == '~' && ln[i+1] == '~')
+            {
+                size_t end = ln.find("~~", i + 2);
+                if (end != std::string::npos)
+                {
+                    out += darkgray;
+                    out += ln.substr(i + 2, end - (i + 2));
+                    out += rst;
+                    i = end + 2;
+                    continue;
+                }
+            }
+
+            // `inline code`
+            if (ln[i] == '`' && (i + 1 >= n || ln[i+1] != '`'))
+            {
+                size_t end = ln.find('`', i + 1);
+                if (end != std::string::npos)
+                {
+                    out += gray;
+                    out += ln.substr(i + 1, end - (i + 1));
+                    out += rst;
+                    i = end + 1;
+                    continue;
+                }
+            }
+
+            // *italic* or _italic_ (single marker, not already consumed as **)
+            if ((ln[i] == '*' || ln[i] == '_') &&
+                (i == 0 || isspace((unsigned char)ln[i-1]) || ispunct((unsigned char)ln[i-1])) &&
+                i + 1 < n && !isspace((unsigned char)ln[i+1]))
+            {
+                char marker = ln[i];
+                size_t end = i + 1;
+                while (end < n && ln[end] != marker && ln[end] != '\n')
+                    ++end;
+                if (end < n && ln[end] == marker && !isspace((unsigned char)ln[end-1]) &&
+                    (end + 1 >= n || isspace((unsigned char)ln[end+1]) || ispunct((unsigned char)ln[end+1])))
+                {
+                    out += italic;
+                    out += ln.substr(i + 1, end - (i + 1));
+                    out += italic_off;
+                    i = end + 1;
+                    continue;
+                }
+            }
+
+            out += ln[i++];
+        }
+        return out;
+    };
+
+    bool in_code_block = false;
+
+    for (size_t li = 0; li < lines.size(); ++li)
+    {
+        const std::string &ln = lines[li];
+
+        // --- Fenced code block delimiter (``` at start of line) ---
+        if (ln.size() >= 3 && ln[0] == '`' && ln[1] == '`' && ln[2] == '`')
+        {
+            in_code_block = !in_code_block;
+            if (in_code_block)
+                result += gray;
+            else
+                result += rst;
+            // Optionally show the language hint (characters after the ```)
+            // but don't render it prominently — just append dimly.
+            std::string lang = ln.substr(3);
+            // Trim whitespace
+            auto s = lang.find_first_not_of(" \t");
+            if (s != std::string::npos)
+            {
+                lang = lang.substr(s);
+                result += dim;
+                result += "[" + lang + "]";
+                result += (in_code_block ? gray : rst);
+            }
+            result += '\n';
+            continue;
+        }
+
+        // Inside a fenced code block — pass through verbatim (already gray).
+        if (in_code_block)
+        {
+            result += ln;
+            result += '\n';
+            continue;
+        }
+
+        // --- Horizontal rule: ---, ***, or ___ (3 or more, whole line) ---
+        {
+            bool is_hr = false;
+            if (ln.size() >= 3)
+            {
+                char c = ln[0];
+                if (c == '-' || c == '*' || c == '_')
+                {
+                    is_hr = true;
+                    for (char ch : ln)
+                        if (ch != c && ch != ' ') { is_hr = false; break; }
+                }
+            }
+            if (is_hr)
+            {
+                result += dim;
+                result += "────────────────────────────────────────";
+                result += rst;
+                result += '\n';
+                continue;
+            }
+        }
+
+        // --- Headings: # H1, ## H2, ### H3 ---
+        {
+            size_t hashes = 0;
+            while (hashes < ln.size() && ln[hashes] == '#')
+                ++hashes;
+            if (hashes >= 1 && hashes <= 6 &&
+                hashes < ln.size() && ln[hashes] == ' ')
+            {
+                std::string heading = ln.substr(hashes + 1);
+                result += bold;
+                result += apply_inline(heading);
+                result += bold_off;
+                result += '\n';
+                continue;
+            }
+        }
+
+        // --- Blockquote: > text ---
+        if (!ln.empty() && ln[0] == '>' &&
+            (ln.size() == 1 || ln[1] == ' ' || ln[1] == '>'))
+        {
+            // Strip the leading "> " and recurse for nested quotes
+            std::string inner = (ln.size() > 2 && ln[1] == ' ') ? ln.substr(2)
+                              : (ln.size() > 1)                  ? ln.substr(1)
+                              : "";
+            result += green;
+            result += "> ";
+            result += rst;
+            result += apply_inline(inner);
+            result += '\n';
+            continue;
+        }
+
+        // --- Unordered list: - item or * item (not *** which is handled above) ---
+        if (ln.size() >= 2 &&
+            (ln[0] == '-' || ln[0] == '*') &&
+            ln[1] == ' ')
+        {
+            result += "• ";
+            result += apply_inline(ln.substr(2));
+            result += '\n';
+            continue;
+        }
+
+        // --- Ordered list: 1. item ---
+        {
+            size_t j = 0;
+            while (j < ln.size() && isdigit((unsigned char)ln[j]))
+                ++j;
+            if (j > 0 && j < ln.size() && ln[j] == '.' &&
+                j + 1 < ln.size() && ln[j+1] == ' ')
+            {
+                result += ln.substr(0, j);   // keep the number
+                result += ". ";
+                result += apply_inline(ln.substr(j + 2));
+                result += '\n';
+                continue;
+            }
+        }
+
+        // --- Plain line: apply inline spans ---
+        result += apply_inline(ln);
+        result += '\n';
+    }
+
+    // Trim trailing newline added by the loop (the original text may or may
+    // not have ended with one; we normalise to match the input).
+    if (!result.empty() && result.back() == '\n' &&
+        (text.empty() || text.back() != '\n'))
+        result.pop_back();
+
+    return result;
+}
