@@ -48,7 +48,7 @@ rpmdev-setuptree
 
 # Create source tarball
 cd ..
-tar czf ~/rpmbuild/SOURCES/xepher-0.2.0.tar.gz xepher/
+tar czf ~/rpmbuild/SOURCES/xepher-0.3.0.tar.gz xepher/
 
 # Copy spec file
 cp xepher/packaging/rpm/weechat-xmpp.spec ~/rpmbuild/SPECS/xepher.spec
@@ -101,11 +101,12 @@ All packages install:
 ## Dependencies
 
 ### Runtime Dependencies
-- weechat (>= 1.0)
+- weechat (>= 3.0)
 - libstrophe
 - libxml2
 - lmdb
 - libsignal-protocol-c
+- libomemo-c
 - gpgme
 - libfmt
 - libcurl
@@ -191,7 +192,7 @@ makepkg --printsrcinfo > .SRCINFO
 
 # Commit and push
 git add PKGBUILD .SRCINFO
-git commit -m "Update to version 0.2.0"
+git commit -m "Update to version 0.3.0"
 git push
 ```
 

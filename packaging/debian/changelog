@@ -1,3 +1,15 @@
+xepher (0.3.0-1) unstable; urgency=medium
+
+  * Update to v0.3.0
+  * Add macOS/Homebrew build support
+  * Fix: keg-only Homebrew headers and libs resolved via pkg-config
+  * Fix: bison/flex/llvm keg-only binaries used on macOS
+  * Fix: default CC/CXX to Homebrew clang/clang++ on macOS
+  * Add libomemo-c runtime and build dependency
+  * Raise minimum weechat version to 3.0
+
+ -- Emiel Kollof <emiel@kollof.nl>  Tue, 31 Mar 2026 00:00:00 +0000
+
 xepher (0.2.0-1) unstable; urgency=medium
 
   * Initial Debian package release

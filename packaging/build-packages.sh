@@ -5,7 +5,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-VERSION="${1:-0.2.0}"
+VERSION="${1:-0.3.0}"
 
 echo "Building packages for Xepher version $VERSION"
 echo "Project directory: $PROJECT_DIR"

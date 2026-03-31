@@ -1,6 +1,6 @@
 # Maintainer: Emiel Kollof <emiel@kollof.nl>
 pkgname=xepher
-pkgver=0.2.0
+pkgver=0.3.0
 pkgrel=1
 pkgdesc="Xepher — WeeChat plugin for XMPP/Jabber protocol"
 arch=('x86_64' 'aarch64')
@@ -12,13 +12,14 @@ depends=(
     'libxml2'
     'lmdb'
     'libsignal-protocol-c'
+    'libomemo-c'
     'gpgme'
     'fmt'
     'curl'
     'openssl'
 )
 makedepends=(
-    'gcc>=12'
+    'gcc'
     'git'
     'bison'
     'flex'
