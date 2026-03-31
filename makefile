@@ -22,11 +22,18 @@ SHELL = /bin/sh
 RM ?= rm -f
 FIND ?= find
 
-INCLUDES=-Ilibstrophe -Ideps/lmdbxx -Ideps -Isrc -I. \
+INCLUDES=-Ideps/lmdbxx -Ideps -Isrc -I. \
 	 $(shell xml2-config --cflags) \
+	 $(shell pkg-config --cflags libstrophe) \
+	 -I$(shell pkg-config --variable=includedir weechat) \
+	 $(shell pkg-config --cflags fmt) \
+	 $(shell pkg-config --cflags openssl) \
 	 $(shell pkg-config --cflags gpgme) \
 	 $(shell pkg-config --cflags libsignal-protocol-c) \
 	 $(shell pkg-config --cflags libomemo-c)
+ifeq ($(UNAME_S),Darwin)
+INCLUDES+=-I$(HOMEBREW_PREFIX)/include
+endif
 ifeq ($(UNAME_S),Darwin)
 DWARF_FLAG := -g
 else
@@ -71,10 +78,13 @@ endif
 LDFLAGS+=$(DBGLDFLAGS) \
 	 -std=c++23 $(DWARF_FLAG) \
 	 $(DBGCFLAGS)
-LDLIBS=-lstrophe \
+ifeq ($(UNAME_S),Darwin)
+LDFLAGS+=-L$(HOMEBREW_PREFIX)/lib
+endif
+LDLIBS=$(shell pkg-config --libs libstrophe) \
 	   -lpthread \
 	   -lcurl \
-	   -lcrypto \
+	   $(shell pkg-config --libs libcrypto) \
 	   $(shell xml2-config --libs) \
 	   $(shell pkg-config --libs gpgme) \
 		   $(shell pkg-config --libs libomemo-c) \
@@ -193,14 +203,14 @@ sexp/sexp.a: sexp/parser.o sexp/lexer.o sexp/driver.o
 sexp/parser.o: sexp/parser.yy
 	cd sexp && bison -t -d -v parser.yy
 ifneq ($(IS_CLANG),)
-	$(CXX) $(CPPFLAGS) -fvisibility=default -Wno-unused-variable -c sexp/parser.tab.cc -o $@
+	$(CXX) $(CPPFLAGS) -fvisibility=default -Wno-unused-variable -Wno-unused-but-set-variable -c sexp/parser.tab.cc -o $@
 else
 	$(CXX) $(CPPFLAGS) -fvisibility=default -Wno-unused-but-set-variable -c sexp/parser.tab.cc -o $@
 endif
 
 sexp/lexer.o: sexp/lexer.l
 	cd sexp && flex -d --outfile=lexer.yy.cc lexer.l
-	$(CXX) $(CPPFLAGS) -fvisibility=default -c sexp/lexer.yy.cc -o $@
+	$(CXX) $(CPPFLAGS) -fvisibility=default -Wno-sign-compare -c sexp/lexer.yy.cc -o $@
 
 sexp/driver.o: sexp/driver.cpp
 	$(CXX) $(CPPFLAGS) -fvisibility=default -c $< -o $@

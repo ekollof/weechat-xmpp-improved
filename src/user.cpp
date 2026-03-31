@@ -138,11 +138,12 @@ void weechat::user::nicklist_add(weechat::account *account,
     if (this->profile.affiliation.has_value() && this->profile.affiliation.value() == "owner")
         group = "~";
     ptr_group = weechat_nicklist_search_group(ptr_buffer, nullptr, group);
+    auto nick_colour = get_colour_for_nicklist();
     weechat_nicklist_add_nick(ptr_buffer, ptr_group,
                               name,
                               this->is_away ?
                               "weechat.color.nicklist_away" :
-                              get_colour_for_nicklist().data(),
+                              nick_colour.data(),
                               group,
                               "bar_fg",
                               1);
@@ -176,9 +177,10 @@ void weechat::user::nicklist_set_color(weechat::account *account,
     struct t_gui_nick *ptr_nick = weechat_nicklist_search_nick(ptr_buffer, nullptr, name);
     if (ptr_nick)
     {
+        auto nick_colour = get_colour_for_nicklist();
         const char *color = this->is_away
             ? "weechat.color.nicklist_away"
-            : get_colour_for_nicklist().data();
+            : nick_colour.data();
         weechat_nicklist_nick_set(ptr_buffer, ptr_nick, "color", color);
     }
 }

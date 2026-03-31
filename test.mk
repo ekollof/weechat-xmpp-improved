@@ -2,7 +2,7 @@
 # vim: set noexpandtab:
 
 ifeq ($(UNAME_S),Darwin)
-TEST_LDFLAGS := -Wl,-undefined,dynamic_lookup -Wl,-rpath,$(PWD)
+TEST_LDFLAGS := -Wl,-undefined,dynamic_lookup -Wl,-rpath,$(PWD)/tests
 else
 TEST_LDFLAGS := -Wl,--allow-shlib-undefined -Wl,-rpath,$$PWD
 endif
@@ -20,11 +20,15 @@ debug: xmpp.so
 endif
 
 tests/xmpp.cov.so: $(COVS) $(DEPS) $(HDRS)
+ifeq ($(UNAME_S),Darwin)
+	$(CXX) --coverage $(SHARED_FLAG) $(LDFLAGS) -Wl,-install_name,@rpath/xmpp.cov.so -o tests/xmpp.cov.so $(AS_NEEDED) $(COVS) $(DEPS) $(LDLIBS)
+else
 	$(CXX) --coverage $(SHARED_FLAG) $(LDFLAGS) -o tests/xmpp.cov.so $(AS_NEEDED) $(COVS) $(DEPS) $(LDLIBS)
+endif
 
 tests/run: $(COVS) tests/main.cc tests/xmpp.cov.so $(wildcard tests/*.inl)
 	cd tests && $(CXX) $(CPPFLAGS) $(LDFLAGS) -o run main.cc $(patsubst %,../%,$(DEPS)) $(LDLIBS) \
-		$(TEST_LDFLAGS) $(PWD)/xmpp.cov.so
+		$(TEST_LDFLAGS) $(PWD)/tests/xmpp.cov.so
 
 .PHONY: test
 test: tests/run

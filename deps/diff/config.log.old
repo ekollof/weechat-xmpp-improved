@@ -1,0 +1,179 @@
+configure.local: reading...
+HAVE___PROGNAME=1
+
+arc4random: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_ARC4RANDOM  -o test-arc4random tests.c 
+arc4random: cc succeeded
+arc4random: yes
+
+capsicum: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_CAPSICUM  -o test-capsicum tests.c 
+tests.c:20:10: fatal error: 'sys/capsicum.h' file not found
+   20 | #include <sys/capsicum.h>
+      |          ^~~~~~~~~~~~~~~~
+1 error generated.
+capsicum: cc failed with 1
+
+err: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_ERR  -o test-err tests.c 
+err: cc succeeded
+test-err: 1. warnx
+test-err: 2. warn: Undefined error: 0
+test-err: 3. err: Undefined error: 0
+err: yes
+
+explicit_bzero: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_EXPLICIT_BZERO  -o test-explicit_bzero tests.c 
+tests.c:66:2: error: call to undeclared function 'explicit_bzero'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+   66 |         explicit_bzero(foo, sizeof(foo));
+      |         ^
+1 error generated.
+explicit_bzero: cc failed with 1
+
+getprogname: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_GETPROGNAME  -o test-getprogname tests.c 
+getprogname: cc succeeded
+getprogname: yes
+
+INFTIM: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_INFTIM  -o test-INFTIM tests.c 
+tests.c:93:48: error: use of undeclared identifier 'INFTIM'
+   93 |         printf("INFTIM is defined to be %ld\n", (long)INFTIM);
+      |                                                       ^
+1 error generated.
+INFTIM: cc failed with 1
+
+md5: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_MD5  -o test-md5 tests.c 
+tests.c:99:10: fatal error: 'md5.h' file not found
+   99 | #include <md5.h>
+      |          ^~~~~~~
+1 error generated.
+md5: cc failed with 1
+
+memmem: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_MEMMEM  -o test-memmem tests.c 
+memmem: cc succeeded
+memmem: yes
+
+memrchr: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_MEMRCHR  -o test-memrchr tests.c 
+tests.c:134:8: error: call to undeclared function 'memrchr'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  134 |         res = memrchr(buf, 'a', strlen(buf));
+      |               ^
+tests.c:134:8: note: did you mean 'memchr'?
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/_string.h:74:3: note: 'memchr' declared here
+   74 |                 memchr(const void *_LIBC_SIZE(__n) __s, int __c, size_t __n);
+      |                 ^
+tests.c:134:6: error: incompatible integer to pointer conversion assigning to 'void *' from 'int' [-Wint-conversion]
+  134 |         res = memrchr(buf, 'a', strlen(buf));
+      |             ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2 errors generated.
+memrchr: cc failed with 1
+
+memset_s: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_MEMSET_S  -o test-memset_s tests.c 
+memset_s: cc succeeded
+memset_s: yes
+
+PATH_MAX: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_PATH_MAX  -o test-PATH_MAX tests.c 
+PATH_MAX: cc succeeded
+PATH_MAX is defined to be 1024
+PATH_MAX: yes
+
+pledge: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_PLEDGE  -o test-pledge tests.c 
+tests.c:186:11: error: call to undeclared function 'pledge'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  186 |         return !!pledge("stdio", NULL);
+      |                  ^
+1 error generated.
+pledge: cc failed with 1
+
+program_invocation_short_name: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_PROGRAM_INVOCATION_SHORT_NAME  -o test-program_invocation_short_name tests.c 
+tests.c:197:10: error: use of undeclared identifier 'program_invocation_short_name'
+  197 |         return !program_invocation_short_name;
+      |                 ^
+1 error generated.
+program_invocation_short_name: cc failed with 1
+
+reallocarray: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_REALLOCARRAY  -o test-reallocarray tests.c 
+tests.c:206:10: error: call to undeclared function 'reallocarray'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  206 |         return !reallocarray(NULL, 2, 2);
+      |                 ^
+1 error generated.
+reallocarray: cc failed with 1
+
+recallocarray: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_RECALLOCARRAY  -o test-recallocarray tests.c 
+tests.c:215:10: error: call to undeclared function 'recallocarray'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  215 |         return !recallocarray(NULL, 0, 2, 2);
+      |                 ^
+1 error generated.
+recallocarray: cc failed with 1
+
+sandbox_init: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_SANDBOX_INIT -Wno-deprecated -o test-sandbox_init tests.c 
+sandbox_init: cc succeeded
+sandbox_init: yes
+
+seccomp-filter: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_SECCOMP_FILTER  -o test-seccomp-filter tests.c 
+tests.c:234:10: fatal error: 'sys/prctl.h' file not found
+  234 | #include <sys/prctl.h>
+      |          ^~~~~~~~~~~~~
+1 error generated.
+seccomp-filter: cc failed with 1
+
+SOCK_NONBLOCK: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_SOCK_NONBLOCK  -o test-SOCK_NONBLOCK tests.c 
+tests.c:257:34: error: use of undeclared identifier 'SOCK_NONBLOCK'
+  257 |         socketpair(AF_UNIX, SOCK_STREAM|SOCK_NONBLOCK, 0, fd);
+      |                                         ^
+1 error generated.
+SOCK_NONBLOCK: cc failed with 1
+
+strlcat: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_STRLCAT  -o test-strlcat tests.c 
+strlcat: cc succeeded
+strlcat: yes
+
+strlcpy: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_STRLCPY  -o test-strlcpy tests.c 
+strlcpy: cc succeeded
+strlcpy: yes
+
+strndup: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_STRNDUP  -o test-strndup tests.c 
+strndup: cc succeeded
+strndup: yes
+
+strnlen: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_STRNLEN  -o test-strnlen tests.c 
+strnlen: cc succeeded
+strnlen: yes
+
+strtonum: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_STRTONUM  -o test-strtonum tests.c 
+strtonum: cc succeeded
+strtonum: yes
+
+systrace: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_SYSTRACE  -o test-systrace tests.c 
+tests.c:354:10: fatal error: 'dev/systrace.h' file not found
+  354 | #include <dev/systrace.h>
+      |          ^~~~~~~~~~~~~~~~
+1 error generated.
+systrace: cc failed with 1
+
+zlib: testing...
+cc  -g -W -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-unused-parameter  -Wno-unused -Werror -DTEST_ZLIB  -o test-zlib tests.c -lz
+zlib: cc succeeded
+zlib: yes
+
+__progname: manual (HAVE___PROGNAME=1)
+
+config.h: written
+Makefile.configure: written
