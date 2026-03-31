@@ -17,23 +17,28 @@ Archive Management, HTTP file upload, microblogging via PubSub, and more.
 
 ### Dependencies
 
-| Library | Type |
-|---------|------|
-| libstrophe | runtime |
-| libxml2 | runtime |
-| lmdb | runtime |
-| libomemo-c (libsignal-protocol-c) | runtime |
-| gpgme | runtime |
-| libfmt | runtime |
-| g++ >= GCC 12 | build |
-| bison | build |
-| flex | build |
-| doctest | test |
-| WeeChat >= 3.0 | runtime |
+| Library | Type | Linux | macOS (Homebrew) |
+|---------|------|-------|-----------------|
+| libstrophe | runtime | ✅ package | ✅ `brew install libstrophe` |
+| libxml2 | runtime | ✅ package | ✅ `brew install libxml2` |
+| lmdb | runtime | ✅ package | ✅ `brew install lmdb` |
+| libomemo-c | runtime | ✅ package | ⚠️ build from source |
+| libsignal-protocol-c | runtime | ✅ package | ⚠️ build from source |
+| gpgme | runtime | ✅ package | ✅ `brew install gpgme` |
+| libfmt | runtime | ✅ package | ✅ `brew install fmt` |
+| g++ >= GCC 12 / clang >= 15 | build | ✅ | ✅ `brew install llvm` |
+| bison | build | ✅ package | ✅ `brew install bison` |
+| flex | build | ✅ package | ✅ `brew install flex` |
+| doctest | test | ✅ | ✅ |
+| WeeChat >= 3.0 | runtime | ✅ package | ✅ `brew install weechat` |
 
 ### Supported platforms
 
 The plugin is developed and tested on **Linux** (Arch, Debian/Ubuntu, Fedora).
+
+**macOS** (Apple Silicon and Intel) receives best-effort support via Homebrew.
+The build system auto-detects the Homebrew prefix and sets `PKG_CONFIG_PATH`
+accordingly. See [macOS build instructions](#macos-homebrew) below.
 
 **FreeBSD, OpenBSD, and NetBSD** receive best-effort support: the build system
 and scripts have been ported to POSIX sh and BSD-compatible make, but these
@@ -61,8 +66,69 @@ make install        # installs to ~/.local/share/weechat/plugins/ — do NOT run
 On BSD, replace `make` with `gmake` throughout.
 
 `make install-deps` automatically detects your distribution (Debian/Ubuntu,
-Fedora/RHEL, Arch, openSUSE, Void, Alpine, Gentoo, FreeBSD, OpenBSD, NetBSD)
-and installs the required packages.
+Fedora/RHEL, Arch, openSUSE, Void, Alpine, Gentoo, FreeBSD, OpenBSD, NetBSD,
+macOS) and installs the required packages.
+
+### macOS (Homebrew)
+
+> **Note:** `libsignal-protocol-c` and `libomemo-c` are not in Homebrew core
+> and must be built from source before the plugin will compile.
+
+**Step 1 — Install Homebrew packages:**
+
+```sh
+./install-deps.sh   # detects macOS and runs the brew install block
+```
+
+Or manually:
+
+```sh
+brew install llvm make bison flex libstrophe libxml2 lmdb gpgme fmt curl openssl weechat
+```
+
+**Step 2 — Build `libsignal-protocol-c` from source:**
+
+```sh
+git clone https://github.com/signalapp/libsignal-protocol-c
+cd libsignal-protocol-c
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$(brew --prefix) .
+make && make install
+cd ..
+```
+
+**Step 3 — Build `libomemo-c` from source:**
+
+```sh
+git clone https://github.com/gkdr/libomemo-c
+cd libomemo-c
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$(brew --prefix) .
+make && make install
+cd ..
+```
+
+**Step 4 — Build Xepher:**
+
+```sh
+git clone --depth 1 git@github.com:ekollof/xepher.git
+cd xepher
+git submodule update --init --recursive
+make
+make test
+make install
+```
+
+The build system uses `-dynamiclib` instead of `-shared` and plain `-g` instead
+of `-gdwarf-4` on macOS automatically. No extra flags are needed.
+
+**Compiler note:** The system Apple clang ships with Xcode is supported. For
+faster builds you can use `brew install llvm` and point `CXX` at it:
+
+```sh
+CXX=$(brew --prefix llvm)/bin/clang++ make
+```
+
+**Debugger:** On macOS the `make debug` target uses `lldb` with
+`DYLD_INSERT_LIBRARIES` instead of `gdb`/`LD_PRELOAD`.
 
 ### WeeChat version compatibility
 
