@@ -2,9 +2,9 @@
 # vim: set noexpandtab:
 
 ifeq ($(UNAME_S),Darwin)
-TEST_LDFLAGS := -Wl,-undefined,dynamic_lookup -Wl,-rpath,$(PWD)
+TEST_LDFLAGS := -Wl,-undefined,dynamic_lookup -Wl,-rpath,$(PWD)/tests
 else
-TEST_LDFLAGS := -Wl,--allow-shlib-undefined -Wl,-rpath,$$PWD
+TEST_LDFLAGS := -Wl,--allow-shlib-undefined -Wl,-rpath,$$PWD/tests
 endif
 
 .PHONY: debug
@@ -24,7 +24,7 @@ tests/xmpp.cov.so: $(COVS) $(DEPS) $(HDRS)
 
 tests/run: $(COVS) tests/main.cc tests/xmpp.cov.so $(wildcard tests/*.inl)
 	cd tests && $(CXX) $(CPPFLAGS) $(LDFLAGS) -o run main.cc $(patsubst %,../%,$(DEPS)) $(LDLIBS) \
-		$(TEST_LDFLAGS) $(PWD)/xmpp.cov.so
+		$(TEST_LDFLAGS) $(PWD)/tests/xmpp.cov.so
 
 .PHONY: test
 test: tests/run
