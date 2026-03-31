@@ -511,8 +511,17 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                                     weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
                                         "  %s\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500%s",
                                         dim, rst);
-                                    weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
-                                        "  %s", body.c_str());
+                                    std::string_view bv(body);
+                                    for (std::string_view::size_type pos = 0;;)
+                                    {
+                                        auto nl = bv.find('\n', pos);
+                                        auto line = bv.substr(pos, nl == std::string_view::npos ? nl : nl - pos);
+                                        weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                            "  %.*s", static_cast<int>(line.size()), line.data());
+                                        if (nl == std::string_view::npos) break;
+                                        pos = nl + 1;
+                                    }
+                                    weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed", "");
                                 }
 
                                 if (item_id_raw)
@@ -1464,8 +1473,17 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                                     weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
                                         "  %s\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500%s",
                                         dim, rst);
-                                    weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
-                                        "  %s", body.c_str());
+                                    std::string_view bv(body);
+                                    for (std::string_view::size_type pos = 0;;)
+                                    {
+                                        auto nl = bv.find('\n', pos);
+                                        auto line = bv.substr(pos, nl == std::string_view::npos ? nl : nl - pos);
+                                        weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed",
+                                            "  %.*s", static_cast<int>(line.size()), line.data());
+                                        if (nl == std::string_view::npos) break;
+                                        pos = nl + 1;
+                                    }
+                                    weechat_printf_date_tags(feed_ch.buffer, 0, "xmpp_feed", "");
                                 }
                             }
                             // Mark this item seen so push duplicates are suppressed.
