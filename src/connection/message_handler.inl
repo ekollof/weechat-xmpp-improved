@@ -3182,7 +3182,10 @@ message_handler_after_omemo:
         stanza, "unstyled", "urn:xmpp:styling:0") != nullptr;
     if (text && difftext.empty() && !has_unstyled)  // Don't style diffs (already styled)
     {
-        styled_text = apply_xep393_styling(text);
+        // XEP-0394: Message Markup takes precedence over XEP-0393 ad-hoc styling.
+        styled_text = apply_xep394_markup(stanza, text);
+        if (styled_text.empty())
+            styled_text = apply_xep393_styling(text);
         display_text = styled_text.c_str();
     }
     else if (!difftext.empty())
@@ -3328,6 +3331,7 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash, 
         "urn:xmpp:reply:0",
         "urn:xmpp:sid:0",
         "urn:xmpp:styling:0",
+        "urn:xmpp:markup:0",
         "urn:xmpp:eme:0",
         "http://jabber.org/protocol/mood",
         "http://jabber.org/protocol/mood+notify",

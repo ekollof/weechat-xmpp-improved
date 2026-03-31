@@ -609,6 +609,15 @@
 
     <implements>
       <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0394.html' />
+        <xmpp:status>partial</xmpp:status>
+        <xmpp:version>0.3.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Message Markup (Experimental) - receive-only: parses &lt;markup xmlns='urn:xmpp:markup:0'&gt; and applies WeeChat colour codes for &lt;span&gt; (emphasis→italic, strong→bold, code→cyan, deleted→dark-grey), &lt;bcode&gt; (grey monospace block), &lt;bquote&gt; (green prefix per line), and &lt;list&gt;/&lt;li&gt; (bullet markers); when &lt;markup&gt; is present it takes precedence over XEP-0393 ad-hoc styling; urn:xmpp:markup:0 advertised in caps; send side not implemented</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0452.html' />
         <xmpp:status>partial</xmpp:status>
         <xmpp:version>0.1.1</xmpp:version>

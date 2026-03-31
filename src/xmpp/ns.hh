@@ -241,6 +241,7 @@ struct urn {
             struct items : public xmlns { items() : xmlns("urn:xmpp:langtrans:items") {} };
         };
         struct locationquery { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:locationquery:0") {} }; };
+        struct markup { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:markup:0") {} }; };
         struct media_element : public xmlns { media_element() : xmlns("urn:xmpp:media-element") {} };
         struct message_attaching { struct _1 : public xmlns { _1() : xmlns("urn:xmpp:message-attaching:1") {} }; };
         struct message_correct { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:message-correct:0") {} }; };
