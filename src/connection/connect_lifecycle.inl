@@ -462,6 +462,31 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
                 return;
             }
 
+            // PEP feeds have the user's own bare JID as the service JID (contains '@').
+            // Sending disco#info to a bare JID is unreliable: many servers (including
+            // Prosody) return type='error' for such queries, leaving the deferred feed
+            // stuck forever.  For PEP nodes, fall straight through to XEP-0060 items.
+            bool is_pep = service_jid.find('@') != std::string::npos;
+            if (is_pep)
+            {
+                std::array<xmpp_stanza_t *, 2> pub_ch = {nullptr, nullptr};
+                pub_ch[0] = stanza__iq_pubsub_items(account.context, nullptr,
+                                                     node_name.c_str(), max_items);
+                pub_ch[0] = stanza__iq_pubsub(account.context, nullptr, pub_ch.data(),
+                    with_noop("http://jabber.org/protocol/pubsub"));
+
+                xmpp_string_guard fuid_g(account.context, xmpp_uuid_gen(account.context));
+                const char *fuid = fuid_g.ptr;
+                pub_ch[0] = stanza__iq(account.context, nullptr, pub_ch.data(),
+                    nullptr, fuid,
+                    account.jid().data(), service_jid.c_str(), "get");
+                if (fuid)
+                    account.pubsub_fetch_ids[fuid] = {service_jid, node_name, {}, max_items};
+                account.connection.send(pub_ch[0]);
+                xmpp_stanza_release(pub_ch[0]);
+                return;
+            }
+
             // The disco#items response handler already queries disco#info for every
             // server component and records upload services. We piggyback on the same
             // disco#info round-trip: check if a MAM-discovery query for this service

@@ -1836,6 +1836,45 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
             account.upload_requests.erase(req_it);
         }
 
+        // XEP-0442: if a disco#info IQ to a pubsub service returned an error,
+        // flush deferred feeds via XEP-0060 plain items IQ (fallback path).
+        // Without this, the deferred feeds hang forever since the success path
+        // (inside the `if (query && type)` block) is only entered for type=result.
+        if (id && account.pubsub_mam_disco_queries.count(id))
+        {
+            std::string svc_jid = account.pubsub_mam_disco_queries[id];
+            account.pubsub_mam_disco_queries.erase(id);
+
+            auto def_it = account.pubsub_mam_deferred_feeds.find(svc_jid);
+            if (def_it != account.pubsub_mam_deferred_feeds.end())
+            {
+                const int max_items = 20;
+                for (const auto &feed_key : def_it->second)
+                {
+                    auto slash = feed_key.find('/');
+                    if (slash == std::string::npos) continue;
+                    std::string node_name = feed_key.substr(slash + 1);
+
+                    std::array<xmpp_stanza_t *, 2> pub_ch = {nullptr, nullptr};
+                    pub_ch[0] = stanza__iq_pubsub_items(account.context, nullptr,
+                                                         node_name.c_str(), max_items);
+                    pub_ch[0] = stanza__iq_pubsub(account.context, nullptr, pub_ch.data(),
+                        with_noop("http://jabber.org/protocol/pubsub"));
+
+                    xmpp_string_guard fuid_g(account.context, xmpp_uuid_gen(account.context));
+                    const char *fuid = fuid_g.ptr;
+                    pub_ch[0] = stanza__iq(account.context, nullptr, pub_ch.data(),
+                        nullptr, fuid,
+                        account.jid().data(), svc_jid.c_str(), "get");
+                    if (fuid)
+                        account.pubsub_fetch_ids[fuid] = {svc_jid, node_name, {}, max_items};
+                    account.connection.send(pub_ch[0]);
+                    xmpp_stanza_release(pub_ch[0]);
+                }
+                account.pubsub_mam_deferred_feeds.erase(def_it);
+            }
+        }
+
         // XEP-0060: pubsub publish error — report to the originating buffer.
         {
             auto pub_it = account.pubsub_publish_ids.find(id);
