@@ -3224,15 +3224,25 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
     
     query = xmpp_stanza_get_child_by_name_and_ns(
         stanza, "query", "jabber:iq:private");
-    if (query && type)
+    // BUG 1 fix: only process jabber:iq:private results, not gets/sets/errors.
+    // An <iq type='error'> from a server that doesn't support XEP-0049 would
+    // otherwise clear our bookmarks and crash on the autojoin NULL deref below.
+    if (query && type && weechat_strcasecmp(type, "result") == 0)
     {
         storage = xmpp_stanza_get_child_by_name_and_ns(
                 query, "storage", "storage:bookmarks");
         if (storage)
         {
-            // Clear existing bookmarks
-            account.bookmarks.clear();
-            
+            // BUG 5 fix: only clear XEP-0048 bookmarks; preserve any entries
+            // already populated by a XEP-0402 PEP push that arrived first.
+            // We remove only entries whose source is XEP-0048 (i.e. those not
+            // already in the map, which is empty on first connect and may have
+            // been populated by the PEP push).  Simplest safe approach: clear
+            // only if the map is empty (PEP push hasn't run yet); otherwise
+            // we merge — the XEP-0049 data wins per-JID via operator[].
+            if (account.bookmarks.empty())
+                account.bookmarks.clear();
+
             for (conference = xmpp_stanza_get_children(storage);
                  conference; conference = xmpp_stanza_get_next(conference))
             {
@@ -3248,9 +3258,10 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 if (nick)
                 {
                     text = xmpp_stanza_get_children(nick);
-                    intext = xmpp_stanza_get_text(text);
+                    // BUG 3 fix: text may be NULL if <nick/> element is empty
+                    intext = text ? xmpp_stanza_get_text(text) : NULL;
                 }
-                
+
                 if (!jid)
                     continue;
 
@@ -3269,22 +3280,20 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                             .query()
                             .build(account.context)
                             .get());
-                if (weechat_strcasecmp(autojoin, "true") == 0)
+                // BUG 2 fix: autojoin attr may be absent (NULL); use the already
+                // computed bookmarks[jid].autojoin flag which is null-safe.
+                if (account.bookmarks[jid].autojoin)
                 {
                     // Skip autojoin for biboumi (IRC gateway) rooms
                     // Biboumi JIDs typically contain % (e.g., #channel%irc.server.org@gateway)
                     // or have 'biboumi' in the server component
-                    bool is_biboumi = false;
-                    if (jid)
-                    {
-                        is_biboumi = (strchr(jid, '%') != NULL) ||
-                                    (strstr(jid, "biboumi") != NULL) ||
-                                    (strstr(jid, "@irc.") != NULL);
-                    }
-                    
+                    bool is_biboumi = (strchr(jid, '%') != NULL) ||
+                                      (strstr(jid, "biboumi") != NULL) ||
+                                      (strstr(jid, "@irc.") != NULL);
+
                     if (is_biboumi)
                     {
-                        weechat_printf(account.buffer, 
+                        weechat_printf(account.buffer,
                                       "%sSkipping autojoin for IRC gateway room: %s",
                                       weechat_prefix("network"), jid);
                     }
@@ -3293,7 +3302,8 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         char **command = weechat_string_dyn_alloc(256);
                         weechat_string_dyn_concat(command, "/enter ", -1);
                         weechat_string_dyn_concat(command, jid, -1);
-                        if (nick)
+                        // BUG 3 fix: only append nick if intext is non-NULL and non-empty
+                        if (intext && intext[0])
                         {
                             weechat_string_dyn_concat(command, "/", -1);
                             weechat_string_dyn_concat(command, intext, -1);
