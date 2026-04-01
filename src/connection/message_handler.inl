@@ -2156,11 +2156,11 @@ message_handler_after_omemo:
         // new "* " line.  Use the inline diff if available, otherwise plain text.
         if (edit_line_data)
         {
-            const char *new_msg = text;
+            const std::string new_msg = std::string("✏️ ") + text;
             struct t_hashtable *ht = weechat_hashtable_new(4,
                 WEECHAT_HASHTABLE_STRING, WEECHAT_HASHTABLE_STRING,
                 nullptr, nullptr);
-            weechat_hashtable_set(ht, "message", new_msg);
+            weechat_hashtable_set(ht, "message", new_msg.c_str());
             weechat_hdata_update(weechat_hdata_get("line_data"), edit_line_data, ht);
             weechat_hashtable_free(ht);
             return 1;
@@ -2690,7 +2690,7 @@ message_handler_after_omemo:
             weechat_string_dyn_concat(dyn_tags, ",notify_highlight", -1);
     }
 
-    const char *edit = replace ? "* " : ""; // Losing which message was edited, sadly
+    const char *edit = replace ? "✏️ " : "";
     if (x && text == cleartext && channel->transport != weechat::channel::transport::PGP)
     {
         channel->transport = weechat::channel::transport::PGP;
