@@ -1,7 +1,7 @@
 %global debug_package %{nil}
 
 Name:           xepher
-Version:        0.3.0
+Version:        0.4.0
 Release:        1%{?dist}
 Summary:        Xepher — WeeChat plugin for XMPP/Jabber protocol
 
@@ -69,6 +69,11 @@ install -D -m 0755 xmpp.so %{buildroot}%{_libdir}/weechat/plugins/xmpp.so
 %{_libdir}/weechat/plugins/xmpp.so
 
 %changelog
+* Wed Apr 01 2026 Emiel Kollof <emiel@kollof.nl> - 0.4.0-1
+- Update to v0.4.0
+- UI: prefix edited messages (XEP-0308) with pencil glyph instead of diff markup
+- Refactor: eliminate all raw libstrophe stanza__* / xmpp_jid_* / xmpp_uuid_gen calls
+
 * Tue Mar 31 2026 Emiel Kollof <emiel@kollof.nl> - 0.3.0-1
 - Update to v0.3.0
 - Add macOS/Homebrew build support
