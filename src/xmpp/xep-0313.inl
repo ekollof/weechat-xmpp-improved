@@ -104,6 +104,33 @@ namespace stanza {
             query& rsm(spec& s) { child(s); return *this; }
         };
 
+        // <prefs xmlns='urn:xmpp:mam:2' default='...'> … </prefs>
+        // Used by XEP-0441 MAM preferences IQ.
+        struct prefs : virtual public spec {
+            prefs() : spec("prefs") {
+                xmlns<urn::xmpp::mam::_2>();
+            }
+
+            prefs& default_(std::string_view val) { attr("default", val); return *this; }
+
+            // A list element <always> or <never> with optional <jid> children.
+            struct jid_list : virtual public spec {
+                jid_list(std::string_view element_name) : spec(element_name) {}
+
+                jid_list& jid(std::string_view s) {
+                    struct jid_el : virtual public spec {
+                        jid_el(std::string_view v) : spec("jid") { text(v); }
+                    };
+                    jid_el j(s);
+                    child(j);
+                    return *this;
+                }
+            };
+
+            prefs& always(jid_list l = jid_list("always")) { child(l); return *this; }
+            prefs& never_(jid_list l = jid_list("never"))  { child(l); return *this; }
+        };
+
         // stanza::iq mixin
         struct iq : virtual public spec {
             iq() : spec("iq") {}
@@ -111,6 +138,8 @@ namespace stanza {
             iq& xep0313() { return *this; }
 
             iq& query(xep0313::query q = {}) { child(q); return *this; }
+
+            iq& prefs(xep0313::prefs p = {}) { child(p); return *this; }
         };
     };
 
