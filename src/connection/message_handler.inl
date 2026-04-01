@@ -1228,30 +1228,21 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                                 {
                                     std::string feed_service_str(feed_service_sv);
                                     std::string node_str(node_sv);
-                                    xmpp_stanza_t *item_req =
-                                        stanza__iq_pubsub_items_item(account.context, nullptr,
-                                                                     with_noop(item_id_raw));
-                                    xmpp_stanza_t *items_req =
-                                        stanza__iq_pubsub_items(account.context, nullptr,
-                                                                node_str.c_str());
-                                    xmpp_stanza_add_child(items_req, item_req);
-                                    xmpp_stanza_release(item_req);
-                                    std::array<xmpp_stanza_t *, 2> ch_arr = {items_req, nullptr};
-                                    ch_arr[0] = stanza__iq_pubsub(account.context, nullptr,
-                                                                  ch_arr.data(),
-                                                                  with_noop("http://jabber.org/protocol/pubsub"));
-                                    xmpp_string_guard uid_g(account.context,
-                                                            xmpp_uuid_gen(account.context));
-                                    const char *uid = uid_g.ptr;
-                                    ch_arr[0] = stanza__iq(account.context, nullptr, ch_arr.data(),
-                                                           nullptr, uid,
-                                                           to ? to : account.jid().data(),
-                                                           feed_service_str.c_str(), "get");
-                                    if (uid)
-                                        account.pubsub_fetch_ids[uid] = {feed_service_str,
-                                                                          node_str, "", 0};
-                                    account.connection.send(ch_arr[0]);
-                                    xmpp_stanza_release(ch_arr[0]);
+                                    std::string uid = stanza::uuid(account.context);
+                                    stanza::xep0060::items its(node_str);
+                                    its.item(stanza::xep0060::item().id(item_id_raw));
+                                    stanza::xep0060::pubsub ps;
+                                    ps.items(its);
+                                    account.pubsub_fetch_ids[uid] = {feed_service_str, node_str, "", 0};
+                                    account.connection.send(stanza::iq()
+                                        .from(to ? to : account.jid())
+                                        .to(feed_service_str)
+                                        .type("get")
+                                        .id(uid)
+                                        .xep0060()
+                                        .pubsub(ps)
+                                        .build(account.context)
+                                        .get());
                                     deferred_to_iq = true;
                                 }
                                 else
@@ -1505,22 +1496,20 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                     {
                         std::string feed_service_str(feed_service_sv);
                         std::string node_str(node_sv);
-                        std::array<xmpp_stanza_t *, 2> ch_arr = {nullptr, nullptr};
-                        ch_arr[0] = stanza__iq_pubsub_items(account.context, nullptr,
-                                                            node_str.c_str());
-                        ch_arr[0] = stanza__iq_pubsub(account.context, nullptr,
-                                                      ch_arr.data(),
-                                                      with_noop("http://jabber.org/protocol/pubsub"));
-                        xmpp_string_guard uid_g(account.context, xmpp_uuid_gen(account.context));
-                        const char *uid = uid_g.ptr;
-                        ch_arr[0] = stanza__iq(account.context, nullptr, ch_arr.data(),
-                                               nullptr, uid,
-                                               to ? to : account.jid().data(),
-                                               feed_service_str.c_str(), "get");
-                        if (uid)
-                            account.pubsub_fetch_ids[uid] = {feed_service_str, node_str, "", 0};
-                        account.connection.send(ch_arr[0]);
-                        xmpp_stanza_release(ch_arr[0]);
+                        std::string uid = stanza::uuid(account.context);
+                        stanza::xep0060::items its(node_str);
+                        stanza::xep0060::pubsub ps;
+                        ps.items(its);
+                        account.pubsub_fetch_ids[uid] = {feed_service_str, node_str, "", 0};
+                        account.connection.send(stanza::iq()
+                            .from(to ? to : account.jid())
+                            .to(feed_service_str)
+                            .type("get")
+                            .id(uid)
+                            .xep0060()
+                            .pubsub(ps)
+                            .build(account.context)
+                            .get());
                     }
                 }
             }
@@ -1744,57 +1733,22 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
 
         // XEP-0334: receipt/marker replies MUST NOT be stored.
         // Use the incoming message type so routing is correct.
-        xmpp_stanza_t *message = xmpp_message_new(account.context,
-                                                  type,  // "chat" or "groupchat"
-                                                  channel->id.data(), nullptr);
+        stanza::message msg;
+        msg.to(channel->id).type(type ? type : "chat");
 
         if (request)
-        {
-            xmpp_stanza_t *message__received = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_name(message__received, "received");
-            xmpp_stanza_set_ns(message__received, "urn:xmpp:receipts");
-            xmpp_stanza_set_id(message__received, unread->id.c_str());
-
-            xmpp_stanza_add_child(message, message__received);
-            xmpp_stanza_release(message__received);
-        }
+            msg.receipt_received(unread->id);
 
         if (markable)
-        {
-            xmpp_stanza_t *message__received = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_name(message__received, "received");
-            xmpp_stanza_set_ns(message__received, "urn:xmpp:chat-markers:0");
-            xmpp_stanza_set_id(message__received, unread->id.c_str());
-
-            xmpp_stanza_add_child(message, message__received);
-            xmpp_stanza_release(message__received);
-        }
+            msg.chat_marker_received(unread->id);
 
         if (unread->thread.has_value())
-        {
-            xmpp_stanza_t *message__thread = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_name(message__thread, "thread");
-
-            xmpp_stanza_t *message__thread__text = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_text(message__thread__text, unread->thread->c_str());
-            xmpp_stanza_add_child(message__thread, message__thread__text);
-            xmpp_stanza_release(message__thread__text);
-
-            xmpp_stanza_add_child(message, message__thread);
-            xmpp_stanza_release(message__thread);
-        }
+            msg.thread(*unread->thread);
 
         // XEP-0334: receipt/marker replies MUST NOT be stored
-        {
-            xmpp_stanza_t *no_store = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_name(no_store, "no-store");
-            xmpp_stanza_set_ns(no_store, "urn:xmpp:hints");
-            xmpp_stanza_add_child(message, no_store);
-            xmpp_stanza_release(no_store);
-        }
+        msg.no_store();
 
-        account.connection.send( message);
-        xmpp_stanza_release(message);
+        account.connection.send(msg.build(account.context).get());
 
         channel->unreads.push_back(*unread);
     }

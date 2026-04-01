@@ -180,6 +180,7 @@ namespace stanza {
 #include "xep-0059.inl"
 #include "xep-0060.inl"
 #include "xep-0115.inl"
+#include "xep-0184.inl"
 #include "xep-0191.inl"
 #include "xep-0198.inl"
 #include "xep-0199.inl"
@@ -217,7 +218,15 @@ namespace stanza {
         }
     };
 
+    struct thread : virtual public spec {
+        thread() : spec("thread") {}
+        thread(std::string_view s) : spec("thread") {
+            text(s);
+        }
+    };
+
     struct message : virtual public spec,
+                     public xep0184::message,
                      public xep0224::message,
                      public xep0249::message,
                      public xep0308::message,
@@ -244,6 +253,8 @@ namespace stanza {
         message& subject(stanza::subject s) { child(s); return *this; }
         message& subject(std::string_view s) { return subject(stanza::subject(s)); }
         message& subject() { stanza::subject s; child(s); return *this; }
+
+        message& thread(std::string_view s) { stanza::thread t(s); child(t); return *this; }
     };
 
     struct presence : virtual public spec,

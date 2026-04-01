@@ -178,6 +178,7 @@ struct urn {
         struct captcha : public xmlns { captcha() : xmlns("urn:xmpp:captcha") {} };
         struct carbons { struct _2 : public xmlns { _2() : xmlns("urn:xmpp:carbons:2") {} }; };
         struct chatting { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:chatting:0") {} }; };
+        struct chat_markers { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:chat-markers:0") {} }; };
         struct cmr { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:cmr:0") {} }; };
         struct component { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:component:0") {} }; };
         struct decloak { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:decloak:0") {} }; };

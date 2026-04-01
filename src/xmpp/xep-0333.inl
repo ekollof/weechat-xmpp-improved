@@ -35,6 +35,14 @@ namespace stanza {
             }
         };
 
+        // <received xmlns='urn:xmpp:chat-markers:0' id='...'/>  (XEP-0333 Chat Markers)
+        struct markers_received : virtual public spec {
+            markers_received() : spec("received") {
+                xmlns<urn::xmpp::chat_markers::_0>();
+            }
+            markers_received& id(std::string_view s) { attr("id", s); return *this; }
+        };
+
         // stanza::message mixin
         struct message : virtual public spec {
             message() : spec("message") {}
@@ -42,6 +50,12 @@ namespace stanza {
             message& store() { xep0333::store s; child(s); return *this; }
             message& no_store() { xep0333::no_store ns; child(ns); return *this; }
             message& no_permanent_store() { xep0333::no_permanent_store nps; child(nps); return *this; }
+            message& chat_marker_received(std::string_view msg_id) {
+                xep0333::markers_received r;
+                r.id(msg_id);
+                child(r);
+                return *this;
+            }
         };
     };
 
