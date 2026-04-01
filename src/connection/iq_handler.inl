@@ -3729,38 +3729,28 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
 
                                 device_count++;
 
-                                xmpp_stanza_t *item_stanza =
-                                    stanza__iq_pubsub_items_item(account.context, nullptr, with_noop(device_id));
-                                xmpp_stanza_t *items_stanza =
-                                    stanza__iq_pubsub_items(account.context, nullptr,
-                                                            "urn:xmpp:omemo:2:bundles");
-                                // item must be a child of items, not a sibling
-                                xmpp_stanza_add_child(items_stanza, item_stanza);
-                                xmpp_stanza_release(item_stanza);
-                                xmpp_stanza_t *pubsub_children[] = {items_stanza, nullptr};
-                                xmpp_stanza_t *pubsub_stanza =
-                                    stanza__iq_pubsub(account.context, nullptr, pubsub_children,
-                                                      with_noop("http://jabber.org/protocol/pubsub"));
-                                xmpp_string_guard uuid_g(account.context, xmpp_uuid_gen(account.context));
-                                const char *uuid = uuid_g.ptr;
                                 // Fetch from the node owner (contact), not from ourselves.
-                                xmpp_stanza_t *iq_children[] = {pubsub_stanza, nullptr};
-                                xmpp_stanza_t *iq_stanza =
-                                    stanza__iq(account.context, nullptr, iq_children, nullptr, uuid,
-                                               account.jid().data(), node_owner, "get");
+                                std::string uuid = stanza::uuid(account.context);
+                                stanza::xep0060::item it;
+                                it.id(device_id);
+                                stanza::xep0060::items its("urn:xmpp:omemo:2:bundles");
+                                its.item(it);
+                                stanza::xep0060::pubsub ps;
+                                ps.items(its);
+                                stanza::iq iq_s;
+                                iq_s.id(uuid).from(account.jid()).to(node_owner).type("get");
+                                iq_s.pubsub(ps);
                                 // Register IQ id → target JID so the result handler
                                 // can recover the correct JID even if `from` is server domain.
-                                if (uuid && account.omemo)
+                                if (account.omemo)
                                     account.omemo.pending_iq_jid[uuid] = node_owner;
                                 account.omemo.pending_bundle_fetch.insert(bundle_key);
-                                // freed by uuid_g
 
                                 weechat_printf(account.buffer,
                                                "%somemo: requesting bundle for %s/%s",
                                                weechat_prefix("network"), node_owner, device_id);
 
-                                account.connection.send(iq_stanza);
-                                xmpp_stanza_release(iq_stanza);
+                                account.connection.send(iq_s.build(account.context).get());
                             }
                             weechat_printf(account.buffer,
                                            "%somemo: processed %d child elements, initiated %d bundle fetch(es) for %s",
@@ -3999,25 +3989,18 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         const auto bundle_node = fmt::format(
                             "eu.siacs.conversations.axolotl.bundles:{}",
                             *parsed_did);
-                        xmpp_stanza_t *items_stanza =
-                            stanza__iq_pubsub_items(account.context, nullptr, bundle_node.c_str());
-                        xmpp_stanza_t *pubsub_children[] = {items_stanza, nullptr};
-                        xmpp_stanza_t *pubsub_stanza =
-                            stanza__iq_pubsub(account.context, nullptr, pubsub_children,
-                                              with_noop("http://jabber.org/protocol/pubsub"));
-                        xmpp_string_guard uuid_g(account.context, xmpp_uuid_gen(account.context));
-                        const char *uuid = uuid_g.ptr;
-                        xmpp_stanza_t *iq_children[] = {pubsub_stanza, nullptr};
-                        xmpp_stanza_t *iq_stanza =
-                            stanza__iq(account.context, nullptr, iq_children, nullptr, uuid,
-                                       account.jid().data(), node_owner_str.c_str(), "get");
-                        if (uuid)
-                            account.omemo.pending_iq_jid[uuid] = node_owner_str;
+                        std::string uuid = stanza::uuid(account.context);
+                        stanza::xep0060::items its(bundle_node);
+                        stanza::xep0060::pubsub ps;
+                        ps.items(its);
+                        stanza::iq iq_s;
+                        iq_s.id(uuid).from(account.jid()).to(node_owner_str).type("get");
+                        iq_s.pubsub(ps);
+                        account.omemo.pending_iq_jid[uuid] = node_owner_str;
                         account.omemo.pending_bundle_fetch.insert(bundle_key);
 
                         ++legacy_device_count;
-                        account.connection.send(iq_stanza);
-                        xmpp_stanza_release(iq_stanza);
+                        account.connection.send(iq_s.build(account.context).get());
                     }
 
                     weechat_printf(account.buffer,
