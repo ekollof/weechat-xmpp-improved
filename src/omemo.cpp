@@ -41,8 +41,10 @@
 #include "omemo.hh"
 #include "plugin.hh"
 #include "strophe.hh"
+#include "xmpp/node.hh"
 #include "xmpp/ns.hh"
 #include "xmpp/stanza.hh"
+#include "xmpp/xep-0060.inl"
 
 #ifndef NDEBUG
 #define OMEMO_ASSERT(condition, message)                                                     \

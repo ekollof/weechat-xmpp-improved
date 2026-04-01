@@ -127,15 +127,10 @@ using c_string = std::unique_ptr<char, decltype(&free)>;
     return eval_path(fmt::format("${{weechat_data_dir}}/xmpp/omemo_{}.db", account_name));
 }
 
-[[nodiscard]] auto normalize_bare_jid(xmpp_ctx_t *context, std::string_view jid) -> std::string
+[[nodiscard]] auto normalize_bare_jid([[maybe_unused]] xmpp_ctx_t *context, std::string_view jid) -> std::string
 {
-    if (!context)
-        return std::string {jid};
-
-    xmpp_string_guard bare_g(context, xmpp_jid_bare(context, std::string {jid}.c_str()));
-    if (bare_g.ptr && *bare_g.ptr)
-        return bare_g.ptr;
-    return std::string {jid};
+    const std::string bare = ::jid(nullptr, std::string {jid}).bare;
+    return bare.empty() ? std::string {jid} : bare;
 }
 
 void request_devicelist(weechat::account &account, std::string_view jid)
@@ -144,20 +139,21 @@ void request_devicelist(weechat::account &account, std::string_view jid)
     if (account.omemo.missing_omemo2_devicelist.count(target_jid) != 0)
         return;
 
-    xmpp_stanza_t *children[2] = {nullptr, nullptr};
-    children[0] = stanza__iq_pubsub_items(*account.context, nullptr, kDevicesNode.data());
-    children[0] = stanza__iq_pubsub(*account.context, nullptr, children,
-                                    with_noop("http://jabber.org/protocol/pubsub"));
-
-    xmpp_string_guard uuid_g(*account.context, xmpp_uuid_gen(*account.context));
-    const char *uuid = uuid_g.ptr;
-    children[0] = stanza__iq(*account.context, nullptr, children, nullptr, uuid,
-                             account.jid().data(), target_jid.c_str(), "get");
-    if (uuid)
+    const std::string uuid = stanza::uuid(account.context);
+    if (!uuid.empty())
         account.omemo.pending_iq_jid[uuid] = target_jid;
 
-    account.connection.send(children[0]);
-    xmpp_stanza_release(children[0]);
+    auto items_el = stanza::xep0060::items(kDevicesNode);
+    auto pubsub_el = stanza::xep0060::pubsub();
+    pubsub_el.items(items_el);
+    auto iq_s = stanza::iq()
+        .type("get")
+        .id(uuid)
+        .from(account.jid())
+        .to(target_jid);
+    static_cast<stanza::xep0060::iq&>(iq_s).pubsub(pubsub_el);
+    auto stanza_ptr = iq_s.build(account.context);
+    account.connection.send(stanza_ptr.get());
 }
 
 void request_bundle(weechat::account &account, std::string_view jid, std::uint32_t device_id)
@@ -181,32 +177,25 @@ void request_bundle(weechat::account &account, std::string_view jid, std::uint32
     }
 
     const auto item_id = fmt::format("{}", device_id);
-    xmpp_stanza_t *item_stanza =
-        stanza__iq_pubsub_items_item(*account.context, nullptr, with_noop(item_id.c_str()));
-    xmpp_stanza_t *items_stanza =
-        stanza__iq_pubsub_items(*account.context, nullptr, kBundlesNode.data());
-    xmpp_stanza_add_child(items_stanza, item_stanza);
-    xmpp_stanza_release(item_stanza);
-    xmpp_stanza_t *pubsub_children[] = {items_stanza, nullptr};
-    xmpp_stanza_t *pubsub_stanza =
-        stanza__iq_pubsub(*account.context, nullptr, pubsub_children,
-                          with_noop("http://jabber.org/protocol/pubsub"));
-
-    xmpp_string_guard uuid_g(*account.context, xmpp_uuid_gen(*account.context));
-    const char *uuid = uuid_g.ptr;
-    xmpp_stanza_t *iq_children[] = {pubsub_stanza, nullptr};
-    xmpp_stanza_t *iq_stanza =
-        stanza__iq(*account.context, nullptr, iq_children, nullptr, uuid,
-                   account.jid().data(), target_jid.c_str(), "get");
-    if (uuid)
+    const std::string uuid = stanza::uuid(account.context);
+    if (!uuid.empty())
         account.omemo.pending_iq_jid[uuid] = target_jid;
     account.omemo.pending_bundle_fetch.insert(key);
 
-    XDEBUG("omemo: sent bundle request for {}/{} (uuid={})",
-           target_jid, device_id, uuid ? uuid : "?");
+    XDEBUG("omemo: sent bundle request for {}/{} (uuid={})", target_jid, device_id, uuid.empty() ? "?" : uuid);
 
-    account.connection.send(iq_stanza);
-    xmpp_stanza_release(iq_stanza);
+    auto items_el = stanza::xep0060::items(kBundlesNode);
+    items_el.item(stanza::xep0060::item().id(item_id));
+    auto pubsub_el = stanza::xep0060::pubsub();
+    pubsub_el.items(items_el);
+    auto iq_s = stanza::iq()
+        .type("get")
+        .id(uuid)
+        .from(account.jid())
+        .to(target_jid);
+    static_cast<stanza::xep0060::iq&>(iq_s).pubsub(pubsub_el);
+    auto stanza_ptr = iq_s.build(account.context);
+    account.connection.send(stanza_ptr.get());
 }
 
 void print_info(t_gui_buffer *buffer, std::string_view message)
@@ -428,15 +417,13 @@ void store_atm_trust(omemo &self,
     if (!stanza)
         return {};
 
-    xmpp_string_guard text {xmpp_stanza_get_context(stanza), xmpp_stanza_get_text(stanza)};
-    return text ? text.str() : std::string {};
-}
-
-[[nodiscard]] auto base64_encode(xmpp_ctx_t *context, const unsigned char *data, std::size_t size)
-    -> std::string
-{
-    xmpp_string_guard encoded {context, xmpp_base64_encode(context, data, size)};
-    return encoded ? encoded.str() : std::string {};
+    xmpp_ctx_t *ctx = xmpp_stanza_get_context(stanza);
+    struct ctx_free {
+        xmpp_ctx_t *ctx;
+        void operator()(char *p) const noexcept { if (p && ctx) xmpp_free(ctx, p); }
+    };
+    std::unique_ptr<char, ctx_free> text_ptr { xmpp_stanza_get_text(stanza), ctx_free{ctx} };
+    return (text_ptr && *text_ptr) ? std::string {text_ptr.get()} : std::string {};
 }
 
 [[nodiscard]] auto base64_encode_raw(const std::uint8_t *data, std::size_t size) -> std::string
@@ -454,6 +441,12 @@ void store_atm_trust(omemo &self,
     return encoded;
 }
 
+[[nodiscard]] auto base64_encode([[maybe_unused]] xmpp_ctx_t *context,
+                                 const unsigned char *data, std::size_t size) -> std::string
+{
+    return base64_encode_raw(data, size);
+}
+
 // Compute Base64-encoded SHA-256 fingerprint of raw bytes — used as ATM key identifier.
 [[nodiscard]] auto atm_fingerprint_b64(const std::vector<std::uint8_t> &key_bytes) -> std::string
 {
@@ -464,18 +457,23 @@ void store_atm_trust(omemo &self,
     return base64_encode_raw(digest, sizeof(digest));
 }
 
-[[nodiscard]] auto base64_decode(xmpp_ctx_t *context, std::string_view encoded)
+[[nodiscard]] auto base64_decode([[maybe_unused]] xmpp_ctx_t *context, std::string_view encoded)
     -> std::vector<std::uint8_t>
 {
-    unsigned char *decoded = nullptr;
-    size_t decoded_size = 0;
-    xmpp_base64_decode_bin(context, encoded.data(), encoded.size(), &decoded, &decoded_size);
-    if (!decoded || decoded_size == 0)
+    if (encoded.empty())
         return {};
 
-    std::vector<std::uint8_t> result(decoded, decoded + decoded_size);
-    xmpp_free(context, decoded);
-    return result;
+    // Upper bound: base64 expands 3 bytes → 4 chars, so decoded ≤ 3*(len/4)+3
+    const std::size_t max_decoded = (encoded.size() / 4 + 1) * 3 + 3;
+    std::vector<char> buf(max_decoded, '\0');
+    // encoded must be NUL-terminated; use a temporary std::string
+    const std::string encoded_str {encoded};
+    const int written = weechat_string_base_decode("64", encoded_str.c_str(), buf.data());
+    if (written <= 0)
+        return {};
+
+    const auto *ubuf = reinterpret_cast<const std::uint8_t *>(buf.data());
+    return std::vector<std::uint8_t>(ubuf, ubuf + static_cast<std::size_t>(written));
 }
 
 [[nodiscard]] auto utc_timestamp_now() -> std::string
@@ -515,22 +513,23 @@ void request_legacy_devicelist(weechat::account &account, std::string_view jid)
     if (account.omemo.missing_legacy_devicelist.count(target_jid) != 0)
         return;
 
-    xmpp_stanza_t *children[2] = {nullptr, nullptr};
-    children[0] = stanza__iq_pubsub_items(*account.context, nullptr, kLegacyDevicesNode.data());
-    children[0] = stanza__iq_pubsub(*account.context, nullptr, children,
-                                    with_noop("http://jabber.org/protocol/pubsub"));
-
-    xmpp_string_guard uuid_g(*account.context, xmpp_uuid_gen(*account.context));
-    const char *uuid = uuid_g.ptr;
-    children[0] = stanza__iq(*account.context, nullptr, children, nullptr, uuid,
-                             account.jid().data(), target_jid.c_str(), "get");
-    if (uuid)
+    const std::string uuid = stanza::uuid(account.context);
+    if (!uuid.empty())
         account.omemo.pending_iq_jid[uuid] = target_jid;
 
     XDEBUG("omemo: requesting legacy device list for {}", target_jid);
 
-    account.connection.send(children[0]);
-    xmpp_stanza_release(children[0]);
+    auto items_el = stanza::xep0060::items(kLegacyDevicesNode);
+    auto pubsub_el = stanza::xep0060::pubsub();
+    pubsub_el.items(items_el);
+    auto iq_s = stanza::iq()
+        .type("get")
+        .id(uuid)
+        .from(account.jid())
+        .to(target_jid);
+    static_cast<stanza::xep0060::iq&>(iq_s).pubsub(pubsub_el);
+    auto stanza_ptr = iq_s.build(account.context);
+    account.connection.send(stanza_ptr.get());
 }
 
 // Request a legacy OMEMO bundle (eu.siacs.conversations.axolotl.bundles:{device_id}) for jid.
@@ -557,36 +556,31 @@ void request_legacy_bundle(weechat::account &account, std::string_view jid, std:
 
     // Per the Conversations protocol, bundle node = prefix + device_id (no separate item id)
     const auto bundle_node = fmt::format("{}{}", kLegacyBundlesNodePrefix, device_id);
-    xmpp_stanza_t *items_stanza =
-        stanza__iq_pubsub_items(*account.context, nullptr, bundle_node.c_str());
-    xmpp_stanza_t *pubsub_children[] = {items_stanza, nullptr};
-    xmpp_stanza_t *pubsub_stanza =
-        stanza__iq_pubsub(*account.context, nullptr, pubsub_children,
-                          with_noop("http://jabber.org/protocol/pubsub"));
-
-    xmpp_string_guard uuid_g(*account.context, xmpp_uuid_gen(*account.context));
-    const char *uuid = uuid_g.ptr;
-    xmpp_stanza_t *iq_children[] = {pubsub_stanza, nullptr};
-    xmpp_stanza_t *iq_stanza =
-        stanza__iq(*account.context, nullptr, iq_children, nullptr, uuid,
-                   account.jid().data(), target_jid.c_str(), "get");
-    if (uuid)
+    const std::string uuid = stanza::uuid(account.context);
+    if (!uuid.empty())
         account.omemo.pending_iq_jid[uuid] = target_jid;
     account.omemo.pending_bundle_fetch.insert(key);
 
-    XDEBUG("omemo: requesting legacy bundle for {}/{} (node={})",
-           target_jid, device_id, bundle_node);
+    XDEBUG("omemo: requesting legacy bundle for {}/{} (node={})", target_jid, device_id, bundle_node);
 
-    account.connection.send(iq_stanza);
-    xmpp_stanza_release(iq_stanza);
+    auto items_el = stanza::xep0060::items(bundle_node);
+    auto pubsub_el = stanza::xep0060::pubsub();
+    pubsub_el.items(items_el);
+    auto iq_s = stanza::iq()
+        .type("get")
+        .id(uuid)
+        .from(account.jid())
+        .to(target_jid);
+    static_cast<stanza::xep0060::iq&>(iq_s).pubsub(pubsub_el);
+    auto stanza_ptr = iq_s.build(account.context);
+    account.connection.send(stanza_ptr.get());
 }
 
-[[nodiscard]] auto sce_wrap(xmpp_ctx_t *context, weechat::account &account,
+[[nodiscard]] auto sce_wrap([[maybe_unused]] xmpp_ctx_t *context, weechat::account &account,
                             std::string_view plaintext) -> std::string
 {
     const char *bound = xmpp_conn_get_bound_jid(account.connection);
-    xmpp_string_guard bare_guard {context, bound ? xmpp_jid_bare(context, bound) : nullptr};
-    const std::string from = bare_guard ? bare_guard.str() : std::string {};
+    const std::string from = bound ? ::jid(nullptr, bound).bare : std::string {};
 
     return fmt::format(
         "<envelope xmlns='urn:xmpp:sce:1'><content><body xmlns='jabber:client'>{}</body></content><time stamp='{}'/><from jid='{}'/><rpad/></envelope>",
