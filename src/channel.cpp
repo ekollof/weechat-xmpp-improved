@@ -786,8 +786,13 @@ std::optional<weechat::channel::member*> weechat::channel::member_search(const c
     if (!id)
         return std::nullopt;
 
-    auto it = members.find(id);
-    return it != members.end() ? std::optional<member*>(&it->second) : std::nullopt;
+    for (auto& [key, ptr_member] : members)
+    {
+        if (weechat_strcasecmp(ptr_member.id.c_str(), id) == 0)
+            return &ptr_member;
+    }
+
+    return std::nullopt;
 }
 
 std::optional<weechat::channel::member*> weechat::channel::remove_member(const char *id, const char *reason)

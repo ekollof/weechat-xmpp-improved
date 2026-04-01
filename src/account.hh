@@ -473,14 +473,11 @@ namespace weechat
 
         struct t_gui_buffer* create_buffer();
 
-        const std::string& jid() const {
+        std::string jid() const {
             if (!jid_bare_cache_.empty())
                 return jid_bare_cache_;
-            // Fallback when not connected: return configured JID (as a static
-            // per-call temporary — callers must not store the reference across
-            // a connect/disconnect boundary).
-            static thread_local std::string tmp;
-            tmp = std::string(this->option_jid.string());
+            // Fallback when not connected: build from configured JID option.
+            std::string tmp(this->option_jid.string());
             auto slash = tmp.find('/');
             if (slash != std::string::npos)
                 tmp.resize(slash);
