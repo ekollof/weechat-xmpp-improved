@@ -260,6 +260,7 @@ struct urn {
                                   struct _1 : public xmlns { _1() : xmlns("urn:xmpp:message-moderate:1") {} }; };
         struct message_retract { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:message-retract:0") {} };
                                  struct _1 : public xmlns { _1() : xmlns("urn:xmpp:message-retract:1") {} }; };
+        struct mam { struct _2 : public xmlns { _2() : xmlns("urn:xmpp:mam:2") {} }; };
         struct mds { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:mds:displayed:0") {} }; };
         struct moved { struct _1 : public xmlns { _1() : xmlns("urn:xmpp:moved:1") {} }; };
         struct muc {

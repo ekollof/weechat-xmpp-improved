@@ -4,81 +4,104 @@
 
 #pragma once
 
-#include <strophe.h>
-#include "../strophe.hh"
+#include <string>
+#include <vector>
+#include <optional>
 
-namespace xmpp { namespace xep0191 {
+#include "node.hh"
+#pragma GCC visibility push(default)
+#include "ns.hh"
+#pragma GCC visibility pop
 
-    // XEP-0191: Blocking Command
+namespace stanza {
 
-    // Request block list
-    inline xmpp_stanza_t *blocklist_request(xmpp_ctx_t *context)
-    {
-        xmpp_string_guard id(context, xmpp_uuid_gen(context));
-        xmpp_stanza_t *iq = xmpp_iq_new(context, "get", id.c_str());
-        
-        xmpp_stanza_t *blocklist = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(blocklist, "blocklist");
-        xmpp_stanza_set_ns(blocklist, "urn:xmpp:blocking");
-        
-        xmpp_stanza_add_child(iq, blocklist);
-        xmpp_stanza_release(blocklist);
-        
-        return iq;
-    }
-
-    // Block one or more JIDs
-    inline xmpp_stanza_t *block_jid(xmpp_ctx_t *context, const char **jids, int count)
-    {
-        xmpp_string_guard id(context, xmpp_uuid_gen(context));
-        xmpp_stanza_t *iq = xmpp_iq_new(context, "set", id.c_str());
-        
-        xmpp_stanza_t *block = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(block, "block");
-        xmpp_stanza_set_ns(block, "urn:xmpp:blocking");
-        
-        for (int i = 0; i < count; i++)
-        {
-            xmpp_stanza_t *item = xmpp_stanza_new(context);
-            xmpp_stanza_set_name(item, "item");
-            xmpp_stanza_set_attribute(item, "jid", jids[i]);
-            xmpp_stanza_add_child(block, item);
-            xmpp_stanza_release(item);
-        }
-        
-        xmpp_stanza_add_child(iq, block);
-        xmpp_stanza_release(block);
-        
-        return iq;
-    }
-
-    // Unblock one or more JIDs (or all if count == 0)
-    inline xmpp_stanza_t *unblock_jid(xmpp_ctx_t *context, const char **jids, int count)
-    {
-        xmpp_string_guard id(context, xmpp_uuid_gen(context));
-        xmpp_stanza_t *iq = xmpp_iq_new(context, "set", id.c_str());
-        
-        xmpp_stanza_t *unblock = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(unblock, "unblock");
-        xmpp_stanza_set_ns(unblock, "urn:xmpp:blocking");
-        
-        if (count > 0)
-        {
-            for (int i = 0; i < count; i++)
-            {
-                xmpp_stanza_t *item = xmpp_stanza_new(context);
-                xmpp_stanza_set_name(item, "item");
-                xmpp_stanza_set_attribute(item, "jid", jids[i]);
-                xmpp_stanza_add_child(unblock, item);
-                xmpp_stanza_release(item);
+    /* Blocking Command (XEP-0191) */
+    struct xep0191 {
+        // <item jid='...'/>
+        struct item : virtual public spec {
+            item(std::string_view jid_s) : spec("item") {
+                attr("jid", jid_s);
             }
-        }
-        // Empty unblock = unblock all
-        
-        xmpp_stanza_add_child(iq, unblock);
-        xmpp_stanza_release(unblock);
-        
-        return iq;
-    }
+        };
 
-} }
+        // <block xmlns='urn:xmpp:blocking'>
+        //   <item jid='user@example.org'/>
+        // </block>
+        struct block : virtual public spec {
+            block() : spec("block") {
+                xmlns<urn::xmpp::blocking>();
+            }
+
+            block& item(std::string_view jid_s) {
+                xep0191::item it(jid_s);
+                child(it);
+                return *this;
+            }
+        };
+
+        // <unblock xmlns='urn:xmpp:blocking'>
+        struct unblock : virtual public spec {
+            unblock() : spec("unblock") {
+                xmlns<urn::xmpp::blocking>();
+            }
+
+            // When called with no items: unblock all
+            unblock& item(std::string_view jid_s) {
+                xep0191::item it(jid_s);
+                child(it);
+                return *this;
+            }
+        };
+
+        // <blocklist xmlns='urn:xmpp:blocking'/> (get request)
+        struct blocklist : virtual public spec {
+            blocklist() : spec("blocklist") {
+                xmlns<urn::xmpp::blocking>();
+            }
+        };
+
+        // stanza::iq mixin
+        struct iq : virtual public spec {
+            iq() : spec("iq") {}
+
+            iq& xep0191() { return *this; }
+
+            iq& block(xep0191::block b) { child(b); return *this; }
+            iq& unblock(xep0191::unblock u) { child(u); return *this; }
+            iq& blocklist(xep0191::blocklist l = {}) { child(l); return *this; }
+        };
+    };
+
+}
+
+namespace xml {
+
+    /* Blocking Command parse layer (XEP-0191) */
+    class xep0191 : virtual public node {
+    public:
+        struct blocklist {
+            blocklist(node& n) {
+                for (auto& ch : n.get_children("item"))
+                    if (auto jid_s = ch.get().get_attr("jid"))
+                        items.push_back(*jid_s);
+            }
+
+            std::vector<std::string> items;
+        };
+
+    private:
+        std::optional<std::optional<blocklist>> _blocklist;
+    public:
+        std::optional<blocklist>& blocking_list() {
+            if (!_blocklist) {
+                auto bl = get_children<urn::xmpp::blocking>("blocklist");
+                if (!bl.empty())
+                    _blocklist = blocklist(bl.front().get());
+                else
+                    _blocklist.emplace(std::nullopt);
+            }
+            return *_blocklist;
+        }
+    };
+
+}

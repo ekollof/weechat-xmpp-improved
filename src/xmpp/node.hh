@@ -176,10 +176,15 @@ namespace stanza {
 #include "xep-0030.inl"
 #include "xep-0045.inl"
 #include "xep-0049.inl"
+#include "xep-0059.inl"
+#include "xep-0060.inl"
 #include "xep-0115.inl"
+#include "xep-0191.inl"
 #include "xep-0198.inl"
+#include "xep-0199.inl"
 #include "xep-0249.inl"
 #include "xep-0280.inl"
+#include "xep-0313.inl"
 #include "xep-0319.inl"
 #include "xep-0352.inl"
 #include "rfc-6121.inl"
@@ -216,7 +221,11 @@ namespace stanza {
     struct iq : virtual public spec,
                 public xep0030::iq,
                 public xep0049::iq,
+                public xep0060::iq,
+                public xep0191::iq,
+                public xep0199::iq,
                 public xep0280::iq,
+                public xep0313::iq,
                 public rfc6121::iq {
         iq() : spec("iq") {}
 
