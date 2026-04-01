@@ -16,7 +16,7 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
 
         // Populate bare JID cache (avoids re-parsing bound JID on every stanza)
         {
-            std::string full = xmpp_conn_get_bound_jid(connection);
+            std::string full = xmpp_conn_get_bound_jid(static_cast<xmpp_conn_t*>(*this));
             auto slash = full.find('/');
             account.jid_bare_cache_ = (slash != std::string::npos) ? full.substr(0, slash) : std::move(full);
         }
