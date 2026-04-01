@@ -510,85 +510,52 @@ std::vector<std::string> weechat::account::feed_open_list()
     //   </pubsub>
     // </iq>
 
-    char *id = xmpp_uuid_gen(context);
-    xmpp_stanza_t *iq = xmpp_iq_new(context, "set", id);
-    xmpp_free(context, id);
+    // conference spec — <conference xmlns='urn:xmpp:bookmarks:1' ...>
+    struct conference_spec : stanza::spec {
+        conference_spec(const weechat::account::bookmark_item &bm) : spec("conference") {
+            attr("xmlns", "urn:xmpp:bookmarks:1");
+            if (!bm.name.empty())  attr("name", bm.name);
+            if (bm.autojoin)       attr("autojoin", "true");
+            if (!bm.nick.empty()) {
+                struct nick_spec : stanza::spec {
+                    nick_spec(std::string_view s) : spec("nick") { text(s); }
+                } nick_ch(bm.nick);
+                child(nick_ch);
+            }
+            // XEP-0492: persist per-chat notification preference in <extensions>
+            if (!bm.notify_setting.empty()) {
+                struct setting_spec : stanza::spec {
+                    setting_spec(std::string_view name) : spec(name) {}
+                };
+                struct notify_spec : stanza::spec {
+                    notify_spec(std::string_view setting) : spec("notify") {
+                        attr("xmlns", "urn:xmpp:notification-settings:1");
+                        setting_spec s(setting);
+                        child(s);
+                    }
+                };
+                struct extensions_spec : stanza::spec {
+                    extensions_spec(std::string_view setting) : spec("extensions") {
+                        notify_spec n(setting);
+                        child(n);
+                    }
+                } ext_ch(bm.notify_setting);
+                child(ext_ch);
+            }
+        }
+    };
 
-    xmpp_stanza_t *pubsub = xmpp_stanza_new(context);
-    xmpp_stanza_set_name(pubsub, "pubsub");
-    xmpp_stanza_set_ns(pubsub, "http://jabber.org/protocol/pubsub");
-
-    xmpp_stanza_t *publish = xmpp_stanza_new(context);
-    xmpp_stanza_set_name(publish, "publish");
-    xmpp_stanza_set_attribute(publish, "node", "urn:xmpp:bookmarks:1");
-
-    for (const auto& bookmark_pair : bookmarks)
+    auto publish_el = stanza::xep0060::publish("urn:xmpp:bookmarks:1");
+    for (const auto& [_, bookmark] : bookmarks)
     {
-        const auto& bookmark = bookmark_pair.second;
-
-        xmpp_stanza_t *item = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(item, "item");
-        xmpp_stanza_set_id(item, bookmark.jid.data());
-
-        xmpp_stanza_t *conference = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(conference, "conference");
-        xmpp_stanza_set_ns(conference, "urn:xmpp:bookmarks:1");
-
-        if (!bookmark.name.empty())
-            xmpp_stanza_set_attribute(conference, "name", bookmark.name.data());
-
-        if (bookmark.autojoin)
-            xmpp_stanza_set_attribute(conference, "autojoin", "true");
-
-        if (!bookmark.nick.empty())
-        {
-            xmpp_stanza_t *nick = xmpp_stanza_new(context);
-            xmpp_stanza_set_name(nick, "nick");
-            xmpp_stanza_t *nick_text = xmpp_stanza_new(context);
-            xmpp_stanza_set_text(nick_text, bookmark.nick.data());
-            xmpp_stanza_add_child(nick, nick_text);
-            xmpp_stanza_add_child(conference, nick);
-            xmpp_stanza_release(nick_text);
-            xmpp_stanza_release(nick);
-        }
-
-        // XEP-0492: persist per-chat notification preference in <extensions>.
-        if (!bookmark.notify_setting.empty())
-        {
-            xmpp_stanza_t *extensions = xmpp_stanza_new(context);
-            xmpp_stanza_set_name(extensions, "extensions");
-
-            xmpp_stanza_t *notify_elem = xmpp_stanza_new(context);
-            xmpp_stanza_set_name(notify_elem, "notify");
-            xmpp_stanza_set_ns(notify_elem, "urn:xmpp:notification-settings:1");
-
-            // Fallback element without identity-category/identity-type.
-            xmpp_stanza_t *setting_elem = xmpp_stanza_new(context);
-            xmpp_stanza_set_name(setting_elem, bookmark.notify_setting.c_str());
-
-            xmpp_stanza_add_child(notify_elem, setting_elem);
-            xmpp_stanza_add_child(extensions, notify_elem);
-            xmpp_stanza_add_child(conference, extensions);
-
-            xmpp_stanza_release(setting_elem);
-            xmpp_stanza_release(notify_elem);
-            xmpp_stanza_release(extensions);
-        }
-
-        xmpp_stanza_add_child(item, conference);
-        xmpp_stanza_add_child(publish, item);
-        xmpp_stanza_release(conference);
-        xmpp_stanza_release(item);
+        conference_spec conf_ch(bookmark);
+        publish_el.item(stanza::xep0060::item().id(bookmark.jid).payload(conf_ch));
     }
 
-    xmpp_stanza_add_child(pubsub, publish);
-    xmpp_stanza_add_child(iq, pubsub);
-
-    connection.send(iq);
-
-    xmpp_stanza_release(publish);
-    xmpp_stanza_release(pubsub);
-    xmpp_stanza_release(iq);
+    auto iq_s = stanza::iq().type("set").id(stanza::uuid(context));
+    static_cast<stanza::xep0060::iq&>(iq_s)
+        .pubsub(stanza::xep0060::pubsub().publish(publish_el));
+    connection.send(iq_s.build(context).get());
 }
 
 // XEP-0402 §3.5: Remove a bookmark via PubSub <retract> with notify='true'.
@@ -596,35 +563,13 @@ std::vector<std::string> weechat::account::feed_open_list()
 // the remaining bookmarks, which is the correct spec-mandated behaviour.
 void weechat::account::retract_bookmark(std::string_view jid_sv)
 {
-    char *id = xmpp_uuid_gen(context);
-    xmpp_stanza_t *iq = xmpp_iq_new(context, "set", id);
-    xmpp_free(context, id);
-
-    xmpp_stanza_t *pubsub = xmpp_stanza_new(context);
-    xmpp_stanza_set_name(pubsub, "pubsub");
-    xmpp_stanza_set_ns(pubsub, "http://jabber.org/protocol/pubsub");
-
-    xmpp_stanza_t *retract = xmpp_stanza_new(context);
-    xmpp_stanza_set_name(retract, "retract");
-    xmpp_stanza_set_attribute(retract, "node", "urn:xmpp:bookmarks:1");
-    xmpp_stanza_set_attribute(retract, "notify", "true");
-
-    xmpp_stanza_t *item = xmpp_stanza_new(context);
-    xmpp_stanza_set_name(item, "item");
-    // item id must be a null-terminated string; jid_sv is backed by a
-    // std::string in bookmarks map so .data() is NUL-terminated.
-    xmpp_stanza_set_id(item, jid_sv.data());
-
-    xmpp_stanza_add_child(retract, item);
-    xmpp_stanza_add_child(pubsub, retract);
-    xmpp_stanza_add_child(iq, pubsub);
-
-    connection.send(iq);
-
-    xmpp_stanza_release(item);
-    xmpp_stanza_release(retract);
-    xmpp_stanza_release(pubsub);
-    xmpp_stanza_release(iq);
+    auto retract_el = stanza::xep0060::retract("urn:xmpp:bookmarks:1")
+        .notify(true)
+        .item(stanza::xep0060::item().id(jid_sv));
+    auto iq_s = stanza::iq().type("set").id(stanza::uuid(context));
+    static_cast<stanza::xep0060::iq&>(iq_s)
+        .pubsub(stanza::xep0060::pubsub().retract(retract_el));
+    connection.send(iq_s.build(context).get());
 }
 
 // Capability cache implementation (XEP-0115)

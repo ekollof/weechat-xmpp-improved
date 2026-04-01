@@ -87,6 +87,7 @@ namespace stanza {
                 attr("node", node_uri);
             }
 
+            retract& notify(bool v) { attr("notify", v ? "true" : "false"); return *this; }
             retract& item(xep0060::item i) { child(i); return *this; }
         };
 
