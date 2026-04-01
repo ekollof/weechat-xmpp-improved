@@ -314,9 +314,7 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool top_level
         if (is_new_room && channel)
         {
             // Status 201: new room was created — send empty config submit to unlock it
-            char *room_jid_raw = xmpp_jid_bare(account.context, binding.from->full.data());
-            std::string room_jid(room_jid_raw ? room_jid_raw : "");
-            xmpp_free(account.context, room_jid_raw);
+            std::string room_jid = jid(nullptr, binding.from->full).bare;
 
             struct x_data_submit : stanza::spec {
                 x_data_submit() : spec("x") {
@@ -419,15 +417,15 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool top_level
             xmpp_stanza_t *photo = xmpp_stanza_get_child_by_name(vcard_x, "photo");
             if (photo)
             {
-                char *photo_hash = xmpp_stanza_get_text(photo);
-                if (photo_hash && !std::string_view(photo_hash).empty())
+                xmpp_string_guard photo_hash_g(account.context,
+                                               xmpp_stanza_get_text(photo));
+                std::string_view photo_hash = photo_hash_g.ptr ? photo_hash_g.ptr : "";
+                if (!photo_hash.empty())
                 {
                     // Store the vCard avatar hash if we don't already have one
                     // from XEP-0084 (prefer PEP avatar over legacy vCard avatar)
                     if (user->profile.avatar_hash.empty())
-                    {
                         user->profile.avatar_hash = photo_hash;
-                    }
                     // Auto-fetch vCard to retrieve the photo and profile info if
                     // we haven't fetched it yet, or if the hash changed.
                     bool hash_changed = (user->profile.avatar_hash != photo_hash);
@@ -437,17 +435,16 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool top_level
                         const char *from_full = xmpp_stanza_get_from(stanza);
                         if (from_full)
                         {
-                            char *bare = xmpp_jid_bare(account.context, from_full);
-                            if (bare)
+                            std::string bare = jid(nullptr, from_full).bare;
+                            if (!bare.empty())
                             {
-                                xmpp_stanza_t *iq = ::xmpp::xep0054::vcard_request(account.context, bare);
-                                send(iq);
-                                xmpp_stanza_release(iq);
-                                xmpp_free(account.context, bare);
+                                std::shared_ptr<xmpp_stanza_t> iq {
+                                    ::xmpp::xep0054::vcard_request(account.context, bare.c_str()),
+                                    xmpp_stanza_release};
+                                send(iq.get());
                             }
                         }
                     }
-                    xmpp_free(account.context, photo_hash);
                 }
             }
         }

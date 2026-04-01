@@ -262,23 +262,17 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
 
             // Publish our bundle unconditionally on connect so remote clients
             // always have fresh pre-keys for our device.
-            xmpp_stanza_t *bundle_stanza =
-            account.omemo.get_bundle(account.context, jid_str.data(), nullptr);
-            if (bundle_stanza)
-            {
-                this->send(bundle_stanza);
-                xmpp_stanza_release(bundle_stanza);
-            }
+            if (std::shared_ptr<xmpp_stanza_t> bundle_stanza {
+                    account.omemo.get_bundle(account.context, jid_str.data(), nullptr),
+                    xmpp_stanza_release})
+                this->send(bundle_stanza.get());
 
             // Also publish the legacy bundle node so OMEMO:1 clients can
             // target our current device id during first-contact bootstrap.
-            xmpp_stanza_t *legacy_bundle_stanza =
-            account.omemo.get_legacy_bundle(account.context, jid_str.data(), nullptr);
-            if (legacy_bundle_stanza)
-            {
-                this->send(legacy_bundle_stanza);
-                xmpp_stanza_release(legacy_bundle_stanza);
-            }
+            if (std::shared_ptr<xmpp_stanza_t> legacy_bundle_stanza {
+                    account.omemo.get_legacy_bundle(account.context, jid_str.data(), nullptr),
+                    xmpp_stanza_release})
+                this->send(legacy_bundle_stanza.get());
 
             // Do NOT publish our devicelist here.  We first fetch the server's
             // current list (IQ sent above).  The IQ result handler merges our
@@ -292,17 +286,16 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         XDEBUG("Discovering upload service...");
 
         {
-            char *server_domain_raw = xmpp_jid_domain(account.context, account.jid().data());
+            std::string server_domain = jid(nullptr, account.jid()).domain;
             this->send(stanza::iq()
                         .from(account.jid())
-                        .to(server_domain_raw ? server_domain_raw : "")
+                        .to(server_domain)
                         .type("get")
                         .id(stanza::uuid(account.context))
                         .xep0030()
                         .query_items()
                         .build(account.context)
                         .get());
-            xmpp_free(account.context, server_domain_raw);
         }
 
         // Query MAM globally to discover recent conversations.
@@ -693,13 +686,9 @@ int weechat::connection::connect(std::string jid, std::string password, weechat:
         resource = account.resource().data();
     }
     {
-        char *jid_node = xmpp_jid_node(account.context, jid.data());
-        char *jid_domain = xmpp_jid_domain(account.context, jid.data());
-        char *full_jid = xmpp_jid_new(account.context, jid_node, jid_domain, resource);
-        m_conn.set_jid(full_jid);
-        xmpp_free(account.context, full_jid);
-        xmpp_free(account.context, jid_domain);
-        xmpp_free(account.context, jid_node);
+        ::jid parsed(nullptr, jid);
+        std::string full_jid = fmt::format("{}@{}/{}", parsed.local, parsed.domain, resource);
+        m_conn.set_jid(full_jid.c_str());
     }
     {
         std::unique_ptr<char, decltype(&free)> evaled_pass(
