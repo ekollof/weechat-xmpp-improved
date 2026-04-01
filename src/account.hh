@@ -13,6 +13,7 @@
 #include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <optional>
 #include <utility>
 #include <lmdb++.h>
@@ -325,8 +326,13 @@ namespace weechat
         // Capability cache (XEP-0115)
         std::unordered_map<std::string, std::vector<std::string>> caps_cache;  // verification_hash -> features
         // Last seen disco features per peer bare JID.
-        std::unordered_map<std::string, std::vector<std::string>> peer_features;
-        
+        std::unordered_map<std::string, std::unordered_set<std::string>> peer_features;
+
+        // Cached bare JID — populated on connect, cleared on disconnect.
+        // Avoids re-parsing xmpp_conn_get_bound_jid() on every stanza.
+        std::string jid_bare_cache_;
+
+
         // MAM cache database
         lmdb::env mam_db_env = nullptr;
         struct mam_dbi {
@@ -467,14 +473,18 @@ namespace weechat
 
         struct t_gui_buffer* create_buffer();
 
-        std::string jid() {
-            if (connection && xmpp_conn_is_connected(connection)) {
-                // Strip resource from full bound JID (part before '/')
-                std::string full = xmpp_conn_get_bound_jid(connection);
-                auto slash = full.find('/');
-                return slash == std::string::npos ? full : full.substr(0, slash);
-            }
-            return std::string(this->option_jid.string());
+        const std::string& jid() const {
+            if (!jid_bare_cache_.empty())
+                return jid_bare_cache_;
+            // Fallback when not connected: return configured JID (as a static
+            // per-call temporary — callers must not store the reference across
+            // a connect/disconnect boundary).
+            static thread_local std::string tmp;
+            tmp = std::string(this->option_jid.string());
+            auto slash = tmp.find('/');
+            if (slash != std::string::npos)
+                tmp.resize(slash);
+            return tmp;
         }
         void jid(std::string jid) { this->option_jid = jid; }
         std::string jid_device() {

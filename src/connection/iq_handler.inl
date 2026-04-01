@@ -80,9 +80,11 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
     if (type && (weechat_strcasecmp(type, "result") == 0 || weechat_strcasecmp(type, "error") == 0))
     {
         const char *stanza_id = xmpp_stanza_get_id(stanza);
-        if (stanza_id && account.user_ping_queries.count(stanza_id))
-        {
-            time_t start_time = account.user_ping_queries[stanza_id];
+        if (stanza_id) {
+            auto ping_it = account.user_ping_queries.find(stanza_id);
+            if (ping_it != account.user_ping_queries.end())
+            {
+            time_t start_time = ping_it->second;
             time_t now = time(nullptr);
             long rtt_ms = (now - start_time) * 1000;  // Convert to milliseconds
             
@@ -143,6 +145,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                                   weechat_prefix("error"), from_jid, error_type);
                 }
             }
+        }
     // XEP-0283: Moved — detect JID migration notice
     {
         xmpp_stanza_t *moved_elem = xmpp_stanza_get_child_by_name_and_ns(
