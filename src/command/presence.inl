@@ -4,7 +4,6 @@ int command__ping(const void *pointer, void *data,
 {
     weechat::account *ptr_account = nullptr;
     weechat::channel *ptr_channel = nullptr;
-    xmpp_stanza_t *iq;
     const char *target = nullptr;
 
     (void) pointer;
@@ -31,17 +30,13 @@ int command__ping(const void *pointer, void *data,
     else
         target = nullptr;  // Ping the server
 
-    // Create ping IQ
-    xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
-    const char *id = id_g.ptr;
-    iq = xmpp_iq_new(ptr_account->context, "get", id);
-    
+    std::string id = stanza::uuid(ptr_account->context);
+
     // Track ping time for response measurement
     ptr_account->user_ping_queries[id] = time(nullptr);
-    
+
     if (target)
     {
-        xmpp_stanza_set_to(iq, target);
         weechat_printf(buffer, "%sSending ping to %s...",
                        weechat_prefix("network"), target);
     }
@@ -50,17 +45,14 @@ int command__ping(const void *pointer, void *data,
         weechat_printf(buffer, "%sSending ping to server...",
                        weechat_prefix("network"));
     }
-    
-    xmpp_stanza_t *ping = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(ping, "ping");
-    xmpp_stanza_set_ns(ping, "urn:xmpp:ping");
-    
-    xmpp_stanza_add_child(iq, ping);
-    xmpp_stanza_release(ping);
-    
-    ptr_account->connection.send( iq);
-    xmpp_stanza_release(iq);
-    // freed by id_g
+
+    auto iq = stanza::iq()
+        .type("get")
+        .id(id);
+    if (target)
+        iq.to(target);
+    iq.ping();
+    ptr_account->connection.send(iq.build(ptr_account->context).get());
 
     return WEECHAT_RC_OK;
 }
@@ -138,7 +130,27 @@ int command__mood(const void *pointer, void *data,
         return WEECHAT_RC_OK;
     }
 
-    // Build PEP mood publish stanza
+    // Validate mood
+    bool valid = false;
+    for (int i = 0; valid_moods[i] != nullptr; i++)
+    {
+        if (weechat_strcasecmp(mood, valid_moods[i]) == 0)
+        {
+            valid = true;
+            break;
+        }
+    }
+
+    if (!valid)
+    {
+        weechat_printf(buffer, "%sxmpp: invalid mood '%s'",
+                      weechat_prefix("error"), mood);
+        weechat_printf(buffer, "%sValid moods: happy, sad, angry, excited, tired, etc.",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    // Build PEP mood publish stanza using stanza:: builder
     // <iq type='set' id='...'>
     //   <pubsub xmlns='http://jabber.org/protocol/pubsub'>
     //     <publish node='http://jabber.org/protocol/mood'>
@@ -152,106 +164,44 @@ int command__mood(const void *pointer, void *data,
     //   </pubsub>
     // </iq>
 
-    xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
-    const char *id = id_g.ptr;
-    xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "set", id);
-    // freed by id_g
-
-    // <pubsub xmlns='http://jabber.org/protocol/pubsub'>
-    xmpp_stanza_t *pubsub = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(pubsub, "pubsub");
-    xmpp_stanza_set_ns(pubsub, "http://jabber.org/protocol/pubsub");
-
-    // <publish node='http://jabber.org/protocol/mood'>
-    xmpp_stanza_t *publish = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(publish, "publish");
-    xmpp_stanza_set_attribute(publish, "node", "http://jabber.org/protocol/mood");
-
-    // <item>
-    xmpp_stanza_t *item = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(item, "item");
-
-    // <mood xmlns='http://jabber.org/protocol/mood'>
-    xmpp_stanza_t *mood_elem = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(mood_elem, "mood");
-    xmpp_stanza_set_ns(mood_elem, "http://jabber.org/protocol/mood");
-
-    if (mood)
-    {
-        // Validate mood
-        bool valid = false;
-        for (int i = 0; valid_moods[i] != nullptr; i++)
-        {
-            if (weechat_strcasecmp(mood, valid_moods[i]) == 0)
+    // Inner mood element: <mood xmlns='http://jabber.org/protocol/mood'>
+    struct mood_payload : virtual public stanza::spec {
+        mood_payload(std::string_view mood_s, std::optional<std::string_view> text_s)
+            : spec("mood") {
+            xmlns<jabber_org::protocol::mood>();
+            // Add mood value sub-element, e.g. <happy/>
+            struct mood_value : virtual public spec {
+                mood_value(std::string_view n) : spec(n) {}
+            };
+            mood_value mv(mood_s);
+            child(mv);
+            if (text_s)
             {
-                valid = true;
-                break;
+                struct text_el : virtual public spec {
+                    text_el(std::string_view s) : spec("text") { text(s); }
+                };
+                text_el te(*text_s);
+                child(te);
             }
         }
+    };
 
-        if (!valid)
-        {
-            weechat_printf(buffer, "%sxmpp: invalid mood '%s'", 
-                          weechat_prefix("error"), mood);
-            weechat_printf(buffer, "%sValid moods: happy, sad, angry, excited, tired, etc.",
-                          weechat_prefix("error"));
-            
-            xmpp_stanza_release(mood_elem);
-            xmpp_stanza_release(item);
-            xmpp_stanza_release(publish);
-            xmpp_stanza_release(pubsub);
-            xmpp_stanza_release(iq);
-            return WEECHAT_RC_OK;
-        }
+    mood_payload mp(mood, text ? std::optional<std::string_view>(text) : std::nullopt);
+    auto item = stanza::xep0060::item().payload(mp);
+    auto publish = stanza::xep0060::publish("http://jabber.org/protocol/mood").item(item);
+    auto pubsub = stanza::xep0060::pubsub().publish(publish);
+    auto iq = stanza::iq()
+        .type("set")
+        .id(stanza::uuid(ptr_account->context))
+        .pubsub(pubsub);
+    ptr_account->connection.send(iq.build(ptr_account->context).get());
 
-        // Add mood element (e.g., <happy/>)
-        xmpp_stanza_t *mood_value = xmpp_stanza_new(ptr_account->context);
-        xmpp_stanza_set_name(mood_value, mood);
-        xmpp_stanza_add_child(mood_elem, mood_value);
-        xmpp_stanza_release(mood_value);
-
-        // Add optional text
-        if (text)
-        {
-            xmpp_stanza_t *text_elem = xmpp_stanza_new(ptr_account->context);
-            xmpp_stanza_set_name(text_elem, "text");
-            xmpp_stanza_t *text_content = xmpp_stanza_new(ptr_account->context);
-            xmpp_stanza_set_text(text_content, text);
-            xmpp_stanza_add_child(text_elem, text_content);
-            xmpp_stanza_add_child(mood_elem, text_elem);
-            xmpp_stanza_release(text_content);
-            xmpp_stanza_release(text_elem);
-        }
-    }
-    // If no mood specified, publish empty <mood/> to clear
-
-    xmpp_stanza_add_child(item, mood_elem);
-    xmpp_stanza_add_child(publish, item);
-    xmpp_stanza_add_child(pubsub, publish);
-    xmpp_stanza_add_child(iq, pubsub);
-
-    ptr_account->connection.send(iq);
-
-    xmpp_stanza_release(mood_elem);
-    xmpp_stanza_release(item);
-    xmpp_stanza_release(publish);
-    xmpp_stanza_release(pubsub);
-    xmpp_stanza_release(iq);
-
-    if (mood)
-    {
-        if (text)
-            weechat_printf(buffer, "%sxmpp: mood set to '%s': %s",
-                          weechat_prefix("network"), mood, text);
-        else
-            weechat_printf(buffer, "%sxmpp: mood set to '%s'",
-                          weechat_prefix("network"), mood);
-    }
+    if (text)
+        weechat_printf(buffer, "%sxmpp: mood set to '%s': %s",
+                      weechat_prefix("network"), mood, text);
     else
-    {
-        weechat_printf(buffer, "%sxmpp: mood cleared",
-                      weechat_prefix("network"));
-    }
+        weechat_printf(buffer, "%sxmpp: mood set to '%s'",
+                      weechat_prefix("network"), mood);
 
     return WEECHAT_RC_OK;
 }
@@ -297,14 +247,14 @@ int command__activity(const void *pointer, void *data,
         // Parse "category" or "category/specific"
         category_s = argv[1];
         std::string::size_type slash_pos = category_s.find('/');
-        
+
         if (slash_pos != std::string::npos)
         {
             specific_s = category_s.substr(slash_pos + 1);
             category_s.resize(slash_pos);
             specific = specific_s.c_str();
         }
-        
+
         if (argc >= 3)
             text = argv_eol[2];
     }
@@ -333,7 +283,27 @@ int command__activity(const void *pointer, void *data,
         return WEECHAT_RC_OK;
     }
 
-    // Build PEP activity publish stanza
+    // Validate category
+    bool valid = false;
+    for (int i = 0; valid_categories[i] != nullptr; i++)
+    {
+        if (weechat_strcasecmp(category, valid_categories[i]) == 0)
+        {
+            valid = true;
+            break;
+        }
+    }
+
+    if (!valid)
+    {
+        weechat_printf(buffer, "%sxmpp: invalid activity category '%s'",
+                      weechat_prefix("error"), category);
+        weechat_printf(buffer, "%sValid categories: working, relaxing, eating, drinking, traveling, etc.",
+                      weechat_prefix("error"));
+        return WEECHAT_RC_OK;
+    }
+
+    // Build PEP activity publish stanza using stanza:: builder
     // <iq type='set'>
     //   <pubsub xmlns='http://jabber.org/protocol/pubsub'>
     //     <publish node='http://jabber.org/protocol/activity'>
@@ -349,121 +319,61 @@ int command__activity(const void *pointer, void *data,
     //   </pubsub>
     // </iq>
 
-    xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
-    const char *id = id_g.ptr;
-    xmpp_stanza_t *iq = xmpp_iq_new(ptr_account->context, "set", id);
-    // freed by id_g
-
-    xmpp_stanza_t *pubsub = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(pubsub, "pubsub");
-    xmpp_stanza_set_ns(pubsub, "http://jabber.org/protocol/pubsub");
-
-    xmpp_stanza_t *publish = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(publish, "publish");
-    xmpp_stanza_set_attribute(publish, "node", "http://jabber.org/protocol/activity");
-
-    xmpp_stanza_t *item = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(item, "item");
-
-    xmpp_stanza_t *activity_elem = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(activity_elem, "activity");
-    xmpp_stanza_set_ns(activity_elem, "http://jabber.org/protocol/activity");
-
-    if (category)
-    {
-        // Validate category
-        bool valid = false;
-        for (int i = 0; valid_categories[i] != nullptr; i++)
-        {
-            if (weechat_strcasecmp(category, valid_categories[i]) == 0)
+    struct activity_payload : virtual public stanza::spec {
+        activity_payload(std::string_view cat, std::optional<std::string_view> spec_s,
+                         std::optional<std::string_view> text_s)
+            : spec("activity") {
+            xmlns<jabber_org::protocol::activity>();
+            // Add category element with optional specific sub-element
+            struct category_el : virtual public stanza::spec {
+                category_el(std::string_view n, std::optional<std::string_view> sp)
+                    : stanza::spec(n) {
+                    if (sp) {
+                        struct specific_el : virtual public stanza::spec {
+                            specific_el(std::string_view s) : stanza::spec(s) {}
+                        };
+                        specific_el se(*sp);
+                        child(se);
+                    }
+                }
+            };
+            category_el ce(cat, spec_s);
+            child(ce);
+            if (text_s)
             {
-                valid = true;
-                break;
+                struct text_el : virtual public stanza::spec {
+                    text_el(std::string_view s) : stanza::spec("text") { text(s); }
+                };
+                text_el te(*text_s);
+                child(te);
             }
         }
+    };
 
-        if (!valid)
-        {
-            weechat_printf(buffer, "%sxmpp: invalid activity category '%s'", 
-                          weechat_prefix("error"), category);
-            weechat_printf(buffer, "%sValid categories: working, relaxing, eating, drinking, traveling, etc.",
-                          weechat_prefix("error"));
-            
-            // category_s freed by std::string destructor
-            xmpp_stanza_release(activity_elem);
-            xmpp_stanza_release(item);
-            xmpp_stanza_release(publish);
-            xmpp_stanza_release(pubsub);
-            xmpp_stanza_release(iq);
-            return WEECHAT_RC_OK;
-        }
+    std::optional<std::string_view> spec_opt = specific ? std::optional<std::string_view>(specific) : std::nullopt;
+    std::optional<std::string_view> text_opt = text ? std::optional<std::string_view>(text) : std::nullopt;
+    activity_payload ap(category, spec_opt, text_opt);
+    auto item = stanza::xep0060::item().payload(ap);
+    auto publish = stanza::xep0060::publish("http://jabber.org/protocol/activity").item(item);
+    auto pubsub = stanza::xep0060::pubsub().publish(publish);
+    auto iq = stanza::iq()
+        .type("set")
+        .id(stanza::uuid(ptr_account->context))
+        .pubsub(pubsub);
+    ptr_account->connection.send(iq.build(ptr_account->context).get());
 
-        // Add category element
-        xmpp_stanza_t *category_elem = xmpp_stanza_new(ptr_account->context);
-        xmpp_stanza_set_name(category_elem, category);
-
-        // Add specific activity if provided
-        if (specific)
-        {
-            xmpp_stanza_t *specific_elem = xmpp_stanza_new(ptr_account->context);
-            xmpp_stanza_set_name(specific_elem, specific);
-            xmpp_stanza_add_child(category_elem, specific_elem);
-            xmpp_stanza_release(specific_elem);
-        }
-
-        xmpp_stanza_add_child(activity_elem, category_elem);
-        xmpp_stanza_release(category_elem);
-
-        // Add optional text
-        if (text)
-        {
-            xmpp_stanza_t *text_elem = xmpp_stanza_new(ptr_account->context);
-            xmpp_stanza_set_name(text_elem, "text");
-            xmpp_stanza_t *text_content = xmpp_stanza_new(ptr_account->context);
-            xmpp_stanza_set_text(text_content, text);
-            xmpp_stanza_add_child(text_elem, text_content);
-            xmpp_stanza_add_child(activity_elem, text_elem);
-            xmpp_stanza_release(text_content);
-            xmpp_stanza_release(text_elem);
-        }
-
-        // category_s freed by std::string destructor
-    }
-    // If no activity specified, publish empty <activity/> to clear
-
-    xmpp_stanza_add_child(item, activity_elem);
-    xmpp_stanza_add_child(publish, item);
-    xmpp_stanza_add_child(pubsub, publish);
-    xmpp_stanza_add_child(iq, pubsub);
-
-    ptr_account->connection.send(iq);
-
-    xmpp_stanza_release(activity_elem);
-    xmpp_stanza_release(item);
-    xmpp_stanza_release(publish);
-    xmpp_stanza_release(pubsub);
-    xmpp_stanza_release(iq);
-
-    if (category)
-    {
-        if (specific && text)
-            weechat_printf(buffer, "%sxmpp: activity set to '%s/%s': %s",
-                          weechat_prefix("network"), argv[1], specific, text);
-        else if (specific)
-            weechat_printf(buffer, "%sxmpp: activity set to '%s/%s'",
-                          weechat_prefix("network"), argv[1], specific);
-        else if (text)
-            weechat_printf(buffer, "%sxmpp: activity set to '%s': %s",
-                          weechat_prefix("network"), argv[1], text);
-        else
-            weechat_printf(buffer, "%sxmpp: activity set to '%s'",
-                          weechat_prefix("network"), argv[1]);
-    }
+    if (specific && text)
+        weechat_printf(buffer, "%sxmpp: activity set to '%s/%s': %s",
+                      weechat_prefix("network"), argv[1], specific, text);
+    else if (specific)
+        weechat_printf(buffer, "%sxmpp: activity set to '%s/%s'",
+                      weechat_prefix("network"), argv[1], specific);
+    else if (text)
+        weechat_printf(buffer, "%sxmpp: activity set to '%s': %s",
+                      weechat_prefix("network"), argv[1], text);
     else
-    {
-        weechat_printf(buffer, "%sxmpp: activity cleared",
-                      weechat_prefix("network"));
-    }
+        weechat_printf(buffer, "%sxmpp: activity set to '%s'",
+                      weechat_prefix("network"), argv[1]);
 
     return WEECHAT_RC_OK;
 }
@@ -474,7 +384,6 @@ int command__selfping(const void *pointer, void *data,
 {
     weechat::account *ptr_account = nullptr;
     weechat::channel *ptr_channel = nullptr;
-    xmpp_stanza_t *iq;
 
     (void) pointer;
     (void) data;
@@ -515,23 +424,16 @@ int command__selfping(const void *pointer, void *data,
     // Construct our full MUC JID (room@server/nickname)
     std::string muc_jid = std::string(ptr_channel->id) + "/" + std::string(ptr_account->nickname());
 
-    // Send self-ping to our own MUC nickname
-    xmpp_string_guard iq_id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
-    iq = xmpp_iq_new(ptr_account->context, "get", iq_id_g.ptr);
-    xmpp_stanza_set_to(iq, muc_jid.c_str());
-    
-    xmpp_stanza_t *ping = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(ping, "ping");
-    xmpp_stanza_set_ns(ping, "urn:xmpp:ping");
-    
-    xmpp_stanza_add_child(iq, ping);
-    xmpp_stanza_release(ping);
-
     weechat_printf(buffer, "%sSending MUC self-ping to %s...",
                    weechat_prefix("network"), muc_jid.c_str());
 
-    ptr_account->connection.send(iq);
-    xmpp_stanza_release(iq);
+    // Send self-ping to our own MUC nickname
+    auto iq = stanza::iq()
+        .type("get")
+        .id(stanza::uuid(ptr_account->context))
+        .to(muc_jid)
+        .ping();
+    ptr_account->connection.send(iq.build(ptr_account->context).get());
 
     return WEECHAT_RC_OK;
 }
@@ -702,4 +604,3 @@ int command__setavatar(const void *pointer, void *data,
 
     return WEECHAT_RC_OK;
 }
-
