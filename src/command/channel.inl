@@ -37,29 +37,23 @@ int command__enter(const void *pointer, void *data,
         char **jids = weechat_string_split(argv[1], ",", nullptr, 0, 0, &n_jid);
         for (int i = 0; i < n_jid; i++)
         {
-            xmpp_string_guard jid_bare_g(ptr_account->context,
-                xmpp_jid_bare(ptr_account->context, jids[i]));
-            jid = jid_bare_g.c_str();
+            ::jid jid_parsed(nullptr, jids[i]);
+            std::string jid_bare_s = jid_parsed.bare;
+            jid = jid_bare_s.c_str();
             pres_jid = jids[i];
 
-            if(!xmpp_jid_resource(ptr_account->context, pres_jid))
+            std::string pres_jid_s;
+            if (jid_parsed.resource.empty())
             {
-                xmpp_string_guard pres_node_g(ptr_account->context,
-                    xmpp_jid_node(ptr_account->context, jid));
-                xmpp_string_guard pres_domain_g(ptr_account->context,
-                    xmpp_jid_domain(ptr_account->context, jid));
-                const char *nick = !ptr_account->nickname().empty()
-                    ? ptr_account->nickname().data()
-                    : nullptr;
-                xmpp_string_guard fallback_nick_g(ptr_account->context,
-                    nick ? nullptr : xmpp_jid_node(ptr_account->context,
-                                                   ptr_account->jid().data()));
-                xmpp_string_guard pres_jid_g(ptr_account->context,
-                    xmpp_jid_new(ptr_account->context,
-                        pres_node_g.c_str(),
-                        pres_domain_g.c_str(),
-                        nick ? nick : fallback_nick_g.c_str()));
-                pres_jid = pres_jid_g.c_str();
+                std::string_view nick = ptr_account->nickname();
+                std::string fallback_nick;
+                if (nick.empty())
+                    fallback_nick = ::jid(nullptr, ptr_account->jid()).local;
+                const std::string &effective_nick = nick.empty() ? fallback_nick
+                                                                  : std::string(nick);
+                pres_jid_s = fmt::format("{}@{}/{}", jid_parsed.local,
+                                         jid_parsed.domain, effective_nick);
+                pres_jid = pres_jid_s.c_str();
 
                 if (!ptr_account->channels.contains(jid))
                 {
@@ -112,14 +106,11 @@ int command__enter(const void *pointer, void *data,
         const char *buffer_jid = weechat_buffer_get_string(buffer, "localvar_remote_jid");
 
         {
-            xmpp_string_guard node_g(ptr_account->context,
-                xmpp_jid_node(ptr_account->context, buffer_jid));
-            xmpp_string_guard domain_g(ptr_account->context,
-                xmpp_jid_domain(ptr_account->context, buffer_jid));
-            xmpp_string_guard pres_jid_g(ptr_account->context,
-                xmpp_jid_new(ptr_account->context, node_g.c_str(), domain_g.c_str(),
-                    weechat_buffer_get_string(buffer, "localvar_nick")));
-            pres_jid = pres_jid_g.c_str();
+            ::jid bjid(nullptr, buffer_jid ? buffer_jid : "");
+            const char *nick = weechat_buffer_get_string(buffer, "localvar_nick");
+            std::string pres_jid_s = fmt::format("{}@{}/{}", bjid.local, bjid.domain,
+                                                  nick ? nick : "");
+            pres_jid = pres_jid_s.c_str();
 
             if (!ptr_account->channels.contains(buffer_jid))
                 ptr_channel = &ptr_account->channels.emplace(
@@ -170,22 +161,16 @@ int command__open(const void *pointer, void *data,
             const char *effective_jid = bare_g.c_str();
 
             // When in a MUC and given a bare nick (no '@'), build the full JID.
-            // All three guards outlive the if-block via the enclosing for-body scope.
-            xmpp_string_guard node_g(ptr_account->context,
-                ptr_channel && !std::string_view(effective_jid).contains('@')
-                    ? xmpp_jid_node(ptr_account->context, ptr_channel->name.data())
-                    : nullptr);
-            xmpp_string_guard domain_g(ptr_account->context,
-                ptr_channel && !std::string_view(effective_jid).contains('@')
-                    ? xmpp_jid_domain(ptr_account->context, ptr_channel->name.data())
-                    : nullptr);
-            xmpp_string_guard full_g(ptr_account->context,
-                (node_g && domain_g)
-                    ? xmpp_jid_new(ptr_account->context,
-                                   node_g.c_str(), domain_g.c_str(), effective_jid)
-                    : nullptr);
-            if (full_g)
-                effective_jid = full_g.c_str();
+            std::string full_jid_s;
+            bool is_muc_occupant_jid = false;
+            if (ptr_channel && !std::string_view(effective_jid).contains('@'))
+            {
+                ::jid ch_jid(nullptr, ptr_channel->name);
+                full_jid_s = fmt::format("{}@{}/{}", ch_jid.local, ch_jid.domain,
+                                         effective_jid);
+                effective_jid = full_jid_s.c_str();
+                is_muc_occupant_jid = (ptr_channel->type == weechat::channel::chat_type::MUC);
+            }
 
             jid = const_cast<char*>(effective_jid);
 
@@ -193,8 +178,6 @@ int command__open(const void *pointer, void *data,
             // Do NOT send presence to a MUC occupant full JID (room@service/nick):
             // the MUC server treats any presence to a full MUC JID as a join
             // request and responds with <conflict/> if you are already in the room.
-            bool is_muc_occupant_jid = full_g && ptr_channel
-                && ptr_channel->type == weechat::channel::chat_type::MUC;
             if (!is_muc_occupant_jid)
             {
                 auto open_pres = stanza::presence().to(jid).from(ptr_account->jid());

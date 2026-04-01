@@ -202,11 +202,15 @@ int command__disco(const void *pointer, void *data,
     bool do_items = argc > 1 && weechat_strcasecmp(argv[1], "items") == 0;
     int jid_arg = do_items ? 2 : 1;  // argv index of optional jid
 
+    std::string target_domain;
     const char *target = nullptr;
     if (argc > jid_arg)
         target = argv[jid_arg];
     else
-        target = xmpp_jid_domain(ptr_account->context, ptr_account->jid().data());
+    {
+        target_domain = jid(nullptr, ptr_account->jid()).domain;
+        target = target_domain.c_str();
+    }
 
     std::string id = stanza::uuid(ptr_account->context);
 

@@ -9,6 +9,7 @@
 #include <fmt/core.h>
 
 #include "plugin.hh"
+#include "xmpp/node.hh"
 #include "account.hh"
 #include "user.hh"
 #include "channel.hh"
@@ -103,20 +104,17 @@ void weechat::user::nicklist_add(weechat::account *account,
     std::string bare_buf, resource_buf;
     if (!channel)
     {
-        xmpp_string_guard bare_g(account->context,
-            xmpp_jid_bare(account->context, this->id.c_str()));
-        if (bare_g) { bare_buf = bare_g.str(); name = bare_buf.c_str(); }
+        bare_buf = jid(nullptr, this->id).bare;
+        if (!bare_buf.empty()) name = bare_buf.c_str();
     }
 
     {
-        xmpp_string_guard jid_bare_g(account->context,
-            channel ? xmpp_jid_bare(account->context, name) : nullptr);
-        if (channel && jid_bare_g &&
-            weechat_strcasecmp(jid_bare_g.c_str(), channel->id.data()) == 0)
+        std::string name_bare = channel ? jid(nullptr, name).bare : std::string{};
+        if (channel && !name_bare.empty() &&
+            weechat_strcasecmp(name_bare.c_str(), channel->id.data()) == 0)
         {
-            xmpp_string_guard resource_g(account->context,
-                xmpp_jid_resource(account->context, name));
-            if (resource_g) { resource_buf = resource_g.str(); name = resource_buf.c_str(); }
+            resource_buf = jid(nullptr, name).resource;
+            if (!resource_buf.empty()) name = resource_buf.c_str();
         }
     }
 
@@ -156,19 +154,16 @@ void weechat::user::nicklist_set_color(weechat::account *account,
     std::string bare_buf, resource_buf;
     if (!channel)
     {
-        xmpp_string_guard bare_g(account->context,
-            xmpp_jid_bare(account->context, this->id.c_str()));
-        if (bare_g) { bare_buf = bare_g.str(); name = bare_buf.c_str(); }
+        bare_buf = jid(nullptr, this->id).bare;
+        if (!bare_buf.empty()) name = bare_buf.c_str();
     }
     {
-        xmpp_string_guard jid_bare_g(account->context,
-            channel ? xmpp_jid_bare(account->context, name) : nullptr);
-        if (channel && jid_bare_g &&
-            weechat_strcasecmp(jid_bare_g.c_str(), channel->id.data()) == 0)
+        std::string name_bare = channel ? jid(nullptr, name).bare : std::string{};
+        if (channel && !name_bare.empty() &&
+            weechat_strcasecmp(name_bare.c_str(), channel->id.data()) == 0)
         {
-            xmpp_string_guard resource_g(account->context,
-                xmpp_jid_resource(account->context, name));
-            if (resource_g) { resource_buf = resource_g.str(); name = resource_buf.c_str(); }
+            resource_buf = jid(nullptr, name).resource;
+            if (!resource_buf.empty()) name = resource_buf.c_str();
         }
     }
 
@@ -191,14 +186,12 @@ void weechat::user::nicklist_remove(weechat::account *account,
     const char *name = this->profile.display_name.c_str();
     std::string resource_buf;
     {
-        xmpp_string_guard bare_g(account->context,
-            channel ? xmpp_jid_bare(account->context, name) : nullptr);
-        if (channel && bare_g &&
-            weechat_strcasecmp(bare_g.c_str(), channel->id.data()) == 0)
+        std::string name_bare = channel ? jid(nullptr, name).bare : std::string{};
+        if (channel && !name_bare.empty() &&
+            weechat_strcasecmp(name_bare.c_str(), channel->id.data()) == 0)
         {
-            xmpp_string_guard resource_g(account->context,
-                xmpp_jid_resource(account->context, name));
-            if (resource_g) { resource_buf = resource_g.str(); name = resource_buf.c_str(); }
+            resource_buf = jid(nullptr, name).resource;
+            if (!resource_buf.empty()) name = resource_buf.c_str();
         }
     }
 

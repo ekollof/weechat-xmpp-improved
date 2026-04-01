@@ -463,21 +463,27 @@ namespace weechat
 
         struct t_gui_buffer* create_buffer();
 
-        std::string_view jid() {
-            if (connection && xmpp_conn_is_connected(connection))
-                return xmpp_jid_bare(context, xmpp_conn_get_bound_jid(connection));
-            else
-                return this->option_jid.string();
+        std::string jid() {
+            if (connection && xmpp_conn_is_connected(connection)) {
+                // Strip resource from full bound JID (part before '/')
+                std::string full = xmpp_conn_get_bound_jid(connection);
+                auto slash = full.find('/');
+                return slash == std::string::npos ? full : full.substr(0, slash);
+            }
+            return std::string(this->option_jid.string());
         }
         void jid(std::string jid) { this->option_jid = jid; }
-        std::string_view jid_device() {
+        std::string jid_device() {
             if (connection && xmpp_conn_is_connected(connection))
                 return xmpp_conn_get_bound_jid(connection);
-            else
-                return xmpp_jid_new(context,
-                                    xmpp_jid_node(context, this->option_jid.string().data()),
-                                    xmpp_jid_domain(context, this->option_jid.string().data()),
-                                    "weechat");
+            // Build user@domain/weechat from the configured JID
+            std::string opt = std::string(this->option_jid.string());
+            auto at = opt.find('@');
+            std::string node = at == std::string::npos ? opt : opt.substr(0, at);
+            std::string domain = at == std::string::npos ? opt : opt.substr(at + 1);
+            auto slash = domain.find('/');
+            if (slash != std::string::npos) domain = domain.substr(0, slash);
+            return fmt::format("{}@{}/{}", node, domain, "weechat");
         }
         std::string_view password() { return this->option_password.string(); }
         void password(std::string password) { this->option_password = password; }

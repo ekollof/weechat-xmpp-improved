@@ -18,6 +18,7 @@
 #include <weechat/weechat-plugin.h>
 
 #include "plugin.hh"
+#include "xmpp/node.hh"
 #include "config.hh"
 #include "account.hh"
 #include "channel.hh"
@@ -66,10 +67,9 @@ int nick_color_config_cb(const void *, void *, const char *, const char *)
                 // user's map key (full JID, e.g. "room@conf/nick") against the
                 // channel id (bare JID, e.g. "room@conf").  Using display_name
                 // was wrong for MUC users whose display_name is just a nickname.
-                xmpp_string_guard bare_g(account.context,
-                    xmpp_jid_bare(account.context, uid.c_str()));
-                if (bare_g &&
-                    weechat_strcasecmp(bare_g.c_str(), channel.id.data()) == 0)
+                std::string uid_bare = jid(nullptr, uid).bare;
+                if (!uid_bare.empty() &&
+                    weechat_strcasecmp(uid_bare.c_str(), channel.id.data()) == 0)
                 {
                     user.nicklist_set_color(&account, &channel);
                 }
