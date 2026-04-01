@@ -198,12 +198,15 @@ struct urn {
         };
         struct eventlog : public xmlns { eventlog() : xmlns("urn:xmpp:eventlog") {} };
         struct extdisco { struct _2 : public xmlns { _2() : xmlns("urn:xmpp:extdisco:2") {} }; };
+        struct fasten { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:fasten:0") {} }; };
+        struct fallback { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:fallback:0") {} }; };
         struct features {
             struct rosterver : public xmlns { rosterver() : xmlns("urn:xmpp:features:rosterver") {} };
         };
         struct forward { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:forward:0") {} }; };
         struct gaming { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:gaming:0") {} }; };
         struct hashes { struct _2 : public xmlns { _2() : xmlns("urn:xmpp:hashes:2") {} }; };
+        struct hints : public xmlns { hints() : xmlns("urn:xmpp:hints") {} };
         struct http : public xmlns { http() : xmlns("urn:xmpp:http") {}
             struct upload { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:http:upload:0") {} }; };
         };
@@ -275,8 +278,10 @@ struct urn {
         struct ping : public xmlns { ping() : xmlns("urn:xmpp:ping") {} };
         struct privilege { struct _1 : public xmlns { _1() : xmlns("urn:xmpp:privilege:1") {} }; };
         struct reach { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:reach:0") {} }; };
+        struct reactions { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:reactions:0") {} }; };
         struct receipts : public xmlns { receipts() : xmlns("urn:xmpp:receipts") {} };
         struct reference { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:reference:0") {} }; };
+        struct reply { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:reply:0") {} }; };
         struct reputation { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:reputation:0") {} }; };
         struct sec_label { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:sec-label:0") {} };
             struct catalog { struct _2 : public xmlns { _2() : xmlns("urn:xmpp:sec-label:catalog:2") {} }; };
@@ -284,6 +289,7 @@ struct urn {
         };
         struct sic { struct _1 : public xmlns { _1() : xmlns("urn:xmpp:sic:1") {} }; };
         struct sift { struct _2 : public xmlns { _2() : xmlns("urn:xmpp:sift:2") {} }; };
+        struct sid { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:sid:0") {} }; };
         struct sm { struct _3 : public xmlns { _3() : xmlns("urn:xmpp:sm:3") {} }; };
         struct spoiler { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:spoiler:0") {} }; };
         struct thumbs { struct _0 : public xmlns { _0() : xmlns("urn:xmpp:thumbs:0") {} }; };

@@ -268,40 +268,21 @@ int command__edit_to(const void *pointer, void *data,
     const char *type       = (ptr_channel->type == weechat::channel::chat_type::MUC)
                               ? "groupchat" : "chat";
 
-    xmpp_stanza_t *message = xmpp_message_new(ptr_account->context,
-                                              type,
-                                              ptr_channel->id.data(), nullptr);
+    std::string new_id = stanza::uuid(ptr_account->context);
 
-    xmpp_string_guard id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
-    const char *new_id = id_g.ptr;
-    xmpp_stanza_set_id(message, new_id);
-    xmpp_message_set_body(message, new_text);
+    stanza::xep0308::replace replace_el(target_id);
+    stanza::xep0359::origin_id oid(new_id);
 
-    // XEP-0308 <replace> element
-    xmpp_stanza_t *replace = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(replace, "replace");
-    xmpp_stanza_set_ns(replace, "urn:xmpp:message-correct:0");
-    xmpp_stanza_set_id(replace, target_id);
-    xmpp_stanza_add_child(message, replace);
-    xmpp_stanza_release(replace);
+    auto msg_s = stanza::message()
+        .type(type)
+        .to(ptr_channel->id)
+        .id(new_id)
+        .body(new_text);
+    msg_s.replace(replace_el);
+    msg_s.store();
+    msg_s.origin_id(oid);
 
-    // <store xmlns='urn:xmpp:hints'/>
-    xmpp_stanza_t *store = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(store, "store");
-    xmpp_stanza_set_ns(store, "urn:xmpp:hints");
-    xmpp_stanza_add_child(message, store);
-    xmpp_stanza_release(store);
-
-    // XEP-0359 origin-id so the sender can correlate the edit in MAM
-    xmpp_stanza_t *origin_id = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(origin_id, "origin-id");
-    xmpp_stanza_set_ns(origin_id, "urn:xmpp:sid:0");
-    xmpp_stanza_set_attribute(origin_id, "id", new_id);
-    xmpp_stanza_add_child(message, origin_id);
-    xmpp_stanza_release(origin_id);
-
-    ptr_account->connection.send(message);
-    xmpp_stanza_release(message);
+    ptr_account->connection.send(msg_s.build(ptr_account->context).get());
 
     weechat_printf(buffer, "%sxmpp: message edit sent", weechat_prefix("network"));
     return WEECHAT_RC_OK;
@@ -312,54 +293,26 @@ static void
 do_retract_send(weechat::account *account, weechat::channel *channel,
                 struct t_gui_buffer *buffer, const std::string &msg_id)
 {
-    xmpp_stanza_t *message = xmpp_message_new(account->context,
-                    channel->type == weechat::channel::chat_type::MUC
-                    ? "groupchat" : "chat",
-                    channel->id.data(), nullptr);
+    const char *type = channel->type == weechat::channel::chat_type::MUC
+                       ? "groupchat" : "chat";
 
-    xmpp_string_guard id_g(account->context, xmpp_uuid_gen(account->context));
-    const char *id = id_g.ptr;
-    xmpp_stanza_set_id(message, id);
+    std::string new_id = stanza::uuid(account->context);
 
-    xmpp_stanza_t *retract = xmpp_stanza_new(account->context);
-    xmpp_stanza_set_name(retract, "retract");
-    xmpp_stanza_set_ns(retract, "urn:xmpp:message-retract:1");
-    xmpp_stanza_set_attribute(retract, "id", msg_id.c_str());
-    xmpp_stanza_add_child(message, retract);
-    xmpp_stanza_release(retract);
+    stanza::xep0424::retract retract_el(msg_id);
+    stanza::xep0428::fallback fallback_el("urn:xmpp:message-retract:1");
+    stanza::xep0359::origin_id oid(new_id);
 
-    xmpp_stanza_t *body = xmpp_stanza_new(account->context);
-    xmpp_stanza_set_name(body, "body");
-    xmpp_stanza_t *body_text = xmpp_stanza_new(account->context);
-    xmpp_stanza_set_text(body_text,
-        "/me retracted a previous message, but it's unsupported by your client.");
-    xmpp_stanza_add_child(body, body_text);
-    xmpp_stanza_release(body_text);
-    xmpp_stanza_add_child(message, body);
-    xmpp_stanza_release(body);
+    auto msg_s = stanza::message()
+        .type(type)
+        .to(channel->id)
+        .id(new_id)
+        .body("/me retracted a previous message, but it's unsupported by your client.");
+    msg_s.retract(retract_el);
+    msg_s.fallback(fallback_el);
+    msg_s.store();
+    msg_s.origin_id(oid);
 
-    xmpp_stanza_t *fallback = xmpp_stanza_new(account->context);
-    xmpp_stanza_set_name(fallback, "fallback");
-    xmpp_stanza_set_ns(fallback, "urn:xmpp:fallback:0");
-    xmpp_stanza_set_attribute(fallback, "for", "urn:xmpp:message-retract:1");
-    xmpp_stanza_add_child(message, fallback);
-    xmpp_stanza_release(fallback);
-
-    xmpp_stanza_t *store = xmpp_stanza_new(account->context);
-    xmpp_stanza_set_name(store, "store");
-    xmpp_stanza_set_ns(store, "urn:xmpp:hints");
-    xmpp_stanza_add_child(message, store);
-    xmpp_stanza_release(store);
-
-    xmpp_stanza_t *origin_id = xmpp_stanza_new(account->context);
-    xmpp_stanza_set_name(origin_id, "origin-id");
-    xmpp_stanza_set_ns(origin_id, "urn:xmpp:sid:0");
-    xmpp_stanza_set_attribute(origin_id, "id", id);
-    xmpp_stanza_add_child(message, origin_id);
-    xmpp_stanza_release(origin_id);
-
-    account->connection.send(message);
-    xmpp_stanza_release(message);
+    account->connection.send(msg_s.build(account->context).get());
 
     weechat_printf(buffer, "%sxmpp: message retraction sent",
                   weechat_prefix("network"));
@@ -372,45 +325,20 @@ do_moderate_send(weechat::account *account, weechat::channel *channel,
                  const char *reason)
 {
     const char *room_jid = channel->id.data();
-    xmpp_stanza_t *iq = xmpp_message_new(account->context, "groupchat",
-                                         room_jid, nullptr);
-    xmpp_stanza_set_to(iq, room_jid);
 
-    xmpp_stanza_t *apply_to = xmpp_stanza_new(account->context);
-    xmpp_stanza_set_name(apply_to, "apply-to");
-    xmpp_stanza_set_ns(apply_to, "urn:xmpp:fasten:0");
-    xmpp_stanza_set_attribute(apply_to, "id", msg_id.c_str());
-
-    xmpp_stanza_t *moderate = xmpp_stanza_new(account->context);
-    xmpp_stanza_set_name(moderate, "moderate");
-    xmpp_stanza_set_ns(moderate, "urn:xmpp:message-moderate:1");
-
-    xmpp_stanza_t *retract = xmpp_stanza_new(account->context);
-    xmpp_stanza_set_name(retract, "retract");
-    xmpp_stanza_set_ns(retract, "urn:xmpp:message-retract:1");
-    xmpp_stanza_add_child(moderate, retract);
-
+    stanza::xep0425::moderate mod;
     if (reason)
-    {
-        xmpp_stanza_t *reason_elem = xmpp_stanza_new(account->context);
-        xmpp_stanza_set_name(reason_elem, "reason");
-        xmpp_stanza_t *reason_text = xmpp_stanza_new(account->context);
-        xmpp_stanza_set_text(reason_text, reason);
-        xmpp_stanza_add_child(reason_elem, reason_text);
-        xmpp_stanza_add_child(moderate, reason_elem);
-        xmpp_stanza_release(reason_text);
-        xmpp_stanza_release(reason_elem);
-    }
+        mod.reason(reason);
 
-    xmpp_stanza_add_child(apply_to, moderate);
-    xmpp_stanza_add_child(iq, apply_to);
+    stanza::xep0422::apply_to at(msg_id);
+    at.child_el(mod);
 
-    account->connection.send(iq);
+    auto msg_s = stanza::message()
+        .type("groupchat")
+        .to(room_jid);
+    msg_s.apply_to(at);
 
-    xmpp_stanza_release(retract);
-    xmpp_stanza_release(moderate);
-    xmpp_stanza_release(apply_to);
-    xmpp_stanza_release(iq);
+    account->connection.send(msg_s.build(account->context).get());
 
     weechat_printf(buffer, "%sxmpp: moderation request sent%s",
                   weechat_prefix("network"),
@@ -603,46 +531,20 @@ int command__react(const void *pointer, void *data,
     }
 
     // Send reaction (XEP-0444)
-    xmpp_stanza_t *message = xmpp_message_new(ptr_account->context,
-                    ptr_channel->type == weechat::channel::chat_type::MUC
-                    ? "groupchat" : "chat",
-                    ptr_channel->id.data(), nullptr);
+    std::string msg_id = stanza::uuid(ptr_account->context);
 
-    xmpp_string_guard msg_id_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
-    const char *msg_id = msg_id_g.ptr;
-    xmpp_stanza_set_id(message, msg_id);
-    // freed by msg_id_g
+    stanza::xep0444::reactions reactions_el(target_msg_id);
+    reactions_el.reaction(emoji);
 
-    // Add reactions element
-    xmpp_stanza_t *reactions = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(reactions, "reactions");
-    xmpp_stanza_set_ns(reactions, "urn:xmpp:reactions:0");
-    xmpp_stanza_set_attribute(reactions, "id", target_msg_id.c_str());
-    
-    // Add reaction element with emoji
-    xmpp_stanza_t *reaction = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(reaction, "reaction");
-    xmpp_stanza_t *reaction_text = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_text(reaction_text, emoji);
-    xmpp_stanza_add_child(reaction, reaction_text);
-    xmpp_stanza_release(reaction_text);
-    
-    xmpp_stanza_add_child(reactions, reaction);
-    xmpp_stanza_release(reaction);
-    
-    xmpp_stanza_add_child(message, reactions);
-    xmpp_stanza_release(reactions);
+    auto msg_s = stanza::message()
+        .type(ptr_channel->type == weechat::channel::chat_type::MUC
+              ? "groupchat" : "chat")
+        .to(ptr_channel->id)
+        .id(msg_id);
+    msg_s.reactions(reactions_el);
+    msg_s.store();
 
-    // Add store hint for MAM
-    xmpp_stanza_t *store_hint = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(store_hint, "store");
-    xmpp_stanza_set_ns(store_hint, "urn:xmpp:hints");
-    xmpp_stanza_add_child(message, store_hint);
-    xmpp_stanza_release(store_hint);
-
-    ptr_account->connection.send(message);
-    xmpp_stanza_release(message);
-    // target_msg_id freed by std::string destructor
+    ptr_account->connection.send(msg_s.build(ptr_account->context).get());
 
     weechat_printf(buffer, "%sxmpp: reaction %s sent",
                   weechat_prefix("network"), emoji);
@@ -771,61 +673,24 @@ int command__reply(const void *pointer, void *data,
     else
         reply_to_jid = ptr_channel->name;
 
-    xmpp_stanza_t *message = xmpp_message_new(ptr_account->context, type, to, nullptr);
-    xmpp_string_guard uuid_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
-    const char *uuid = uuid_g.ptr;
-    xmpp_stanza_set_id(message, uuid);
-    // freed by uuid_g
+    std::string uuid = stanza::uuid(ptr_account->context);
+    std::string origin_uuid = stanza::uuid(ptr_account->context);
 
-    // Add <body> with reply text
-    xmpp_stanza_t *body = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(body, "body");
-    xmpp_stanza_t *body_text = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_text(body_text, reply_text);
-    xmpp_stanza_add_child(body, body_text);
-    xmpp_stanza_add_child(message, body);
+    stanza::xep0461::reply reply_el(target_id_str, reply_to_jid);
+    stanza::xep0428::fallback fallback_el("urn:xmpp:reply:0");
+    stanza::xep0359::origin_id oid(origin_uuid);
 
-    // Add <reply xmlns='urn:xmpp:reply:0' id='target-id' to='original-sender-jid'/>
-    xmpp_stanza_t *reply_elem = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(reply_elem, "reply");
-    xmpp_stanza_set_ns(reply_elem, "urn:xmpp:reply:0");
-    xmpp_stanza_set_attribute(reply_elem, "id", target_id_str.c_str());
-    xmpp_stanza_set_attribute(reply_elem, "to", reply_to_jid.c_str());
-    xmpp_stanza_add_child(message, reply_elem);
+    auto msg_s = stanza::message()
+        .type(type)
+        .to(to)
+        .id(uuid)
+        .body(reply_text);
+    msg_s.reply(reply_el);
+    msg_s.fallback(fallback_el);
+    msg_s.store();
+    msg_s.origin_id(oid);
 
-    // XEP-0461 §4 + XEP-0428: add <fallback> so clients that don't support
-    // XEP-0461 know the body is a fallback representation of the reply.
-    xmpp_stanza_t *fallback_elem = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(fallback_elem, "fallback");
-    xmpp_stanza_set_ns(fallback_elem, "urn:xmpp:fallback:0");
-    xmpp_stanza_set_attribute(fallback_elem, "for", "urn:xmpp:reply:0");
-    xmpp_stanza_add_child(message, fallback_elem);
-    xmpp_stanza_release(fallback_elem);
-
-    // Add store hint for MAM
-    xmpp_stanza_t *store_hint = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(store_hint, "store");
-    xmpp_stanza_set_ns(store_hint, "urn:xmpp:hints");
-    xmpp_stanza_add_child(message, store_hint);
-
-    // Add origin-id for XEP-0359
-    xmpp_stanza_t *origin_id = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(origin_id, "origin-id");
-    xmpp_stanza_set_ns(origin_id, "urn:xmpp:sid:0");
-    xmpp_string_guard origin_uuid_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
-    const char *origin_uuid = origin_uuid_g.ptr;
-    xmpp_stanza_set_attribute(origin_id, "id", origin_uuid);
-    // freed by origin_uuid_g
-    xmpp_stanza_add_child(message, origin_id);
-
-    ptr_account->connection.send(message);
-
-    xmpp_stanza_release(body_text);
-    xmpp_stanza_release(body);
-    xmpp_stanza_release(reply_elem);
-    xmpp_stanza_release(store_hint);
-    xmpp_stanza_release(origin_id);
-    xmpp_stanza_release(message);
+    ptr_account->connection.send(msg_s.build(ptr_account->context).get());
 
     weechat_printf(buffer, "%sxmpp: reply sent",
                   weechat_prefix("network"));
@@ -881,51 +746,24 @@ int command__reply_to(const void *pointer, void *data,
     const char *type = (ptr_channel->type == weechat::channel::chat_type::MUC)
                         ? "groupchat" : "chat";
 
-    xmpp_stanza_t *message = xmpp_message_new(ptr_account->context, type, to, nullptr);
-    xmpp_string_guard uuid_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
-    xmpp_stanza_set_id(message, uuid_g.ptr);
+    std::string uuid_s = stanza::uuid(ptr_account->context);
+    std::string origin_uuid_s = stanza::uuid(ptr_account->context);
 
-    xmpp_stanza_t *body = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(body, "body");
-    xmpp_stanza_t *body_text = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_text(body_text, reply_text);
-    xmpp_stanza_add_child(body, body_text);
-    xmpp_stanza_add_child(message, body);
+    stanza::xep0461::reply reply_el(target_id, reply_to_jid);
+    stanza::xep0428::fallback fallback_el("urn:xmpp:reply:0");
+    stanza::xep0359::origin_id oid_el(origin_uuid_s);
 
-    xmpp_stanza_t *reply_elem = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(reply_elem, "reply");
-    xmpp_stanza_set_ns(reply_elem, "urn:xmpp:reply:0");
-    xmpp_stanza_set_attribute(reply_elem, "id", target_id);
-    xmpp_stanza_set_attribute(reply_elem, "to", reply_to_jid.c_str());
-    xmpp_stanza_add_child(message, reply_elem);
+    auto msg_s = stanza::message()
+        .type(type)
+        .to(to)
+        .id(uuid_s)
+        .body(reply_text);
+    msg_s.reply(reply_el);
+    msg_s.fallback(fallback_el);
+    msg_s.store();
+    msg_s.origin_id(oid_el);
 
-    xmpp_stanza_t *fallback_elem = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(fallback_elem, "fallback");
-    xmpp_stanza_set_ns(fallback_elem, "urn:xmpp:fallback:0");
-    xmpp_stanza_set_attribute(fallback_elem, "for", "urn:xmpp:reply:0");
-    xmpp_stanza_add_child(message, fallback_elem);
-    xmpp_stanza_release(fallback_elem);
-
-    xmpp_stanza_t *store_hint = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(store_hint, "store");
-    xmpp_stanza_set_ns(store_hint, "urn:xmpp:hints");
-    xmpp_stanza_add_child(message, store_hint);
-
-    xmpp_stanza_t *origin_id = xmpp_stanza_new(ptr_account->context);
-    xmpp_stanza_set_name(origin_id, "origin-id");
-    xmpp_stanza_set_ns(origin_id, "urn:xmpp:sid:0");
-    xmpp_string_guard origin_uuid_g(ptr_account->context, xmpp_uuid_gen(ptr_account->context));
-    xmpp_stanza_set_attribute(origin_id, "id", origin_uuid_g.ptr);
-    xmpp_stanza_add_child(message, origin_id);
-
-    ptr_account->connection.send(message);
-
-    xmpp_stanza_release(body_text);
-    xmpp_stanza_release(body);
-    xmpp_stanza_release(reply_elem);
-    xmpp_stanza_release(store_hint);
-    xmpp_stanza_release(origin_id);
-    xmpp_stanza_release(message);
+    ptr_account->connection.send(msg_s.build(ptr_account->context).get());
 
     weechat_printf(buffer, "%sxmpp: reply sent", weechat_prefix("network"));
     return WEECHAT_RC_OK;
