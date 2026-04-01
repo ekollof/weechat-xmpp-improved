@@ -38,8 +38,7 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool top_level
             bool has_resource = binding.from && !binding.from->resource.empty();
             if (has_resource)
             {
-                xmpp_string_guard disco_id_g(account.context, xmpp_uuid_gen(account.context));
-                const char *disco_id = disco_id_g.ptr;
+                std::string disco_id = stanza::uuid(account.context);
                 account.caps_disco_queries[disco_id] = ver;  // Track this query for caching
 
                 account.connection.send(stanza::iq()
@@ -51,8 +50,6 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool top_level
                             .query()
                             .build(account.context)
                             .get());
-
-                // freed by disco_id_g
             }
         }
     }
@@ -158,10 +155,9 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool top_level
                                 start = now - (7 * 86400); // fallback: last 7 days
 
                             time_t end = now;
-                            xmpp_string_guard mam_uuid_g(account.context,
-                                xmpp_uuid_gen(account.context));
-                            if (mam_uuid_g.ptr)
-                                channel->fetch_mam(mam_uuid_g.ptr, &start, &end, nullptr);
+                            std::string mam_uuid = stanza::uuid(account.context);
+                            if (!mam_uuid.empty())
+                                channel->fetch_mam(mam_uuid.c_str(), &start, &end, nullptr);
                         }
                     }
                     break;
@@ -318,26 +314,39 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool top_level
         if (is_new_room && channel)
         {
             // Status 201: new room was created — send empty config submit to unlock it
-            char *room_jid = xmpp_jid_bare(account.context, binding.from->full.data());
-            xmpp_string_guard owner_id_g(account.context, xmpp_uuid_gen(account.context));
-            const char *owner_id = owner_id_g.ptr;
-            xmpp_stanza_t *iq = xmpp_iq_new(account.context, "set", owner_id);
-            xmpp_stanza_set_to(iq, room_jid);
-            xmpp_stanza_t *query = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_name(query, "query");
-            xmpp_stanza_set_ns(query, "http://jabber.org/protocol/muc#owner");
-            xmpp_stanza_t *x_form = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_name(x_form, "x");
-            xmpp_stanza_set_ns(x_form, "jabber:x:data");
-            xmpp_stanza_set_attribute(x_form, "type", "submit");
-            xmpp_stanza_add_child(query, x_form);
-            xmpp_stanza_add_child(iq, query);
-            xmpp_stanza_release(x_form);
-            xmpp_stanza_release(query);
-            xmpp_send(account.connection, iq);
-            xmpp_stanza_release(iq);
-            // freed by owner_id_g
-            xmpp_free(account.context, room_jid);
+            char *room_jid_raw = xmpp_jid_bare(account.context, binding.from->full.data());
+            std::string room_jid(room_jid_raw ? room_jid_raw : "");
+            xmpp_free(account.context, room_jid_raw);
+
+            struct x_data_submit : stanza::spec {
+                x_data_submit() : spec("x") {
+                    xmlns<jabber::x::data>();
+                    attr("type", "submit");
+                }
+            };
+
+            struct muc_owner_query : stanza::spec {
+                muc_owner_query(x_data_submit &x) : spec("query") {
+                    xmlns<jabber_org::protocol::muc::owner>();
+                    child(x);
+                }
+            };
+
+            struct room_unlock_iq : stanza::spec {
+                room_unlock_iq(std::string_view to_, std::string_view id_,
+                               muc_owner_query &q) : spec("iq") {
+                    attr("type", "set");
+                    attr("to", to_);
+                    attr("id", id_);
+                    child(q);
+                }
+            };
+
+            x_data_submit xd;
+            muc_owner_query owner_q(xd);
+            std::string unlock_id = stanza::uuid(account.context);
+            room_unlock_iq unlock_iq(room_jid, unlock_id, owner_q);
+            account.connection.send(unlock_iq.build(account.context).get());
         }
     }
     else
