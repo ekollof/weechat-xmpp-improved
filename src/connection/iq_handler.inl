@@ -3506,19 +3506,15 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
             }
             else if (retry_node == "urn:xmpp:omemo:2:devices")
             {
-                xmpp_stanza_t *dl_stanza = account.get_devicelist();
-                xmpp_string_guard dl_uuid_g(account.context, xmpp_uuid_gen(account.context));
-                xmpp_stanza_set_id(dl_stanza, dl_uuid_g.ptr);
-                account.connection.send(dl_stanza);
-                xmpp_stanza_release(dl_stanza);
+                auto dl_stanza = account.get_devicelist();
+                if (dl_stanza)
+                    account.connection.send(dl_stanza.get());
             }
             else if (retry_node == "eu.siacs.conversations.axolotl.devicelist")
             {
-                xmpp_stanza_t *dl_stanza = account.get_legacy_devicelist();
-                xmpp_string_guard dl_uuid_g(account.context, xmpp_uuid_gen(account.context));
-                xmpp_stanza_set_id(dl_stanza, dl_uuid_g.ptr);
-                account.connection.send(dl_stanza);
-                xmpp_stanza_release(dl_stanza);
+                auto dl_stanza = account.get_legacy_devicelist();
+                if (dl_stanza)
+                    account.connection.send(dl_stanza.get());
             }
             else if (std::string_view(retry_node).starts_with(
                          "eu.siacs.conversations.axolotl.bundles:"))
@@ -3658,12 +3654,9 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
 
                             if (!found_self)
                             {
-                                reply = account.get_devicelist();
-                                xmpp_string_guard uuid_g(account.context, xmpp_uuid_gen(account.context));
-                                const char *uuid = uuid_g.ptr;
-                                xmpp_stanza_set_id(reply, uuid);
-                                account.connection.send(reply);
-                                xmpp_stanza_release(reply);
+                                auto dl_stanza = account.get_devicelist();
+                                if (dl_stanza)
+                                    account.connection.send(dl_stanza.get());
                             }
                         }
                         else
@@ -3949,11 +3942,9 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                             "%somemo: our device %u missing from server legacy devicelist — re-publishing",
                             weechat_prefix("network"), account.omemo.device_id);
 
-                        xmpp_stanza_t *reply = account.get_legacy_devicelist();
-                        xmpp_string_guard uuid_g(account.context, xmpp_uuid_gen(account.context));
-                        xmpp_stanza_set_id(reply, uuid_g.ptr);
-                        account.connection.send(reply);
-                        xmpp_stanza_release(reply);
+                        auto dl_stanza = account.get_legacy_devicelist();
+                        if (dl_stanza)
+                            account.connection.send(dl_stanza.get());
                     }
                 }
                 else if (account.omemo)

@@ -62,11 +62,10 @@ int command__omemo(const void *pointer, void *data,
                            weechat_prefix("network"));
 
             // Publish devicelist
-            xmpp_stanza_t *devicelist_stanza = ptr_account->get_devicelist();
+            auto devicelist_stanza = ptr_account->get_devicelist();
             if (devicelist_stanza)
             {
-                ptr_account->connection.send(devicelist_stanza);
-                xmpp_stanza_release(devicelist_stanza);
+                ptr_account->connection.send(devicelist_stanza.get());
                 weechat_printf(buffer,
                                _("%sDevicelist published (device ID: %u)"),
                                weechat_prefix("network"), ptr_account->omemo.device_id);
@@ -92,11 +91,10 @@ int command__omemo(const void *pointer, void *data,
             }
 
             // Publish legacy OMEMO nodes for OMEMO:1 interoperability.
-            xmpp_stanza_t *legacy_devicelist_stanza = ptr_account->get_legacy_devicelist();
+            auto legacy_devicelist_stanza = ptr_account->get_legacy_devicelist();
             if (legacy_devicelist_stanza)
             {
-                ptr_account->connection.send(legacy_devicelist_stanza);
-                xmpp_stanza_release(legacy_devicelist_stanza);
+                ptr_account->connection.send(legacy_devicelist_stanza.get());
                 weechat_printf(buffer,
                                _("%sLegacy devicelist published (device ID: %u)"),
                                weechat_prefix("network"), ptr_account->omemo.device_id);

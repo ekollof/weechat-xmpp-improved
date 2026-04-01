@@ -122,10 +122,8 @@ void weechat::account::device_free_all()
     devices.clear();
 }
 
-xmpp_stanza_t *weechat::account::get_devicelist()
+std::shared_ptr<xmpp_stanza_t> weechat::account::get_devicelist()
 {
-    int i = 0;
-
     if (omemo.device_id == 0 || omemo.device_id > 0x7fffffffU)
     {
         weechat_printf(buffer,
@@ -134,107 +132,97 @@ xmpp_stanza_t *weechat::account::get_devicelist()
         return nullptr;
     }
 
-    account::device device;
+    using DeviceMap = std::unordered_map<std::uint32_t, weechat::account::device>;
 
-    device.id = omemo.device_id;
-    device.name = fmt::format("{}", device.id);
-    device.label = "weechat";
-
-    std::vector<xmpp_stanza_t*> children_vec(devices.size() + 4, nullptr);
-    xmpp_stanza_t **children = children_vec.data();
-    children[i++] = stanza__iq_pubsub_publish_item_list_device(
-        context, nullptr, with_noop(device.name.c_str()), with_noop(nullptr));
-
-    for (auto& device : devices)
-    {
-        if (device.first == omemo.device_id || device.first == 0 || device.first > 0x7fffffffU)
-            continue;
-
-        if (device.second.name == "%u")
-            continue;
-
-        const auto expected_device_name = fmt::format("{}", device.first);
-        if (device.second.name != expected_device_name)
+    // <devices xmlns='urn:xmpp:omemo:2'> populated in-constructor to satisfy protected child()
+    struct devices_spec : stanza::spec {
+        devices_spec(std::uint32_t self_id, const DeviceMap& devs,
+                     xmpp_conn_t* /*unused*/, weechat::account* acct)
+            : spec("devices")
         {
-            weechat_printf(buffer,
-                           "%somemo: skipping cached device entry %u with mismatched published id '%s'",
-                           weechat_prefix("error"),
-                           device.first,
-                           device.second.name.c_str());
-            continue;
+            attr("xmlns", "urn:xmpp:omemo:2");
+
+            struct device_spec : stanza::spec {
+                device_spec(std::string_view id_sv, std::string_view label_sv) : spec("device") {
+                    attr("id", id_sv);
+                    if (!label_sv.empty())
+                        attr("label", label_sv);
+                }
+            };
+
+            const std::string self_id_s = fmt::format("{}", self_id);
+            device_spec self_dev(self_id_s, "weechat");
+            child(self_dev);
+
+            for (const auto& [dev_id, dev_info] : devs)
+            {
+                if (dev_id == self_id || dev_id == 0 || dev_id > 0x7fffffffU)
+                    continue;
+                if (dev_info.name == "%u")
+                    continue;
+                const auto expected = fmt::format("{}", dev_id);
+                if (dev_info.name != expected)
+                {
+                    weechat_printf(acct->buffer,
+                                   "%somemo: skipping cached device entry %u with mismatched published id '%s'",
+                                   weechat_prefix("error"),
+                                   dev_id,
+                                   dev_info.name.c_str());
+                    continue;
+                }
+                const std::string label = dev_info.label.empty() ? "weechat" : dev_info.label;
+                device_spec peer_dev(dev_info.name, label);
+                child(peer_dev);
+            }
         }
+    };
 
-        if (device.second.label.empty())
-            device.second.label = "weechat";
+    // Publish-options x:data form (4 fields)
+    struct omemo_pub_options : stanza::spec {
+        omemo_pub_options() : spec("x") {
+            attr("xmlns", "jabber:x:data");
+            attr("type", "submit");
+            struct field_spec : stanza::spec {
+                field_spec(std::string_view var, std::string_view val,
+                           std::string_view type_sv = {}) : spec("field") {
+                    attr("var", var);
+                    if (!type_sv.empty()) attr("type", type_sv);
+                    struct value_spec : stanza::spec {
+                        value_spec(std::string_view v) : spec("value") { text(v); }
+                    } v(val);
+                    child(v);
+                }
+            };
+            field_spec f1("FORM_TYPE",
+                "http://jabber.org/protocol/pubsub#publish-options", "hidden");
+            child(f1);
+            field_spec f2("pubsub#max_items", "max");
+            child(f2);
+            field_spec f3("pubsub#access_model", "open");
+            child(f3);
+            field_spec f4("pubsub#persist_items", "true");
+            child(f4);
+        }
+    };
 
-        if (device.first != omemo.device_id)
-            children[i++] = stanza__iq_pubsub_publish_item_list_device(
-                context,
-                nullptr,
-                with_noop(device.second.name.data()),
-                with_noop(device.second.label.empty() ? nullptr : device.second.label.c_str()));
-    }
+    devices_spec devs_el(omemo.device_id, devices, connection, this);
+    omemo_pub_options pub_opts;
+    auto pubsub_el = stanza::xep0060::pubsub()
+        .publish(stanza::xep0060::publish("urn:xmpp:omemo:2:devices")
+            .item(stanza::xep0060::item().id("current").payload(devs_el)))
+        .publish_options(stanza::xep0060::publish_options().child_spec(pub_opts));
 
-    children[i] = nullptr;
-    const char *node = "urn:xmpp:omemo:2";
-    children[0] = stanza__iq_pubsub_publish_item_list(
-        context, nullptr, children, with_noop(node));
-    children[1] = nullptr;
-    children[0] = stanza__iq_pubsub_publish_item(
-        context, nullptr, children, with_noop("current"));
-    node = "urn:xmpp:omemo:2:devices";
-    children[0] = stanza__iq_pubsub_publish(context, nullptr, children, with_noop(node));
-    const char *ns = "http://jabber.org/protocol/pubsub";
-    children[0] = stanza__iq_pubsub(context, nullptr, children, with_noop(ns));
-
-    // Add publish-options so the server delivers PubSub notifications to
-    // contacts and allows them to fetch our devicelist (access_model=open).
-    // Without this many servers default to presence/whitelist which silently
-    // prevents remote clients from seeing our device.
-    {
-        xmpp_stanza_t *pubsub = children[0];
-
-        auto make_field = [&](const char *var, const char *val, const char *type = nullptr) {
-            return stanza_make_field(context, var, val, type);
-        };
-
-        xmpp_stanza_t *x = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(x, "x");
-        xmpp_stanza_set_ns(x, "jabber:x:data");
-        xmpp_stanza_set_attribute(x, "type", "submit");
-
-        xmpp_stanza_t *f1 = make_field("FORM_TYPE",
-            "http://jabber.org/protocol/pubsub#publish-options", "hidden");
-        xmpp_stanza_t *f2 = make_field("pubsub#max_items", "max");
-        xmpp_stanza_t *f3 = make_field("pubsub#access_model", "open");
-        xmpp_stanza_t *f4 = make_field("pubsub#persist_items", "true");
-
-        xmpp_stanza_add_child(x, f1); xmpp_stanza_release(f1);
-        xmpp_stanza_add_child(x, f2); xmpp_stanza_release(f2);
-        xmpp_stanza_add_child(x, f3); xmpp_stanza_release(f3);
-        xmpp_stanza_add_child(x, f4); xmpp_stanza_release(f4);
-
-        xmpp_stanza_t *publish_options = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(publish_options, "publish-options");
-        xmpp_stanza_add_child(publish_options, x);
-        xmpp_stanza_release(x);
-
-        xmpp_stanza_add_child(pubsub, publish_options);
-        xmpp_stanza_release(publish_options);
-    }
-
-    xmpp_stanza_t * parent = stanza__iq(context, nullptr,
-                                        children, nullptr, "announce1",
-                                        nullptr, nullptr, "set");
+    auto iq_s = stanza::iq().type("set").id(stanza::uuid(context));
+    static_cast<stanza::xep0060::iq&>(iq_s).pubsub(pubsub_el);
 
     weechat_printf(buffer,
                    "%somemo: publishing devicelist for device %u with open access model",
                    weechat_prefix("network"), omemo.device_id);
 
-    return parent;
+    return iq_s.build(context);
 }
 
-xmpp_stanza_t *weechat::account::get_legacy_devicelist()
+std::shared_ptr<xmpp_stanza_t> weechat::account::get_legacy_devicelist()
 {
     if (omemo.device_id == 0 || omemo.device_id > 0x7fffffffU)
     {
@@ -244,97 +232,93 @@ xmpp_stanza_t *weechat::account::get_legacy_devicelist()
         return nullptr;
     }
 
-    xmpp_stanza_t *list = xmpp_stanza_new(context);
-    xmpp_stanza_set_name(list, "list");
-    xmpp_stanza_set_ns(list, "eu.siacs.conversations.axolotl");
+    using DeviceMap2 = std::unordered_map<std::uint32_t, weechat::account::device>;
 
-    auto add_device = [&](const std::string &id) {
-        xmpp_stanza_t *dev = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(dev, "device");
-        xmpp_stanza_set_attribute(dev, "id", id.c_str());
-        xmpp_stanza_add_child(list, dev);
-        xmpp_stanza_release(dev);
+    // <list xmlns='eu.siacs.conversations.axolotl'> populated in-constructor
+    struct list_spec : stanza::spec {
+        list_spec(std::uint32_t self_id, const DeviceMap2& devs, weechat::account* acct)
+            : spec("list")
+        {
+            attr("xmlns", "eu.siacs.conversations.axolotl");
+
+            struct device_spec : stanza::spec {
+                device_spec(std::string_view id_sv) : spec("device") {
+                    attr("id", id_sv);
+                }
+            };
+
+            const std::string self_id_s = fmt::format("{}", self_id);
+            device_spec self_dev(self_id_s);
+            child(self_dev);
+
+            for (const auto& [dev_id, dev_info] : devs)
+            {
+                if (dev_id == self_id || dev_id == 0 || dev_id > 0x7fffffffU)
+                    continue;
+                if (dev_info.name == "%u")
+                    continue;
+                const auto expected = fmt::format("{}", dev_id);
+                if (dev_info.name != expected)
+                {
+                    weechat_printf(acct->buffer,
+                                   "%somemo: skipping cached device entry %u with mismatched published id '%s' (legacy devicelist)",
+                                   weechat_prefix("error"),
+                                   dev_id,
+                                   dev_info.name.c_str());
+                    continue;
+                }
+                device_spec peer_dev(dev_info.name);
+                child(peer_dev);
+            }
+        }
     };
 
-    add_device(fmt::format("{}", omemo.device_id));
-
-    for (auto &device : devices)
-    {
-        if (device.first == omemo.device_id || device.first == 0 || device.first > 0x7fffffffU)
-            continue;
-
-        if (device.second.name == "%u")
-            continue;
-
-        const auto expected_device_name = fmt::format("{}", device.first);
-        if (device.second.name != expected_device_name)
-        {
-            weechat_printf(buffer,
-                           "%somemo: skipping cached device entry %u with mismatched published id '%s' (legacy devicelist)",
-                           weechat_prefix("error"),
-                           device.first,
-                           device.second.name.c_str());
-            continue;
+    // Same 4-field publish-options as the OMEMO:2 devicelist
+    struct legacy_pub_options : stanza::spec {
+        legacy_pub_options() : spec("x") {
+            attr("xmlns", "jabber:x:data");
+            attr("type", "submit");
+            struct field_spec : stanza::spec {
+                field_spec(std::string_view var, std::string_view val,
+                           std::string_view type_sv = {}) : spec("field") {
+                    attr("var", var);
+                    if (!type_sv.empty()) attr("type", type_sv);
+                    struct value_spec : stanza::spec {
+                        value_spec(std::string_view v) : spec("value") { text(v); }
+                    } v(val);
+                    child(v);
+                }
+            };
+            field_spec f1("FORM_TYPE",
+                "http://jabber.org/protocol/pubsub#publish-options", "hidden");
+            child(f1);
+            field_spec f2("pubsub#max_items", "max");
+            child(f2);
+            field_spec f3("pubsub#access_model", "open");
+            child(f3);
+            field_spec f4("pubsub#persist_items", "true");
+            child(f4);
         }
+    };
 
-        add_device(device.second.name);
-    }
-
-    xmpp_stanza_t *item_children[] = {list, nullptr};
-    xmpp_stanza_t *item = stanza__iq_pubsub_publish_item(
-        context, nullptr, item_children, with_noop("current"));
-
-    xmpp_stanza_t *publish_children[] = {item, nullptr};
-    xmpp_stanza_t *publish = stanza__iq_pubsub_publish(
-        context, nullptr, publish_children,
-        with_noop("eu.siacs.conversations.axolotl.devicelist"));
-
-    xmpp_stanza_t *pubsub_children[] = {publish, nullptr};
-    xmpp_stanza_t *pubsub = stanza__iq_pubsub(
-        context, nullptr, pubsub_children, with_noop("http://jabber.org/protocol/pubsub"));
+    list_spec list_el(omemo.device_id, devices, this);
 
     // Keep legacy node public/persistent as well so clients still using
     // OMEMO:1 can reliably discover this device.
-    {
-        auto make_field = [&](const char *var, const char *val, const char *type = nullptr) {
-            return stanza_make_field(context, var, val, type);
-        };
+    legacy_pub_options pub_opts;
+    auto pubsub_el = stanza::xep0060::pubsub()
+        .publish(stanza::xep0060::publish("eu.siacs.conversations.axolotl.devicelist")
+            .item(stanza::xep0060::item().id("current").payload(list_el)))
+        .publish_options(stanza::xep0060::publish_options().child_spec(pub_opts));
 
-        xmpp_stanza_t *x = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(x, "x");
-        xmpp_stanza_set_ns(x, "jabber:x:data");
-        xmpp_stanza_set_attribute(x, "type", "submit");
-
-        xmpp_stanza_t *f1 = make_field("FORM_TYPE",
-            "http://jabber.org/protocol/pubsub#publish-options", "hidden");
-        xmpp_stanza_t *f2 = make_field("pubsub#max_items", "max");
-        xmpp_stanza_t *f3 = make_field("pubsub#access_model", "open");
-        xmpp_stanza_t *f4 = make_field("pubsub#persist_items", "true");
-
-        xmpp_stanza_add_child(x, f1); xmpp_stanza_release(f1);
-        xmpp_stanza_add_child(x, f2); xmpp_stanza_release(f2);
-        xmpp_stanza_add_child(x, f3); xmpp_stanza_release(f3);
-        xmpp_stanza_add_child(x, f4); xmpp_stanza_release(f4);
-
-        xmpp_stanza_t *publish_options = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(publish_options, "publish-options");
-        xmpp_stanza_add_child(publish_options, x);
-        xmpp_stanza_release(x);
-
-        xmpp_stanza_add_child(pubsub, publish_options);
-        xmpp_stanza_release(publish_options);
-    }
-
-    xmpp_stanza_t *iq_children[] = {pubsub, nullptr};
-    xmpp_stanza_t *parent = stanza__iq(context, nullptr,
-                                       iq_children, nullptr, "announce-legacy1",
-                                       nullptr, nullptr, "set");
+    auto iq_s = stanza::iq().type("set").id(stanza::uuid(context));
+    static_cast<stanza::xep0060::iq&>(iq_s).pubsub(pubsub_el);
 
     weechat_printf(buffer,
                    "%somemo: publishing legacy devicelist for device %u with open access model",
                    weechat_prefix("network"), omemo.device_id);
 
-    return parent;
+    return iq_s.build(context);
 }
 
 void weechat::account::add_mam_query(const std::string id, const std::string with,
@@ -828,21 +812,25 @@ void weechat::account::build_and_publish_post(const xepher::pending_feed_post &p
     const bool         access_open       = post.access_open;
     const bool         is_comment        = !reply_to_id.empty();
 
-    // Build Atom <entry>
-    auto make_text_el = [this](const char *tag, const char *text) -> xmpp_stanza_t *
+    // Build Atom <entry> using RAII shared_ptr (dynamic/conditional children require runtime loops)
+    auto make_sp = [this](const char *tag) -> std::shared_ptr<xmpp_stanza_t> {
+        auto s = std::shared_ptr<xmpp_stanza_t>{ xmpp_stanza_new(context), xmpp_stanza_release };
+        xmpp_stanza_set_name(s.get(), tag);
+        return s;
+    };
+    auto make_text_el = [&](const char *tag, std::string_view text_sv)
+        -> std::shared_ptr<xmpp_stanza_t>
     {
-        xmpp_stanza_t *el = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(el, tag);
-        xmpp_stanza_t *t = xmpp_stanza_new(context);
-        xmpp_stanza_set_text(t, text);
-        xmpp_stanza_add_child(el, t);
-        xmpp_stanza_release(t);
+        auto el = make_sp(tag);
+        auto t = std::shared_ptr<xmpp_stanza_t>{ xmpp_stanza_new(context), xmpp_stanza_release };
+        xmpp_stanza_set_text(t.get(), std::string(text_sv).c_str());
+        xmpp_stanza_add_child(el.get(), t.get());
         return el;
     };
 
-    xmpp_stanza_t *entry = xmpp_stanza_new(context);
-    xmpp_stanza_set_name(entry, "entry");
-    xmpp_stanza_set_ns(entry, "http://www.w3.org/2005/Atom");
+    auto entry = make_sp("entry");
+    xmpp_stanza_set_name(entry.get(), "entry");
+    xmpp_stanza_set_ns(entry.get(), "http://www.w3.org/2005/Atom");
 
     // <title type='text'>
     // For comments (XEP-0277 §3.2) the body goes into <title> and there is no
@@ -850,69 +838,53 @@ void weechat::account::build_and_publish_post(const xepher::pending_feed_post &p
     // was explicitly provided by the user.
     if (!post_title.empty() || is_comment)
     {
-        const char *title_text = is_comment ? body.c_str() : post_title.c_str();
-        xmpp_stanza_t *title_el = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(title_el, "title");
-        xmpp_stanza_set_attribute(title_el, "type", "text");
-        {
-            xmpp_stanza_t *t = xmpp_stanza_new(context);
-            xmpp_stanza_set_text(t, title_text);
-            xmpp_stanza_add_child(title_el, t);
-            xmpp_stanza_release(t);
-        }
-        xmpp_stanza_add_child(entry, title_el);
-        xmpp_stanza_release(title_el);
+        std::string_view title_text = is_comment ? body : post_title;
+        auto title_el = make_sp("title");
+        xmpp_stanza_set_name(title_el.get(), "title");
+        xmpp_stanza_set_attribute(title_el.get(), "type", "text");
+        auto t = make_sp("text");
+        xmpp_stanza_set_text(t.get(), std::string(title_text).c_str());
+        xmpp_stanza_add_child(title_el.get(), t.get());
+        xmpp_stanza_add_child(entry.get(), title_el.get());
     }
 
     // <id>
     {
-        xmpp_stanza_t *id_el = make_text_el("id", atom_id.c_str());
-        xmpp_stanza_add_child(entry, id_el);
-        xmpp_stanza_release(id_el);
+        auto id_el = make_text_el("id", atom_id);
+        xmpp_stanza_add_child(entry.get(), id_el.get());
     }
 
     // <published> <updated>
     {
-        xmpp_stanza_t *pub_el = make_text_el("published", ts_str.c_str());
-        xmpp_stanza_add_child(entry, pub_el);
-        xmpp_stanza_release(pub_el);
-        xmpp_stanza_t *upd_el = make_text_el("updated", ts_str.c_str());
-        xmpp_stanza_add_child(entry, upd_el);
-        xmpp_stanza_release(upd_el);
+        auto pub_el = make_text_el("published", ts_str);
+        xmpp_stanza_add_child(entry.get(), pub_el.get());
+        auto upd_el = make_text_el("updated", ts_str);
+        xmpp_stanza_add_child(entry.get(), upd_el.get());
     }
 
     // <author>
     {
-        xmpp_string_guard bare_g(context,
-                                 xmpp_jid_bare(context, jid().data()));
-        xmpp_stanza_t *author_el = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(author_el, "author");
-        {
-            xmpp_stanza_t *name_el = make_text_el("name",
-                bare_g.ptr ? bare_g.ptr : jid().data());
-            xmpp_stanza_add_child(author_el, name_el);
-            xmpp_stanza_release(name_el);
-            std::string xmpp_uri = fmt::format("xmpp:{}", bare_g.ptr ? bare_g.ptr : "");
-            xmpp_stanza_t *uri_el = make_text_el("uri", xmpp_uri.c_str());
-            xmpp_stanza_add_child(author_el, uri_el);
-            xmpp_stanza_release(uri_el);
-        }
-        xmpp_stanza_add_child(entry, author_el);
-        xmpp_stanza_release(author_el);
+        const std::string bare_jid = ::jid(nullptr, jid()).bare;
+        auto author_el = make_sp("author");
+        xmpp_stanza_set_name(author_el.get(), "author");
+        auto name_el = make_text_el("name", bare_jid.empty() ? jid() : bare_jid);
+        xmpp_stanza_add_child(author_el.get(), name_el.get());
+        std::string xmpp_uri = fmt::format("xmpp:{}", bare_jid);
+        auto uri_el = make_text_el("uri", xmpp_uri);
+        xmpp_stanza_add_child(author_el.get(), uri_el.get());
+        xmpp_stanza_add_child(entry.get(), author_el.get());
     }
 
     // <content type='text'> — omitted for comments (body is in <title> per XEP-0277 §3.2)
     if (!is_comment)
     {
-        xmpp_stanza_t *content_el = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(content_el, "content");
-        xmpp_stanza_set_attribute(content_el, "type", "text");
-        xmpp_stanza_t *ct = xmpp_stanza_new(context);
-        xmpp_stanza_set_text(ct, body.c_str());
-        xmpp_stanza_add_child(content_el, ct);
-        xmpp_stanza_release(ct);
-        xmpp_stanza_add_child(entry, content_el);
-        xmpp_stanza_release(content_el);
+        auto content_el = make_sp("content");
+        xmpp_stanza_set_name(content_el.get(), "content");
+        xmpp_stanza_set_attribute(content_el.get(), "type", "text");
+        auto ct = make_sp("text");
+        xmpp_stanza_set_text(ct.get(), body.c_str());
+        xmpp_stanza_add_child(content_el.get(), ct.get());
+        xmpp_stanza_add_child(entry.get(), content_el.get());
     }
 
     // <file-sharing xmlns='urn:xmpp:sfs:0'> for each embed (XEP-0447)
@@ -920,78 +892,64 @@ void weechat::account::build_and_publish_post(const xepher::pending_feed_post &p
     {
         if (!emb.uploaded()) continue;
 
-        xmpp_stanza_t *fs = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(fs, "file-sharing");
-        xmpp_stanza_set_ns(fs, "urn:xmpp:sfs:0");
-        xmpp_stanza_set_attribute(fs, "disposition", emb.disposition());
+        auto fs = make_sp("file-sharing");
+        xmpp_stanza_set_name(fs.get(), "file-sharing");
+        xmpp_stanza_set_ns(fs.get(), "urn:xmpp:sfs:0");
+        xmpp_stanza_set_attribute(fs.get(), "disposition", emb.disposition());
 
         // <file>
-        xmpp_stanza_t *file_el = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(file_el, "file");
+        auto file_el = make_sp("file");
+        xmpp_stanza_set_name(file_el.get(), "file");
         {
-            xmpp_stanza_t *name_el = make_text_el("name", emb.filename.c_str());
-            xmpp_stanza_add_child(file_el, name_el);
-            xmpp_stanza_release(name_el);
+            auto name_el = make_text_el("name", emb.filename);
+            xmpp_stanza_add_child(file_el.get(), name_el.get());
         }
         if (!emb.mime.empty())
         {
-            xmpp_stanza_t *mt_el = make_text_el("media-type", emb.mime.c_str());
-            xmpp_stanza_add_child(file_el, mt_el);
-            xmpp_stanza_release(mt_el);
+            auto mt_el = make_text_el("media-type", emb.mime);
+            xmpp_stanza_add_child(file_el.get(), mt_el.get());
         }
         if (emb.size > 0)
         {
-            std::string sz = fmt::format("{}", emb.size);
-            xmpp_stanza_t *sz_el = make_text_el("size", sz.c_str());
-            xmpp_stanza_add_child(file_el, sz_el);
-            xmpp_stanza_release(sz_el);
+            auto sz_el = make_text_el("size", fmt::format("{}", emb.size));
+            xmpp_stanza_add_child(file_el.get(), sz_el.get());
         }
         if (!emb.sha256_b64.empty())
         {
-            xmpp_stanza_t *hash_el = xmpp_stanza_new(context);
-            xmpp_stanza_set_name(hash_el, "hash");
-            xmpp_stanza_set_ns(hash_el, "urn:xmpp:hashes:2");
-            xmpp_stanza_set_attribute(hash_el, "algo", "sha-256");
-            xmpp_stanza_t *ht = xmpp_stanza_new(context);
-            xmpp_stanza_set_text(ht, emb.sha256_b64.c_str());
-            xmpp_stanza_add_child(hash_el, ht);
-            xmpp_stanza_release(ht);
-            xmpp_stanza_add_child(file_el, hash_el);
-            xmpp_stanza_release(hash_el);
+            auto hash_el = make_sp("hash");
+            xmpp_stanza_set_name(hash_el.get(), "hash");
+            xmpp_stanza_set_ns(hash_el.get(), "urn:xmpp:hashes:2");
+            xmpp_stanza_set_attribute(hash_el.get(), "algo", "sha-256");
+            auto ht = make_sp("text");
+            xmpp_stanza_set_text(ht.get(), emb.sha256_b64.c_str());
+            xmpp_stanza_add_child(hash_el.get(), ht.get());
+            xmpp_stanza_add_child(file_el.get(), hash_el.get());
         }
         if (emb.width > 0)
         {
-            std::string ws = fmt::format("{}", emb.width);
-            xmpp_stanza_t *w_el = make_text_el("width", ws.c_str());
-            xmpp_stanza_add_child(file_el, w_el);
-            xmpp_stanza_release(w_el);
+            auto w_el = make_text_el("width", fmt::format("{}", emb.width));
+            xmpp_stanza_add_child(file_el.get(), w_el.get());
         }
         if (emb.height > 0)
         {
-            std::string hs = fmt::format("{}", emb.height);
-            xmpp_stanza_t *h_el = make_text_el("height", hs.c_str());
-            xmpp_stanza_add_child(file_el, h_el);
-            xmpp_stanza_release(h_el);
+            auto h_el = make_text_el("height", fmt::format("{}", emb.height));
+            xmpp_stanza_add_child(file_el.get(), h_el.get());
         }
-        xmpp_stanza_add_child(fs, file_el);
-        xmpp_stanza_release(file_el);
+        xmpp_stanza_add_child(fs.get(), file_el.get());
 
         // <sources><url-data target='…'/></sources>
-        xmpp_stanza_t *sources_el = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(sources_el, "sources");
+        auto sources_el = make_sp("sources");
+        xmpp_stanza_set_name(sources_el.get(), "sources");
         {
-            xmpp_stanza_t *ud = xmpp_stanza_new(context);
-            xmpp_stanza_set_name(ud, "url-data");
-            xmpp_stanza_set_ns(ud, "http://jabber.org/protocol/url-data");
-            xmpp_stanza_set_attribute(ud, "target", emb.get_url.c_str());
-            xmpp_stanza_add_child(sources_el, ud);
-            xmpp_stanza_release(ud);
+            auto ud = make_sp("url-data");
+            xmpp_stanza_set_name(ud.get(), "url-data");
+            xmpp_stanza_set_ns(ud.get(), "http://jabber.org/protocol/url-data");
+            xmpp_stanza_set_attribute(ud.get(), "target", emb.get_url.c_str());
+            xmpp_stanza_add_child(sources_el.get(), ud.get());
         }
-        xmpp_stanza_add_child(fs, sources_el);
-        xmpp_stanza_release(sources_el);
+        xmpp_stanza_add_child(fs.get(), sources_el.get());
 
-        xmpp_stanza_add_child(entry, fs);
-        xmpp_stanza_release(fs);
+        xmpp_stanza_add_child(entry.get(), fs.get());
     }
 
     // <thr:in-reply-to> for replies
@@ -1006,16 +964,15 @@ void weechat::account::build_and_publish_post(const xepher::pending_feed_post &p
         const std::string reply_xmpp_uri = fmt::format(
             "xmpp:{}?;node={};item={}", pub_service, reply_ref_node, reply_to_id);
         const std::string reply_atom_id = feed_atom_id_get(reply_feed_key, reply_to_id);
-        xmpp_stanza_t *reply_el = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(reply_el, "thr:in-reply-to");
-        xmpp_stanza_set_attribute(reply_el, "xmlns:thr",
+        auto reply_el = make_sp("thr:in-reply-to");
+        xmpp_stanza_set_name(reply_el.get(), "thr:in-reply-to");
+        xmpp_stanza_set_attribute(reply_el.get(), "xmlns:thr",
                                   "http://purl.org/syndication/thread/1.0");
-        xmpp_stanza_set_attribute(reply_el, "ref",
+        xmpp_stanza_set_attribute(reply_el.get(), "ref",
                                   reply_atom_id.empty() ? reply_xmpp_uri.c_str()
                                                         : reply_atom_id.c_str());
-        xmpp_stanza_set_attribute(reply_el, "href", reply_xmpp_uri.c_str());
-        xmpp_stanza_add_child(entry, reply_el);
-        xmpp_stanza_release(reply_el);
+        xmpp_stanza_set_attribute(reply_el.get(), "href", reply_xmpp_uri.c_str());
+        xmpp_stanza_add_child(entry.get(), reply_el.get());
     }
 
     // Determine target service/node
@@ -1033,88 +990,89 @@ void weechat::account::build_and_publish_post(const xepher::pending_feed_post &p
             fmt::format("urn:xmpp:microblog:0:comments/{}", item_uuid);
         const std::string comments_xmpp_uri = fmt::format(
             "xmpp:{}?;node={}", target_service, comments_node_name);
-        xmpp_stanza_t *replies_el = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(replies_el, "link");
-        xmpp_stanza_set_attribute(replies_el, "rel",   "replies");
-        xmpp_stanza_set_attribute(replies_el, "title", "comments");
-        xmpp_stanza_set_attribute(replies_el, "href",  comments_xmpp_uri.c_str());
-        xmpp_stanza_add_child(entry, replies_el);
-        xmpp_stanza_release(replies_el);
+        auto replies_el = make_sp("link");
+        xmpp_stanza_set_name(replies_el.get(), "link");
+        xmpp_stanza_set_attribute(replies_el.get(), "rel",   "replies");
+        xmpp_stanza_set_attribute(replies_el.get(), "title", "comments");
+        xmpp_stanza_set_attribute(replies_el.get(), "href",  comments_xmpp_uri.c_str());
+        xmpp_stanza_add_child(entry.get(), replies_el.get());
     }
 
     // <generator>
     {
-        xmpp_stanza_t *gen_el = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(gen_el, "generator");
-        xmpp_stanza_set_attribute(gen_el, "uri", "https://github.com/ekollof/xepher");
-        xmpp_stanza_set_attribute(gen_el, "version", WEECHAT_XMPP_PLUGIN_VERSION);
-        {
-            xmpp_stanza_t *gt = xmpp_stanza_new(context);
-            xmpp_stanza_set_text(gt, "Xepher");
-            xmpp_stanza_add_child(gen_el, gt);
-            xmpp_stanza_release(gt);
-        }
-        xmpp_stanza_add_child(entry, gen_el);
-        xmpp_stanza_release(gen_el);
+        auto gen_el = make_sp("generator");
+        xmpp_stanza_set_name(gen_el.get(), "generator");
+        xmpp_stanza_set_attribute(gen_el.get(), "uri", "https://github.com/ekollof/xepher");
+        xmpp_stanza_set_attribute(gen_el.get(), "version", WEECHAT_XMPP_PLUGIN_VERSION);
+        auto gt = make_sp("text");
+        xmpp_stanza_set_text(gt.get(), "Xepher");
+        xmpp_stanza_add_child(gen_el.get(), gt.get());
+        xmpp_stanza_add_child(entry.get(), gen_el.get());
     }
 
-    // Wrap in <item id='uuid'><entry/></item>
-    xmpp_stanza_t *item_children[2] = {entry, nullptr};
-    xmpp_stanza_t *item_el = stanza__iq_pubsub_publish_item(
-        context, nullptr, item_children, with_noop(item_uuid.c_str()));
+    // Wrap in <item id='uuid'><entry/></item> → <publish> → <pubsub> → <iq>
+    // All built with shared_ptr RAII since entry is already a live stanza_t
 
-    xmpp_stanza_t *pub_children2[2] = {item_el, nullptr};
-    xmpp_stanza_t *publish_el = stanza__iq_pubsub_publish(
-        context, nullptr, pub_children2, with_noop(target_node.c_str()));
+    // <item id='uuid'> wrapping the entry
+    auto item_el = make_sp("item");
+    xmpp_stanza_set_name(item_el.get(), "item");
+    xmpp_stanza_set_attribute(item_el.get(), "id", item_uuid.c_str());
+    xmpp_stanza_add_child(item_el.get(), entry.get());
 
-    // publish-options
-    xmpp_stanza_t *pub_opts = nullptr;
+    // <publish node='...'>
+    auto publish_el = make_sp("publish");
+    xmpp_stanza_set_name(publish_el.get(), "publish");
+    xmpp_stanza_set_attribute(publish_el.get(), "node", target_node.c_str());
+    xmpp_stanza_add_child(publish_el.get(), item_el.get());
+
+    // <pubsub xmlns='http://jabber.org/protocol/pubsub'>
+    auto pubsub_el = make_sp("pubsub");
+    xmpp_stanza_set_name(pubsub_el.get(), "pubsub");
+    xmpp_stanza_set_ns(pubsub_el.get(), "http://jabber.org/protocol/pubsub");
+    xmpp_stanza_add_child(pubsub_el.get(), publish_el.get());
+
+    // publish-options (only when access_open)
     if (access_open)
     {
-        pub_opts = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(pub_opts, "publish-options");
+        auto x = make_sp("x");
+        xmpp_stanza_set_name(x.get(), "x");
+        xmpp_stanza_set_ns(x.get(), "jabber:x:data");
+        xmpp_stanza_set_attribute(x.get(), "type", "submit");
 
-        xmpp_stanza_t *x = xmpp_stanza_new(context);
-        xmpp_stanza_set_name(x, "x");
-        xmpp_stanza_set_ns(x, "jabber:x:data");
-        xmpp_stanza_set_attribute(x, "type", "submit");
-
-        auto add_field = [&](const char *var, const char *val) {
-            xmpp_stanza_t *f = xmpp_stanza_new(context);
-            xmpp_stanza_set_name(f, "field");
-            xmpp_stanza_set_attribute(f, "var", var);
-            xmpp_stanza_t *v = xmpp_stanza_new(context);
-            xmpp_stanza_set_name(v, "value");
-            xmpp_stanza_t *vt = xmpp_stanza_new(context);
-            xmpp_stanza_set_text(vt, val);
-            xmpp_stanza_add_child(v, vt); xmpp_stanza_release(vt);
-            xmpp_stanza_add_child(f, v);  xmpp_stanza_release(v);
-            xmpp_stanza_add_child(x, f);  xmpp_stanza_release(f);
+        auto add_field = [&](std::string_view var, std::string_view val) {
+            auto f = make_sp("field");
+            xmpp_stanza_set_name(f.get(), "field");
+            xmpp_stanza_set_attribute(f.get(), "var", std::string(var).c_str());
+            auto v = make_sp("value");
+            xmpp_stanza_set_name(v.get(), "value");
+            auto vt = make_sp("text");
+            xmpp_stanza_set_text(vt.get(), std::string(val).c_str());
+            xmpp_stanza_add_child(v.get(), vt.get());
+            xmpp_stanza_add_child(f.get(), v.get());
+            xmpp_stanza_add_child(x.get(), f.get());
         };
         add_field("FORM_TYPE", "http://jabber.org/protocol/pubsub#publish-options");
         add_field("pubsub#access_model", "open");
 
-        xmpp_stanza_add_child(pub_opts, x);
-        xmpp_stanza_release(x);
+        auto pub_opts = make_sp("publish-options");
+        xmpp_stanza_set_name(pub_opts.get(), "publish-options");
+        xmpp_stanza_add_child(pub_opts.get(), x.get());
+        xmpp_stanza_add_child(pubsub_el.get(), pub_opts.get());
     }
 
-    xmpp_stanza_t *ps_children[3] = {publish_el, pub_opts, nullptr};
-    xmpp_stanza_t *pubsub_el = stanza__iq_pubsub(
-        context, nullptr, ps_children,
-        with_noop("http://jabber.org/protocol/pubsub"));
+    // <iq type='set' id='...' from='...' to='...'>
+    const std::string uid = stanza::uuid(context);
+    auto iq_el = make_sp("iq");
+    xmpp_stanza_set_name(iq_el.get(), "iq");
+    xmpp_stanza_set_attribute(iq_el.get(), "type", "set");
+    xmpp_stanza_set_attribute(iq_el.get(), "id",   uid.c_str());
+    xmpp_stanza_set_attribute(iq_el.get(), "from", jid().c_str());
+    xmpp_stanza_set_attribute(iq_el.get(), "to",   target_service.c_str());
+    xmpp_stanza_add_child(iq_el.get(), pubsub_el.get());
 
-    xmpp_string_guard uid_g(context, xmpp_uuid_gen(context));
-    xmpp_stanza_t *iq_children[2] = {pubsub_el, nullptr};
-    xmpp_stanza_t *iq = stanza__iq(context, nullptr, iq_children,
-                                   nullptr, uid_g.ptr,
-                                   jid().data(),
-                                   target_service.c_str(),
-                                   "set");
-    connection.send(iq);
-    xmpp_stanza_release(iq);
+    connection.send(iq_el.get());
 
-    if (uid_g.ptr)
-        pubsub_publish_ids[uid_g.ptr] = {target_service, target_node, item_uuid, post.buffer};
+    pubsub_publish_ids[uid] = {target_service, target_node, item_uuid, post.buffer};
 
     if (post.is_reply)
         weechat_printf(post.buffer, "%sPosted reply to %s on %s/%s",
@@ -1125,4 +1083,3 @@ void weechat::account::build_and_publish_post(const xepher::pending_feed_post &p
                        weechat_prefix("network"),
                        pub_service.c_str(), pub_node.c_str(), item_uuid.c_str());
 }
-
