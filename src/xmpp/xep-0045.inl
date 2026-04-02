@@ -376,14 +376,26 @@ namespace stanza {
     /* Multi-User Chat (XEP-0045) — stanza builder side */
     struct xep0045 {
 
-        // <x xmlns='http://jabber.org/protocol/muc'/>  — used in MUC join presence
+        // <x xmlns='http://jabber.org/protocol/muc'>
+        //   <history maxstanzas='0'/>  — suppress server history (MAM handles catch-up)
+        // </x>
         struct join_x : virtual public spec {
             join_x() : spec("x") {
                 xmlns<jabber_org::protocol::muc>();
+                // XEP-0045 §7.1.6: request no server history so MAM catch-up is the
+                // sole source of history, avoiding duplicates.
+                struct history_elem : virtual public spec {
+                    history_elem() : spec("history") {
+                        attr("maxstanzas", "0");
+                    }
+                };
+                history_elem h;
+                child(h);
             }
         };
 
-        // stanza::presence mixin — adds a bare <x xmlns='...muc'/> child for room joining
+        // stanza::presence mixin — adds a <x xmlns='...muc'><history maxstanzas='0'/></x>
+        // child for room joining (XEP-0045 §7.1).
         struct presence : virtual public spec {
             presence() : spec("presence") {}
 

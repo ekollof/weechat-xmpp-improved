@@ -80,8 +80,8 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0045.html' />
         <xmpp:status>partial</xmpp:status>
-        <xmpp:version>1.35.1</xmpp:version>
-        <xmpp:note xml:lang='en'>Multi-User Chat (MUC) - join/leave, send/receive, /kick, /ban, /topic, /nick commands; no full room configuration</xmpp:note>
+        <xmpp:version>1.35.3</xmpp:version>
+        <xmpp:note xml:lang='en'>Multi-User Chat (MUC) - join/leave, send/receive, /kick, /ban, /topic, /nick commands; <history maxstanzas='0'/> included in join presence to suppress server history duplication (MAM handles catch-up); no full room configuration</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
 
@@ -596,8 +596,8 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0452.html' />
         <xmpp:status>partial</xmpp:status>
-        <xmpp:version>0.1.1</xmpp:version>
-        <xmpp:note xml:lang='en'>MUC Mention Notifications (Experimental) - receive side: detects incoming notification messages containing &lt;addresses xmlns='http://jabber.org/protocol/address'&gt;&lt;address type='mentioned' jid='room@...'&gt;; extracts forwarded groupchat message and renders its body to the MUC buffer with notify_highlight so missed mentions are surfaced even when not present in the room; opt-in publish not yet implemented</xmpp:note>
+        <xmpp:version>0.2.2</xmpp:version>
+        <xmpp:note xml:lang='en'>MUC Mention Notifications (Experimental) - receive side: detects incoming notification messages containing &lt;mentions xmlns='urn:xmpp:mmn:0'&gt; (v0.2.x wire format); §4 MUST source-JID validation: outer from= bare-JID verified to match forwarded message from= bare-JID before processing; renders forwarded groupchat body to MUC buffer with notify_highlight so missed mentions are surfaced even when not present in the room; opt-in publish not yet implemented</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
 
