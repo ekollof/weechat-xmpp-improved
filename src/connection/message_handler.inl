@@ -958,8 +958,19 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
                             bool is_biboumi = item_sv.contains('%') ||
                                             item_sv.contains("biboumi") ||
                                             item_sv.contains("@irc.");
-                            
-                            if (!is_biboumi)
+
+                            // Guard: if we are already in this room (buffer exists and
+                            // join completed), do not re-enter.  The server echoes our
+                            // own PEP publishes back to us as push notifications, so
+                            // without this guard every bookmark publish during a session
+                            // triggers a redundant /enter, producing a flood of join
+                            // presences visible to other clients (e.g. Movim).
+                            auto existing_ch = account.channels.find(item_id);
+                            bool already_joined = existing_ch != account.channels.end()
+                                && existing_ch->second.buffer
+                                && !existing_ch->second.joining;
+
+                            if (!is_biboumi && !already_joined)
                             {
                                 char **command = weechat_string_dyn_alloc(256);
                                 weechat_string_dyn_concat(command, "/enter ", -1);
@@ -973,12 +984,13 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
                                 weechat_command(account.buffer, *command);
                                 weechat_string_dyn_free(command, 1);
                             }
-                            else
+                            else if (is_biboumi)
                             {
-                                weechat_printf(account.buffer, 
+                                weechat_printf(account.buffer,
                                               "%sSkipping autojoin for IRC gateway room: %s",
                                               weechat_prefix("network"), item_id);
                             }
+                            // else: already_joined — PEP echo of our own publish, ignore silently
                         }
                         else
                         {
