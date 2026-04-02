@@ -403,6 +403,39 @@ bool weechat::connection::presence_handler(xmpp_stanza_t *stanza, bool top_level
         }
     }
 
+    // XEP-0283: Moved — detect JID migration notice in subscription requests.
+    // Per §4.3, when we receive <presence type='subscribe'> containing
+    // <moved xmlns='urn:xmpp:moved:1'><old-jid>…</old-jid></moved>, the
+    // sender's new JID is binding.from->bare and the old JID is in <old-jid>.
+    // We display a notice; full verification (PEP fetch) is left to the user.
+    if (binding.type && *binding.type == "subscribe")
+    {
+        xmpp_stanza_t *moved_elem = xmpp_stanza_get_child_by_name_and_ns(
+            stanza, "moved", "urn:xmpp:moved:1");
+        if (moved_elem)
+        {
+            xmpp_stanza_t *old_jid_elem = xmpp_stanza_get_child_by_name(
+                moved_elem, "old-jid");
+            std::string old_jid_str;
+            if (old_jid_elem)
+            {
+                xmpp_string_guard old_jid_g(account.context,
+                                            xmpp_stanza_get_text(old_jid_elem));
+                if (old_jid_g.ptr)
+                    old_jid_str = old_jid_g.ptr;
+            }
+            const char *new_jid = binding.from ? binding.from->bare.data() : nullptr;
+            if (!old_jid_str.empty() && new_jid)
+                weechat_printf_date_tags(account.buffer, 0,
+                    "xmpp_presence,notify_highlight",
+                    "%s%sContact %s%s%s has moved to %s%s%s — verify and update your roster",
+                    weechat_prefix("network"),
+                    weechat_color("yellow"),
+                    weechat_color("bold"), old_jid_str.c_str(), weechat_color("reset"),
+                    weechat_color("bold"), new_jid, weechat_color("reset"));
+        }
+    }
+
     // XEP-0153: vCard-Based Avatars — parse photo hash from presence <x>
     // Only fetch vCards for roster contacts (non-MUC presences).
     // MUC occupant presences come from room@conference.example/nick — the bare

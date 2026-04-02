@@ -217,44 +217,8 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         ? xmpp_stanza_get_attribute(err_elem, "type") : "unknown";
                     weechat_printf(account.buffer, "%sPing failed to %s: %s",
                                   weechat_prefix("error"), from_jid, error_type);
-                }
             }
-    // XEP-0283: Moved — detect JID migration notice
-    {
-        xmpp_stanza_t *moved_elem = xmpp_stanza_get_child_by_name_and_ns(
-            stanza, "moved", "urn:xmpp:moved:1");
-        if (moved_elem)
-        {
-            const char *new_jid = xmpp_stanza_get_attribute(moved_elem, "new-jid");
-            std::string new_jid_text_storage;
-            if (!new_jid)
-            {
-                // Some implementations put the new JID as text content
-                xmpp_string_guard new_jid_text_g { account.context,
-                    xmpp_stanza_get_text(moved_elem) };
-                if (new_jid_text_g.ptr)
-                {
-                    new_jid_text_storage = new_jid_text_g.ptr;
-                    new_jid = new_jid_text_storage.c_str();
-                }
-            }
-            const char *old_jid_full = binding.from ? binding.from->full.data() : "unknown";
-            const std::string old_jid_bare_s = binding.from
-                ? ::jid(nullptr, binding.from->full).bare : std::string {};
-            const char *old_jid_bare_p = old_jid_bare_s.empty() ? nullptr : old_jid_bare_s.c_str();
-            if (new_jid)
-                weechat_printf_date_tags(account.buffer, 0, "xmpp_presence,notify_highlight",
-                                         "%s%sContact %s%s%s has moved to %s%s%s — update your roster",
-                                         weechat_prefix("network"),
-                                         weechat_color("yellow"),
-                                         weechat_color("bold"),
-                                         old_jid_bare_p ? old_jid_bare_p : old_jid_full,
-                                         weechat_color("reset"),
-                                         weechat_color("bold"),
-                                         new_jid,
-                                         weechat_color("reset"));
         }
-    }
 
     return true;
 }
