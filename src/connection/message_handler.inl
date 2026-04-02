@@ -3681,8 +3681,13 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash, 
 
     add_feature1("FORM_TYPE", "hidden", "urn:xmpp:dataforms:softwareinfo");
     add_feature2("ip_version", "text-multi", "ipv4", "ipv6");
-    add_feature1("os",               nullptr, osinfo.sysname);
-    add_feature1("os_version",       nullptr, osinfo.release);
+    // XEP-0092 §5 MUST NOT: an application MUST provide a way to disable
+    // sharing OS information.  Gate on look.share_os_info (default on).
+    if (weechat_config_boolean(weechat::config::instance->look.share_os_info))
+    {
+        add_feature1("os",         nullptr, osinfo.sysname);
+        add_feature1("os_version", nullptr, osinfo.release);
+    }
     add_feature1("software",         nullptr, "weechat");
     add_feature1("software_version", nullptr, weechat_info_get("version", nullptr));
 

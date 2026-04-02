@@ -51,6 +51,7 @@ namespace weechat
             config_option smart_filter;
             config_option smart_filter_delay;
             config_option omemo_atm;
+            config_option share_os_info;
         } look;
 
     public:

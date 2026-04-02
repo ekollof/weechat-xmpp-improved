@@ -183,6 +183,13 @@ weechat::config::config()
                 "to other own endpoints via unencrypted trust messages (urn:xmpp:tm:1)",
                 nullptr, 0, 0,
                 "on", nullptr, false,
+                {}, {}, {}},
+            .share_os_info{file, section_look, "share_os_info", "boolean",
+                "include OS name and version in XEP-0092 software version responses "
+                "and XEP-0115 capability discovery; disable to protect privacy "
+                "(XEP-0092 §5 requires an opt-out mechanism)",
+                nullptr, 0, 0,
+                "on", nullptr, false,
                 {}, {}, {}}}
 {
 }
