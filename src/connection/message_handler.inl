@@ -1888,7 +1888,11 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
     
     intext = body ? xmpp_stanza_get_text(body) : nullptr;
 
-    if (encrypted && is_self_outbound_copy)
+    // For live carbon copies of self-sent OMEMO messages we don't have the
+    // session state to decrypt them on the spot, so show the advisory text.
+    // For MAM replays of self-sent messages we DO have the persisted session
+    // and must call decode() — fall through rather than substituting OMEMO_ADVICE.
+    if (encrypted && is_self_outbound_copy && !is_mam_replay)
     {
         if (intext)
             xmpp_free(account.context, intext);
