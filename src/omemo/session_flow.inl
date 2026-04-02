@@ -425,6 +425,44 @@ void weechat::xmpp::omemo::handle_devicelist(weechat::account *account,
         store_device_mode(*this, bare_jid, *remote_device_id, peer_mode::omemo2);
     }
 
+    // XEP-0384 §6: "If a client receives a device list update and its own
+    // device ID is not present in the list, it MUST re-announce its device."
+    // Only check when the update is for our own bare JID and we have a valid
+    // device_id so we don't spuriously republish for other contacts' lists.
+    if (account && is_valid_omemo_device_id(device_id))
+    {
+        const std::string own_bare_jid = [&]{
+            auto b = ::jid(nullptr, account->jid().data()).bare;
+            return b.empty() ? std::string(account->jid()) : b;
+        }();
+
+        if (bare_jid == own_bare_jid)
+        {
+            const bool self_present = std::any_of(devices.begin(), devices.end(),
+                [&](const std::string &dev) {
+                    const auto id = parse_uint32(dev);
+                    return id && *id == device_id;
+                });
+
+            if (!self_present)
+            {
+                XDEBUG("omemo: own device_id {} absent from received devicelist — republishing",
+                       device_id);
+                weechat_printf(nullptr,
+                               "%somemo: own device %u missing from server device list — re-announcing",
+                               weechat_prefix("network"), device_id);
+
+                if (auto dl = account->get_devicelist())
+                    account->connection.send(dl.get());
+                if (auto bundle = get_bundle(*account->context, nullptr, nullptr))
+                {
+                    auto bs = std::shared_ptr<xmpp_stanza_t> { bundle, xmpp_stanza_release };
+                    account->connection.send(bs.get());
+                }
+            }
+        }
+    }
+
     // Conversations resends waiting messages once OMEMO metadata/session setup
     // completes. If we already have at least one usable session for this JID
     // when a devicelist update arrives, opportunistically flush PM queue now.
