@@ -834,11 +834,30 @@ void weechat::account::build_and_publish_post(const xepher::pending_feed_post &p
 
     // <title type='text'>
     // For comments (XEP-0277 §3.2) the body goes into <title> and there is no
-    // <content> element.  For regular posts a title is only emitted when one
-    // was explicitly provided by the user.
-    if (!post_title.empty() || is_comment)
+    // <content> element.  For regular posts, use the explicit title when provided,
+    // or fall back to the first 60 characters of the body (RFC 4287 §4.2.14 requires
+    // <title> on every entry).
     {
-        std::string_view title_text = is_comment ? body : post_title;
+        std::string_view title_text;
+        std::string body_excerpt;
+        if (is_comment)
+        {
+            title_text = body;
+        }
+        else if (!post_title.empty())
+        {
+            title_text = post_title;
+        }
+        else
+        {
+            // Derive title from body: up to first newline or 60 chars
+            std::string_view bv(body);
+            auto nl = bv.find('\n');
+            body_excerpt = std::string(bv.substr(0, std::min(nl == std::string_view::npos
+                                                             ? bv.size() : nl,
+                                                             size_t{60})));
+            title_text = body_excerpt;
+        }
         auto title_el = make_sp("title");
         xmpp_stanza_set_name(title_el.get(), "title");
         xmpp_stanza_set_attribute(title_el.get(), "type", "text");
