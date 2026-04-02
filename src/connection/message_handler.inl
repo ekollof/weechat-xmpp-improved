@@ -1974,24 +1974,34 @@ message_handler_after_omemo:
         else if (reply_fb)
         {
             // XEP-0461 §3.1: strip the fallback quote prefix from the body.
-            // The <fallback> child <body start="0" end="N"/> gives the byte
-            // range to remove.  After stripping, skip any leading whitespace
-            // (blank lines that separate the quote from the reply text).
+            // The <fallback> child <body start="N" end="M"/> gives the byte
+            // range [start,end) to remove (XEP-0428 §2.2).  Default start=0.
+            // After stripping, skip any leading whitespace (blank lines
+            // that separate the quote from the reply text).
             xmpp_stanza_t *fb_body = xmpp_stanza_get_child_by_name(fallback_elem, "body");
-            const char *end_attr = fb_body
-                ? xmpp_stanza_get_attribute(fb_body, "end") : nullptr;
+            const char *end_attr   = fb_body
+                ? xmpp_stanza_get_attribute(fb_body, "end")   : nullptr;
+            const char *start_attr = fb_body
+                ? xmpp_stanza_get_attribute(fb_body, "start") : nullptr;
             if (end_attr)
             {
-                long end = std::strtol(end_attr, nullptr, 10);
+                long end   = std::strtol(end_attr,   nullptr, 10);
+                long start = start_attr ? std::strtol(start_attr, nullptr, 10) : 0L;
+                if (start < 0) start = 0;
                 std::string_view sv(text);
                 if (end > 0 && static_cast<std::size_t>(end) < sv.size())
                 {
-                    sv.remove_prefix(static_cast<std::size_t>(end));
+                    // Reconstruct: prefix (before start) + suffix (after end)
+                    std::string rebuilt;
+                    if (start > 0)
+                        rebuilt = std::string(sv.substr(0, static_cast<std::size_t>(start)));
+                    std::string_view suffix = sv.substr(static_cast<std::size_t>(end));
                     // Skip blank lines / leading whitespace between quote and reply
-                    auto first_non_ws = sv.find_first_not_of(" \t\r\n");
+                    auto first_non_ws = suffix.find_first_not_of(" \t\r\n");
                     if (first_non_ws != std::string_view::npos)
-                        sv.remove_prefix(first_non_ws);
-                    trimmed_body = std::string(sv);
+                        suffix.remove_prefix(first_non_ws);
+                    rebuilt += suffix;
+                    trimmed_body = std::move(rebuilt);
                     text = trimmed_body.empty() ? nullptr : trimmed_body.c_str();
                 }
                 // If end >= body length, the whole body was the fallback quote;
