@@ -989,10 +989,16 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                         }
                         else
                         {
-                            // XEP-0402 §4 (v1.2.0): autojoin is false (or absent) —
-                            // leave the room immediately if we are currently in it.
+                            // XEP-0402 §4 (v1.2.0): autojoin is false (or absent).
+                            // Only close the buffer if we have already *fully* joined
+                            // the room (joining==false, i.e. status 110 was received).
+                            // During initial session setup the server sends the full
+                            // bookmark list as individual PEP notifications; closing
+                            // buffers here at that point would destroy channels that
+                            // were just created by the XEP-0049 autojoin flow.
                             auto ch_it = account.channels.find(item_id);
-                            if (ch_it != account.channels.end() && ch_it->second.buffer)
+                            if (ch_it != account.channels.end() && ch_it->second.buffer
+                                && !ch_it->second.joining)
                             {
                                 weechat_printf(ch_it->second.buffer,
                                                "%sBookmark autojoin disabled — leaving room",
