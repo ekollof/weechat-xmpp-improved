@@ -1,4 +1,4 @@
-bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
+bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level, bool is_mam_replay)
 {
     // SM counter incremented in libstrophe wrapper, not here
     // top_level parameter kept for nested/recursive calls
@@ -671,7 +671,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                     message = xmpp_stanza_copy(message);
                     if (delay != nullptr)
                         xmpp_stanza_add_child_ex(message, xmpp_stanza_copy(delay), 0);
-                    int ret = message_handler(message, false);  // Don't double-count MAM forwarded message
+                    int ret = message_handler(message, false, true);  // MAM replay: suppress outgoing receipts/markers
                     xmpp_stanza_release(message);
                     return ret;
                 }
@@ -1691,8 +1691,10 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
     // messages we sent (received back via carbons or MAM).
     // XEP-0333 §4.1: SHOULD NOT send Chat Markers to a MUC room; they reveal
     // presence to all participants and serve no useful purpose in group chat.
+    // MAM-replayed messages MUST NOT generate any outgoing receipts or markers:
+    // the archive is a historical record; replaying it on reconnect must be silent.
     const bool is_muc_channel = channel && channel->type == weechat::channel::chat_type::MUC;
-    if (id && (markable || request) && !is_self_outbound_copy && !is_muc_channel)
+    if (id && (markable || request) && !is_self_outbound_copy && !is_muc_channel && !is_mam_replay)
     {
         weechat::channel::unread unread_val;
         unread_val.id = id;
@@ -1702,10 +1704,14 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
         unread_val.stanza_id_by = stanza_id_by ? std::optional<std::string>(stanza_id_by) : std::nullopt;
         auto unread = &unread_val;
 
+        // XEP-0184 / XEP-0333: reply MUST go to the full JID (from= of the
+        // incoming stanza, which includes the resource).  Sending to the bare
+        // JID causes the server to fan-out to all active resources, so every
+        // other device of the contact sees the receipt/marker.
         // XEP-0334: receipt/marker replies MUST NOT be stored.
         // Use the incoming message type so routing is correct.
         stanza::message msg;
-        msg.to(channel->id).type(type ? type : "chat");
+        msg.to(from).type(type ? type : "chat");
 
         if (request)
             msg.receipt_received(unread->id);
