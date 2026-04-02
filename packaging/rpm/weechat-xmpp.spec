@@ -1,7 +1,7 @@
 %global debug_package %{nil}
 
 Name:           xepher
-Version:        0.4.1
+Version:        0.5.0
 Release:        1%{?dist}
 Summary:        Xepher — WeeChat plugin for XMPP/Jabber protocol
 
@@ -69,6 +69,14 @@ install -D -m 0755 xmpp.so %{buildroot}%{_libdir}/weechat/plugins/xmpp.so
 %{_libdir}/weechat/plugins/xmpp.so
 
 %changelog
+* Thu Apr 02 2026 Emiel Kollof <emiel@kollof.nl> - 0.5.0-1
+- Update to v0.5.0
+- Feat(omemo/atm): add /omemo fingerprint, /omemo approve, /omemo distrust manual trust UI (XEP-0450)
+- Fix(omemo/atm): encrypt trust messages with OMEMO+SCE per XEP-0450 §4
+- Fix(omemo/atm): batch multiple key-owners into one XEP-0434 trust message per XEP-0434 §4
+- Fix(omemo/atm): enforce sender authentication gate and add deferred trust queues
+- Fix(omemo/atm): implement XEP-0450 §4.2 distrust send path
+
 * Thu Apr 02 2026 Emiel Kollof <emiel@kollof.nl> - 0.4.1-1
 - Update to v0.4.1
 - Perf: cache hdata handles in message_handler (single weechat_hdata_get() per handle per process)

@@ -1,3 +1,14 @@
+xepher (0.5.0-1) unstable; urgency=medium
+
+  * Update to v0.5.0
+  * Feat(omemo/atm): add /omemo fingerprint, /omemo approve, /omemo distrust manual trust UI (XEP-0450)
+  * Fix(omemo/atm): encrypt trust messages with OMEMO+SCE per XEP-0450 §4
+  * Fix(omemo/atm): batch multiple key-owners into one XEP-0434 trust message per XEP-0434 §4
+  * Fix(omemo/atm): enforce sender authentication gate and add deferred trust queues
+  * Fix(omemo/atm): implement XEP-0450 §4.2 distrust send path
+
+ -- Emiel Kollof <emiel@kollof.nl>  Thu, 02 Apr 2026 00:00:00 +0000
+
 xepher (0.4.1-1) unstable; urgency=medium
 
   * Update to v0.4.1
