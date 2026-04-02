@@ -89,7 +89,7 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0048.html' />
         <xmpp:status>complete</xmpp:status>
-        <xmpp:version>1.2.1</xmpp:version>
+        <xmpp:version>1.2</xmpp:version>
         <xmpp:note xml:lang='en'>Bookmark Storage</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
@@ -98,7 +98,7 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0049.html' />
         <xmpp:status>partial</xmpp:status>
-        <xmpp:version>1.3.0</xmpp:version>
+        <xmpp:version>1.2</xmpp:version>
         <xmpp:note xml:lang='en'>Private XML Storage (for bookmarks)</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
@@ -533,7 +533,7 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0004.html' />
         <xmpp:status>partial</xmpp:status>
-        <xmpp:version>2.10.0</xmpp:version>
+        <xmpp:version>2.13.2</xmpp:version>
         <xmpp:note xml:lang='en'>Data Forms - rendered in the buffer for Ad-Hoc Commands</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
@@ -695,7 +695,7 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0224.html' />
         <xmpp:status>complete</xmpp:status>
-        <xmpp:version>1.0.0</xmpp:version>
+        <xmpp:version>1.0</xmpp:version>
         <xmpp:note xml:lang='en'>Attention - receives attention requests and opens a PM buffer; advertised in caps</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
@@ -713,7 +713,7 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0297.html' />
         <xmpp:status>partial</xmpp:status>
-        <xmpp:version>1.0.0</xmpp:version>
+        <xmpp:version>1.0</xmpp:version>
         <xmpp:note xml:lang='en'>Forwarded Messages - used as wrapper for Message Carbons and MAM results</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
@@ -722,7 +722,7 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0300.html' />
         <xmpp:status>partial</xmpp:status>
-        <xmpp:version>0.6.0</xmpp:version>
+        <xmpp:version>1.0.0</xmpp:version>
         <xmpp:note xml:lang='en'>Cryptographic Hash Functions - SHA-256 used in SIMS (XEP-0385) file metadata</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
@@ -821,7 +821,7 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0077.html' />
         <xmpp:status>complete</xmpp:status>
-        <xmpp:version>2.4.0</xmpp:version>
+        <xmpp:version>2.4</xmpp:version>
         <xmpp:note xml:lang='en'>In-Band Registration — §3.1 /account register &lt;name&gt; &lt;jid&gt; &lt;password&gt;: new account registration before authentication; supports username/password flat fields, already-registered detection, OOB-redirect, and x:data form detection with helpful abort message. §3.2 /account unregister &lt;account&gt;: cancels the account on the server while authenticated. §3.3 /account password &lt;account&gt; &lt;new-password&gt;: in-band password change while authenticated (TLS required). §10: advertises jabber:iq:register in disco#info.</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
