@@ -621,6 +621,33 @@ void request_legacy_bundle(weechat::account &account, std::string_view jid, std:
         xml_escape(make_rpad()));
 }
 
+// Like sce_wrap() but places arbitrary pre-serialised XML as the sole child of
+// <content> instead of <body>.  Used by the ATM trust message path where the
+// content element is <trust-message xmlns='urn:xmpp:tm:1'> (XEP-0450 §4).
+// content_xml must already be properly XML-serialised (not further escaped).
+[[nodiscard]] auto sce_wrap_content([[maybe_unused]] xmpp_ctx_t *context,
+                                    weechat::account &account,
+                                    std::string_view content_xml,
+                                    std::string_view to_jid = {},
+                                    bool is_muc = false) -> std::string
+{
+    const char *bound = xmpp_conn_get_bound_jid(account.connection);
+    const std::string from = bound ? ::jid(nullptr, bound).bare : std::string {};
+
+    const std::string to_elem = (is_muc && !to_jid.empty())
+        ? fmt::format("<to jid='{}'/>" , xml_escape(std::string(to_jid)))
+        : std::string {};
+
+    return fmt::format(
+        "<envelope xmlns='urn:xmpp:sce:1'><content>{}</content>"
+        "<time stamp='{}'/><from jid='{}'/>{}<rpad>{}</rpad></envelope>",
+        content_xml,              // already serialised XML — not escaped again
+        utc_timestamp_now(),
+        xml_escape(from),
+        to_elem,
+        xml_escape(make_rpad()));
+}
+
 [[nodiscard]] auto pkcs7_pad(std::string_view plaintext, std::size_t block_size)
     -> std::vector<std::uint8_t>
 {

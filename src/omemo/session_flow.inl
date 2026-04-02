@@ -63,8 +63,235 @@ static void send_key_transport(omemo &self,
                                const char *peer_jid,
                                std::uint32_t remote_device_id);
 
-// XEP-0450: send an unencrypted trust message (XEP-0434) to own bare JID
-// advertising that we authenticated key_b64 for key_owner_jid.
+// XEP-0450 §4 + XEP-0420 §4.3: encrypt a <trust-message> inside an SCE
+// envelope using OMEMO:2, then send it to every device in recipient_devicelist
+// (semicolon-separated device IDs for recipient_jid).  The <encrypted> stanza
+// is wrapped in a <message type='chat' to='recipient_jid'>.
+// Returns true if the stanza was sent to at least one device.
+static bool send_atm_trust_message_omemo2(
+    omemo &self,
+    weechat::account &account,
+    const std::string &trust_message_xml,  // pre-serialised <trust-message>...</trust-message>
+    const std::string &recipient_jid,
+    const std::string &recipient_devicelist)
+{
+    if (!account.context || recipient_jid.empty() || recipient_devicelist.empty())
+        return false;
+
+    const std::string own_bare_jid = [&]{
+        auto b = ::jid(nullptr, account.jid().data()).bare;
+        return b.empty() ? std::string(account.jid()) : b;
+    }();
+
+    // SCE-wrap the <trust-message> (no <body>, no MUC <to/>)
+    const auto sce_envelope = sce_wrap_content(*account.context, account, trust_message_xml);
+
+    // OMEMO:2 symmetric encryption
+    const auto ep = omemo2_encrypt(sce_envelope);
+    if (!ep)
+        return false;
+
+    auto mk = [&]() {
+        return std::shared_ptr<xmpp_stanza_t> { xmpp_stanza_new(*account.context), xmpp_stanza_release };
+    };
+
+    xmpp_stanza_t *encrypted = xmpp_stanza_new(*account.context);
+    xmpp_stanza_set_name(encrypted, "encrypted");
+    xmpp_stanza_set_ns(encrypted, kOmemoNs.data());
+
+    auto header = mk();
+    xmpp_stanza_set_name(header.get(), "header");
+    xmpp_stanza_set_attribute(header.get(), "sid", fmt::format("{}", self.device_id).c_str());
+
+    // Build <keys jid='recipient_jid'>  one <key rid='…'> per device
+    auto keys = mk();
+    xmpp_stanza_set_name(keys.get(), "keys");
+    xmpp_stanza_set_attribute(keys.get(), "jid", recipient_jid.c_str());
+    int key_count = 0;
+    for (const auto &dev : split(recipient_devicelist, ';'))
+    {
+        const auto remote_id = parse_uint32(dev);
+        if (!remote_id || !is_valid_omemo_device_id(*remote_id))
+            continue;
+        // Skip our own current device
+        if (own_bare_jid == recipient_jid && *remote_id == self.device_id)
+            continue;
+        if (self.failed_session_bootstrap.count({recipient_jid, *remote_id}) > 0)
+            continue;
+        if (!self.has_session(recipient_jid.c_str(), *remote_id))
+        {
+            if (!establish_session_from_bundle(self, *account.context, recipient_jid, *remote_id))
+                continue;
+        }
+        const auto transport = encrypt_transport_key(self, recipient_jid, *remote_id, *ep);
+        if (!transport)
+            continue;
+        const auto enc_key = base64_encode(*account.context,
+                                           transport->first.data(), transport->first.size());
+        auto key_st = mk();
+        xmpp_stanza_set_name(key_st.get(), "key");
+        xmpp_stanza_set_attribute(key_st.get(), "rid", fmt::format("{}", *remote_id).c_str());
+        if (transport->second)
+            xmpp_stanza_set_attribute(key_st.get(), "kex", "true");
+        auto key_text = mk();
+        xmpp_stanza_set_text(key_text.get(), enc_key.c_str());
+        xmpp_stanza_add_child(key_st.get(), key_text.get());
+        xmpp_stanza_add_child(keys.get(), key_st.get());
+        ++key_count;
+    }
+    if (key_count == 0)
+    {
+        xmpp_stanza_release(encrypted);
+        return false;
+    }
+    xmpp_stanza_add_child(header.get(), keys.get());
+
+    // <payload>
+    auto payload = mk();
+    xmpp_stanza_set_name(payload.get(), "payload");
+    const auto enc_payload = base64_encode(*account.context,
+                                           ep->payload.data(), ep->payload.size());
+    auto payload_text = mk();
+    xmpp_stanza_set_text(payload_text.get(), enc_payload.c_str());
+    xmpp_stanza_add_child(payload.get(), payload_text.get());
+
+    xmpp_stanza_add_child(encrypted, header.get());
+    xmpp_stanza_add_child(encrypted, payload.get());
+
+    // Wrap in <message type='chat' to='recipient_jid'>
+    auto message = mk();
+    xmpp_stanza_set_name(message.get(), "message");
+    xmpp_stanza_set_type(message.get(), "chat");
+    xmpp_stanza_set_attribute(message.get(), "to", recipient_jid.c_str());
+    xmpp_stanza_set_id(message.get(), stanza::uuid(*account.context).c_str());
+    xmpp_stanza_add_child(message.get(), encrypted);
+
+    auto store_hint = mk();
+    xmpp_stanza_set_name(store_hint.get(), "store");
+    xmpp_stanza_set_ns(store_hint.get(), "urn:xmpp:hints");
+    xmpp_stanza_add_child(message.get(), store_hint.get());
+
+    account.connection.send(message.get());
+    xmpp_stanza_release(encrypted);
+    return true;
+}
+
+// XEP-0450 §4: send ATM trust message using legacy OMEMO encryption
+// (eu.siacs.conversations.axolotl namespace, AES-128-GCM, no SCE).
+// NOTE: legacy OMEMO has no SCE layer — the <trust-message> is the plaintext.
+static bool send_atm_trust_message_legacy(
+    omemo &self,
+    weechat::account &account,
+    const std::string &trust_message_xml,
+    const std::string &recipient_jid,
+    const std::string &recipient_devicelist)
+{
+    if (!account.context || recipient_jid.empty() || recipient_devicelist.empty())
+        return false;
+
+    const std::string own_bare_jid = [&]{
+        auto b = ::jid(nullptr, account.jid().data()).bare;
+        return b.empty() ? std::string(account.jid()) : b;
+    }();
+
+    // Legacy encrypts the raw plaintext (no SCE wrapper)
+    const auto ep = legacy_omemo_encrypt(std::string_view(trust_message_xml));
+    if (!ep)
+        return false;
+
+    auto mk = [&]() {
+        return std::shared_ptr<xmpp_stanza_t> { xmpp_stanza_new(*account.context), xmpp_stanza_release };
+    };
+
+    xmpp_stanza_t *encrypted = xmpp_stanza_new(*account.context);
+    xmpp_stanza_set_name(encrypted, "encrypted");
+    xmpp_stanza_set_ns(encrypted, kLegacyOmemoNs.data());
+
+    auto header = mk();
+    xmpp_stanza_set_name(header.get(), "header");
+    xmpp_stanza_set_attribute(header.get(), "sid", fmt::format("{}", self.device_id).c_str());
+
+    auto keys = mk();
+    xmpp_stanza_set_name(keys.get(), "keys");
+    xmpp_stanza_set_attribute(keys.get(), "jid", recipient_jid.c_str());
+    int key_count = 0;
+    for (const auto &dev : split(recipient_devicelist, ';'))
+    {
+        const auto remote_id = parse_uint32(dev);
+        if (!remote_id || !is_valid_omemo_device_id(*remote_id))
+            continue;
+        if (own_bare_jid == recipient_jid && *remote_id == self.device_id)
+            continue;
+        if (self.failed_session_bootstrap.count({recipient_jid, *remote_id}) > 0)
+            continue;
+        if (!self.has_session(recipient_jid.c_str(), *remote_id))
+        {
+            if (!establish_session_from_bundle(self, *account.context, recipient_jid, *remote_id))
+                continue;
+        }
+        const auto transport = encrypt_legacy_transport_key(self, recipient_jid, *remote_id, *ep);
+        if (!transport)
+            continue;
+        const auto enc_key = base64_encode(*account.context,
+                                           transport->first.data(), transport->first.size());
+        auto key_st = mk();
+        xmpp_stanza_set_name(key_st.get(), "key");
+        xmpp_stanza_set_attribute(key_st.get(), "rid", fmt::format("{}", *remote_id).c_str());
+        if (transport->second)
+            xmpp_stanza_set_attribute(key_st.get(), "prekey", "true");
+        auto key_text = mk();
+        xmpp_stanza_set_text(key_text.get(), enc_key.c_str());
+        xmpp_stanza_add_child(key_st.get(), key_text.get());
+        xmpp_stanza_add_child(keys.get(), key_st.get());
+        ++key_count;
+    }
+    if (key_count == 0)
+    {
+        xmpp_stanza_release(encrypted);
+        return false;
+    }
+    xmpp_stanza_add_child(header.get(), keys.get());
+
+    const auto enc_iv = base64_encode(*account.context, ep->iv.data(), ep->iv.size());
+    auto iv_st = mk();
+    xmpp_stanza_set_name(iv_st.get(), "iv");
+    auto iv_text = mk();
+    xmpp_stanza_set_text(iv_text.get(), enc_iv.c_str());
+    xmpp_stanza_add_child(iv_st.get(), iv_text.get());
+    xmpp_stanza_add_child(header.get(), iv_st.get());
+
+    xmpp_stanza_add_child(encrypted, header.get());
+
+    const auto enc_payload = base64_encode(*account.context, ep->payload.data(), ep->payload.size());
+    auto payload = mk();
+    xmpp_stanza_set_name(payload.get(), "payload");
+    auto payload_text = mk();
+    xmpp_stanza_set_text(payload_text.get(), enc_payload.c_str());
+    xmpp_stanza_add_child(payload.get(), payload_text.get());
+    xmpp_stanza_add_child(encrypted, payload.get());
+
+    auto message = mk();
+    xmpp_stanza_set_name(message.get(), "message");
+    xmpp_stanza_set_type(message.get(), "chat");
+    xmpp_stanza_set_attribute(message.get(), "to", recipient_jid.c_str());
+    xmpp_stanza_set_id(message.get(), stanza::uuid(*account.context).c_str());
+    xmpp_stanza_add_child(message.get(), encrypted);
+
+    auto store_hint = mk();
+    xmpp_stanza_set_name(store_hint.get(), "store");
+    xmpp_stanza_set_ns(store_hint.get(), "urn:xmpp:hints");
+    xmpp_stanza_add_child(message.get(), store_hint.get());
+
+    account.connection.send(message.get());
+    xmpp_stanza_release(encrypted);
+    return true;
+}
+
+// XEP-0450 §4: send a trust message for key_owner_jid/key_b64.
+// Sends one encrypted message per namespace (OMEMO:2 and legacy) to:
+//   - All own devices (so other clients learn the trust decision)
+//   - All of key_owner_jid's devices (to distribute our trust decision to them)
+// Both sends are best-effort; failures are silently skipped.
 static void send_atm_trust_message(omemo &self,
                                    weechat::account &account,
                                    const std::string &key_owner_jid,
@@ -78,47 +305,97 @@ static void send_atm_trust_message(omemo &self,
         return b.empty() ? std::string(account.jid()) : b;
     }();
 
-    // Build <trust-message xmlns='urn:xmpp:tm:1' usage='urn:xmpp:atm:1' encryption='urn:xmpp:omemo:2'>
-    //   <key-owner jid='...'><trust>BASE64</trust></key-owner>
-    // </trust-message>
-    auto mk_atm = [&]() {
-        return std::shared_ptr<xmpp_stanza_t> { xmpp_stanza_new(*account.context), xmpp_stanza_release };
+    // Build serialised <trust-message> for OMEMO:2 and legacy namespaces.
+    const auto tm_omemo2 = fmt::format(
+        "<trust-message xmlns='urn:xmpp:tm:1' usage='urn:xmpp:atm:1'"
+        " encryption='urn:xmpp:omemo:2'>"
+        "<key-owner jid='{}'><trust>{}</trust></key-owner>"
+        "</trust-message>",
+        xml_escape(key_owner_jid), xml_escape(key_b64));
+
+    const auto tm_legacy = fmt::format(
+        "<trust-message xmlns='urn:xmpp:tm:1' usage='urn:xmpp:atm:1'"
+        " encryption='eu.siacs.conversations.axolotl'>"
+        "<key-owner jid='{}'><trust>{}</trust></key-owner>"
+        "</trust-message>",
+        xml_escape(key_owner_jid), xml_escape(key_b64));
+
+    // Helper: send to a JID if we have a devicelist for it
+    auto send_to = [&](const std::string &target_jid) {
+        const auto dl2 = load_string(self, key_for_devicelist(target_jid));
+        if (dl2 && !dl2->empty())
+            send_atm_trust_message_omemo2(self, account, tm_omemo2, target_jid, *dl2);
+
+        const auto dll = load_string(self, key_for_legacy_devicelist(target_jid));
+        if (dll && !dll->empty())
+            send_atm_trust_message_legacy(self, account, tm_legacy, target_jid, *dll);
     };
 
-    auto trust_msg = mk_atm();
-    xmpp_stanza_set_name(trust_msg.get(), "trust-message");
-    xmpp_stanza_set_ns(trust_msg.get(), "urn:xmpp:tm:1");
-    xmpp_stanza_set_attribute(trust_msg.get(), "usage", "urn:xmpp:atm:1");
-    xmpp_stanza_set_attribute(trust_msg.get(), "encryption", "urn:xmpp:omemo:2");
+    // Send to own devices (required — other own clients must learn the decision)
+    if (own_bare_jid != key_owner_jid)
+        send_to(own_bare_jid);
 
-    auto key_owner = mk_atm();
-    xmpp_stanza_set_name(key_owner.get(), "key-owner");
-    xmpp_stanza_set_attribute(key_owner.get(), "jid", key_owner_jid.c_str());
+    // Send to key owner's devices as well (XEP-0450 §4.1.1.2)
+    send_to(key_owner_jid);
+}
 
-    auto trust_elem = mk_atm();
-    xmpp_stanza_set_name(trust_elem.get(), "trust");
-    auto trust_text = mk_atm();
-    xmpp_stanza_set_text(trust_text.get(), key_b64.c_str());
-    xmpp_stanza_add_child(trust_elem.get(), trust_text.get());
-    xmpp_stanza_add_child(key_owner.get(), trust_elem.get());
-    xmpp_stanza_add_child(trust_msg.get(), key_owner.get());
+// XEP-0450 §4.2: send a <distrust> message for key_owner_jid/key_b64.
+// Mirrors send_atm_trust_message but uses the <distrust> element.
+static void send_atm_distrust_message(omemo &self,
+                                      weechat::account &account,
+                                      const std::string &key_owner_jid,
+                                      const std::string &key_b64)
+{
+    if (!account.context || key_owner_jid.empty() || key_b64.empty())
+        return;
 
-    // Wrap in <message type='chat' to='{own_bare_jid}'> with <store/> hint
-    auto message = mk_atm();
-    xmpp_stanza_set_name(message.get(), "message");
-    xmpp_stanza_set_type(message.get(), "chat");
-    xmpp_stanza_set_attribute(message.get(), "to", own_bare_jid.c_str());
-    xmpp_stanza_set_id(message.get(), stanza::uuid(*account.context).c_str());
-    xmpp_stanza_add_child(message.get(), trust_msg.get());
+    const std::string own_bare_jid = [&]{
+        auto b = ::jid(nullptr, account.jid().data()).bare;
+        return b.empty() ? std::string(account.jid()) : b;
+    }();
 
-    auto store_hint = mk_atm();
-    xmpp_stanza_set_name(store_hint.get(), "store");
-    xmpp_stanza_set_ns(store_hint.get(), "urn:xmpp:hints");
-    xmpp_stanza_add_child(message.get(), store_hint.get());
+    const auto tm_omemo2 = fmt::format(
+        "<trust-message xmlns='urn:xmpp:tm:1' usage='urn:xmpp:atm:1'"
+        " encryption='urn:xmpp:omemo:2'>"
+        "<key-owner jid='{}'><distrust>{}</distrust></key-owner>"
+        "</trust-message>",
+        xml_escape(key_owner_jid), xml_escape(key_b64));
 
-    account.connection.send(message.get());
+    const auto tm_legacy = fmt::format(
+        "<trust-message xmlns='urn:xmpp:tm:1' usage='urn:xmpp:atm:1'"
+        " encryption='eu.siacs.conversations.axolotl'>"
+        "<key-owner jid='{}'><distrust>{}</distrust></key-owner>"
+        "</trust-message>",
+        xml_escape(key_owner_jid), xml_escape(key_b64));
 
-    (void) self;
+    auto send_to = [&](const std::string &target_jid) {
+        const auto dl2 = load_string(self, key_for_devicelist(target_jid));
+        if (dl2 && !dl2->empty())
+            send_atm_trust_message_omemo2(self, account, tm_omemo2, target_jid, *dl2);
+
+        const auto dll = load_string(self, key_for_legacy_devicelist(target_jid));
+        if (dll && !dll->empty())
+            send_atm_trust_message_legacy(self, account, tm_legacy, target_jid, *dll);
+    };
+
+    if (own_bare_jid != key_owner_jid)
+        send_to(own_bare_jid);
+    send_to(key_owner_jid);
+}
+
+// XEP-0450 §5.1: drain any trust decisions that were deferred while sender_jid
+// was not yet ATM-trusted.  Called after sender_jid's first device becomes
+// trusted (i.e. right after store_atm_trust() records a "trusted" entry).
+static void drain_pending_atm_trust(omemo &self, const std::string &sender_jid)
+{
+    auto it = self.pending_atm_trust_from_unauthenticated.find(sender_jid);
+    if (it == self.pending_atm_trust_from_unauthenticated.end())
+        return;
+
+    for (const auto &[ko_jid, fp, level] : it->second)
+        store_atm_trust(self, ko_jid, fp, level);
+
+    self.pending_atm_trust_from_unauthenticated.erase(it);
 }
 
 void weechat::xmpp::omemo::request_devicelist(weechat::account &account, std::string_view jid)
@@ -967,6 +1244,8 @@ void weechat::xmpp::omemo::handle_bundle(weechat::account *account,
                             {
                                 store_atm_trust(*this, bare_jid, fp, "trusted");
                                 send_atm_trust_message(*this, *account, bare_jid, fp);
+                                // §5.1: drain deferred trust from this sender
+                                drain_pending_atm_trust(*this, bare_jid);
                             }
                         }
                     }
@@ -1095,6 +1374,32 @@ void weechat::xmpp::omemo::handle_bundle(weechat::account *account,
                         failed_session_bootstrap.insert({bare_jid, remote_device_id});
                     const bool session_is_fresh = !had_session_before
                         && has_session(bare_jid.c_str(), remote_device_id);
+
+                    // XEP-0450: on first legacy session establishment, record ATM trust
+                    // and propagate to own and peer endpoints via an encrypted trust message.
+                    if (session_is_fresh && account
+                        && weechat::config::instance
+                        && weechat_config_boolean(weechat::config::instance->look.omemo_atm))
+                    {
+                        const auto ik_bytes = load_bytes(*this,
+                            key_for_identity(bare_jid, static_cast<std::int32_t>(remote_device_id)));
+                        if (ik_bytes && !ik_bytes->empty())
+                        {
+                            const std::string fp = atm_fingerprint_b64(*ik_bytes);
+                            if (!fp.empty())
+                            {
+                                const auto existing = load_atm_trust(*this, bare_jid, fp);
+                                if (!existing || *existing == "undecided")
+                                {
+                                    store_atm_trust(*this, bare_jid, fp, "trusted");
+                                    send_atm_trust_message(*this, *account, bare_jid, fp);
+                                    // §5.1: drain deferred trust from this sender
+                                    drain_pending_atm_trust(*this, bare_jid);
+                                }
+                            }
+                        }
+                    }
+
                     if ((session_is_fresh || needs_key_transport) && account && buffer)
                     {
                         key_transport_bootstrap_attempted.insert({bare_jid, remote_device_id});
