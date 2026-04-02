@@ -107,7 +107,7 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0054.html' />
         <xmpp:status>complete</xmpp:status>
-        <xmpp:version>1.2</xmpp:version>
+        <xmpp:version>1.3.0</xmpp:version>
         <xmpp:note
                     xml:lang='en'
                 >vcard-temp — fetch (all standard fields) and publish own vCard via /whois and /setvcard; auto-fetch triggered by XEP-0153 presence hash</xmpp:note>
@@ -184,7 +184,7 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0108.html' />
         <xmpp:status>complete</xmpp:status>
-        <xmpp:version>1.3.1</xmpp:version>
+        <xmpp:version>1.3</xmpp:version>
         <xmpp:note
                     xml:lang='en'
                 >User Activity - publish and subscribe to activity updates via PEP</xmpp:note>
@@ -337,7 +337,7 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0384.html' />
         <xmpp:status>partial</xmpp:status>
-        <xmpp:version>0.8.3</xmpp:version>
+        <xmpp:version>0.9.0</xmpp:version>
         <xmpp:note
                     xml:lang='en'
                 >OMEMO Encryption with auto-detection, OMEMO:2 + legacy OMEMO:1 (axolotl) interoperability, per-device bundle/bootstrap mode selection, and key-transport based session recovery</xmpp:note>
@@ -686,7 +686,7 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0153.html' />
         <xmpp:status>partial</xmpp:status>
-        <xmpp:version>1.1.0</xmpp:version>
+        <xmpp:version>1.1.1</xmpp:version>
         <xmpp:note xml:lang='en'>vCard-Based Avatars - receives photo hash from presence and advertises in caps; publishing own avatar not implemented</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
@@ -704,7 +704,7 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0283.html' />
         <xmpp:status>complete</xmpp:status>
-        <xmpp:version>0.3.0</xmpp:version>
+        <xmpp:version>0.2.0</xmpp:version>
         <xmpp:note xml:lang='en'>Moved - displays account migration notices when a contact has moved to a new JID</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
