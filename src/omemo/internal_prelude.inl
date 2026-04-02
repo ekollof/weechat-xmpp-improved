@@ -576,17 +576,49 @@ void request_legacy_bundle(weechat::account &account, std::string_view jid, std:
     account.connection.send(stanza_ptr.get());
 }
 
+// Generate a random padding string for SCE <rpad/> (XEP-0420 §4.3 MUST).
+// Uses a random length in [1,64] and random alphanumeric characters.
+[[nodiscard]] static auto make_rpad() -> std::string
+{
+    static const std::string_view kAlphanum =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    thread_local std::mt19937 rng { std::random_device{}() };
+    std::uniform_int_distribution<std::size_t> len_dist { 1, 64 };
+    std::uniform_int_distribution<std::size_t> char_dist { 0, kAlphanum.size() - 1 };
+    const std::size_t len = len_dist(rng);
+    std::string pad;
+    pad.reserve(len);
+    for (std::size_t i = 0; i < len; ++i)
+        pad += kAlphanum[char_dist(rng)];
+    return pad;
+}
+
+// Build an SCE envelope for the plaintext message body (XEP-0420 §4.3).
+//  - <from jid='…'/>  always present (MUST per spec)
+//  - <to jid='…'/>    MUST be included iff the message is addressed to a group (MUC/MIX)
+//  - <time stamp='…'/>
+//  - <rpad>…</rpad>  random-length random-content padding (MUST per spec)
 [[nodiscard]] auto sce_wrap([[maybe_unused]] xmpp_ctx_t *context, weechat::account &account,
-                            std::string_view plaintext) -> std::string
+                            std::string_view plaintext,
+                            std::string_view to_jid = {},
+                            bool is_muc = false) -> std::string
 {
     const char *bound = xmpp_conn_get_bound_jid(account.connection);
     const std::string from = bound ? ::jid(nullptr, bound).bare : std::string {};
 
+    // XEP-0420 §4.3: <to/> MUST be included if and only if addressed to a group.
+    const std::string to_elem = (is_muc && !to_jid.empty())
+        ? fmt::format("<to jid='{}'/>" , xml_escape(std::string(to_jid)))
+        : std::string {};
+
     return fmt::format(
-        "<envelope xmlns='urn:xmpp:sce:1'><content><body xmlns='jabber:client'>{}</body></content><time stamp='{}'/><from jid='{}'/><rpad/></envelope>",
+        "<envelope xmlns='urn:xmpp:sce:1'><content><body xmlns='jabber:client'>{}</body></content>"
+        "<time stamp='{}'/><from jid='{}'/>{}<rpad>{}</rpad></envelope>",
         xml_escape(plaintext),
         utc_timestamp_now(),
-        xml_escape(from));
+        xml_escape(from),
+        to_elem,
+        xml_escape(make_rpad()));
 }
 
 [[nodiscard]] auto pkcs7_pad(std::string_view plaintext, std::size_t block_size)

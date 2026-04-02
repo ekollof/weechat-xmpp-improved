@@ -403,7 +403,16 @@ xmpp_stanza_t *weechat::xmpp::omemo::encode(weechat::account *account,
         return nullptr;
     }
     
-    const auto sce = sce_wrap(*account->context, *account, unencrypted);
+    // Determine if target is a MUC so SCE adds the mandatory <to/> affix
+    // (XEP-0420 §4.3: MUST include <to/> iff message is addressed to a group).
+    bool target_is_muc = false;
+    {
+        auto ch_it = account->channels.find(target_jid);
+        if (ch_it != account->channels.end())
+            target_is_muc = (ch_it->second.type == weechat::channel::chat_type::MUC);
+    }
+
+    const auto sce = sce_wrap(*account->context, *account, unencrypted, target_jid, target_is_muc);
     const auto encrypted_payload = omemo2_encrypt(sce);
     if (!encrypted_payload)
     {
