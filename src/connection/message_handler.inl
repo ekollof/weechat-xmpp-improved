@@ -3586,8 +3586,10 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash, 
         "urn:xmpp:microblog:0+notify",
         // XEP-0442: Pubsub Message Archive Management
         "urn:xmpp:mam:2#pubsub",
-        // XEP-0413: Order-By for MAM queries
+        // XEP-0413: Order-By — bare feature plus scoped variants (§6)
         "urn:xmpp:order-by:1",
+        "urn:xmpp:order-by:1@urn:xmpp:mam:2",
+        "urn:xmpp:order-by:1@http://jabber.org/protocol/pubsub",
         // XEP-0466: Ephemeral Messages
         "urn:xmpp:ephemeral:0",
         // XEP-0448: Encrypted File Sharing
