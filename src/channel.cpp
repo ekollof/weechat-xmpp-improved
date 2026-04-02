@@ -1913,6 +1913,10 @@ void weechat::channel::send_gone(weechat::user *user)
             || !weechat::config::instance->look.send_chat_states.boolean())
         return;
 
+    // XEP-0085 §5.5: SHOULD NOT send <gone/> in a MUC
+    if (type == weechat::channel::chat_type::MUC)
+        return;
+
     std::string to_jid = user ? std::string(user->id) : id;
     if (!is_chat_state_supported(to_jid)) return;
 
