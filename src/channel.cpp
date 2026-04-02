@@ -1191,16 +1191,23 @@ int weechat::channel::send_message(std::string_view to, std::string_view body, b
         const auto peer_mode = account.omemo.select_peer_mode(account, peer_bare);
         const char *eme_namespace = "urn:xmpp:omemo:2";
 
+        // Use a null-safe helper: xmpp_stanza_release(nullptr) segfaults, so
+        // only install the deleter when the raw pointer is non-null.
+        auto make_encrypted = [](xmpp_stanza_t *raw) -> std::shared_ptr<xmpp_stanza_t> {
+            if (!raw) return {};
+            return { raw, xmpp_stanza_release };
+        };
+
         if (peer_mode == weechat::xmpp::omemo::peer_mode::legacy)
         {
-            encrypted = { account.omemo.encode_legacy(&account, buffer, to_str.c_str(), body_str.c_str()),
-                          xmpp_stanza_release };
+            encrypted = make_encrypted(
+                account.omemo.encode_legacy(&account, buffer, to_str.c_str(), body_str.c_str()));
             eme_namespace = "eu.siacs.conversations.axolotl";
         }
         else
         {
-            encrypted = { account.omemo.encode(&account, buffer, to_str.c_str(), body_str.c_str()),
-                          xmpp_stanza_release };
+            encrypted = make_encrypted(
+                account.omemo.encode(&account, buffer, to_str.c_str(), body_str.c_str()));
         }
 
         if (!encrypted)
