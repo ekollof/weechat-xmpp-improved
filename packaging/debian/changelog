@@ -1,3 +1,16 @@
+xepher (0.4.1-1) unstable; urgency=medium
+
+  * Update to v0.4.1
+  * Perf: cache hdata handles in message_handler (single weechat_hdata_get() per handle per process)
+  * Perf: replace contains()+find() double-lookups with single find() throughout message_handler
+  * Perf: static constexpr nicklist group strings, const option overloads, unordered_set peer_features
+  * Perf: cache bare JID to avoid re-parsing on every stanza
+  * Perf: iq_handler ping — single find() instead of count()+operator[]
+  * Fix(xep0402): guard autojoin=false buffer-close with !joining to prevent MUC disappear on connect
+  * Fix(xep0402): accept autojoin="1" alongside autojoin="true" in XEP-0049 IQ handler
+
+ -- Emiel Kollof <emiel@kollof.nl>  Thu, 02 Apr 2026 00:00:00 +0000
+
 xepher (0.4.0-1) unstable; urgency=medium
 
   * Update to v0.4.0

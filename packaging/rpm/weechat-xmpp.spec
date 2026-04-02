@@ -1,7 +1,7 @@
 %global debug_package %{nil}
 
 Name:           xepher
-Version:        0.4.0
+Version:        0.4.1
 Release:        1%{?dist}
 Summary:        Xepher — WeeChat plugin for XMPP/Jabber protocol
 
@@ -69,6 +69,16 @@ install -D -m 0755 xmpp.so %{buildroot}%{_libdir}/weechat/plugins/xmpp.so
 %{_libdir}/weechat/plugins/xmpp.so
 
 %changelog
+* Thu Apr 02 2026 Emiel Kollof <emiel@kollof.nl> - 0.4.1-1
+- Update to v0.4.1
+- Perf: cache hdata handles in message_handler (single weechat_hdata_get() per handle per process)
+- Perf: replace contains()+find() double-lookups with single find() throughout message_handler
+- Perf: static constexpr nicklist group strings, const option overloads, unordered_set peer_features
+- Perf: cache bare JID to avoid re-parsing on every stanza
+- Perf: iq_handler ping — single find() instead of count()+operator[]
+- Fix(xep0402): guard autojoin=false buffer-close with !joining to prevent MUC disappear on connect
+- Fix(xep0402): accept autojoin="1" alongside autojoin="true" in XEP-0049 IQ handler
+
 * Wed Apr 01 2026 Emiel Kollof <emiel@kollof.nl> - 0.4.0-1
 - Update to v0.4.0
 - UI: prefix edited messages (XEP-0308) with pencil glyph instead of diff markup
