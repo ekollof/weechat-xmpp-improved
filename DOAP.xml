@@ -317,8 +317,8 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0333.html' />
         <xmpp:status>complete</xmpp:status>
-        <xmpp:version>0.4.0</xmpp:version>
-        <xmpp:note xml:lang='en'>Chat Markers</xmpp:note>
+        <xmpp:version>1.0.0</xmpp:version>
+        <xmpp:note xml:lang='en'>Displayed Markers - sends &lt;displayed/&gt; per v1.0 wire format; &lt;received/&gt; and &lt;acknowledged/&gt; removed per spec; MUC markers use XEP-0359 stanza-id when available</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
 
@@ -500,17 +500,6 @@
 
     <implements>
       <xmpp:SupportedXep>
-        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0424.html' />
-        <xmpp:status>complete</xmpp:status>
-        <xmpp:version>0.4.2</xmpp:version>
-        <xmpp:note
-                    xml:lang='en'
-                >Message Retraction - allows users to retract/delete sent messages</xmpp:note>
-      </xmpp:SupportedXep>
-    </implements>
-
-    <implements>
-      <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0422.html' />
         <xmpp:status>partial</xmpp:status>
         <xmpp:version>0.2.0</xmpp:version>
@@ -528,6 +517,15 @@
         <xmpp:note
                     xml:lang='en'
                 >Message Moderation - allows MUC moderators to retract messages from other users</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0421.html' />
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>1.0.1</xmpp:version>
+        <xmpp:note xml:lang='en'>Occupant Identifiers for semi-anonymous MUCs - receive and store occupant-id tag from MUC messages and presences; ignored when room does not advertise urn:xmpp:occupant-id:0 in disco#info (MUST-IGNORE per §4); occupant_id_ line tag used to verify sender identity in XEP-0424 retractions, taking priority over nick matching to handle nick changes</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
 
