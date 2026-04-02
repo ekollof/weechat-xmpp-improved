@@ -3237,7 +3237,9 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 account.bookmarks[jid].jid = jid;
                 account.bookmarks[jid].name = name ? name : "";
                 account.bookmarks[jid].nick = intext ? intext : "";
-                account.bookmarks[jid].autojoin = autojoin && weechat_strcasecmp(autojoin, "true") == 0;
+                account.bookmarks[jid].autojoin = autojoin
+                    && (weechat_strcasecmp(autojoin, "true") == 0
+                        || weechat_strcasecmp(autojoin, "1") == 0);
 
                 account.connection.send(stanza::iq()
                             .from(to)
