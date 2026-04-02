@@ -206,41 +206,26 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
             return 1;
         }
 
-        // XEP-0452: MUC Mention Notifications
-        // The server sends a <message> containing:
-        //   <addresses xmlns='http://jabber.org/protocol/address'>
-        //     <address type='mentioned' jid='room@muc.example.com'/>
-        //   </addresses>
-        //   <forwarded xmlns='urn:xmpp:forward:0'>...the original groupchat message...</forwarded>
-        // Render the forwarded body to the MUC buffer with notify_highlight.
+        // XEP-0452: MUC Mention Notifications (v0.2.x wire format)
+        // The server sends a <message from='room@muc.example.com'> containing:
+        //   <mentions xmlns='urn:xmpp:mmn:0'>
+        //     <forwarded xmlns='urn:xmpp:forward:0'>...the original groupchat message...</forwarded>
+        //   </mentions>
+        // Security (§4 MUST): outer from= must match the from= of the forwarded message.
         {
-            xmpp_stanza_t *mmn_addrs = xmpp_stanza_get_child_by_name_and_ns(
-                stanza, "addresses", "http://jabber.org/protocol/address");
-            if (mmn_addrs)
+            xmpp_stanza_t *mmn_elem = xmpp_stanza_get_child_by_name_and_ns(
+                stanza, "mentions", "urn:xmpp:mmn:0");
+            if (mmn_elem)
             {
-                // Find <address type='mentioned'> child
-                std::string muc_jid;
-                for (xmpp_stanza_t *addr = xmpp_stanza_get_children(mmn_addrs);
-                     addr; addr = xmpp_stanza_get_next(addr))
-                {
-                    const char *addr_name = xmpp_stanza_get_name(addr);
-                    if (!addr_name || weechat_strcasecmp(addr_name, "address") != 0)
-                        continue;
-                    const char *addr_type = xmpp_stanza_get_attribute(addr, "type");
-                    if (!addr_type || weechat_strcasecmp(addr_type, "mentioned") != 0)
-                        continue;
-                    const char *addr_jid = xmpp_stanza_get_attribute(addr, "jid");
-                    if (addr_jid && *addr_jid)
-                    {
-                        muc_jid = addr_jid;
-                        break;
-                    }
-                }
+                // The outer message from= is the MUC JID that sent us the notification.
+                const char *outer_from = xmpp_stanza_get_from(stanza);
+                std::string muc_jid = outer_from ? ::jid(nullptr, outer_from).bare : std::string{};
 
                 if (!muc_jid.empty())
                 {
+                    // <forwarded> is a direct child of <mentions>, not of <message>
                     xmpp_stanza_t *mmn_fwd = xmpp_stanza_get_child_by_name_and_ns(
-                        stanza, "forwarded", "urn:xmpp:forward:0");
+                        mmn_elem, "forwarded", "urn:xmpp:forward:0");
                     if (mmn_fwd)
                     {
                         xmpp_stanza_t *mmn_msg = xmpp_stanza_get_child_by_name(mmn_fwd, "message");
@@ -248,6 +233,14 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level)
                             mmn_fwd, "delay", "urn:xmpp:delay");
                         if (mmn_msg)
                         {
+                            // §4 MUST: forwarded message from= bare JID must match muc_jid
+                            const char *inner_from_raw = xmpp_stanza_get_from(mmn_msg);
+                            if (!inner_from_raw)
+                                return 1;
+                            std::string inner_muc = ::jid(nullptr, inner_from_raw).bare;
+                            if (weechat_strcasecmp(inner_muc.c_str(), muc_jid.c_str()) != 0)
+                                return 1;
+
                             // Ensure MUC channel exists (may not be joined)
                             if (!account.channels.contains(muc_jid))
                                 account.channels.emplace(
