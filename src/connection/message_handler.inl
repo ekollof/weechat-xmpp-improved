@@ -1674,6 +1674,11 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
     markable = xmpp_stanza_get_child_by_name_and_ns(stanza, "markable",
                                                     "urn:xmpp:chat-markers:0");
 
+    // XEP-0203: check for delayed delivery early so we can suppress
+    // receipts/markers for offline-stored messages (see receipt block below).
+    const bool is_delayed_delivery = xmpp_stanza_get_child_by_name_and_ns(
+        stanza, "delay", "urn:xmpp:delay") != nullptr;
+
     const char *channel_id = account.jid() == from_bare ? to_bare : from_bare;
     auto parent_ch_it = account.channels.find(channel_id);
     parent_channel = parent_ch_it != account.channels.end() ? &parent_ch_it->second : nullptr;
@@ -1705,8 +1710,12 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
     // presence to all participants and serve no useful purpose in group chat.
     // MAM-replayed messages MUST NOT generate any outgoing receipts or markers:
     // the archive is a historical record; replaying it on reconnect must be silent.
+    // XEP-0203: offline/delayed deliveries (messages with <delay>) must also be
+    // suppressed — the sending client has already moved on and firing a receipt
+    // for a stale offline message creates a spurious error→receipt loop when the
+    // remote user has no active session on their server.
     const bool is_muc_channel = channel && channel->type == weechat::channel::chat_type::MUC;
-    if (id && (markable || request) && !is_self_outbound_copy && !is_muc_channel && !is_mam_replay)
+    if (id && (markable || request) && !is_self_outbound_copy && !is_muc_channel && !is_mam_replay && !is_delayed_delivery)
     {
         weechat::channel::unread unread_val;
         unread_val.id = id;
