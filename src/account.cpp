@@ -1072,6 +1072,11 @@ void weechat::account::build_and_publish_post(const xepher::pending_feed_post &p
         };
         add_field("FORM_TYPE", "http://jabber.org/protocol/pubsub#publish-options");
         add_field("pubsub#access_model", "open");
+        // XEP-0472 §5.1.1 Base profile MUST requirements for social feed nodes
+        add_field("pubsub#type",          "urn:xmpp:microblog:0");
+        add_field("pubsub#persist_items", "true");
+        add_field("pubsub#max_items",     "max");
+        add_field("pubsub#notify_retract","true");
 
         auto pub_opts = make_sp("publish-options");
         xmpp_stanza_set_name(pub_opts.get(), "publish-options");
