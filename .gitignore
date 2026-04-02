@@ -85,6 +85,9 @@ packaging/build/
 # Legacy/archive files
 *.legacy
 
+# Tools build artifacts
+tools/dump_omemo_db
+
 # Stray source tarballs / extracted packages in repo root
 libstrophe*/
 libstrophe_*
