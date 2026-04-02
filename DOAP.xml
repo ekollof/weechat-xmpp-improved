@@ -297,7 +297,7 @@
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0313.html' />
         <xmpp:status>complete</xmpp:status>
-        <xmpp:version>1.1.0</xmpp:version>
+        <xmpp:version>1.1.3</xmpp:version>
         <xmpp:note
                     xml:lang='en'
                 >Message Archive Management (MAM) v2 with persistent local caching; IQ routing fixed to address own bare JID for personal archive queries</xmpp:note>
@@ -577,8 +577,8 @@
     <implements>
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0442.html' />
-        <xmpp:status>partial</xmpp:status>
-        <xmpp:version>0.1.2</xmpp:version>
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>0.2.0</xmpp:version>
         <xmpp:note xml:lang='en'>Pubsub Message Archive Management (Experimental) - on reconnect, sends disco#info to each pubsub service; when urn:xmpp:mam:2 is advertised, fetches the node archive via MAM IQ with node= filter and XEP-0413 order-by instead of plain pubsub items IQ; falls back to XEP-0060 max_items fetch for servers that do not support pubsub MAM; forwarded item payloads (Atom entries) extracted from MAM result messages and rendered to the feed buffer with deduplication; RSM last cursor persisted to LMDB; urn:xmpp:mam:2#pubsub and urn:xmpp:order-by:1 advertised in caps</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
