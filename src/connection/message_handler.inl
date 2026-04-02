@@ -2469,7 +2469,8 @@ message_handler_after_omemo:
         }
         
         const char *emojis = *dyn_emojis;
-        if (std::string_view(emojis).size() > 0)
+        // Always walk the buffer to update the target line — even when emojis
+        // is empty (XEP-0444 §3.2: empty <reactions> means remove all reactions).
         {
             // Find the message being reacted to and append reaction
             void *lines = weechat_hdata_pointer(hdata_buffer,
@@ -2511,10 +2512,12 @@ message_handler_after_omemo:
                                 if (rxn_pos != std::string::npos)
                                     base.resize(rxn_pos);
 
-                                std::string new_message = base
-                                    + " " + weechat_color("blue")
-                                    + "[" + emojis + "]"
-                                    + weechat_color("resetcolor");
+                                std::string new_message = emojis && *emojis
+                                    ? base
+                                      + " " + weechat_color("blue")
+                                      + "[" + emojis + "]"
+                                      + weechat_color("resetcolor")
+                                    : base; // empty reactions = remove suffix
 
                                 // Update the line with reaction replaced
                                 struct t_hashtable *hashtable = weechat_hashtable_new(8,
