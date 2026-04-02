@@ -12,7 +12,8 @@ bool weechat::xmpp::omemo::has_session(const char *jid, std::uint32_t remote_dev
 std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *account,
                                    struct t_gui_buffer *buffer,
                                    const char *jid,
-                                   xmpp_stanza_t *encrypted)
+                                   xmpp_stanza_t *encrypted,
+                                   bool quiet)
 {
     OMEMO_ASSERT(account != nullptr, "OMEMO decode requires a valid account");
     OMEMO_ASSERT(jid != nullptr, "OMEMO decode requires a peer jid");
@@ -151,14 +152,14 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
             {
                 legacy_transport_key = decrypt_legacy_transport_key(*this, jid, *sender_device_id, serialized, is_prekey,
                                                                      is_prekey ? &used_prekey_id : nullptr);
-                if (!legacy_transport_key)
+                if (!legacy_transport_key && !quiet)
                     print_error(buffer, "OMEMO (legacy) Signal decryption of transport key failed.");
             }
             else
             {
                 transport_key = decrypt_transport_key(*this, jid, *sender_device_id, serialized, is_prekey,
                                                       is_prekey ? &used_prekey_id : nullptr);
-                if (!transport_key)
+                if (!transport_key && !quiet)
                     print_error(buffer, "OMEMO Signal decryption of transport key failed.");
             }
         }
@@ -217,13 +218,16 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
 
     if (!transport_key && !legacy_transport_key)
     {
-        if (!found_keys_elem)
-            print_error(buffer, "OMEMO message has no <keys> element in header.");
-        else if (!found_keys_for_our_bare_jid)
-            print_error(buffer, fmt::format(
-                "OMEMO message has no <keys jid='{}'> element for our bare JID.",
-                own_bare_jid));
-        else if (!found_key_for_us)
+        if (!quiet)
+        {
+            if (!found_keys_elem)
+                print_error(buffer, "OMEMO message has no <keys> element in header.");
+            else if (!found_keys_for_our_bare_jid)
+                print_error(buffer, fmt::format(
+                    "OMEMO message has no <keys jid='{}'> element for our bare JID.",
+                    own_bare_jid));
+        }
+        if (!found_key_for_us)
         {
             // The sender does not (yet) know our device_id. Request their bundle
             // once per peer device and avoid repeating the same error every message.
@@ -236,9 +240,10 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
 
                 if (!already_attempted && !already_pending)
                 {
-                    print_error(buffer, fmt::format(
-                        "OMEMO message has no key for our device {} (sender did not encrypt for us).",
-                        device_id));
+                    if (!quiet)
+                        print_error(buffer, fmt::format(
+                            "OMEMO message has no key for our device {} (sender did not encrypt for us).",
+                            device_id));
 
                     pending_key_transport.insert(key);
                     const auto selected_mode = resolve_device_mode(
@@ -254,14 +259,14 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
                         request_bundle(*account, bare_jid, *sender_device_id);
                 }
             }
-            else
+            else if (!quiet)
             {
                 print_error(buffer, fmt::format(
                     "OMEMO message has no key for our device {} (sender did not encrypt for us).",
                     device_id));
             }
         }
-        else
+        else if (!quiet)
             print_error(buffer, "OMEMO transport key decryption failed.");
         return std::nullopt;
     }

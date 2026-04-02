@@ -1957,7 +1957,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
     
     if (encrypted && account.omemo)
     {
-        auto omemo_result = account.omemo.decode(&account, channel->buffer, from_bare, encrypted);
+        auto omemo_result = account.omemo.decode(&account, channel->buffer, from_bare, encrypted, is_mam_replay);
         if (omemo_result)
         {
             omemo_cleartext_storage = std::move(*omemo_result);
@@ -1965,7 +1965,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
         }
         if (!cleartext)
         {
-            if (is_self_outbound_copy)
+            if (is_self_outbound_copy || is_mam_replay)
                 goto message_handler_after_omemo;
 
             xmpp_stanza_t *payload = xmpp_stanza_get_child_by_name(encrypted, "payload");

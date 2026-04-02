@@ -184,7 +184,8 @@ namespace weechat {
                          std::optional<std::string> decode(weechat::account *account,
                                      struct t_gui_buffer *buffer,
                                      const char *jid,
-                                     xmpp_stanza_t *encrypted);
+                                     xmpp_stanza_t *encrypted,
+                                     bool quiet = false);
 
                         xmpp_stanza_t *encode(weechat::account *account, struct t_gui_buffer *buffer,
                                               const char *jid, const char *unencrypted);

@@ -462,6 +462,23 @@ void crypto_unlock(void *user_data)
         if (out_used_prekey_id && pre_key_signal_message_has_pre_key_id(message.get()))
             *out_used_prekey_id = pre_key_signal_message_get_pre_key_id(message.get());
         result = session_cipher_decrypt_pre_key_signal_message(cipher.get(), message.get(), nullptr, &plaintext_raw);
+
+        // If prekey decryption fails but a session already exists, the prekey
+        // was consumed on a previous delivery (MAM replay of a session-establishing
+        // message).  Fall back to the embedded SignalMessage — recovers the
+        // plaintext if the ratchet hasn't advanced past this message yet.
+        if (result != 0 && plaintext_raw == nullptr)
+        {
+            weechat_printf(nullptr, "%somemo: prekey decrypt failed for %.*s/%u: rc=%d; trying inner SignalMessage",
+                           weechat_prefix("error"),
+                           static_cast<int>(jid.size()), jid.data(),
+                           remote_device_id, result);
+            signal_message *inner = pre_key_signal_message_get_signal_message(message.get());
+            if (inner)
+            {
+                result = session_cipher_decrypt_signal_message(cipher.get(), inner, nullptr, &plaintext_raw);
+            }
+        }
     }
     else
     {
@@ -799,6 +816,26 @@ struct legacy_omemo_payload {
         if (out_used_prekey_id && pre_key_signal_message_has_pre_key_id(message.get()))
             *out_used_prekey_id = pre_key_signal_message_get_pre_key_id(message.get());
         result = session_cipher_decrypt_pre_key_signal_message(cipher.get(), message.get(), nullptr, &plaintext_raw);
+
+        // If prekey decryption fails but a session already exists, the prekey
+        // was consumed on a previous delivery (e.g. MAM replay consumed it live,
+        // or this is a repeated MAM fetch of the same archived stanza).
+        // Fall back to decrypting the embedded SignalMessage — if the ratchet
+        // position still matches, this recovers the plaintext.  If the ratchet
+        // has advanced past this message (rc=-1001) it is irrecoverable; we
+        // return nullopt so the caller can silently discard it per XEP-0384 §6.
+        if (result != 0 && plaintext_raw == nullptr)
+        {
+            weechat_printf(nullptr, "%somemo: (legacy) prekey decrypt failed for %.*s/%u: rc=%d; trying inner SignalMessage",
+                           weechat_prefix("error"),
+                           static_cast<int>(jid.size()), jid.data(),
+                           remote_device_id, result);
+            signal_message *inner = pre_key_signal_message_get_signal_message(message.get());
+            if (inner)
+            {
+                result = session_cipher_decrypt_signal_message(cipher.get(), inner, nullptr, &plaintext_raw);
+            }
+        }
     }
     else
     {
