@@ -1202,16 +1202,12 @@ static void send_key_transport(omemo &self,
     send_omemo2_key_transport(self, account, buffer, peer_jid, remote_device_id);
 }
 
-void weechat::xmpp::omemo::handle_bundle(weechat::account *account,
+XMPP_TEST_EXPORT void weechat::xmpp::omemo::handle_bundle(weechat::account *account,
                                          struct t_gui_buffer *buffer,
                                          const char *jid,
                                          std::uint32_t remote_device_id,
                                          xmpp_stanza_t *items)
 {
-    pending_bundle_fetch.erase({jid ? jid : "", remote_device_id});
-    const bool needs_key_transport = pending_key_transport.count({jid ? jid : "", remote_device_id}) > 0;
-    pending_key_transport.erase({jid ? jid : "", remote_device_id});
-
     // Do not attempt X3DH session establishment with our own device.
     // Building a session with ourselves would fail in libsignal (we can't
     // be both initiator and responder), and the resulting exception thrown
@@ -1232,6 +1228,18 @@ void weechat::xmpp::omemo::handle_bundle(weechat::account *account,
     }
     const bool is_own_device = (account && !bare_jid.empty() && own_bare_jid == bare_jid)
                                 && (remote_device_id == device_id);
+
+    // Bootstrap-race guard: insert into key_transport_bootstrap_attempted
+    // *before* clearing pending_bundle_fetch and pending_key_transport so that
+    // any concurrent decode() call that arrives while we are processing the
+    // bundle result sees already_attempted==true and does not re-enqueue
+    // another bundle fetch for the same {jid, device_id} pair.
+    if (!is_own_device && !bare_jid.empty())
+        key_transport_bootstrap_attempted.insert({bare_jid, remote_device_id});
+
+    pending_bundle_fetch.erase({jid ? jid : "", remote_device_id});
+    const bool needs_key_transport = pending_key_transport.count({jid ? jid : "", remote_device_id}) > 0;
+    pending_key_transport.erase({jid ? jid : "", remote_device_id});
 
     if (db_env && !bare_jid.empty())
     {
@@ -1289,9 +1297,6 @@ void weechat::xmpp::omemo::handle_bundle(weechat::account *account,
 
                 if ((session_is_fresh || needs_key_transport) && account && buffer)
                 {
-                    // Mark attempted regardless of defer/send so codec.inl
-                    // doesn't re-queue another bundle fetch for this device.
-                    key_transport_bootstrap_attempted.insert({bare_jid, remote_device_id});
                     if (global_mam_catchup)
                     {
                         // Defer until MAM catchup completes (process_postponed_key_transports).
@@ -1350,16 +1355,12 @@ void weechat::xmpp::omemo::handle_bundle(weechat::account *account,
 
     // Identical logic to handle_bundle() but uses extract_legacy_bundle_from_items()
     // which parses the Conversations/axolotl stanza format.
-    void weechat::xmpp::omemo::handle_axolotl_bundle(weechat::account *account,
+    XMPP_TEST_EXPORT void weechat::xmpp::omemo::handle_axolotl_bundle(weechat::account *account,
                                                     struct t_gui_buffer *buffer,
                                                     const char *jid,
                                                     std::uint32_t remote_device_id,
                                                     xmpp_stanza_t *items)
     {
-        pending_bundle_fetch.erase({jid ? jid : "", remote_device_id});
-        const bool needs_key_transport = pending_key_transport.count({jid ? jid : "", remote_device_id}) > 0;
-        pending_key_transport.erase({jid ? jid : "", remote_device_id});
-
         std::string bare_jid = jid ? jid : "";
         std::string own_bare_jid;
         if (account && account->context && jid)
@@ -1376,6 +1377,16 @@ void weechat::xmpp::omemo::handle_bundle(weechat::account *account,
         }
         const bool is_own_device = (account && !bare_jid.empty() && own_bare_jid == bare_jid)
                                     && (remote_device_id == device_id);
+
+        // Bootstrap-race guard: same as handle_bundle() — mark attempted before
+        // clearing pending sets so a concurrent decode() cannot re-enqueue a
+        // bundle fetch for the same pair while we are processing this result.
+        if (!is_own_device && !bare_jid.empty())
+            key_transport_bootstrap_attempted.insert({bare_jid, remote_device_id});
+
+        pending_bundle_fetch.erase({jid ? jid : "", remote_device_id});
+        const bool needs_key_transport = pending_key_transport.count({jid ? jid : "", remote_device_id}) > 0;
+        pending_key_transport.erase({jid ? jid : "", remote_device_id});
 
         if (db_env && !bare_jid.empty())
         {
@@ -1438,7 +1449,6 @@ void weechat::xmpp::omemo::handle_bundle(weechat::account *account,
 
                     if ((session_is_fresh || needs_key_transport) && account && buffer)
                     {
-                        key_transport_bootstrap_attempted.insert({bare_jid, remote_device_id});
                         if (global_mam_catchup)
                         {
                             postponed_key_transports.insert({bare_jid, remote_device_id});

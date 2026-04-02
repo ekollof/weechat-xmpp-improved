@@ -475,3 +475,98 @@ TEST_CASE("load_device_mode accepts legacy string as peer_mode::axolotl")
         txn.abort();
     }
 }
+
+// ── 8. Bootstrap-race guard: handle_axolotl_bundle inserts into ───────────────
+//      key_transport_bootstrap_attempted before clearing pending sets
+//
+// Scenario: a stanza for remote device {bob, 99999} is mid-flight (so
+// pending_bundle_fetch and pending_key_transport both contain the key).
+// When handle_axolotl_bundle() returns, key_transport_bootstrap_attempted
+// must contain the key, and both pending sets must be empty for that key.
+// This ensures that any concurrent decode() call cannot re-enqueue a bundle
+// fetch after pending_bundle_fetch is cleared but before the mark is written.
+
+TEST_CASE("handle_axolotl_bundle sets race guard before clearing pending sets")
+{
+    omemo_test_env env;
+
+    const std::string remote_jid  = "bob@example.com";
+    const std::uint32_t remote_id = 99999;
+    const auto key = std::make_pair(remote_jid, remote_id);
+
+    // Pre-seed both pending sets to simulate an in-flight bundle fetch that
+    // was triggered by decode() seeing no key for our device.
+    env.omemo->pending_bundle_fetch.insert(key);
+    env.omemo->pending_key_transport.insert(key);
+
+    // Build a minimal (but parseable) legacy bundle stanza.
+    // Values are arbitrary valid base64; we only need parse to succeed.
+    // establish_session_from_bundle() will fail because the keys are fake,
+    // but the race-guard insert happens unconditionally before that call.
+    const std::string bundle_xml = R"(<items>
+      <item id='current'>
+        <bundle xmlns='eu.siacs.conversations.axolotl'>
+          <signedPreKeyPublic signedPreKeyId='1'>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</signedPreKeyPublic>
+          <signedPreKeySignature>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</signedPreKeySignature>
+          <identityKey>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</identityKey>
+          <prekeys>
+            <preKeyPublic preKeyId='1'>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</preKeyPublic>
+          </prekeys>
+        </bundle>
+      </item>
+    </items>)";
+
+    xmpp_stanza_t *items = xmpp_stanza_new_from_string(env.ctx, bundle_xml.c_str());
+    REQUIRE(items != nullptr);
+
+    // Call the function under test (account=nullptr suppresses key-transport send).
+    env.omemo->handle_axolotl_bundle(nullptr, nullptr, remote_jid.c_str(), remote_id, items);
+    xmpp_stanza_release(items);
+
+    // Race-guard assertion: the pair must be in key_transport_bootstrap_attempted.
+    CHECK(env.omemo->key_transport_bootstrap_attempted.count(key) == 1);
+
+    // Both pending sets must be drained.
+    CHECK(env.omemo->pending_bundle_fetch.count(key)   == 0);
+    CHECK(env.omemo->pending_key_transport.count(key)  == 0);
+}
+
+// ── 9. Bootstrap-race guard: handle_bundle mirrors the same guarantee ─────────
+
+TEST_CASE("handle_bundle sets race guard before clearing pending sets")
+{
+    omemo_test_env env;
+
+    const std::string remote_jid  = "carol@example.com";
+    const std::uint32_t remote_id = 77777;
+    const auto key = std::make_pair(remote_jid, remote_id);
+
+    env.omemo->pending_bundle_fetch.insert(key);
+    env.omemo->pending_key_transport.insert(key);
+
+    // Minimal OMEMO:2 bundle stanza.
+    // <spk id='N'> text content = signed prekey; <spks> = signature; <ik> = identity key;
+    // <prekeys><pk id='N'> text = prekey.  Values are arbitrary valid base64.
+    const std::string bundle_xml = R"(<items>
+      <item id='current'>
+        <bundle xmlns='urn:xmpp:omemo:2'>
+          <spk id='1'>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</spk>
+          <spks>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</spks>
+          <ik>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</ik>
+          <prekeys>
+            <pk id='1'>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pk>
+          </prekeys>
+        </bundle>
+      </item>
+    </items>)";
+
+    xmpp_stanza_t *items = xmpp_stanza_new_from_string(env.ctx, bundle_xml.c_str());
+    REQUIRE(items != nullptr);
+
+    env.omemo->handle_bundle(nullptr, nullptr, remote_jid.c_str(), remote_id, items);
+    xmpp_stanza_release(items);
+
+    CHECK(env.omemo->key_transport_bootstrap_attempted.count(key) == 1);
+    CHECK(env.omemo->pending_bundle_fetch.count(key)              == 0);
+    CHECK(env.omemo->pending_key_transport.count(key)             == 0);
+}

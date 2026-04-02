@@ -166,14 +166,14 @@ namespace weechat {
                                                                                     const char *jid,
                                                                                     xmpp_stanza_t *items);
 
-                        void handle_bundle(weechat::account *account,
+                        XMPP_TEST_EXPORT void handle_bundle(weechat::account *account,
                                                              struct t_gui_buffer *buffer,
                                                              const char *jid, std::uint32_t device_id,
                                                              xmpp_stanza_t *items);
 
                         // Like handle_bundle() but parses the legacy Conversations
                         // (eu.siacs.conversations.axolotl) bundle stanza format.
-                        void handle_axolotl_bundle(weechat::account *account,
+                        XMPP_TEST_EXPORT void handle_axolotl_bundle(weechat::account *account,
                                                                             struct t_gui_buffer *buffer,
                                                                             const char *jid, std::uint32_t device_id,
                                                                             xmpp_stanza_t *items);
