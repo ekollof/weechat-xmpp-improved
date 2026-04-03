@@ -2886,6 +2886,46 @@ message_handler_after_omemo:
             weechat_string_dyn_concat(dyn_tags, ",notify_highlight", -1);
     }
 
+    // XEP-0492: Chat Notification Settings — override the WeeChat notify tag
+    // based on the per-bookmark setting for this channel.
+    // "never"      → suppress all notifications (notify_none)
+    // "always"     → always highlight (notify_highlight)
+    // "on-mention" → only highlight when @mentioned (default MUC behaviour)
+    // (empty / default) → leave the tag already appended unchanged
+    if (!date && !is_from_self && channel)
+    {
+        std::string_view channel_notify;
+        auto bm_it = account.bookmarks.find(channel->id);
+        if (bm_it != account.bookmarks.end())
+            channel_notify = bm_it->second.notify_setting;
+
+        if (channel_notify == "never")
+        {
+            // Strip any existing notify_* tag and replace with notify_none.
+            std::string tags_so_far(*dyn_tags ? *dyn_tags : "");
+            // Remove all ",notify_*" substrings
+            while (true) {
+                auto p = tags_so_far.find(",notify_");
+                if (p == std::string::npos) break;
+                auto end = tags_so_far.find(',', p + 1);
+                if (end == std::string::npos)
+                    tags_so_far.erase(p);
+                else
+                    tags_so_far.erase(p, end - p);
+            }
+            weechat_string_dyn_free(dyn_tags, 1);
+            dyn_tags = weechat_string_dyn_alloc(static_cast<int>(tags_so_far.size() + 16));
+            weechat_string_dyn_concat(dyn_tags, tags_so_far.c_str(), -1);
+            weechat_string_dyn_concat(dyn_tags, ",notify_none", -1);
+        }
+        else if (channel_notify == "always")
+        {
+            // Append notify_highlight unconditionally (WeeChat merges duplicates).
+            weechat_string_dyn_concat(dyn_tags, ",notify_highlight", -1);
+        }
+        // "on-mention": no override — WeeChat highlight rules handle @nick detection
+    }
+
     const char *edit = replace ? "✏️ " : "";
     if (x && text == cleartext && channel->transport != weechat::channel::transport::PGP)
     {
@@ -3589,11 +3629,15 @@ message_handler_after_omemo:
 
 xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash, const char *node)
 {
-    xmpp_stanza_t *query = xmpp_stanza_new(account.context);
-    xmpp_stanza_set_name(query, "query");
-    xmpp_stanza_set_ns(query, "http://jabber.org/protocol/disco#info");
-    if (node && *node)
-        xmpp_stanza_set_attribute(query, "node", node);
+    // Build <query xmlns='http://jabber.org/protocol/disco#info'> via spec builder.
+    struct query_spec : stanza::spec {
+        query_spec(const char *n) : spec("query") {
+            attr("xmlns", "http://jabber.org/protocol/disco#info");
+            if (n && *n) attr("node", n);
+        }
+    } qs(node);
+    auto query_sp = qs.build(account.context);
+    xmpp_stanza_t *query = query_sp.get();
 
     std::unique_ptr<char, decltype(&free)> client_name(
             weechat_string_eval_expression(
@@ -3604,13 +3648,16 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash, 
     weechat_string_dyn_concat(serial, client_name.get(), -1);
     weechat_string_dyn_concat(serial, "<", -1);
 
-    xmpp_stanza_t *identity = xmpp_stanza_new(account.context);
-    xmpp_stanza_set_name(identity, "identity");
-    xmpp_stanza_set_attribute(identity, "category", "client");
-    xmpp_stanza_set_attribute(identity, "name", client_name.get());
-    xmpp_stanza_set_attribute(identity, "type", "pc");
-    xmpp_stanza_add_child(query, identity);
-    xmpp_stanza_release(identity);
+    // Build <identity category='client' name='...' type='pc'/> via spec builder.
+    struct identity_spec : stanza::spec {
+        identity_spec(const char *name) : spec("identity") {
+            attr("category", "client");
+            attr("name", name ? name : "");
+            attr("type", "pc");
+        }
+    } ids(client_name.get());
+    auto id_sp = ids.build(account.context);
+    xmpp_stanza_add_child(query, id_sp.get());
 
     const std::vector<std::string_view> advertised_features {
         "urn:xmpp:omemo:2",
@@ -3689,24 +3736,28 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash, 
         sorted_features.emplace_back(feature);
     std::sort(sorted_features.begin(), sorted_features.end());
 
-    xmpp_stanza_t *feature = nullptr;
     for (const auto &ns : sorted_features)
     {
-        feature = xmpp_stanza_new(account.context);
-        xmpp_stanza_set_name(feature, "feature");
-        xmpp_stanza_set_attribute(feature, "var", ns.c_str());
-        xmpp_stanza_add_child(query, feature);
-        xmpp_stanza_release(feature);
+        struct feature_spec : stanza::spec {
+            feature_spec(const char *v) : spec("feature") { attr("var", v); }
+        } fs(ns.c_str());
+        auto fsp = fs.build(account.context);
+        xmpp_stanza_add_child(query, fsp.get());
 
         // XEP-0115 hash input must use sorted features.
         weechat_string_dyn_concat(serial, ns.c_str(), -1);
         weechat_string_dyn_concat(serial, "<", -1);
     }
 
-    xmpp_stanza_t *x = xmpp_stanza_new(account.context);
-    xmpp_stanza_set_name(x, "x");
-    xmpp_stanza_set_ns(x, "jabber:x:data");
-    xmpp_stanza_set_attribute(x, "type", "result");
+    // Build <x xmlns='jabber:x:data' type='result'> via spec builder.
+    struct xdata_spec : stanza::spec {
+        xdata_spec() : spec("x") {
+            attr("xmlns", "jabber:x:data");
+            attr("type", "result");
+        }
+    } xs;
+    auto x_sp = xs.build(account.context);
+    xmpp_stanza_t *x = x_sp.get();
 
     static struct utsname osinfo;
     if (uname(&osinfo) < 0)
@@ -3727,25 +3778,28 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash, 
         weechat_string_dyn_concat(serial, val, -1);
         weechat_string_dyn_concat(serial, "<", -1);
     };
-    // Add a two-value x-data field and append both values to the serial
+    // Add a two-value x-data field via builder and append both values to the serial.
     auto add_feature2 = [&](const char *var, const char *type,
                             const char *val1, const char *val2) {
-        xmpp_stanza_t *field = xmpp_stanza_new(account.context);
-        xmpp_stanza_set_name(field, "field");
-        xmpp_stanza_set_attribute(field, "var", var);
-        xmpp_stanza_set_attribute(field, "type", type);
-        for (const char *v : {val1, val2}) {
-            xmpp_stanza_t *value = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_name(value, "value");
-            xmpp_stanza_t *text = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_text(text, v);
-            xmpp_stanza_add_child(value, text);
-            xmpp_stanza_release(text);
-            xmpp_stanza_add_child(field, value);
-            xmpp_stanza_release(value);
-        }
-        xmpp_stanza_add_child(x, field);
-        xmpp_stanza_release(field);
+        // Build <field var='...' type='...'><value>val1</value><value>val2</value></field>
+        struct value_spec2 : stanza::spec {
+            explicit value_spec2(const char *v) : spec("value") { text(v); }
+        };
+        struct field_spec2 : stanza::spec {
+            field_spec2(const char *var_, const char *type_,
+                        const char *v1, const char *v2)
+                : spec("field")
+            {
+                attr("var", var_);
+                if (type_) attr("type", type_);
+                value_spec2 vs1(v1);
+                value_spec2 vs2(v2);
+                child(vs1);
+                child(vs2);
+            }
+        } fs2(var, type, val1, val2);
+        auto fsp2 = fs2.build(account.context);
+        xmpp_stanza_add_child(x, fsp2.get());
         weechat_string_dyn_concat(serial, var,  -1);
         weechat_string_dyn_concat(serial, "<",  -1);
         weechat_string_dyn_concat(serial, val1, -1);
@@ -3767,7 +3821,6 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, char **hash, 
     add_feature1("software_version", nullptr, weechat_info_get("version", nullptr));
 
     xmpp_stanza_add_child(query, x);
-    xmpp_stanza_release(x);
 
     xmpp_stanza_set_type(reply, "result");
     xmpp_stanza_add_child(reply, query);

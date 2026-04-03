@@ -2518,40 +2518,33 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                     next_info.form_requested = false;
                     account.channel_search_queries[submit_id] = next_info;
 
-                    // Build search submit based on XEP-0433 fields — RAII.
+                    // Build search submit based on XEP-0433 fields — RAII using spec builder.
                     xmpp_ctx_t *ctx = account.context;
-                    auto mk = [&](const char */*name*/) {
-                        return std::shared_ptr<xmpp_stanza_t> {
-                            xmpp_stanza_new(ctx), xmpp_stanza_release };
-                    };
+
                     auto submit_iq = std::shared_ptr<xmpp_stanza_t> {
                         xmpp_iq_new(ctx, "get", submit_id.c_str()), xmpp_stanza_release };
                     xmpp_stanza_set_to(submit_iq.get(), cs_info.service_jid.c_str());
 
-                    auto submit_search = mk("search");
-                    xmpp_stanza_set_name(submit_search.get(), "search");
-                    xmpp_stanza_set_ns(submit_search.get(), "urn:xmpp:channel-search:0:search");
+                    struct search_spec : stanza::spec {
+                        search_spec() : spec("search") {
+                            attr("xmlns", "urn:xmpp:channel-search:0:search");
+                        }
+                    } ss;
+                    auto submit_search = ss.build(ctx);
 
-                    auto submit_form = mk("x");
-                    xmpp_stanza_set_name(submit_form.get(), "x");
-                    xmpp_stanza_set_ns(submit_form.get(), "jabber:x:data");
-                    xmpp_stanza_set_attribute(submit_form.get(), "type", "submit");
+                    struct xform_spec : stanza::spec {
+                        xform_spec() : spec("x") {
+                            attr("xmlns", "jabber:x:data");
+                            attr("type", "submit");
+                        }
+                    } xfs;
+                    auto submit_form = xfs.build(ctx);
 
                     auto add_field = [&](const char *var, const char *value,
                                          const char *type_attr = nullptr) {
-                        auto field = mk("field");
-                        xmpp_stanza_set_name(field.get(), "field");
-                        xmpp_stanza_set_attribute(field.get(), "var", var);
-                        if (type_attr)
-                            xmpp_stanza_set_attribute(field.get(), "type", type_attr);
-
-                        auto val = mk("value");
-                        xmpp_stanza_set_name(val.get(), "value");
-                        auto txt = mk("text");
-                        xmpp_stanza_set_text(txt.get(), value);
-                        xmpp_stanza_add_child(val.get(), txt.get());
-                        xmpp_stanza_add_child(field.get(), val.get());
-                        xmpp_stanza_add_child(submit_form.get(), field.get());
+                        xmpp_stanza_t *f = stanza_make_field(ctx, var, value, type_attr);
+                        xmpp_stanza_add_child(submit_form.get(), f);
+                        xmpp_stanza_release(f);
                     };
 
                     add_field("FORM_TYPE", "urn:xmpp:channel-search:0:search-params", "hidden");
@@ -2887,10 +2880,14 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
             if (requested_node && *requested_node)
             {
                 // Recompute our caps hash to derive the canonical node URI.
-                xmpp_stanza_t *dummy = xmpp_stanza_new(account.context);
-                xmpp_stanza_set_name(dummy, "caps");
-                char *computed_hash = nullptr;
-                xmpp_stanza_t *caps_st = get_caps(dummy, &computed_hash);
+                    // Use a throwaway pre-existing stanza as reply placeholder.
+                    struct caps_placeholder : stanza::spec {
+                        caps_placeholder() : spec("caps") {}
+                    } cph;
+                    auto dummy_sp = cph.build(account.context);
+                    xmpp_stanza_t *dummy = dummy_sp.get();
+                    char *computed_hash = nullptr;
+                    xmpp_stanza_t *caps_st = get_caps(dummy, &computed_hash);
                 xmpp_stanza_release(caps_st);
                 std::unique_ptr<char, decltype(&free)> hash_guard(computed_hash, &free);
 
@@ -2912,16 +2909,20 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 // Return <iq type='error'><error type='cancel'><item-not-found/></error></iq>
                 xmpp_stanza_t *err_iq = xmpp_stanza_reply(stanza);
                 xmpp_stanza_set_attribute(err_iq, "type", "error");
-                xmpp_stanza_t *err_el = xmpp_stanza_new(account.context);
-                xmpp_stanza_set_name(err_el, "error");
-                xmpp_stanza_set_attribute(err_el, "type", "cancel");
-                xmpp_stanza_t *inf = xmpp_stanza_new(account.context);
-                xmpp_stanza_set_name(inf, "item-not-found");
-                xmpp_stanza_set_ns(inf, "urn:ietf:params:xml:ns:xmpp-stanzas");
-                xmpp_stanza_add_child(err_el, inf);
-                xmpp_stanza_release(inf);
-                xmpp_stanza_add_child(err_iq, err_el);
-                xmpp_stanza_release(err_el);
+                // Build <error type='cancel'><item-not-found xmlns='...'/></error> via spec builder.
+                struct inf_spec : stanza::spec {
+                    inf_spec() : spec("item-not-found") {
+                        attr("xmlns", "urn:ietf:params:xml:ns:xmpp-stanzas");
+                    }
+                } infs;
+                struct err_spec : stanza::spec {
+                    err_spec(stanza::spec &child) : spec("error") {
+                        attr("type", "cancel");
+                        this->child(child);
+                    }
+                } errs(infs);
+                auto err_sp = errs.build(account.context);
+                xmpp_stanza_add_child(err_iq, err_sp.get());
                 account.connection.send(err_iq);
                 xmpp_stanza_release(err_iq);
             }
@@ -2950,10 +2951,131 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
 
             if (caps_query)
             {
-                // Save to capability cache
+                // XEP-0115 §5.4: verify the hash before caching to prevent caps poisoning.
+                // Reconstruct the hash from identities + features + x-data forms.
                 std::string ver_hash = account.caps_disco_queries[stanza_id];
-                account.caps_cache_save(ver_hash, features);
                 account.caps_disco_queries.erase(stanza_id);
+
+                // --- build serial string S per §5.1 ---
+                std::string S;
+
+                // Step 2-3: collect identities, sort by "category/type/lang/name"
+                std::vector<std::string> identities;
+                xmpp_stanza_t *id_elem = xmpp_stanza_get_child_by_name(query, "identity");
+                while (id_elem)
+                {
+                    const char *cat  = xmpp_stanza_get_attribute(id_elem, "category");
+                    const char *typ  = xmpp_stanza_get_attribute(id_elem, "type");
+                    const char *lang = xmpp_stanza_get_attribute(id_elem, "xml:lang");
+                    const char *name = xmpp_stanza_get_attribute(id_elem, "name");
+                    identities.push_back(
+                        std::string(cat  ? cat  : "") + "/" +
+                        std::string(typ  ? typ  : "") + "/" +
+                        std::string(lang ? lang : "") + "/" +
+                        std::string(name ? name : ""));
+                    id_elem = xmpp_stanza_get_next(id_elem);
+                }
+                std::sort(identities.begin(), identities.end());
+                for (const auto &ident : identities)
+                    S += ident + "<";
+
+                // Step 4-5: features already collected above; sort and append
+                std::vector<std::string> sorted_features = features;
+                std::sort(sorted_features.begin(), sorted_features.end());
+                for (const auto &feat : sorted_features)
+                    S += feat + "<";
+
+                // Step 6-7: x-data forms (XEP-0128)
+                struct FormData {
+                    std::string form_type;
+                    // fields: var → sorted values  (FORM_TYPE excluded)
+                    std::vector<std::pair<std::string, std::vector<std::string>>> fields;
+                };
+                std::vector<FormData> forms;
+                xmpp_stanza_t *x_elem = xmpp_stanza_get_child_by_name(query, "x");
+                while (x_elem)
+                {
+                    const char *xmlns_x = xmpp_stanza_get_attribute(x_elem, "xmlns");
+                    if (xmlns_x && std::string_view(xmlns_x) == "jabber:x:data")
+                    {
+                        FormData fd;
+                        // find FORM_TYPE value
+                        xmpp_stanza_t *f = xmpp_stanza_get_child_by_name(x_elem, "field");
+                        while (f)
+                        {
+                            const char *fvar = xmpp_stanza_get_attribute(f, "var");
+                            if (fvar && std::string_view(fvar) == "FORM_TYPE")
+                            {
+                                xmpp_stanza_t *vnode = xmpp_stanza_get_child_by_name(f, "value");
+                                const char *vtext = vnode ? xmpp_stanza_get_text_ptr(vnode) : nullptr;
+                                fd.form_type = vtext ? vtext : "";
+                            }
+                            f = xmpp_stanza_get_next(f);
+                        }
+                        // collect non-FORM_TYPE fields
+                        f = xmpp_stanza_get_child_by_name(x_elem, "field");
+                        while (f)
+                        {
+                            const char *fvar = xmpp_stanza_get_attribute(f, "var");
+                            if (fvar && std::string_view(fvar) != "FORM_TYPE")
+                            {
+                                std::vector<std::string> vals;
+                                xmpp_stanza_t *vnode = xmpp_stanza_get_child_by_name(f, "value");
+                                while (vnode)
+                                {
+                                    const char *vtext = xmpp_stanza_get_text_ptr(vnode);
+                                    if (vtext) vals.push_back(vtext);
+                                    vnode = xmpp_stanza_get_next(vnode);
+                                }
+                                std::sort(vals.begin(), vals.end());
+                                fd.fields.emplace_back(fvar, std::move(vals));
+                            }
+                            f = xmpp_stanza_get_next(f);
+                        }
+                        std::sort(fd.fields.begin(), fd.fields.end(),
+                                  [](const auto &a, const auto &b){ return a.first < b.first; });
+                        forms.push_back(std::move(fd));
+                    }
+                    x_elem = xmpp_stanza_get_next(x_elem);
+                }
+                // sort forms by FORM_TYPE
+                std::sort(forms.begin(), forms.end(),
+                          [](const FormData &a, const FormData &b){ return a.form_type < b.form_type; });
+                for (const auto &form : forms)
+                {
+                    S += form.form_type + "<";
+                    for (const auto &[fvar, fvals] : form.fields)
+                    {
+                        S += fvar + "<";
+                        for (const auto &val : fvals)
+                            S += val + "<";
+                    }
+                }
+
+                // --- hash S with SHA-1 and base64-encode ---
+                unsigned char digest[20];
+                unsigned int  digest_len = sizeof(digest);
+                EVP_Digest(S.data(), S.size(), digest, &digest_len, EVP_sha1(), nullptr);
+
+                const int enc_size = 4 * static_cast<int>((digest_len + 2) / 3) + 1;
+                std::string computed(static_cast<std::size_t>(enc_size), '\0');
+                const int written = weechat_string_base_encode(
+                    "64", reinterpret_cast<const char *>(digest),
+                    static_cast<int>(digest_len), computed.data());
+                if (written > 0)
+                    computed.resize(static_cast<std::size_t>(written));
+                else
+                    computed.clear();
+
+                if (computed == ver_hash)
+                {
+                    account.caps_cache_save(ver_hash, features);
+                }
+                else
+                {
+                    XDEBUG("caps: hash mismatch for %s: got '%s' expected '%s'; discarding",
+                           from ? from : "?", computed.c_str(), ver_hash.c_str());
+                }
             }
             
             // Check if this is a response to upload service discovery
@@ -3059,7 +3181,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                             struct order_spec : stanza::spec {
                                 order_spec() : spec("order") {
                                     xmlns<urn::xmpp::order_by::_1>();
-                                    attr("field", "creation-date");
+                                    attr("by", "creation");
                                 }
                             };
                             stanza::xep0059::set rsm_set;
@@ -3449,33 +3571,24 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         "configuring node and retrying",
                         weechat_prefix("network"), target_node.c_str());
 
-                    // Build node configure IQ using RAII shared_ptr.
+                    // Build node configure IQ using spec builder.
                     xmpp_ctx_t *ctx = account.context;
-                    auto mk = [&](const char */*name*/) {
-                        return std::shared_ptr<xmpp_stanza_t> {
-                            xmpp_stanza_new(ctx), xmpp_stanza_release };
-                    };
+
                     auto mk_field = [&](const char *var, const char *val,
-                                        const char *type_attr = nullptr) {
-                        auto f  = mk("field");
-                        auto v  = mk("value");
-                        auto tv = mk("text");
-                        xmpp_stanza_set_name(f.get(), "field");
-                        xmpp_stanza_set_attribute(f.get(), "var", var);
-                        if (type_attr)
-                            xmpp_stanza_set_attribute(f.get(), "type", type_attr);
-                        xmpp_stanza_set_name(v.get(), "value");
-                        xmpp_stanza_set_name(tv.get(), "text");
-                        xmpp_stanza_set_text(tv.get(), val);
-                        xmpp_stanza_add_child(v.get(), tv.get());
-                        xmpp_stanza_add_child(f.get(), v.get());
-                        return f;
+                                        const char *type_attr = nullptr)
+                        -> std::shared_ptr<xmpp_stanza_t>
+                    {
+                        xmpp_stanza_t *f = stanza_make_field(ctx, var, val, type_attr);
+                        return { f, xmpp_stanza_release };
                     };
 
-                    auto x = mk("x");
-                    xmpp_stanza_set_name(x.get(), "x");
-                    xmpp_stanza_set_ns(x.get(), "jabber:x:data");
-                    xmpp_stanza_set_attribute(x.get(), "type", "submit");
+                    struct xform_cfg : stanza::spec {
+                        xform_cfg() : spec("x") {
+                            attr("xmlns", "jabber:x:data");
+                            attr("type", "submit");
+                        }
+                    } xcfg;
+                    auto x = xcfg.build(ctx);
                     auto f1 = mk_field("FORM_TYPE",
                         "http://jabber.org/protocol/pubsub#meta-data", "hidden");
                     auto f2 = mk_field("pubsub#access_model", "open");
@@ -3486,15 +3599,20 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                     xmpp_stanza_add_child(x.get(), f3.get());
                     xmpp_stanza_add_child(x.get(), f4.get());
 
-                    auto configure = mk("configure");
-                    xmpp_stanza_set_name(configure.get(), "configure");
-                    xmpp_stanza_set_attribute(configure.get(), "node", target_node.c_str());
+                    struct configure_spec : stanza::spec {
+                        configure_spec(const std::string &node_) : spec("configure") {
+                            attr("node", node_);
+                        }
+                    } cfgnode(target_node);
+                    auto configure = cfgnode.build(ctx);
                     xmpp_stanza_add_child(configure.get(), x.get());
 
-                    auto cfg_pubsub = mk("pubsub");
-                    xmpp_stanza_set_name(cfg_pubsub.get(), "pubsub");
-                    xmpp_stanza_set_ns(cfg_pubsub.get(),
-                        "http://jabber.org/protocol/pubsub#owner");
+                    struct pubsub_owner_spec : stanza::spec {
+                        pubsub_owner_spec() : spec("pubsub") {
+                            attr("xmlns", "http://jabber.org/protocol/pubsub#owner");
+                        }
+                    } pso;
+                    auto cfg_pubsub = pso.build(ctx);
                     xmpp_stanza_add_child(cfg_pubsub.get(), configure.get());
 
                     const std::string cfg_uuid = stanza::uuid(account.context);
