@@ -3305,7 +3305,7 @@ message_handler_after_omemo:
                     if (!cipher_attr || std::string_view(cipher_attr)
                             != "urn:xmpp:ciphers:aes-256-gcm-nopadding:0")
                     {
-                        XDEBUG("XEP-0448: unsupported cipher '%s', skipping encrypted source",
+                        XDEBUG("XEP-0448: unsupported cipher '{}', skipping encrypted source",
                                cipher_attr ? cipher_attr : "(none)");
                         break; // still prefer encrypted source, even if unsupported
                     }

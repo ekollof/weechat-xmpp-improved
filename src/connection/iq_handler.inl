@@ -3071,8 +3071,8 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 }
                 else
                 {
-                    XDEBUG("caps: hash mismatch for %s: got '%s' expected '%s'; discarding",
-                           from ? from : "?", computed.c_str(), ver_hash.c_str());
+                    XDEBUG("caps: hash mismatch for {}: got '{}' expected '{}'; discarding",
+                           from ? from : "?", computed, ver_hash);
                 }
             }
             
