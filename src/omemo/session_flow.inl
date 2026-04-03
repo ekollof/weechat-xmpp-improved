@@ -1522,3 +1522,30 @@ void weechat::xmpp::omemo::process_postponed_key_transports(weechat::account &ac
     }
     postponed_key_transports.clear();
 }
+
+// Publish a single OMEMO:2 + legacy axolotl bundle pair if the republish was
+// deferred during global MAM catchup (bundle_republish_pending == true).
+// Called immediately after process_postponed_key_transports() at every
+// MAM <fin> flush point in iq_handler.inl.
+void weechat::xmpp::omemo::process_postponed_bundle_republish(weechat::account &account)
+{
+    if (!bundle_republish_pending)
+        return;
+
+    bundle_republish_pending = false;
+
+    XDEBUG("omemo: MAM catchup complete \xe2\x80\x94 sending deferred bundle republish");
+
+    struct t_gui_buffer *buf = account.buffer;
+
+    if (std::shared_ptr<xmpp_stanza_t> bs {
+            get_bundle(*account.context, nullptr, nullptr), xmpp_stanza_release })
+    {
+        account.connection.send(bs.get());
+        print_info(buf, "OMEMO: republished bundle after MAM catchup (deferred consumed pre-key replacement)");
+    }
+
+    if (std::shared_ptr<xmpp_stanza_t> lbs {
+            get_axolotl_bundle(*account.context, nullptr, nullptr), xmpp_stanza_release })
+        account.connection.send(lbs.get());
+}

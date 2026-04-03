@@ -1821,6 +1821,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
             {
                 account.omemo.global_mam_catchup = false;
                 account.omemo.process_postponed_key_transports(account);
+                account.omemo.process_postponed_bundle_republish(account);
             }
         }
 
@@ -4388,6 +4389,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 {
                     account.omemo.global_mam_catchup = false;
                     account.omemo.process_postponed_key_transports(account);
+                    account.omemo.process_postponed_bundle_republish(account);
                 }
                 return true;
             }
@@ -4462,6 +4464,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         // MAM catchup done — fire deferred key transports now
                         account.omemo.global_mam_catchup = false;
                         account.omemo.process_postponed_key_transports(account);
+                        account.omemo.process_postponed_bundle_republish(account);
                 }
             }
             else

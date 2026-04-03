@@ -271,6 +271,7 @@ XMPP_TEST_EXPORT void weechat::xmpp::omemo::init(struct t_gui_buffer *buffer, co
         failed_session_bootstrap.clear();
         peers_with_observed_traffic.clear();
         global_mam_catchup = false;
+        bundle_republish_pending = false;
 
         gcrypt::check_version();
 

@@ -84,6 +84,13 @@ namespace weechat {
             // Each entry is {bare_jid, remote_device_id}.
             std::set<std::pair<std::string, std::uint32_t>> postponed_key_transports;
 
+            // Set to true when a consumed-prekey bundle republish was skipped
+            // because global_mam_catchup was active.  A single republish of
+            // both the OMEMO:2 and legacy axolotl bundles is sent once the
+            // global MAM <fin> arrives, collapsing any number of repeated
+            // republish triggers into a single PubSub IQ pair.
+            bool bundle_republish_pending = false;
+
             // Devices for which a bundle fetch IQ is currently in-flight.
             // Prevents duplicate fetches when repeated PEP devicelist events
             // arrive before the first IQ result returns.
@@ -233,6 +240,12 @@ namespace weechat {
             // catchup (see `postponed_key_transports`).  Called once the global
             // MAM <fin> arrives and `global_mam_catchup` is cleared.
             void process_postponed_key_transports(weechat::account &account);
+
+            // If `bundle_republish_pending` is set, publish both the OMEMO:2
+            // and legacy axolotl bundles exactly once and clear the flag.
+            // Called immediately after process_postponed_key_transports() at
+            // every MAM <fin> flush point.
+            void process_postponed_bundle_republish(weechat::account &account);
 
             // Proactively fetch the OMEMO devicelist for `jid` from the server.
             // Safe to call even if a fetch is already in-flight (deduplication is

@@ -381,14 +381,27 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
         {
                 if (replace_used_prekey(*this, *account->context, *used_prekey_id))
                 {
-                    print_info(buffer, fmt::format(
-                        "OMEMO: replaced consumed pre-key {} — republishing bundle",
-                        *used_prekey_id));
-                    if (std::shared_ptr<xmpp_stanza_t> bs { get_bundle(*account->context, nullptr, nullptr), xmpp_stanza_release })
-                        account->connection.send(bs.get());
+                    if (global_mam_catchup)
+                    {
+                        // Defer the republish until MAM catchup finishes.
+                        // Many stale prekey messages may arrive in a row; the
+                        // flag collapses all of them into a single IQ pair sent
+                        // at the MAM <fin> by process_postponed_bundle_republish().
+                        bundle_republish_pending = true;
+                        XDEBUG("omemo: consumed pre-key {} — bundle republish deferred (MAM catchup active)",
+                               *used_prekey_id);
+                    }
+                    else
+                    {
+                        print_info(buffer, fmt::format(
+                            "OMEMO: replaced consumed pre-key {} — republishing bundle",
+                            *used_prekey_id));
+                        if (std::shared_ptr<xmpp_stanza_t> bs { get_bundle(*account->context, nullptr, nullptr), xmpp_stanza_release })
+                            account->connection.send(bs.get());
 
-                    if (std::shared_ptr<xmpp_stanza_t> lbs { get_axolotl_bundle(*account->context, nullptr, nullptr), xmpp_stanza_release })
-                        account->connection.send(lbs.get());
+                        if (std::shared_ptr<xmpp_stanza_t> lbs { get_axolotl_bundle(*account->context, nullptr, nullptr), xmpp_stanza_release })
+                            account->connection.send(lbs.get());
+                    }
                 }
         }
         // XEP-0384 §6: MUST send a heartbeat when counter >= 53 (first time per ratchet key).
@@ -470,14 +483,27 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
     {
         if (replace_used_prekey(*this, *account->context, *used_prekey_id))
         {
-            print_info(buffer, fmt::format(
-                "OMEMO: replaced consumed pre-key {} — republishing bundle",
-                *used_prekey_id));
-            if (std::shared_ptr<xmpp_stanza_t> bs { get_bundle(*account->context, nullptr, nullptr), xmpp_stanza_release })
-                account->connection.send(bs.get());
+            if (global_mam_catchup)
+            {
+                // Defer the republish until MAM catchup finishes.
+                // Many stale prekey messages may arrive in a row; the flag
+                // collapses all of them into a single IQ pair sent at the
+                // MAM <fin> by process_postponed_bundle_republish().
+                bundle_republish_pending = true;
+                XDEBUG("omemo: consumed pre-key {} — bundle republish deferred (MAM catchup active)",
+                       *used_prekey_id);
+            }
+            else
+            {
+                print_info(buffer, fmt::format(
+                    "OMEMO: replaced consumed pre-key {} — republishing bundle",
+                    *used_prekey_id));
+                if (std::shared_ptr<xmpp_stanza_t> bs { get_bundle(*account->context, nullptr, nullptr), xmpp_stanza_release })
+                    account->connection.send(bs.get());
 
-            if (std::shared_ptr<xmpp_stanza_t> lbs { get_axolotl_bundle(*account->context, nullptr, nullptr), xmpp_stanza_release })
-                account->connection.send(lbs.get());
+                if (std::shared_ptr<xmpp_stanza_t> lbs { get_axolotl_bundle(*account->context, nullptr, nullptr), xmpp_stanza_release })
+                    account->connection.send(lbs.get());
+            }
         }
         else
         {
