@@ -2885,10 +2885,9 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                         caps_placeholder() : spec("caps") {}
                     } cph;
                     auto dummy_sp = cph.build(account.context);
-                    xmpp_stanza_t *dummy = dummy_sp.get();
                     std::optional<std::string> computed_hash;
-                    xmpp_stanza_t *caps_st = get_caps(dummy, &computed_hash);
-                xmpp_stanza_release(caps_st);
+                    get_caps(dummy_sp.get(), &computed_hash);
+                    // dummy_sp owns the ref — do NOT xmpp_stanza_release here.
 
                 // Accept "http://weechat.org" (bare) or "http://weechat.org#<hash>"
                 std::string_view req(requested_node);
