@@ -787,7 +787,12 @@ struct axolotl_omemo_payload {
     if (session_cipher_create(&cipher_raw, self.store_context, &address.address, self.context) != 0)
         return std::nullopt;
     libsignal::unique_session_cipher cipher {cipher_raw};
-    session_cipher_set_version(cipher.get(), CIPHERTEXT_OMEMO_VERSION);
+    // Legacy eu.siacs.conversations.axolotl uses Signal wire-format version 3
+    // (CIPHERTEXT_CURRENT_VERSION). Using CIPHERTEXT_OMEMO_VERSION (4) here
+    // causes the session to be established at v4, which ConverseJS and other
+    // legacy clients cannot handle: they send v3 messages back, which libsignal
+    // then rejects with "Message version 3, but session version 4".
+    session_cipher_set_version(cipher.get(), CIPHERTEXT_CURRENT_VERSION);
 
     ciphertext_message *message_raw = nullptr;
     if (session_cipher_encrypt(cipher.get(), bundle.data(), bundle.size(), &message_raw) != 0)
@@ -833,7 +838,11 @@ struct axolotl_omemo_payload {
         return std::nullopt;
     }
     libsignal::unique_session_cipher cipher {cipher_raw};
-    session_cipher_set_version(cipher.get(), CIPHERTEXT_OMEMO_VERSION);
+    // Legacy eu.siacs.conversations.axolotl uses Signal wire-format version 3.
+    // Do NOT set CIPHERTEXT_OMEMO_VERSION (4) here — that would cause a v4
+    // session to be established on our side while the peer sends v3 messages,
+    // resulting in "Message version 3, but session version 4" and MAC failures.
+    session_cipher_set_version(cipher.get(), CIPHERTEXT_CURRENT_VERSION);
 
     std::uint32_t registration_id = 0;
     signal_protocol_identity_get_local_registration_id(self.store_context, &registration_id);

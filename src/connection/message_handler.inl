@@ -1989,6 +1989,15 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
                            weechat_prefix("error"));
     }
 message_handler_after_omemo:
+    // If OMEMO decryption produced no cleartext and this is a self-outbound copy
+    // (MAM replay of a message we sent, or a carbon copy), there is nothing to
+    // display.  Key-transport messages (null payload, all-zero IV) are the common
+    // case here — they establish the session but carry no user-visible content.
+    // Falling through to the display path with text==nullptr would print a blank
+    // line (or crash on weechat_string_match(nullptr)).
+    if (encrypted && !cleartext && is_self_outbound_copy)
+        return 1;
+
     // XEP-0450 §4: handle trust messages that arrived encrypted inside OMEMO.
     // Two sub-cases:
     //   (a) OMEMO:2 with SCE: decode() returns the raw SCE XML; detect by

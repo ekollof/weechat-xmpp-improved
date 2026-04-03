@@ -311,6 +311,14 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
             if (account && sender_device_id)
             {
                 const std::string bare_jid = normalize_bare_jid(*account->context, jid);
+                // Self-outbound copy: the key was encrypted for our own device by
+                // ourselves (self-copy mechanism, XEP-0384 §7.2). Decryption fails
+                // on MAM replay because the ratchet has moved forward — this is
+                // expected and harmless. Do NOT delete the self-session or queue a
+                // key-transport to ourselves: that would corrupt our own Signal state
+                // and trigger nonsensical IQ bundle requests to our own device.
+                if (bare_jid == own_bare_jid)
+                    return std::nullopt;
                 const auto kex_key = std::make_pair(bare_jid, *sender_device_id);
                 if (key_transport_bootstrap_attempted.count(kex_key) == 0)
                 {
