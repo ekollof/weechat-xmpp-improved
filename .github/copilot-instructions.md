@@ -60,13 +60,49 @@ Canonical XEP specs for all implemented XEPs are stored in `docs/specs/xep-NNNN.
 - Buffer display values: `"1"` (don't auto-switch), `"auto"` (auto-switch)
 - Never reload plugin - always restart WeeChat (race condition with timer hooks)
 
-### XMPP/Strophe Patterns
+### Stanza Construction
 
-- Use `xmpp_stanza_new()` family for stanza creation
-- Always set namespace with `xmpp_stanza_set_ns()`
-- Use `xmpp_uuid_gen()` for generating UUIDs (returns `char*`)
-- Free strophe objects with `xmpp_stanza_release()`, `xmpp_free()`
-- Handler functions return `int` (1 = keep handler, 0 = remove handler)
+**Raw `xmpp_stanza_new()` calls are forbidden in all OMEMO `.inl` files and any new code.**
+Use the fluent stanza builder system exclusively.
+
+#### The stanza builder (`src/xmpp/node.hh` + XEP `.inl` files)
+
+- Base class: `stanza::spec` — subclassed in `src/xmpp/xep-NNNN.inl` files.
+- Attributes: `attr("name", value)`, namespace: `xmlns<NsType>()`, children: `child(spec&)`, text: `text(sv)`.
+- Build to `shared_ptr<xmpp_stanza_t>`: `auto sp = my_spec.build(ctx);`
+- All namespace types live in `src/xmpp/ns.hh` (e.g. `urn::xmpp::omemo::_2`, `urn::xmpp::hints`, `eu::siacs::conversations::axolotl`).
+- OMEMO:2 and legacy axolotl types are in `src/xmpp/xep-0384.inl` (`stanza::xep0384::encrypted`, `stanza::xep0384::header`, `stanza::xep0384::keys`, `stanza::xep0384::key`, `stanza::xep0384::payload`, `stanza::xep0384::store_hint`, and axolotl_ variants).
+
+#### Returning ownership from builder
+
+Functions that return a raw `xmpp_stanza_t*` (transferring ownership to the caller) must ref-bump before the `shared_ptr` destructs. Use `xmpp_stanza_clone` (libstrophe 0.14) which increments the refcount and returns the same pointer:
+
+```cpp
+auto sp = my_spec.build(ctx);
+xmpp_stanza_clone(sp.get());  // bump refcount; shared_ptr dtor will release its ref
+return sp.get();               // caller owns one reference; must call xmpp_stanza_release()
+```
+
+#### Sending without ownership transfer
+
+`connection.send()` does not take ownership. Pass `.get()` from the `shared_ptr` directly:
+
+```cpp
+auto msg_sp = stanza::message().type("chat").to(jid).id(uuid).build(ctx);
+account.connection.send(msg_sp.get());   // shared_ptr releases on scope exit
+```
+
+#### Incremental child construction in loops
+
+`spec::child()` copies the spec by value, so specs can be built up in loops:
+
+```cpp
+stanza::xep0384::keys keys_spec(jid);
+for (auto &dev : device_list) {
+    keys_spec.add_key(stanza::xep0384::key(rid, b64, is_kex));
+}
+header_spec.add_keys(keys_spec);
+```
 
 ### Memory Management
 
@@ -96,13 +132,6 @@ MDB_val mdb_key = { .mv_size = k_foo.size(), .mv_data = k_foo.data() };
 
 - `gcry_random_bytes()` — allocate once, **free with `gcry_free()`** (not `free()`).
 - `gcry_md_read()` — returns an **internal pointer** into gcrypt's handle; **never call `free()` on it**.
-
-#### Strophe stanza ownership helpers (`src/xmpp/stanza.hh`)
-
-- `with_free(ptr)` — transfers heap ownership to the stanza; the stanza will call `free()`.
-  Do **not** also wrap `ptr` in a smart pointer.
-- `with_noop(ptr)` — stanza **does not** take ownership; caller must keep the value alive
-  until the stanza is consumed, then free it via RAII (smart pointer or `std::string`).
 
 #### `weechat_string_dyn_free` flag
 
