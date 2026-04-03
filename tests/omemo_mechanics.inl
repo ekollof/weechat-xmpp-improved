@@ -677,3 +677,39 @@ TEST_CASE("handle_bundle sets race guard before clearing pending sets")
     CHECK(env.omemo->pending_bundle_fetch.count(key)              == 0);
     CHECK(env.omemo->pending_key_transport.count(key)             == 0);
 }
+
+// ── 12. note_peer_traffic / has_peer_traffic gate for bundle requests ──────────
+//
+// Regression test for the bug where decode() failed to call note_peer_traffic()
+// on the sender's JID, causing the stale-session recovery path (which calls
+// request_axolotl_bundle → has_peer_traffic guard) to silently skip the bundle
+// fetch and leave pending_key_transport unserviced.
+//
+// The fix in decode() calls note_peer_traffic(jid) early so that any subsequent
+// bundle request triggered by a decryption failure for that sender is not deferred.
+//
+// This test exercises the note_peer_traffic / has_peer_traffic round-trip
+// directly and verifies the initial state is false (confirming the guard would
+// have suppressed the bundle request before the fix).
+
+TEST_CASE("note_peer_traffic unblocks has_peer_traffic for sender JID")
+{
+    omemo_test_env env;
+
+    const std::string sender_jid = "dave@example.com";
+
+    // Before any traffic is observed, the guard must return false.
+    CHECK_FALSE(env.omemo->has_peer_traffic(env.ctx, sender_jid));
+
+    // Simulating what decode() does immediately upon receiving any OMEMO stanza.
+    env.omemo->note_peer_traffic(env.ctx, sender_jid);
+
+    // After noting traffic, the guard must return true — bundle requests proceed.
+    CHECK(env.omemo->has_peer_traffic(env.ctx, sender_jid));
+
+    // Normalisation: a full JID for the same user must also be recognised.
+    CHECK(env.omemo->has_peer_traffic(env.ctx, "dave@example.com/resource"));
+
+    // A different JID must still be false.
+    CHECK_FALSE(env.omemo->has_peer_traffic(env.ctx, "eve@example.com"));
+}

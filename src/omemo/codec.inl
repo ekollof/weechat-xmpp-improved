@@ -63,6 +63,12 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
     xmpp_stanza_t *iv_stanza = xmpp_stanza_get_child_by_name(header, "iv");
     const bool is_axolotl_format = (iv_stanza != nullptr);
 
+    // Receiving an OMEMO message from a peer counts as observed traffic for
+    // that peer — this unblocks bundle requests (which check has_peer_traffic)
+    // so the recovery path can fetch their bundle and send a key-transport when
+    // decryption fails due to a stale/mismatched session.
+    note_peer_traffic(account->context, jid);
+
     store_device_mode(*this,
                       normalize_bare_jid(*account->context, jid),
                       *sender_device_id,

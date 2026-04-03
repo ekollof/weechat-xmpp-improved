@@ -246,8 +246,8 @@ namespace weechat {
 
             // Mark and query whether a peer has real PM/MAM traffic observed in
             // this session. JIDs are normalized to bare form.
-            void note_peer_traffic(xmpp_ctx_t *context, std::string_view jid);
-            [[nodiscard]] auto has_peer_traffic(xmpp_ctx_t *context,
+            XMPP_TEST_EXPORT void note_peer_traffic(xmpp_ctx_t *context, std::string_view jid);
+            [[nodiscard]] XMPP_TEST_EXPORT auto has_peer_traffic(xmpp_ctx_t *context,
                                                 std::string_view jid) const -> bool;
 
             // Determine which OMEMO namespace should be used for outgoing

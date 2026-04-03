@@ -608,7 +608,7 @@ void weechat::xmpp::omemo::force_kex(weechat::account &account,
                            bare_jid, sent_now, queued));
 }
 
-void weechat::xmpp::omemo::note_peer_traffic(xmpp_ctx_t *context, std::string_view jid)
+XMPP_TEST_EXPORT void weechat::xmpp::omemo::note_peer_traffic(xmpp_ctx_t *context, std::string_view jid)
 {
     if (jid.empty())
         return;
@@ -616,7 +616,7 @@ void weechat::xmpp::omemo::note_peer_traffic(xmpp_ctx_t *context, std::string_vi
     peers_with_observed_traffic.insert(normalize_bare_jid(context, jid));
 }
 
-auto weechat::xmpp::omemo::has_peer_traffic(xmpp_ctx_t *context,
+XMPP_TEST_EXPORT auto weechat::xmpp::omemo::has_peer_traffic(xmpp_ctx_t *context,
                                             std::string_view jid) const -> bool
 {
     if (jid.empty())
