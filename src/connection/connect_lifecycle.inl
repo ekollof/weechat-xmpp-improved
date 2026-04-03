@@ -87,11 +87,13 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         // SM covers the entire session from the start.
         if (account.sm_available)
         {
-            if (!account.sm_id.empty() && account.sm_h_inbound > 0)
-            {
-                XDEBUG("Attempting to resume SM session (id={}, h={})...",
-                       account.sm_id.data(),
-                       account.sm_h_inbound);
+        if (!account.sm_id.empty())
+        {
+            // XEP-0198 §5: h=0 is valid ("in the unlikely case that the client
+            // never received any stanzas, it would set 'h' to zero").
+            XDEBUG("Attempting to resume SM session (id={}, h={})...",
+                   account.sm_id.data(),
+                   account.sm_h_inbound);
                 this->send(stanza::xep0198::resume(account.sm_h_inbound, account.sm_id)
                            .build(account.context)
                            .get());
@@ -107,12 +109,13 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         /* Send initial <presence/> so that we appear online to contacts */
         /* children: <c/> caps, <status/>, <x vcard-temp:x:update/>, optionally <x jabber:x:signed/> */
         {
-            // Compute entity caps hash
-            xmpp_stanza_t *caps_raw = xmpp_stanza_new(account.context);
-            xmpp_stanza_set_name(caps_raw, "caps");
+            // Compute entity caps hash — use a throwaway stanza as the reply placeholder.
+            struct caps_placeholder_spec : stanza::spec {
+                caps_placeholder_spec() : spec("caps") {}
+            } cpp;
+            auto caps_placeholder = cpp.build(account.context);
             char *cap_hash_raw = nullptr;
-            caps_raw = this->get_caps(caps_raw, &cap_hash_raw);
-            xmpp_stanza_release(caps_raw);
+            this->get_caps(caps_placeholder.get(), &cap_hash_raw);
             std::unique_ptr<char[]> cap_hash(cap_hash_raw);
 
             struct caps_spec : stanza::spec {
@@ -238,6 +241,40 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
                     .build(account.context)
                     .get());
 
+        // XEP-0402 §5: fetch PEP Native Bookmarks node on connect so we have
+        // the full bookmark list, not just push events from the current session.
+        {
+            stanza::xep0060::items bm_items("urn:xmpp:bookmarks:1");
+            stanza::xep0060::pubsub bm_ps;
+            bm_ps.items(bm_items);
+            this->send(stanza::iq()
+                        .from(account.jid())
+                        .to(account.jid())
+                        .type("get")
+                        .id(stanza::uuid(account.context))
+                         .xep0060()
+                         .pubsub(bm_ps)
+                         .build(account.context)
+                         .get());
+        }
+
+        // XEP-0490 §4: fetch own MDS node on connect to synchronize displayed
+        // state across devices (not just push notifications from this session).
+        {
+            stanza::xep0060::items mds_items("urn:xmpp:mds:displayed:0");
+            stanza::xep0060::pubsub mds_ps;
+            mds_ps.items(mds_items);
+            this->send(stanza::iq()
+                        .from(account.jid())
+                        .to(account.jid())
+                        .type("get")
+                        .id(stanza::uuid(account.context))
+                        .xep0060()
+                        .pubsub(mds_ps)
+                        .build(account.context)
+                        .get());
+        }
+
         auto fetch_devicelist = [&](std::string_view node) {
             std::string uid = stanza::uuid(account.context);
             stanza::xep0060::items items_spec(node);
@@ -360,12 +397,12 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         {
             std::string uid = stanza::uuid(account.context);
 
-            // <order xmlns='urn:xmpp:order-by:1' field='creation-date'/> (XEP-0413)
+            // <order xmlns='urn:xmpp:order-by:1' by='creation'/> (XEP-0413 §3)
             // Request newest-first so the RSM <max> limit gives us the most recent items.
             struct order_spec : stanza::spec {
                 order_spec() : spec("order") {
                     xmlns<urn::xmpp::order_by::_1>();
-                    attr("field", "creation-date");
+                    attr("by", "creation");
                 }
             };
 
