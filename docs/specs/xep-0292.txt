@@ -1,0 +1,1555 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0292: vCard4 Over XMPP</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0292";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="vCard4 Over XMPP"><meta name="DC.Creator" content="Peter Saint-Andre"><meta name="DC.Creator" content="Samantha Mizzi"><meta name="DC.Description" content="This document specifies an XMPP extension for use of the vCard4 XML format in XMPP systems, with the intent of obsoleting the vcard-temp format."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2023-03-14"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0292"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0292: vCard4 Over XMPP</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This document specifies an XMPP extension for use of the vCard4 XML format in XMPP systems, with the intent of obsoleting the vcard-temp format.</dd><dt>Authors</dt><dd><ul class="authors"><li>Peter Saint-Andre</li><li>Samantha Mizzi</li></ul></dd><dt>Copyright</dt><dd>© 2010 – 2023 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Experimental</p><div id="status-notice" class="experimental standards track">WARNING: This Standards-Track document is Experimental. Publication as an XMPP Extension Protocol does not imply approval of this proposal by the XMPP Standards Foundation. Implementation of the protocol described herein is encouraged in exploratory implementations, but production systems are advised to carefully consider whether it is appropriate to deploy implementations of this protocol before it advances to a status of Draft.</div></dd><dt>Supersedes</dt><dd><a href="xep-0054.html">XEP-0054</a></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.12.0 (2023-03-14)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li class="current">Experimental</li><li>Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#reqs">Requirements</a></li><li><a href="#reuse">Reuse of vCard4</a></li><li><a href="#public">Self vCards</a><ol><li><a href="#self-iq">PEP Publication and Retrieval</a><ol><li><a href="#self-pep-retrieval">Retrieval</a></li><li><a href="#self-iq-publication">Publication</a></li></ol></li><li><a href="#self-pubsub">Event Notifications</a><ol><li><a href="#self-pubsub-subscribe">Subscribing to vCard Notifications</a></li><li><a href="#sect-idm45456480390480">Receiving a vCard Notification</a></li></ol></li></ol></li><li><a href="#contacts">Contact vCards</a><ol><li><a href="#contacts-format">Format</a></li><li><a href="#contacts-storage">Storage</a></li></ol></li><li><a href="#apps">vCards of Automated Entities</a></li><li><a href="#disco">Determining Support</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#registrar-nodes">Well-Known Service Discovery Nodes</a></li></ol></li><li><a href="#mapping">Mapping from vcard-temp to vCard4</a><ol><li><a href="#mapping-temponly">Properties Defined in vcard-temp but not in vCard3 or vCard4</a><ol><li><a href="#mapping-temponly-desc">DESC</a></li><li><a href="#mapping-temponly-jabberid">JABBERID</a></li><li><a href="#mapping-temponly-middle">MIDDLE</a></li></ol></li><li><a href="#mapping-incorrect">Properties Defined Incorrectly in vcard-temp</a><ol><li><a href="#mapping-incorrect-key">KEY</a></li><li><a href="#mapping-incorrect-sound">SOUND</a></li><li><a href="#mapping-incorrect-version">VERSION</a></li></ol></li><li><a href="#mapping-different">Properties Defined Differently in vcard-temp, vCard3, and vCard4</a><ol><li><a href="#mapping-different-adr">ADR</a></li><li><a href="#mapping-different-agent">AGENT</a></li><li><a href="#mapping-different-org">ORG</a></li><li><a href="#mapping-different-sortstring">SORT-STRING</a></li><li><a href="#mapping-different-tel">TEL</a></li></ol></li><li><a href="#mapping-similar">Properties Defined Similarly in vcard-temp, vCard3, and vCard4</a></li><li><a href="#mapping-removed">Properties Defined in vCard3 but Removed from vCard4</a></li></ol></li><li><a href="#migration">Migration Tools</a><ol><li><a href="#migration-xslt">Extensible Stylesheet Language Transformation (XSLT) from vcard-temp to vCard4</a></li><li><a href="#migration-vcardtemp">Example of vcard-temp Data</a></li><li><a href="#migration-vcard4">Example of vCard4 XML Data</a></li></ol></li><li><a href="#acks">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Since 1999, the Jabber/XMPP community has used an interim, unofficial XML representation of vCard data for personal contacts, called <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0054.html">vcard-temp (XEP-0054)</a></span>  [<a href="#nt-idm45456480468768">1</a>]. Recently, the IETF has upgraded vCard from vCard3 to vCard 4 (<span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6350">RFC 6350</a></span>  [<a href="#nt-idm45456480459936">2</a>]), and at the same time has defined an official XML format for vCard4 (<span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6351">RFC 6351</a></span>  [<a href="#nt-idm45456480463424">3</a>]). This document specifies an XMPP extension for use of the vCard4 XML format in XMPP systems, with the intent of obsoleting the vcard-temp format. Primarily this document defines the encapsulation method itself; secondarily it also defines transport methods and a mapping to the vcard-temp format for migration by clients and servers.</p>
+<h2 id="reqs">2.
+       Requirements<a class="anchor-link" href="#reqs"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This specification was designed with the following requirements in mind.</p>
+  <ol start="" class="" style="">
+    <li class="" style="">Reuse vCard4 as defined in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6350">RFC 6350</a></span>  [<a href="#nt-idm45456480459936">2</a>].</li>
+    <li class="" style="">Reuse the vCard4 XML format as defined in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6351">RFC 6351</a></span>  [<a href="#nt-idm45456480463424">3</a>].</li>
+    <li class="" style="">Ensure that clients and servers can easily migrate from vcard-temp to the new encapsulation format.</li>
+    <li class="" style="">Notify interested parties of changes to vCard data using standard XMPP extensions, specifically <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0163.html">Personal Eventing Protocol (XEP-0163)</a></span>  [<a href="#nt-idm45456480443568">4</a>].</li>
+    <li class="" style="">Support vCards for non-human entities such as XMPP servers and <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45456480433088">5</a>] rooms.</li>
+    <li class="" style="">Enable XMPP servers to store vCard4 XML data in LDAP directories if desired.</li>
+  </ol>
+<h2 id="reuse">3.
+       Reuse of vCard4<a class="anchor-link" href="#reuse"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Because there is now an XML namespace for the official vCard format, we can simply re-use that namespace: "urn:ietf:params:xml:ns:vcard-4.0".</p>
+  <p class="" style="">The vCard XML format defined at the IETF specifies that the root element is &lt;vcards/&gt;, where the only defined child element is &lt;vcard/&gt;. For use in XMPP, we specify that the root element shall be &lt;vcard/&gt;, not &lt;vcards/&gt;.</p>
+<h2 id="public">4.
+       Self vCards<a class="anchor-link" href="#public"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+
+  <p class="" style="">This section describes the use of the vCard format for self-publication and retrieval of publicly-accessible information about any entity on an XMPP network, thus fulfilling all the use cases of the old vcard-temp format.</p>
+
+  <div class="indent"><h3 id="self-iq">4.1 PEP Publication and Retrieval<a class="anchor-link" href="#self-iq"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The primary method for publishing and retrieving vCards is via <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0222.html">Best Practices for Persistent Storage of Public Data via Publish-Subscribe (XEP-0222)</a></span>  [<a href="#nt-idm45456480424592">6</a>] using the node name 'urn:xmpp:vcard4'.</p>
+    <div class="indent"><h4 id="self-pep-retrieval">4.1.1 Retrieval<a class="anchor-link" href="#self-pep-retrieval"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">An XMPP entity retrieves the vCard of another entity (or itself) by sending a PEP-get to the target entity for the 'urn:xmpp:vcard4' node.</p>
+      <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> vCard Retrieval Request<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+  &lt;iq from='samizzi@cisco.com/foo'
+      id='bx81v356'
+      to='stpeter@jabber.org'
+      type='get'&gt;
+    &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+      &lt;items node='urn:xmpp:vcard4'/&gt;
+    &lt;/pubsub&gt;
+  &lt;/iq&gt;
+</pre></figure>
+      <p class="" style="">If a vCard exists for the target entity, the responsible entity (e.g., the XMPP server that hosts the account for a bare JID) MUST return the data in an IQ-result:</p>
+      <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Server Returns vCard<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+  &lt;iq from='stpeter@jabber.org'
+      id='bx81v356'
+      to='samizzi@cisco.com/foo'
+      type='result'&gt;
+    &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+      &lt;items node='urn:xmpp:vcard4'&gt;
+        &lt;item id='e0bf7714-a8dd-4749-8a18-e1979525b0d5'&gt;
+          &lt;vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0"&gt;
+            &lt;fn&gt;&lt;text&gt;Peter Saint-Andre&lt;/text&gt;&lt;/fn&gt;
+            &lt;n&gt;&lt;surname&gt;Saint-Andre&lt;/surname&gt;&lt;given&gt;Peter&lt;/given&gt;&lt;additional&gt;&lt;/additional&gt;&lt;/n&gt;
+            &lt;nickname&gt;&lt;text&gt;stpeter&lt;/text&gt;&lt;/nickname&gt;
+            &lt;nickname&gt;&lt;text&gt;psa&lt;/text&gt;&lt;/nickname&gt;
+            &lt;photo&gt;&lt;uri&gt;https://stpeter.im/images/stpeter_oscon.jpg&lt;/uri&gt;&lt;/photo&gt;
+            &lt;bday&gt;&lt;date&gt;1966-08-06&lt;/date&gt;&lt;/bday&gt;
+            &lt;adr&gt;
+              &lt;parameters&gt;
+                &lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;text&gt;voice&lt;/text&gt;&lt;/type&gt;
+                &lt;pref&gt;&lt;integer&gt;1&lt;/integer&gt;&lt;/pref&gt;
+              &lt;/parameters&gt;
+              &lt;ext&gt;Suite 600&lt;/ext&gt;
+              &lt;street&gt;1899 Wynkoop Street&lt;/street&gt;
+              &lt;locality&gt;Denver&lt;/locality&gt;
+              &lt;region&gt;CO&lt;/region&gt;
+              &lt;code&gt;80202&lt;/code&gt;
+              &lt;country&gt;USA&lt;/country&gt;
+            &lt;/adr&gt;
+            &lt;adr&gt;
+              &lt;parameters&gt;&lt;type&gt;&lt;text&gt;home&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+              &lt;ext&gt;&lt;/ext&gt;
+              &lt;street&gt;&lt;/street&gt;
+              &lt;locality&gt;Parker&lt;/locality&gt;
+              &lt;region&gt;CO&lt;/region&gt;
+              &lt;code&gt;80138&lt;/code&gt;
+              &lt;country&gt;USA&lt;/country&gt;
+            &lt;/adr&gt;
+            &lt;tel&gt;
+              &lt;parameters&gt;
+                &lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;text&gt;voice&lt;/text&gt;&lt;/type&gt;
+                &lt;pref&gt;&lt;integer&gt;1&lt;/integer&gt;&lt;/pref&gt;
+              &lt;/parameters&gt;
+              &lt;uri&gt;tel:+1-303-308-3282&lt;/uri&gt;
+            &lt;/tel&gt;
+            &lt;tel&gt;
+              &lt;parameters&gt;&lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;text&gt;fax&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+              &lt;uri&gt;tel:+1-303-308-3219&lt;/uri&gt;
+            &lt;/tel&gt;
+            &lt;tel&gt;
+              &lt;parameters&gt;
+                &lt;type&gt;&lt;text&gt;cell&lt;/text&gt;&lt;text&gt;voice&lt;/text&gt;&lt;text&gt;text&lt;/text&gt;&lt;/type&gt;
+              &lt;/parameters&gt;
+              &lt;uri&gt;tel:+1-720-256-6756&lt;/uri&gt;
+            &lt;/tel&gt;
+            &lt;tel&gt;
+              &lt;parameters&gt;&lt;type&gt;&lt;text&gt;home&lt;/text&gt;&lt;text&gt;voice&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+              &lt;uri&gt;tel:+1-303-555-1212&lt;/uri&gt;
+            &lt;/tel&gt;
+            &lt;geo&gt;&lt;uri&gt;geo:39.59,-105.01&lt;/uri&gt;&lt;/geo&gt;
+            &lt;title&gt;&lt;text&gt;Executive Director&lt;/text&gt;&lt;/title&gt;
+            &lt;role&gt;&lt;text&gt;Patron Saint&lt;/text&gt;&lt;/role&gt;
+            &lt;org&gt;
+              &lt;parameters&gt;&lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+              &lt;text&gt;XMPP Standards Foundation&lt;/text&gt;
+            &lt;/org&gt;
+            &lt;url&gt;&lt;uri&gt;https://stpeter.im/&lt;/uri&gt;&lt;/url&gt;
+            &lt;note&gt;
+              &lt;text&gt;
+              More information about me is located on my
+              personal website: https://stpeter.im/
+              &lt;/text&gt;
+            &lt;/note&gt;
+            &lt;gender&gt;&lt;sex&gt;&lt;text&gt;M&lt;/text&gt;&lt;/sex&gt;&lt;/gender&gt;
+            &lt;lang&gt;
+              &lt;parameters&gt;&lt;pref&gt;1&lt;/pref&gt;&lt;/parameters&gt;
+              &lt;language-tag&gt;en&lt;/language-tag&gt;
+            &lt;/lang&gt;
+            &lt;email&gt;
+              &lt;parameters&gt;&lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+              &lt;text&gt;psaintan@cisco.com&lt;/text&gt;
+            &lt;/email&gt;
+            &lt;email&gt;
+              &lt;parameters&gt;&lt;type&gt;&lt;text&gt;home&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+              &lt;text&gt;stpeter@jabber.org&lt;/text&gt;
+            &lt;/email&gt;
+            &lt;impp&gt;
+              &lt;parameters&gt;&lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+              &lt;uri&gt;xmpp:psaintan@cisco.com&lt;/uri&gt;
+            &lt;/impp&gt;
+            &lt;impp&gt;
+              &lt;parameters&gt;&lt;type&gt;&lt;text&gt;home&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+              &lt;uri&gt;xmpp:stpeter@jabber.org&lt;/uri&gt;
+            &lt;/impp&gt;
+            &lt;key&gt;
+              &lt;uri&gt;https://stpeter.im/stpeter.asc&lt;/uri&gt;
+            &lt;/key&gt;
+          &lt;/vcard&gt;
+        &lt;/item&gt;
+      &lt;/items&gt;
+    &lt;/pubsub&gt;
+  &lt;/iq&gt;
+</pre></figure>
+    </div>
+    <div class="indent"><h4 id="self-iq-publication">4.1.2 Publication<a class="anchor-link" href="#self-iq-publication"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">An XMPP entity publishes or updates its vCard by doing a PEP publish to its own 'urn:xmpp:vcard4' node. The publication request needs to include the entire vCard, not a "diff" against the prior data (if any).</p>
+      <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> vCard Publication Request<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+  &lt;iq from='stpeter@jabber.org/squire'
+      id='h3vz319m'
+      type='set'&gt;
+    &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+      &lt;publish node='urn:xmpp:vcard4'&gt;
+        &lt;item&gt;
+          &lt;vcard xmlns='urn:ietf:params:xml:ns:vcard-4.0'&gt;
+            [...]
+          &lt;/vcard&gt;
+        &lt;/item&gt;
+      &lt;/publish&gt;
+    &lt;/pubsub&gt;
+  &lt;/iq&gt;
+</pre></figure>
+      <p class="" style="">If no error occurs, the responsible entity returns an IQ-result.</p>
+      <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Server Acknowledges Publication<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+  &lt;iq from='stpeter@jabber.org'
+      id='bx81v356'
+      to='stpeter@jabber.org/squire'
+      type='result'&gt;
+    &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+      &lt;publish node='urn:xmpp:vcard4'&gt;
+        &lt;item id='1e3fdd90-f542-41d3-82ae-33d183467a7a'/&gt;
+      &lt;/publish&gt;
+    &lt;/pubsub&gt;
+  &lt;/iq&gt;
+</pre></figure>
+      <p class="" style="">Note: An entity MAY have authorization to update the vCard of another entity (e.g., a server administrator might have authorization to modify the server's vCard).</p>
+    </div>
+
+  </div>
+  <div class="indent"><h3 id="self-pubsub">4.2 Event Notifications<a class="anchor-link" href="#self-pubsub"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style=""><span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0163.html">Personal Eventing Protocol (XEP-0163)</a></span>  [<a href="#nt-idm45456480443568">4</a>] also provides a way to subscribe to events. It can be used to automatically generate event notifications when a user's vCard is modified.</p>
+    <div class="indent"><h4 id="self-pubsub-subscribe">4.2.1 Subscribing to vCard Notifications<a class="anchor-link" href="#self-pubsub-subscribe"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">Let us imagine that Juliet wishes to receive the updates that Romeo publishes to his vCard. She has two options:</p>
+      <ol start="" class="" style="">
+        <li class="" style="">Implicitly subscribe by advertising support for "urn:xmpp:vcard4+notify" in her <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm45456480397120">7</a>] data. Romeo's PEP service then automatically sends vCard updates to her when it receives presence from her, until and unless she sends presence of type unavailable or stops advertising an interest in vCard updates. This is in accordance with <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm45456480386880">8</a>], section 6.1.</li>
+        <li class="" style="">Explicitly subscribe by sending a formal subscription request to the "urn:xmpp:vcard4" node at Romeo's JabberID. Romeo's PEP service might send her all vCard updates even if she is offline at the time (depending on service policies regarding presence integration).</li>
+      </ol>
+    </div>
+    <div class="indent"><h4 id="sect-idm45456480390480">4.2.2 Receiving a vCard Notification<a class="anchor-link" href="#sect-idm45456480390480"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">Because Juliet has sent presence to Romeo including Entity Capabilities data that includes the "urn:xmpp:vcard4+notify" feature, Romeo's XMPP server will send a PEP notification to Juliet.</p>
+      <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> Receiving a vCard publication/update<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+  &lt;message from='romeo@montague.lit'
+           to='juliet@capulet.lit'
+           type='headline'&gt;
+    &lt;event xmlns='http://jabber.org/protocol/pubsub#event'&gt;
+      &lt;items node='urn:xmpp:vcard4'&gt;
+        &lt;item id='1e3fdd90-f542-41d3-82ae-33d183467a7a'/&gt;
+      &lt;/items&gt;
+    &lt;/event&gt;
+  &lt;/message&gt;
+</pre></figure>
+      <p class="" style="">Note: There is no payload, because this is a pure notification (the receiver needs to retrieve the vCard as described earlier).</p>
+    </div>
+  </div>
+
+<h2 id="contacts">5.
+       Contact vCards<a class="anchor-link" href="#contacts"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+
+  <p class="" style="">In addition to enabling the publication and retrieval of vCards about any entity on an XMPP network, the vCard format can also be used to store information about an entity's contacts.</p>
+
+  <div class="indent"><h3 id="contacts-format">5.1 Format<a class="anchor-link" href="#contacts-format"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">A contact is simply a vCard about someone else (or something else, in the case of automated entities). If the other person or entity is in the user's roster <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6121">RFC 6121</a></span>  [<a href="#nt-idm45456480377152">9</a>], the vCard SHOULD contain the Jabber ID of the person or entity. This enables a user to store information about the contact outside of the roster, thus obviating the need for changes or extensions to the roster namespace itself (as in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0145.html">Annotations (XEP-0145)</a></span>  [<a href="#nt-idm45456480372224">10</a>]).</p>
+    <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> Contact<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0"&gt;
+  &lt;fn&gt;&lt;text&gt;Samantha Mizzi&lt;/text&gt;&lt;/fn&gt;
+  &lt;n&gt;
+    &lt;surname&gt;Mizzi&lt;/surname&gt;
+    &lt;given&gt;Samantha&lt;/given&gt;
+    &lt;additional&gt;&lt;/additional&gt;
+  &lt;/n&gt;
+  &lt;nickname&gt;&lt;text&gt;Sam&lt;/text&gt;&lt;/nickname&gt;
+  &lt;nickname&gt;&lt;text&gt;samizzi&lt;/text&gt;&lt;/nickname&gt;
+  &lt;geo&gt;&lt;uri&gt;geo:39.59,-105.01&lt;/uri&gt;&lt;/geo&gt;
+  &lt;org&gt;
+    &lt;parameters&gt;&lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+    &lt;text&gt;Cisco&lt;/text&gt;
+  &lt;/org&gt;
+  &lt;note&gt;
+    &lt;text&gt;
+      My co-author on XEP-0292. She's cool!
+    &lt;/text&gt;
+  &lt;/note&gt;
+  &lt;impp&gt;
+    &lt;parameters&gt;&lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+    &lt;uri&gt;xmpp:samizzi@cisco.com&lt;/uri&gt;
+  &lt;/impp&gt;
+&lt;/vcard&gt;
+</pre></figure>
+  </div>
+
+  <div class="indent"><h3 id="contacts-storage">5.2 Storage<a class="anchor-link" href="#contacts-storage"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Because contact vCards are private information, they are best stored using <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0223.html">Best Practices for Persistent Storage of Private Data via Publish-Subscribe (XEP-0223)</a></span>  [<a href="#nt-idm45456480363936">11</a>]. The canonical location is a well-known pubsub node "urn:xmpp:contacts". In accordance with <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0223.html">Best Practices for Persistent Storage of Private Data via Publish-Subscribe (XEP-0223)</a></span>  [<a href="#nt-idm45456480363936">11</a>], this node MUST have an access type of "whitelist" by default. When a client stores items at this node, it MUST include an ItemID set to the bare JID of the contact.</p>
+    <figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> Storing a Contact vCard<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='stpeter@stpeter.im/squire' type='set' id='h3vs7163'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:contacts'&gt;
+      &lt;item id='samizzi@cisco.com'&gt;
+        &lt;vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0"&gt;
+          &lt;fn&gt;&lt;text&gt;Samantha Mizzi&lt;/text&gt;&lt;/fn&gt;
+          &lt;n&gt;
+            &lt;surname&gt;Mizzi&lt;/surname&gt;
+            &lt;given&gt;Samantha&lt;/given&gt;
+            &lt;additional&gt;&lt;/additional&gt;
+          &lt;/n&gt;
+          &lt;nickname&gt;&lt;text&gt;Sam&lt;/text&gt;&lt;/nickname&gt;
+          &lt;nickname&gt;&lt;text&gt;samizzi&lt;/text&gt;&lt;/nickname&gt;
+          &lt;geo&gt;&lt;uri&gt;geo:39.59,-105.01&lt;/uri&gt;&lt;/geo&gt;
+          &lt;org&gt;
+            &lt;parameters&gt;&lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+            &lt;text&gt;Cisco&lt;/text&gt;
+          &lt;/org&gt;
+          &lt;note&gt;
+            &lt;text&gt;
+              My co-author on XEP-0292. She's cool!
+            &lt;/text&gt;
+          &lt;/note&gt;
+          &lt;impp&gt;
+            &lt;parameters&gt;&lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+            &lt;uri&gt;xmpp:samizzi@cisco.com&lt;/uri&gt;
+          &lt;/impp&gt;
+        &lt;/vcard&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+    &lt;publish-options&gt;
+      &lt;x xmlns='jabber:x:data' type='submit'&gt;
+        &lt;field var='FORM_TYPE' type='hidden'&gt;
+          &lt;value&gt;http://jabber.org/protocol/pubsub#publish-options&lt;/value&gt;
+        &lt;/field&gt;
+        &lt;field var='pubsub#persist_items'&gt;
+          &lt;value&gt;true&lt;/value&gt;
+        &lt;/field&gt;
+        &lt;field var='pubsub#access_model'&gt;
+          &lt;value&gt;whitelist&lt;/value&gt;
+        &lt;/field&gt;
+      &lt;/x&gt;
+    &lt;/publish-options&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">When a contact's vCard is stored in a private node, it is pushed out to all of the user's resources that have included in their entity capabilities (XEP-0115) data a service discovery feature of "urn:xmpp:contacts+notify" (in the following example those resources are "squire" and "roundabout").</p>
+    <figure class="code-example" id="example-8"><figcaption><strong>Example 8.</strong> Publisher resources receive event notification<a class="anchor-link" href="#example-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message from='stpeter@stpeter.im'
+         to='stpeter@stpeter.im/squire'
+         type='headline'
+         id='ka92g1b5'&gt;
+  &lt;event xmlns='http://jabber.org/protocol/pubsub#event'&gt;
+    &lt;items node='urn:xmpp:contacts'&gt;
+      &lt;item id='samizzi@cisco.com'&gt;
+        &lt;vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0"&gt;
+          &lt;fn&gt;&lt;text&gt;Samantha Mizzi&lt;/text&gt;&lt;/fn&gt;
+          &lt;n&gt;
+            &lt;surname&gt;Mizzi&lt;/surname&gt;
+            &lt;given&gt;Samantha&lt;/given&gt;
+            &lt;additional&gt;&lt;/additional&gt;
+          &lt;/n&gt;
+          &lt;nickname&gt;&lt;text&gt;Sam&lt;/text&gt;&lt;/nickname&gt;
+          &lt;nickname&gt;&lt;text&gt;samizzi&lt;/text&gt;&lt;/nickname&gt;
+          &lt;geo&gt;&lt;uri&gt;geo:39.59,-105.01&lt;/uri&gt;&lt;/geo&gt;
+          &lt;org&gt;
+            &lt;parameters&gt;&lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+            &lt;text&gt;Cisco&lt;/text&gt;
+          &lt;/org&gt;
+          &lt;note&gt;
+            &lt;text&gt;
+              My co-author on XEP-0292. She's cool!
+            &lt;/text&gt;
+          &lt;/note&gt;
+          &lt;impp&gt;
+            &lt;parameters&gt;&lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+            &lt;uri&gt;xmpp:samizzi@cisco.com&lt;/uri&gt;
+          &lt;/impp&gt;
+        &lt;/vcard&gt;
+      &lt;/item&gt;
+    &lt;/items&gt;
+  &lt;/event&gt;
+&lt;/message&gt;
+
+&lt;message from='stpeter@stpeter.im'
+         to='stpeter@stpeter.im/roundabout'
+         type='headline'
+         id='pty14x69'&gt;
+  &lt;event xmlns='http://jabber.org/protocol/pubsub#event'&gt;
+    &lt;items node='urn:xmpp:contacts'&gt;
+      &lt;item id='samizzi@cisco.com'&gt;
+        &lt;vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0"&gt;
+          &lt;fn&gt;&lt;text&gt;Samantha Mizzi&lt;/text&gt;&lt;/fn&gt;
+          &lt;n&gt;
+            &lt;surname&gt;Mizzi&lt;/surname&gt;
+            &lt;given&gt;Samantha&lt;/given&gt;
+            &lt;additional&gt;&lt;/additional&gt;
+          &lt;/n&gt;
+          &lt;nickname&gt;&lt;text&gt;Sam&lt;/text&gt;&lt;/nickname&gt;
+          &lt;nickname&gt;&lt;text&gt;samizzi&lt;/text&gt;&lt;/nickname&gt;
+          &lt;geo&gt;&lt;uri&gt;geo:39.59,-105.01&lt;/uri&gt;&lt;/geo&gt;
+          &lt;org&gt;
+            &lt;parameters&gt;&lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+            &lt;text&gt;Cisco&lt;/text&gt;
+          &lt;/org&gt;
+          &lt;note&gt;
+            &lt;text&gt;
+              My co-author on XEP-0292. She's cool!
+            &lt;/text&gt;
+          &lt;/note&gt;
+          &lt;impp&gt;
+            &lt;parameters&gt;&lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+            &lt;uri&gt;xmpp:samizzi@cisco.com&lt;/uri&gt;
+          &lt;/impp&gt;
+        &lt;/vcard&gt;
+      &lt;/item&gt;
+    &lt;/items&gt;
+  &lt;/event&gt;
+&lt;/message&gt;
+</pre></figure>
+  </div>
+
+<h2 id="apps">6.
+       vCards of Automated Entities<a class="anchor-link" href="#apps"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Traditionally, vCards have been used on the XMPP network for entities other than human users, e.g. by XMPP servers and chatrooms. When such automated entities use vCards, it is RECOMMENDED to specify a value of "application" for the vCard4 KIND property <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6473">RFC 6473</a></span>  [<a href="#nt-idm45456481761456">12</a>], as illustrated in the following example:</p>
+  <figure class="code-example" id="example-9"><figcaption><strong>Example 9.</strong> vCard for a Thing<a class="anchor-link" href="#example-9"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='jabber.org'
+    id='yhx51c35'
+    to='samizzi@cisco.com/foo'
+    type='result'&gt;
+  &lt;vcard xmlns='urn:ietf:params:xml:ns:vcard-4.0'&gt;
+    &lt;fn&gt;&lt;text&gt;jabber.org IM service&lt;/text&gt;&lt;/fn&gt;
+    &lt;url&gt;&lt;uri&gt;http://www.jabber.org/&lt;/uri&gt;&lt;/url&gt;
+    &lt;lang&gt;
+      &lt;parameters&gt;&lt;pref&gt;1&lt;/pref&gt;&lt;/parameters&gt;
+      &lt;language-tag&gt;en&lt;/language-tag&gt;
+    &lt;/lang&gt;
+    &lt;email&gt;&lt;text&gt;xmpp@jabber.org&lt;/text&gt;&lt;/email&gt;
+    &lt;impp&gt;&lt;uri&gt;xmpp:jabber.org&lt;/uri&gt;&lt;/impp&gt;
+    &lt;logo&gt;&lt;uri&gt;http://www.jabber.org/images/logo.png&lt;/uri&gt;&lt;/logo&gt;
+    &lt;geo&gt;&lt;uri&gt;geo:42.25,-91.05&lt;/uri&gt;&lt;/geo&gt;
+    &lt;tz&gt;&lt;text&gt;America/Chicago&lt;/text&gt;&lt;/tz&gt;
+    &lt;kind&gt;&lt;text&gt;application&lt;/text&gt;&lt;/kind&gt;
+  &lt;/vcard&gt;
+&lt;/iq&gt;
+</pre></figure>
+<h2 id="disco">7.
+       Determining Support<a class="anchor-link" href="#disco"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">If an XMPP client or server supports the vCard4 namespace, it MUST advertise that fact in its responses to <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45456480331072">13</a>] information ("disco#info") requests by returning a feature of "urn:ietf:params:xml:ns:vcard-4.0":</p>
+  <figure class="code-example" id="example-10"><figcaption><strong>Example 10.</strong> A disco#info query<a class="anchor-link" href="#example-10"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get'
+    from='stpeter@jabber.org/squire'
+    to='samizzi@cisco.com/foo'
+    id='disco1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <figure class="code-example" id="example-11"><figcaption><strong>Example 11.</strong> A disco#info response<a class="anchor-link" href="#example-11"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result'
+    from='samizzi@cisco.com/foo'
+    to='stpeter@jabber.org/squire'
+    id='disco1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+    ...
+    &lt;feature var='urn:ietf:params:xml:ns:vcard-4.0'/&gt;
+    ...
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <p class="" style="">In order for an application to determine whether an entity supports this protocol, where possible it SHOULD use the dynamic, presence-based profile of service discovery defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm45456480397120">7</a>]. However, if an application has not received entity capabilities information from an entity, it SHOULD use explicit service discovery instead.</p>
+<h2 id="security">8.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The vCard information published to one's XMPP server is world-readable; therefore, users should exercise due caution when determining what information to include (e.g., street addresses, personal telephone numbers, or email addresses).</p>
+<h2 id="iana">9.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document does not require interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm45456480316656">14</a>].</p>
+<h2 id="registrar">10.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="registrar-nodes">10.1 Well-Known Service Discovery Nodes<a class="anchor-link" href="#registrar-nodes"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45456480309200">15</a>] shall include 'urn:xmpp:contact' and 'urn:xmpp:vcard4' in its registry of Nodes for Service Discovery and Publish-Subscribe at &lt;<a href="https://xmpp.org/registrar/nodes.html">https://xmpp.org/registrar/nodes.html</a>&gt;.</p>
+  </div>
+<h2 id="mapping">11.
+       Mapping from vcard-temp to vCard4<a class="anchor-link" href="#mapping"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This section provides a more detailed description of mapping vcard-temp properties to vcard4 properties.</p>
+  <div class="indent"><h3 id="mapping-temponly">11.1 Properties Defined in vcard-temp but not in vCard3 or vCard4<a class="anchor-link" href="#mapping-temponly"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <div class="indent"><h4 id="mapping-temponly-desc">11.1.1 DESC<a class="anchor-link" href="#mapping-temponly-desc"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">The vcard-temp specification defined a &lt;DESC/&gt; element. This element was not part of the vCard3 schema. Mapping the vcard-temp &lt;DESC/&gt; element to the vCard4 NOTE property is appropriate.</p>
+      <figure class="code-example" id="example-12"><figcaption><strong>Example 12.</strong> Deprecated DESC element<a class="anchor-link" href="#example-12"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;DESC&gt;
+   More information about me is located on my
+   personal website: https://stpeter.im/
+&lt;/DESC&gt;
+</pre></figure>
+      <figure class="code-example" id="example-13"><figcaption><strong>Example 13.</strong> NOTE property<a class="anchor-link" href="#example-13"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;note&gt;
+  &lt;text&gt;
+     More information about me is located on my
+     personal website: https://stpeter.im/
+  &lt;/text&gt;
+&lt;/note&gt;
+</pre></figure>
+    </div>
+    <div class="indent"><h4 id="mapping-temponly-jabberid">11.1.2 JABBERID<a class="anchor-link" href="#mapping-temponly-jabberid"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">The vcard-temp specification defined a &lt;JABBERID/&gt; element:</p>
+      <figure class="code-example" id="example-14"><figcaption><strong>Example 14.</strong> Deprecated JABBERID element<a class="anchor-link" href="#example-14"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;JABBERID&gt;stpeter@jabber.org&lt;/JABBERID&gt;
+</pre></figure>
+      <p class="" style="">Although the JABBERID field was not part of the vCard3 schema and was simply hacked into vcard-temp, <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc4770">RFC 4770</a></span>  [<a href="#nt-idm45456480292064">16</a>] defined an IMPP property for instant messaging and presence addresses, which was ported to vCard4. In the vCard4 XML format, the IMPP property for a JabberID would be as follows.</p>
+      <figure class="code-example" id="example-15"><figcaption><strong>Example 15.</strong> IMPP property<a class="anchor-link" href="#example-15"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;impp&gt;
+  &lt;uri&gt;xmpp:stpeter@jabber.org&lt;/uri&gt;
+&lt;/impp&gt;
+</pre></figure>
+    </div>
+    <div class="indent"><h4 id="mapping-temponly-middle">11.1.3 MIDDLE<a class="anchor-link" href="#mapping-temponly-middle"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">The vcard-temp specification defined a &lt;MIDDLE/&gt; element as the third allowable element within the &lt;N/&gt; ("name") element. This element was not part of the vCard3 schema, although the Dawson drafts did contain an &lt;other/&gt; element in the third position of child elements within the &lt;n/&gt; element. It is appropriate to map the vcard-temp &lt;MIDDLE/&gt; element to the vCard4 "Additional Name" part of the "N" structured property value, which in xCard is the &lt;additional/&gt; child of the &lt;n/&gt; element.</p>
+    </div>
+  </div>
+  <div class="indent"><h3 id="mapping-incorrect">11.2 Properties Defined Incorrectly in vcard-temp<a class="anchor-link" href="#mapping-incorrect"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Several of the properties in vcard-temp are defined differently in vCard3. In fact, the definitions even differ from those provisionally made in the so-called "Dawson drafts" from which vcard-temp was supposedly derived (for reference, the last of these is archived at &lt;<a href="http://www.watersprings.org/pub/id/draft-dawson-vcard-xml-dtd-03.txt">http://www.watersprings.org/pub/id/draft-dawson-vcard-xml-dtd-03.txt</a>&gt;). The reasons for these discrepancies are unknown. However, care must be taken in correctly mapping these properties from vcard-temp to vCard4.</p>
+    <div class="indent"><h4 id="mapping-incorrect-key">11.2.1 KEY<a class="anchor-link" href="#mapping-incorrect-key"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">The DTD in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0054.html">vcard-temp (XEP-0054)</a></span>  [<a href="#nt-idm45456480468768">1</a>] provided this definition for the KEY element:</p>
+      <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;!ELEMENT KEY (TYPE?, CRED)&gt;
+</pre></figure>
+      <p class="" style="">However, the DTD in the final Dawson draft provided the following definition:</p>
+      <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;!ELEMENT key (extref | b64bin)&gt;
+</pre></figure>
+      <p class="" style="">The relevant RelaxNG definition in vCard4 XML is as follows:</p>
+      <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+property-key = element key {
+    (value-uri | value-text)
+  }
+</pre></figure>
+      <p class="" style="">The source of the spurious &lt;TYPE/&gt; and &lt;CRED/&gt; elements is unknown. The vcard-temp &lt;CRED/&gt; element is mapped to the vCard4 value-text construction.</p>
+    </div>
+    <div class="indent"><h4 id="mapping-incorrect-sound">11.2.2 SOUND<a class="anchor-link" href="#mapping-incorrect-sound"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">The DTD in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0054.html">vcard-temp (XEP-0054)</a></span>  [<a href="#nt-idm45456480468768">1</a>] provided this definition for the SOUND element:</p>
+      <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;!ELEMENT SOUND (PHONETIC | BINVAL | EXTVAL)&gt;
+</pre></figure>
+      <p class="" style="">However, the DTD in the final Dawson draft provided the following definition:</p>
+      <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;!ELEMENT sound (extref | b64bin)&gt;
+</pre></figure>
+      <p class="" style="">The source of the spurious vcard-temp &lt;PHONETIC/&gt; element is unknown. However, it does not exist in vCard4 and therefore is simply discarded when mapping. The vcard-temp &lt;BINVAL/&gt; element is mapped to the vCard4 b64bin construction and the vcard-temp &lt;EXTVAL/&gt; element is mapped to the vCard4 extref construction.</p>
+    </div>
+    <div class="indent"><h4 id="mapping-incorrect-version">11.2.3 VERSION<a class="anchor-link" href="#mapping-incorrect-version"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">As explained in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0054.html">vcard-temp (XEP-0054)</a></span>  [<a href="#nt-idm45456480468768">1</a>], the &lt;VERSION/&gt; element from the final Dawson draft was not used in vcard-temp; instead, the vcard-temp protocol used a 'version' attribute (in fact the Dawson drafts were inconsistent, since the DTD defined a &lt;VERSION/&gt; element and the body of the specification used a 'version' attribute).</p>
+    </div>
+  </div>
+  <div class="indent"><h3 id="mapping-different">11.3 Properties Defined Differently in vcard-temp, vCard3, and vCard4<a class="anchor-link" href="#mapping-different"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The following properties are defined differently in vcard-temp and vCard4. As a result, the mappings are workable but might not preserve all information that could have been contained in vcard-temp data.</p>
+    <div class="indent"><h4 id="mapping-different-adr">11.3.1 ADR<a class="anchor-link" href="#mapping-different-adr"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">The following address type values allowed in vCard3 were removed from vCard4:</p>
+      <ul class="" style="">
+        <li class="" style="">DOM</li>
+        <li class="" style="">INTL</li>
+        <li class="" style="">PARCEL</li>
+        <li class="" style="">POSTAL</li>
+      </ul>
+    </div>
+    <div class="indent"><h4 id="mapping-different-agent">11.3.2 AGENT<a class="anchor-link" href="#mapping-different-agent"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">In vCard3 and vcard-temp, the AGENT property was allowed to contain the inline vCard of someone who could act as an agent for the primary owner of the referenced vCard. In vCard4, inline vCards are disallowed. Therefore only pointers to external vCard objects are now allowed, by means of a URI.</p>
+    </div>
+    <div class="indent"><h4 id="mapping-different-org">11.3.3 ORG<a class="anchor-link" href="#mapping-different-org"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">The ORGUNIT property was removed from vCard4, with the result that the ORGNAME property becomes the only child of ORG.</p>
+    </div>
+    <div class="indent"><h4 id="mapping-different-sortstring">11.3.4 SORT-STRING<a class="anchor-link" href="#mapping-different-sortstring"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">The SORT-STRING property from vCard3 was renamed to SORT-AS in vCard4.</p>
+    </div>
+    <div class="indent"><h4 id="mapping-different-tel">11.3.5 TEL<a class="anchor-link" href="#mapping-different-tel"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">The following telephony type values allowed in vCard3 were removed from vCard4:</p>
+      <ul class="" style="">
+        <li class="" style="">BBS</li>
+        <li class="" style="">ISDN</li>
+        <li class="" style="">MODEM</li>
+        <li class="" style="">MSG</li>
+        <li class="" style="">PCS</li>
+      </ul>
+      <p class="" style="">In addition, in vCard4 the telephone number is represented as a tel: URI, not by means of a NUMBER property.</p>
+    </div>
+  </div>
+  <div class="indent"><h3 id="mapping-similar">11.4 Properties Defined Similarly in vcard-temp, vCard3, and vCard4<a class="anchor-link" href="#mapping-similar"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The following properties are defined similarly in vcard-temp, vCard3, and vCard4. The mappings are fairly straightforward (a future version of this document might provide more detailed narrative descriptions of the mappings).</p>
+    <ul class="" style="">
+      <li class="" style="">BDAY</li>
+      <li class="" style="">CATEGORIES</li>
+      <li class="" style="">EMAIL</li>
+      <li class="" style="">FN</li>
+      <li class="" style="">GEO</li>
+      <li class="" style="">LOGO</li>
+      <li class="" style="">N</li>
+      <li class="" style="">NICKNAME</li>
+      <li class="" style="">NOTE</li>
+      <li class="" style="">PHOTO (mapped to a 'data:' URI in vCard4, see <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc2397">RFC 2397</a></span>  [<a href="#nt-idm45456480225168">17</a>])</li>
+      <li class="" style="">PRODID</li>
+      <li class="" style="">REV</li>
+      <li class="" style="">ROLE</li>
+      <li class="" style="">TITLE</li>
+      <li class="" style="">TZ</li>
+      <li class="" style="">UID</li>
+      <li class="" style="">URL</li>
+    </ul>
+  </div>
+  <div class="indent"><h3 id="mapping-removed">11.5 Properties Defined in vCard3 but Removed from vCard4<a class="anchor-link" href="#mapping-removed"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The following properties were defined in vCard3 but were removed from vCard4:</p>
+    <ul class="" style="">
+      <li class="" style="">CLASS</li>
+      <li class="" style="">LABEL</li>
+      <li class="" style="">MAILER</li>
+    </ul>
+    <p class="" style="">There is no mapping from these properties to vCard4.</p>
+  </div>
+<h2 id="migration">12.
+       Migration Tools<a class="anchor-link" href="#migration"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This section contains three tools that are intended to help developers in migrating from vcard-temp to vCard4 XML:</p>
+  <ol start="" class="" style="">
+    <li class="" style="">An Extensible Stylesheet Language Transformation (XSLT) script for automatically translating the vcard-temp XML format into the vCard4 XML format.</li>
+    <li class="" style="">An example of vcard-temp data that uses most of the elements defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0054.html">vcard-temp (XEP-0054)</a></span>  [<a href="#nt-idm45456480468768">1</a>] that can be mapped to vCard4 properties (note that some of these elements were never used in practice).</li>
+    <li class="" style="">An example of vCard4 XML data showing the transformation of the vcard-temp example using the XSLT stylesheet.</li>
+  </ol>
+  <p class="" style="">The tools are <strong>purely informational</strong> and are not a normative part of this specification.</p>
+  <div class="indent"><h3 id="migration-xslt">12.1 Extensible Stylesheet Language Transformation (XSLT) from vcard-temp to vCard4<a class="anchor-link" href="#migration-xslt"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;!--
+
+Copyright (c) 1999 - 2021 XMPP Standards Foundation
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and
+associated documentation files (the "Software"), to
+deal in the Software without restriction, including
+without limitation the rights to use, copy, modify,
+merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom
+the Software is furnished to do so, subject to the
+following conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR
+ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+OR OTHER DEALINGS IN THE SOFTWARE.
+
+--&gt;
+
+&lt;!-- Author: stpeter@jabber.org --&gt;
+
+&lt;!-- Version: 0.0.3 --&gt;
+
+&lt;!-- Last Updated: 2012-09-12 --&gt;
+
+&lt;xsl:stylesheet
+     xmlns='urn:ietf:params:xml:ns:vcard-4.0'
+     xmlns:xsl='http://www.w3.org/1999/XSL/Transform'
+     version='1.0'&gt;
+
+  &lt;xsl:output method='xml'/&gt;
+
+  &lt;xsl:template match='/'&gt;
+    &lt;vcard&gt;
+
+      &lt;!-- BEGIN VARIABLES --&gt;
+
+      &lt;!-- in case we need them, count instances of the vcard-temp
+           elements per the DTD in XEP-0054 --&gt;
+
+      &lt;xsl:variable name='FN.count' select='count(/vCard/FN)'/&gt;
+      &lt;xsl:variable name='N.count' select='count(/vCard/N)'/&gt;
+      &lt;xsl:variable name='NICKNAME.count' select='count(/vCard/NICKNAME)'/&gt;
+      &lt;xsl:variable name='PHOTO.count' select='count(/vCard/PHOTO)'/&gt;
+      &lt;xsl:variable name='BDAY.count' select='count(/vCard/BDAY)'/&gt;
+      &lt;xsl:variable name='ADR.count' select='count(/vCard/ADR)'/&gt;
+      &lt;xsl:variable name='LABEL.count' select='count(/vCard/LABEL)'/&gt;
+      &lt;xsl:variable name='TEL.count' select='count(/vCard/TEL)'/&gt;
+      &lt;xsl:variable name='EMAIL.count' select='count(/vCard/EMAIL)'/&gt;
+      &lt;xsl:variable name='JABBERID.count' select='count(/vCard/JABBERID)'/&gt;
+      &lt;xsl:variable name='MAILER.count' select='count(/vCard/MAILER)'/&gt;
+      &lt;xsl:variable name='TZ.count' select='count(/vCard/TZ)'/&gt;
+      &lt;xsl:variable name='GEO.count' select='count(/vCard/GEO)'/&gt;
+      &lt;xsl:variable name='TITLE.count' select='count(/vCard/TITLE)'/&gt;
+      &lt;xsl:variable name='ROLE.count' select='count(/vCard/ROLE)'/&gt;
+      &lt;xsl:variable name='LOGO.count' select='count(/vCard/LOGO)'/&gt;
+      &lt;xsl:variable name='AGENT.count' select='count(/vCard/AGENT)'/&gt;
+      &lt;xsl:variable name='ORG.count' select='count(/vCard/ORG)'/&gt;
+      &lt;xsl:variable name='CATEGORIES.count' select='count(/vCard/CATEGORIES)'/&gt;
+      &lt;xsl:variable name='NOTE.count' select='count(/vCard/NOTE)'/&gt;
+      &lt;xsl:variable name='PRODID.count' select='count(/vCard/PRODID)'/&gt;
+      &lt;xsl:variable name='REV.count' select='count(/vCard/REV)'/&gt;
+      &lt;xsl:variable name='SORT-STRING.count' select='count(/vCard/SORT-STRING)'/&gt;
+      &lt;xsl:variable name='SOUND.count' select='count(/vCard/SOUND)'/&gt;
+      &lt;xsl:variable name='UID.count' select='count(/vCard/UID)'/&gt;
+      &lt;xsl:variable name='URL.count' select='count(/vCard/URL)'/&gt;
+      &lt;xsl:variable name='CLASS.count' select='count(/vCard/CLASS)'/&gt;
+      &lt;xsl:variable name='KEY.count' select='count(/vCard/KEY)'/&gt;
+      &lt;xsl:variable name='DESC.count' select='count(/vCard/DESC)'/&gt;
+
+      &lt;!-- END VARIABLES --&gt;
+
+      &lt;!-- BEGIN VCARD4 OUTPUT --&gt;
+
+      &lt;!-- FN is required --&gt;
+
+      &lt;fn&gt;&lt;text&gt;&lt;xsl:value-of select='/vCard/FN'/&gt;&lt;/text&gt;&lt;/fn&gt;
+
+      &lt;!-- N is required --&gt;
+
+      &lt;xsl:apply-templates select='/vCard/N'/&gt;
+
+      &lt;!-- NICKNAME can be included one or more times --&gt;
+
+      &lt;xsl:for-each select='/vCard/NICKNAME'&gt;
+        &lt;nickname&gt;&lt;text&gt;&lt;xsl:value-of select='.'/&gt;&lt;/text&gt;&lt;/nickname&gt;
+      &lt;/xsl:for-each&gt;
+
+      &lt;!-- PHOTO can be included one or more times --&gt;
+      &lt;!-- content is either a pointer to a URL or inline binary,
+           which is mapped to a data: URI in vCard4 --&gt;
+
+      &lt;xsl:for-each select='/vCard/PHOTO'&gt;
+        &lt;xsl:variable name='PHOTO.ext' select='count(EXTVAL)'/&gt;
+        &lt;xsl:variable name='PHOTO.type' select='TYPE'/&gt;
+        &lt;xsl:choose&gt;
+          &lt;xsl:when test='$PHOTO.ext=1'&gt;
+            &lt;photo&gt;&lt;uri&gt;&lt;xsl:value-of select='EXTVAL'/&gt;&lt;/uri&gt;&lt;/photo&gt;
+          &lt;/xsl:when&gt;
+          &lt;xsl:otherwise&gt;
+            &lt;photo&gt;
+              &lt;uri&gt;
+                &lt;xsl:text&gt;data:&lt;/xsl:text&gt;&lt;xsl:value-of select='TYPE'/&gt;&lt;xsl:text&gt;;&lt;/xsl:text&gt;&lt;xsl:value-of select='BINVAL'/&gt;
+              &lt;/uri&gt;
+            &lt;/photo&gt;
+          &lt;/xsl:otherwise&gt;
+        &lt;/xsl:choose&gt;
+      &lt;/xsl:for-each&gt;
+
+      &lt;!-- BDAY can be included once --&gt;
+
+      &lt;xsl:if test='$BDAY.count=1'&gt;
+        &lt;bday&gt;&lt;date&gt;&lt;xsl:value-of select='/vCard/BDAY'/&gt;&lt;/date&gt;&lt;/bday&gt;
+      &lt;/xsl:if&gt;
+
+      &lt;!-- ADR can be included one or more times --&gt;
+
+      &lt;xsl:apply-templates select='/vCard/ADR'/&gt;
+
+      &lt;!-- NOTE: vcard-temp allowed a LABEL element,
+           but it was removed from vCard4 --&gt;
+
+      &lt;!-- one or more TEL elements can be included --&gt;
+
+      &lt;xsl:apply-templates select='/vCard/TEL'/&gt;
+
+      &lt;!-- one or more EMAIL elements can be included --&gt;
+
+      &lt;xsl:apply-templates select='/vCard/EMAIL'/&gt;
+
+      &lt;!-- JABBERID can be included one or more times --&gt;
+      &lt;!-- we map this to the vCard4 IMPP property --&gt;
+
+      &lt;xsl:for-each select='/vCard/JABBERID'&gt;
+        &lt;impp&gt;&lt;uri&gt;&lt;xsl:text&gt;xmpp:&lt;/xsl:text&gt;&lt;xsl:value-of select='.'/&gt;&lt;/uri&gt;&lt;/impp&gt;
+      &lt;/xsl:for-each&gt;
+
+      &lt;!-- NOTE: vcard-temp allowed a MAILER element,
+           but it was removed from vCard4 --&gt;
+
+      &lt;!-- one or more TZ elements can be included --&gt;
+
+      &lt;xsl:for-each select='/vCard/TZ'&gt;
+        &lt;tz&gt;&lt;text&gt;&lt;xsl:value-of select='.'/&gt;&lt;/text&gt;&lt;/tz&gt;
+      &lt;/xsl:for-each&gt;
+
+      &lt;!-- one or more GEO elements can be included --&gt;
+
+      &lt;xsl:for-each select='/vCard/GEO'&gt;
+        &lt;geo&gt;&lt;uri&gt;&lt;xsl:text&gt;geo:&lt;/xsl:text&gt;&lt;xsl:value-of select='LAT'/&gt;&lt;xsl:text&gt;,&lt;/xsl:text&gt;&lt;xsl:value-of select='LON'/&gt;&lt;/uri&gt;&lt;/geo&gt;
+      &lt;/xsl:for-each&gt;
+
+      &lt;!-- one or more TITLE elements can be included --&gt;
+
+      &lt;xsl:for-each select='/vCard/TITLE'&gt;
+        &lt;title&gt;&lt;text&gt;&lt;xsl:value-of select='.'/&gt;&lt;/text&gt;&lt;/title&gt;
+      &lt;/xsl:for-each&gt;
+
+      &lt;!-- one or more ROLE elements can be included --&gt;
+
+      &lt;xsl:for-each select='/vCard/ROLE'&gt;
+        &lt;role&gt;&lt;text&gt;&lt;xsl:value-of select='.'/&gt;&lt;/text&gt;&lt;/role&gt;
+      &lt;/xsl:for-each&gt;
+
+      &lt;!-- one or more LOGO elements can be included --&gt;
+      &lt;!-- content is either a pointer to a URL or inline binary,
+           which is mapped to a data: URI in vCard4 --&gt;
+
+      &lt;xsl:for-each select='/vCard/LOGO'&gt;
+        &lt;xsl:variable name='LOGO.ext' select='count(EXTVAL)'/&gt;
+        &lt;xsl:variable name='LOGO.type' select='TYPE'/&gt;
+        &lt;xsl:choose&gt;
+          &lt;xsl:when test='$LOGO.ext=1'&gt;
+            &lt;logo&gt;&lt;uri&gt;&lt;xsl:value-of select='EXTVAL'/&gt;&lt;/uri&gt;&lt;/logo&gt;
+          &lt;/xsl:when&gt;
+          &lt;xsl:otherwise&gt;
+            &lt;logo&gt;
+              &lt;uri&gt;&lt;xsl:text&gt;data:&lt;/xsl:text&gt;&lt;xsl:value-of select='TYPE'/&gt;&lt;xsl:text&gt;;base64,&lt;/xsl:text&gt;&lt;xsl:value-of select='BINVAL'/&gt;
+              &lt;/uri&gt;
+            &lt;/logo&gt;
+          &lt;/xsl:otherwise&gt;
+        &lt;/xsl:choose&gt;
+      &lt;/xsl:for-each&gt;
+
+      &lt;!-- one or more AGENT elements can be included --&gt;
+      &lt;!-- however, inline vcards are not supported in vCard4 --&gt;
+      &lt;!-- the relevant vCard4 property is RELATED --&gt;
+      &lt;!-- only EXTVAL is supported now via URIs --&gt;
+      &lt;!-- NOTE: this element was probably unused in vcard-temp --&gt;
+
+      &lt;xsl:for-each select='/vCard/AGENT'&gt;
+        &lt;xsl:variable name='AGENT.ext' select='count(EXTVAL)'/&gt;
+        &lt;xsl:if test='$AGENT.ext=1'&gt;
+          &lt;agent&gt;&lt;uri&gt;&lt;xsl:value-of select='EXTVAL'/&gt;&lt;/uri&gt;&lt;/agent&gt;
+        &lt;/xsl:if&gt;
+      &lt;/xsl:for-each&gt;
+
+      &lt;!-- one or more ORG elements can be included --&gt;
+      &lt;!-- NOTE: ORGUNIT is no longer used in vcard4 --&gt;
+
+      &lt;xsl:for-each select='/vCard/ORG'&gt;
+        &lt;org&gt;
+          &lt;xsl:variable name='ORGNAME.count' select='count(ORGNAME)'/&gt;
+          &lt;xsl:if test='$ORGNAME.count=1'&gt;
+            &lt;text&gt;&lt;xsl:value-of select='ORGNAME'/&gt;&lt;/text&gt;
+          &lt;/xsl:if&gt;
+        &lt;/org&gt;
+      &lt;/xsl:for-each&gt;
+
+      &lt;!-- one or more CATEGORIES elements can be included --&gt;
+      &lt;!-- NOTE: this element was probably unused in vcard-temp --&gt;
+
+      &lt;xsl:for-each select='/vCard/CATEGORIES'&gt;
+        &lt;categories&gt;&lt;text&gt;&lt;xsl:value-of select='.'/&gt;&lt;/text&gt;&lt;/categories&gt;
+      &lt;/xsl:for-each&gt;
+
+      &lt;!-- one or more NOTE elements can be included --&gt;
+      &lt;!-- NOTE: this element was probably unused in vcard-temp --&gt;
+
+      &lt;xsl:for-each select='/vCard/NOTE'&gt;
+        &lt;note&gt;&lt;text&gt;&lt;xsl:value-of select='.'/&gt;&lt;/text&gt;&lt;/note&gt;
+      &lt;/xsl:for-each&gt;
+
+      &lt;!-- PRODID can be included exactly once --&gt;
+      &lt;!-- NOTE: this element was probably unused in vcard-temp --&gt;
+
+      &lt;xsl:if test='$PRODID.count=1'&gt;
+        &lt;prodid&gt;&lt;text&gt;&lt;xsl:value-of select='.'/&gt;&lt;/text&gt;&lt;/prodid&gt;
+      &lt;/xsl:if&gt;
+
+      &lt;!-- REV can be included exactly once --&gt;
+      &lt;!-- NOTE: this element was probably unused in vcard-temp --&gt;
+
+      &lt;xsl:if test='$REV.count=1'&gt;
+        &lt;rev&gt;&lt;timestamp&gt;&lt;xsl:value-of select='.'/&gt;&lt;/timestamp&gt;&lt;/rev&gt;
+      &lt;/xsl:if&gt;
+
+      &lt;!-- one or more SORT-STRING elements can be included --&gt;
+      &lt;!-- this element maps to SORT-AS in vCard4 --&gt;
+
+      &lt;xsl:for-each select='/vCard/SORT-STRING'&gt;
+        &lt;sort-as&gt;&lt;xsl:value-of select='.'/&gt;&lt;/sort-as&gt;
+      &lt;/xsl:for-each&gt;
+
+      &lt;!-- one or more SOUND elements can be included --&gt;
+      &lt;!-- NOTE: for some reason, vcard-temp allowed a &lt;PHONETIC/&gt;
+           child element, but that was not documented in the
+           original Dawson I-Ds and is not supported in vCard4 --&gt;
+
+      &lt;xsl:for-each select='/vCard/SOUND'&gt;
+        &lt;xsl:variable name='SOUND.ext' select='count(EXTVAL)'/&gt;
+        &lt;xsl:variable name='SOUND.bin' select='count(BINVAL)'/&gt;
+        &lt;xsl:choose&gt;
+          &lt;xsl:when test='$SOUND.ext=1'&gt;
+            &lt;sound&gt;&lt;uri&gt;&lt;xsl:value-of select='EXTVAL'/&gt;&lt;/uri&gt;&lt;/sound&gt;
+          &lt;/xsl:when&gt;
+          &lt;xsl:when test='$SOUND.ext=1'&gt;
+            &lt;sound&gt;
+              &lt;uri&gt;&lt;xsl:text&gt;data:audio/basic;base64,&lt;/xsl:text&gt;&lt;xsl:value-of select='BINVAL'/&gt;
+              &lt;/uri&gt;
+            &lt;/sound&gt;
+          &lt;/xsl:when&gt;
+          &lt;xsl:otherwise&gt;
+          &lt;/xsl:otherwise&gt;
+        &lt;/xsl:choose&gt;
+      &lt;/xsl:for-each&gt;
+
+      &lt;!-- UID can be included exactly once --&gt;
+
+      &lt;xsl:if test='$UID.count=1'&gt;
+        &lt;uid&gt;&lt;uri&gt;&lt;xsl:value-of select='/vCard/UID'/&gt;&lt;/uri&gt;&lt;/uid&gt;
+      &lt;/xsl:if&gt;
+
+      &lt;!-- URL can be included one or more times --&gt;
+
+      &lt;xsl:for-each select='/vCard/URL'&gt;
+        &lt;url&gt;&lt;uri&gt;&lt;xsl:value-of select='.'/&gt;&lt;/uri&gt;&lt;/url&gt;
+      &lt;/xsl:for-each&gt;
+
+      &lt;!-- NOTE: vcard-temp allowed a CLASS element,
+           but it was removed from vCard4 --&gt;
+
+      &lt;!-- KEY can be included one or more times --&gt;
+
+      &lt;xsl:for-each select='/vCard/KEY'&gt;
+        &lt;key&gt;&lt;text&gt;&lt;xsl:value-of select='CRED'/&gt;&lt;/text&gt;&lt;/key&gt;
+      &lt;/xsl:for-each&gt;
+
+      &lt;!-- DESC can be included one or more times --&gt;
+      &lt;!-- this existed in vcard-temp but not vCard3 --&gt;
+      &lt;!-- mapped to the NOTE element --&gt;
+
+      &lt;xsl:for-each select='/vCard/DESC'&gt;
+        &lt;note&gt;&lt;text&gt;&lt;xsl:value-of select='.'/&gt;&lt;/text&gt;&lt;/note&gt;
+      &lt;/xsl:for-each&gt;
+
+    &lt;/vcard&gt;
+
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template match='N'&gt;
+    &lt;n&gt;
+      &lt;xsl:variable name='FAMILY.count' select='count(FAMILY)'/&gt;
+      &lt;xsl:variable name='GIVEN.count' select='count(GIVEN)'/&gt;
+      &lt;xsl:variable name='MIDDLE.count' select='count(MIDDLE)'/&gt;
+      &lt;xsl:variable name='PREFIX.count' select='count(PREFIX)'/&gt;
+      &lt;xsl:variable name='SUFFIX.count' select='count(SUFFIX)'/&gt;
+      &lt;xsl:if test='$FAMILY.count=1'&gt;
+        &lt;surname&gt;&lt;xsl:value-of select='FAMILY'/&gt;&lt;/surname&gt;
+      &lt;/xsl:if&gt;
+      &lt;xsl:if test='$GIVEN.count=1'&gt;
+        &lt;given&gt;&lt;xsl:value-of select='GIVEN'/&gt;&lt;/given&gt;
+      &lt;/xsl:if&gt;
+      &lt;xsl:if test='$MIDDLE.count=1'&gt;
+        &lt;additional&gt;&lt;xsl:value-of select='MIDDLE'/&gt;&lt;/additional&gt;
+      &lt;/xsl:if&gt;
+      &lt;xsl:if test='$PREFIX.count=1'&gt;
+        &lt;prefix&gt;&lt;xsl:value-of select='PREFIX'/&gt;&lt;/prefix&gt;
+      &lt;/xsl:if&gt;
+      &lt;xsl:if test='$SUFFIX.count=1'&gt;
+        &lt;suffix&gt;&lt;xsl:value-of select='SUFFIX'/&gt;&lt;/suffix&gt;
+      &lt;/xsl:if&gt;
+    &lt;/n&gt;
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template match='ADR'&gt;
+    &lt;adr&gt;
+      &lt;xsl:variable name='HOME.count' select='count(HOME)'/&gt;
+      &lt;xsl:variable name='WORK.count' select='count(WORK)'/&gt;
+
+      &lt;!-- NOTE: vcard-temp allowed address types of POSTAL, PARCEL,
+           DOM, and INTL, but they were removed from vCard4 --&gt;
+
+      &lt;xsl:variable name='PREF.count' select='count(PREF)'/&gt;
+      &lt;xsl:variable name='POBOX.count' select='count(POBOX)'/&gt;
+      &lt;xsl:variable name='EXTADD.count' select='count(EXTADD)'/&gt;
+      &lt;xsl:variable name='STREET.count' select='count(STREET)'/&gt;
+      &lt;xsl:variable name='LOCALITY.count' select='count(LOCALITY)'/&gt;
+      &lt;xsl:variable name='REGION.count' select='count(REGION)'/&gt;
+      &lt;xsl:variable name='PCODE.count' select='count(PCODE)'/&gt;
+
+      &lt;!-- NOTE: yes, vcard-temp has CTRY, not COUNTRY --&gt;
+
+      &lt;xsl:variable name='CTRY.count' select='count(CTRY)'/&gt;
+
+      &lt;!-- first we count the number of vCard TYPE parameters --&gt;
+
+      &lt;xsl:variable name='TYPE.count' select='$HOME.count + $WORK.count'/&gt;
+
+      &lt;!-- now we output all the parameters --&gt;
+
+      &lt;xsl:if test='$TYPE.count &amp;gt; 0'&gt;
+        &lt;parameters&gt;
+          &lt;type&gt;
+            &lt;xsl:if test='$HOME.count=1'&gt;
+              &lt;text&gt;home&lt;/text&gt;
+            &lt;/xsl:if&gt;
+            &lt;xsl:if test='$WORK.count=1'&gt;
+              &lt;text&gt;work&lt;/text&gt;
+            &lt;/xsl:if&gt;
+          &lt;/type&gt;
+          &lt;xsl:if test='$PREF.count=1'&gt;
+            &lt;pref&gt;&lt;integer&gt;1&lt;/integer&gt;&lt;/pref&gt;
+          &lt;/xsl:if&gt;
+        &lt;/parameters&gt;
+      &lt;/xsl:if&gt;
+      &lt;xsl:if test='$POBOX.count=1'&gt;
+        &lt;pobox&gt;&lt;xsl:value-of select='POBOX'/&gt;&lt;/pobox&gt;
+      &lt;/xsl:if&gt;
+      &lt;xsl:if test='$EXTADD.count=1'&gt;
+        &lt;ext&gt;&lt;xsl:value-of select='EXTADD'/&gt;&lt;/ext&gt;
+      &lt;/xsl:if&gt;
+      &lt;xsl:if test='$STREET.count=1'&gt;
+        &lt;street&gt;&lt;xsl:value-of select='STREET'/&gt;&lt;/street&gt;
+      &lt;/xsl:if&gt;
+      &lt;xsl:if test='$LOCALITY.count=1'&gt;
+        &lt;locality&gt;&lt;xsl:value-of select='LOCALITY'/&gt;&lt;/locality&gt;
+      &lt;/xsl:if&gt;
+      &lt;xsl:if test='$REGION.count=1'&gt;
+        &lt;region&gt;&lt;xsl:value-of select='REGION'/&gt;&lt;/region&gt;
+      &lt;/xsl:if&gt;
+      &lt;xsl:if test='$PCODE.count=1'&gt;
+        &lt;code&gt;&lt;xsl:value-of select='PCODE'/&gt;&lt;/code&gt;
+      &lt;/xsl:if&gt;
+      &lt;xsl:if test='$CTRY.count=1'&gt;
+        &lt;country&gt;&lt;xsl:value-of select='CTRY'/&gt;&lt;/country&gt;
+      &lt;/xsl:if&gt;
+    &lt;/adr&gt;
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template match='TEL'&gt;
+    &lt;tel&gt;
+      &lt;xsl:variable name='HOME.count' select='count(HOME)'/&gt;
+      &lt;xsl:variable name='WORK.count' select='count(WORK)'/&gt;
+      &lt;xsl:variable name='TEXT.count' select='count(TEXT)'/&gt;
+      &lt;xsl:variable name='VOICE.count' select='count(VOICE)'/&gt;
+      &lt;xsl:variable name='FAX.count' select='count(FAX)'/&gt;
+      &lt;xsl:variable name='CELL.count' select='count(CELL)'/&gt;
+      &lt;xsl:variable name='VIDEO.count' select='count(VIDEO)'/&gt;
+      &lt;xsl:variable name='PAGER.count' select='count(PAGER)'/&gt;
+      &lt;xsl:variable name='TEXTPHONE.count' select='count(TEXTPHONE)'/&gt;
+
+      &lt;!-- NOTE: vcard-temp allowed telephony types of MSG, BBS,
+           MODEM, ISDN, and PCS but they were removed from vCard4 --&gt;
+
+      &lt;xsl:variable name='PREF.count' select='count(PREF)'/&gt;
+      &lt;xsl:variable name='NUMBER.count' select='count(NUMBER)'/&gt;
+      &lt;!-- first we count the number of vCard TYPE parameters --&gt;
+      &lt;xsl:variable name='TYPE.count'
+                    select='$HOME.count
+                          + $WORK.count
+                          + $TEXT.count
+                          + $VOICE.count
+                          + $FAX.count
+                          + $CELL.count
+                          + $VIDEO.count
+                          + $PAGER.count
+                          + $TEXTPHONE.count'/&gt;
+
+      &lt;!-- now we output all the parameters --&gt;
+
+      &lt;xsl:if test='$TYPE.count &amp;gt; 0'&gt;
+        &lt;parameters&gt;
+          &lt;type&gt;
+            &lt;xsl:if test='$HOME.count=1'&gt;
+              &lt;text&gt;home&lt;/text&gt;
+            &lt;/xsl:if&gt;
+            &lt;xsl:if test='$WORK.count=1'&gt;
+              &lt;text&gt;work&lt;/text&gt;
+            &lt;/xsl:if&gt;
+            &lt;xsl:if test='$TEXT.count=1'&gt;
+              &lt;text&gt;text&lt;/text&gt;
+            &lt;/xsl:if&gt;
+            &lt;xsl:if test='$VOICE.count=1'&gt;
+              &lt;text&gt;voice&lt;/text&gt;
+            &lt;/xsl:if&gt;
+            &lt;xsl:if test='$FAX.count=1'&gt;
+              &lt;text&gt;fax&lt;/text&gt;
+            &lt;/xsl:if&gt;
+            &lt;xsl:if test='$CELL.count=1'&gt;
+              &lt;text&gt;cell&lt;/text&gt;
+            &lt;/xsl:if&gt;
+            &lt;xsl:if test='$VIDEO.count=1'&gt;
+              &lt;text&gt;video&lt;/text&gt;
+            &lt;/xsl:if&gt;
+            &lt;xsl:if test='$PAGER.count=1'&gt;
+              &lt;text&gt;pager&lt;/text&gt;
+            &lt;/xsl:if&gt;
+            &lt;xsl:if test='$TEXTPHONE.count=1'&gt;
+              &lt;text&gt;texphone&lt;/text&gt;
+            &lt;/xsl:if&gt;
+          &lt;/type&gt;
+          &lt;xsl:if test='$PREF.count=1'&gt;
+            &lt;pref&gt;&lt;integer&gt;1&lt;/integer&gt;&lt;/pref&gt;
+          &lt;/xsl:if&gt;
+        &lt;/parameters&gt;
+      &lt;/xsl:if&gt;
+      &lt;xsl:if test='$NUMBER.count=1'&gt;
+        &lt;uri&gt;&lt;xsl:text&gt;tel:&lt;/xsl:text&gt;&lt;xsl:value-of select='NUMBER'/&gt;&lt;/uri&gt;
+      &lt;/xsl:if&gt;
+    &lt;/tel&gt;
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template match='EMAIL'&gt;
+    &lt;email&gt;
+      &lt;xsl:variable name='HOME.count' select='count(HOME)'/&gt;
+      &lt;xsl:variable name='WORK.count' select='count(WORK)'/&gt;
+
+      &lt;!-- NOTE: vcard-temp allowed email types of INTERNET
+           and X400, but they were never in vCard3 --&gt;
+
+      &lt;xsl:variable name='PREF.count' select='count(PREF)'/&gt;
+      &lt;xsl:variable name='USERID.count' select='count(USERID)'/&gt;
+
+      &lt;!-- first we count the number of vCard TYPE parameters --&gt;
+
+      &lt;xsl:variable name='TYPE.count' select='$HOME.count + $WORK.count'/&gt;
+
+      &lt;!-- now we output all the parameters --&gt;
+
+      &lt;xsl:if test='$TYPE.count &amp;gt; 0'&gt;
+        &lt;parameters&gt;
+          &lt;type&gt;
+            &lt;xsl:if test='$HOME.count=1'&gt;
+              &lt;text&gt;home&lt;/text&gt;
+            &lt;/xsl:if&gt;
+            &lt;xsl:if test='$WORK.count=1'&gt;
+              &lt;text&gt;work&lt;/text&gt;
+            &lt;/xsl:if&gt;
+          &lt;/type&gt;
+          &lt;xsl:if test='$PREF.count=1'&gt;
+            &lt;pref&gt;&lt;integer&gt;1&lt;/integer&gt;&lt;/pref&gt;
+          &lt;/xsl:if&gt;
+        &lt;/parameters&gt;
+      &lt;/xsl:if&gt;
+      &lt;xsl:if test='$USERID.count=1'&gt;
+        &lt;text&gt;&lt;xsl:value-of select='USERID'/&gt;&lt;/text&gt;
+      &lt;/xsl:if&gt;
+    &lt;/email&gt;
+  &lt;/xsl:template&gt;
+
+&lt;/xsl:stylesheet&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="migration-vcardtemp">12.2 Example of vcard-temp Data<a class="anchor-link" href="#migration-vcardtemp"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;vCard&gt;
+  &lt;FN&gt;Peter Saint-Andre&lt;/FN&gt;
+  &lt;N&gt;
+    &lt;FAMILY&gt;Saint-Andre&lt;/FAMILY&gt;
+    &lt;GIVEN&gt;Peter&lt;/GIVEN&gt;
+    &lt;MIDDLE/&gt;
+  &lt;/N&gt;
+  &lt;NICKNAME&gt;stpeter&lt;/NICKNAME&gt;
+  &lt;NICKNAME&gt;psa&lt;/NICKNAME&gt;
+  &lt;PHOTO&gt;&lt;EXTVAL&gt;http://stpeter.im/images/stpeter_oscon.jpg&lt;/EXTVAL&gt;&lt;/PHOTO&gt;
+  &lt;PHOTO&gt;&lt;EXTVAL&gt;http://stpeter.im/images/stpeter_hell.jpg&lt;/EXTVAL&gt;&lt;/PHOTO&gt;
+  &lt;BDAY&gt;1966-08-06&lt;/BDAY&gt;
+  &lt;ADR&gt;
+    &lt;WORK/&gt;
+    &lt;PREF/&gt;
+    &lt;EXTADD&gt;Suite 600&lt;/EXTADD&gt;
+    &lt;STREET&gt;1899 Wynkoop Street&lt;/STREET&gt;
+    &lt;LOCALITY&gt;Denver&lt;/LOCALITY&gt;
+    &lt;REGION&gt;CO&lt;/REGION&gt;
+    &lt;PCODE&gt;80202&lt;/PCODE&gt;
+    &lt;CTRY&gt;USA&lt;/CTRY&gt;
+  &lt;/ADR&gt;
+  &lt;ADR&gt;
+    &lt;HOME/&gt;
+    &lt;EXTADD/&gt;
+    &lt;STREET/&gt;
+    &lt;LOCALITY&gt;Parker&lt;/LOCALITY&gt;
+    &lt;REGION&gt;CO&lt;/REGION&gt;
+    &lt;PCODE&gt;80138&lt;/PCODE&gt;
+    &lt;CTRY&gt;USA&lt;/CTRY&gt;
+  &lt;/ADR&gt;
+  &lt;TEL&gt;&lt;PREF/&gt;&lt;WORK/&gt;&lt;VOICE/&gt;&lt;NUMBER&gt;+1-303-308-3282&lt;/NUMBER&gt;&lt;/TEL&gt;
+  &lt;TEL&gt;&lt;WORK/&gt;&lt;FAX/&gt;&lt;NUMBER&gt;+1-303-308-3219&lt;/NUMBER&gt;&lt;/TEL&gt;
+  &lt;TEL&gt;&lt;CELL/&gt;&lt;VOICE/&gt;&lt;TEXT/&gt;&lt;NUMBER&gt;+1-720-256-6756&lt;/NUMBER&gt;&lt;/TEL&gt;
+  &lt;TEL&gt;&lt;HOME/&gt;&lt;VOICE/&gt;&lt;NUMBER&gt;+1-303-555-1212&lt;/NUMBER&gt;&lt;/TEL&gt;
+  &lt;EMAIL&gt;&lt;INTERNET/&gt;&lt;PREF/&gt;&lt;USERID&gt;stpeter@jabber.org&lt;/USERID&gt;&lt;/EMAIL&gt;
+  &lt;EMAIL&gt;&lt;WORK/&gt;&lt;USERID&gt;psaintan@cisco.com&lt;/USERID&gt;&lt;/EMAIL&gt;
+  &lt;JABBERID&gt;stpeter@jabber.org&lt;/JABBERID&gt;
+  &lt;TZ&gt;America/Denver&lt;/TZ&gt;
+  &lt;GEO&gt;&lt;LAT&gt;39.59&lt;/LAT&gt;&lt;LON&gt;-105.01&lt;/LON&gt;&lt;/GEO&gt;
+  &lt;TITLE&gt;Executive Director&lt;/TITLE&gt;
+  &lt;ROLE&gt;Patron Saint&lt;/ROLE&gt;
+  &lt;LOGO&gt;
+    &lt;TYPE&gt;image/jpeg&lt;/TYPE&gt;
+    &lt;BINVAL&gt;
+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
+0vx/+oqw7D4D8qysrzcv7jro/9k=
+    &lt;/BINVAL&gt;
+  &lt;/LOGO&gt;
+  &lt;ORG&gt;
+    &lt;ORGNAME&gt;XMPP Standards Foundation&lt;/ORGNAME&gt;
+    &lt;ORGUNIT/&gt;
+  &lt;/ORG&gt;
+  &lt;URL&gt;https://stpeter.im/&lt;/URL&gt;
+  &lt;URL&gt;http://www.saint-andre.com/&lt;/URL&gt;
+  &lt;KEY&gt;
+    &lt;CRED&gt;
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+Version: GnuPG/MacGPG2 v2.0.18 (Darwin)
+
+mQINBFETDzsBEAC0FOv1N3ZJzIIxN6cKD475KVS9CHDPeYpegcOIPnL5eY1DCHeh
+/IwS1S7RCePtmiybNoV9FsI4PKUknzXQxA6LVEdAR/LUlhgJKjq+gsgp8lqbEILh
+g13ecH66HwLS9rarbQkC47T7kL8miIPBFC6E3A4Lq1L+eueO6UcLhKgoYkMxOjdi
+WrMgKTnVpch5ydLkPm/z0Zo8zRgqlPuTLeCrXXZYnjHXLVFN2xy04UzOs7P5u5KV
+fx5Z7uQisr8pXtyLd6SpTZo6SHgKBv15uz0rqXhsJojiGtOXfWznAjaS5FUOORq9
+CklG5cMOUAT8TNftv0ktsxaWDL1ELDVQPy1m7mtzo+VREG+0xmU6AjMo/GHblW1U
+U7MI9yCiuMLsp/HLrFuiosqLVZ85wuLQ2junPe3tK8h15UcxIXAcpQ1VqIaDQFbe
+uLOXJTF8YHpHdpHYt/ZM1ll7ZBKGAo8yd7uF7wJ9D3gUazwdz9fFjWV7oIk7ATwO
+lFllzmWDn+M2ygbHOGUGMX5hSaa8eDSieiR2QoLdn27Fip7kMBTJ2+GISrfnJTN/
+OQvmj0DXXAdxHmu2C4QgmZbkge35n129yzXn9NcqzrGLroV62lL3LgX6cSbiH5i7
+GgWY6CAPb1pMogV0K475n9FvOSDRiG4QSO5yqKiA3OP5aKrIRp2TNAk4IwARAQAB
+tCZQZXRlciBTYWludC1BbmRyZSA8c3RwZXRlckBzdHBldGVyLmltPokCOQQTAQIA
+IwUCURMPOwIbAwcLCQgHAwIBBhUIAgkKCwQWAgMBAh4BAheAAAoJEOoGpJErxa2p
+6bgQAKpxu07cMDOLc4+EG8H19NWXIVVybOEvfGuHYZaLKkPrhrMZwJiOwBpyISNR
+t9qzX1eLCVaojaoEVX6kD8MGc5zKFfiJZy3j7lBWl+Ybr7FfXYy2BbAXKx49e1n6
+ci9LmBrmVfAEaxtDNPITZ9N9oUAb9vS0nrG036EwteEHAveQvlDjO7lhz6+Cv7lZ
+QgBj9rZ6khfcQ4S3nSCQaKLQ9Iav4fqxI7SfuPKnx6quHX3JNLGnVo3wl+j/foCK
+0iTrmtHxCI3kc/bx6g32pRjHEPX0ALMBhmzU2uca+TE0zCEC96mgYXAUCwdnCFWy
+beIEbt6pz65iML13kAVAq0H/GqncnMGN0MbOatnw1Tdz/vkLojIy7QbPcQ0plUFx
+v5491xPfIrHhOWdRXp6WUt88fcqhT6MHZpVRtusj2ornKVVn+Y0GLsMMCTcrXJRG
+7Ao1YV72t/pJpzfGWSaaxolxDIZ6B+76jrIhUhiWgo/4nf+DN6BIlCZQ6j6xxjjx
+462cu02kuhIILTk2pzaMOufTBWx0uJhZk/KP2Fay/41pX7pvVOwRC4uIlKsLnJKL
+PS7EDa4BUUxENfd/9LqOGwlII8BbSe98PLMI8sXkcigc3UXMVda9ll0YhQa+lbP1
+NaszmnBhwuiCsgnPGbImsJuRzgEEgckwP/dNeyr6MlFMyfaeuQINBFETDzsBEADB
+zOsEHpUmhkRUjH9Tek87dn5P/Yh/L/HptgCGk40TL/C+kYdkd3HyteMEf061PNms
+S/Rq8k37Fu3VODYb9SPYKxtgksKSYUtIkPKvao09K9QNWPqyWuNf0F+iAjVMUuda
+EVFJ7bHF310RDwLY5IvLeCXxtvG+Vv/i+g77d2WdPDp+zLJ8306C4yBKjSJV8xW0
+cn2fd7NviIEN6cNHTsZNDZVMlgYPrxnwSq8GTEPGC7HsLIwGcx3hIe9QjnPw9CpA
+mQENpDEyWcxgF5uwo2NJECoDswKz1Nb0gfawF3ZIbD+GcLujTu94iJuVg25jATWm
+9wTgcfZo4UPllRGXdIb8uWwUFQlLQgd4ROLZZtXNGmHIymJrV2crx53gxup+1j0X
+qhlzKg8xbImWhEfS9oHZkRK8VHgmWSIt7TNwNir6N5j3lqwWVBhnu6GzF01sKGNy
+SlqNRbd0fqhakCkK71b8ot8tYTcYG5Lg10z6HTbgQx2UwLthUjqbblDQ+GLmrOhi
+WklLXRsnlnPMwnEyFePAnsT5tasy2Cn9qjpttNDah7PB8iFUi9mtTF/XDVgpFaB5
+G3CDV7Q2NgbAI6g6QhLIAmXzSP635G83mda0TKXHQXHDyLJTTn+WVFU7t4m4uLt+
+0DsWU8jXHQWyUTNG9WPUrXhusDUAPHxFCQ/n/lQVBwARAQABiQIfBBgBAgAJBQJR
+Ew87AhsMAAoJEOoGpJErxa2pqfgP/ApN+TRu2bBIgaw1dr3AznSSha84DIpXUDh3
+udZvQrGbUtz8/mA+e3iZEN/cmmBw2LGlAuQoJNILTZQ318yTP+E5QU7fJH7FVsoh
+UyvrMfyt3IMA9jg0Z9MuloLezvIjjMfFeNa0ROgDb/ubOT7JQzi1kwN8Lu3lO80H
+wqBHXEeOLoislUSnZajRKvITbKWkZ6PHRjlMw1Wk4oIi6VLHgGgj79zzL3uhML26
+63m7imShvz1QcHTwvyR5i8cZbNOEkotZyERiA1p7YHuruS+QvTi3ZPoQbnMUB3a7
+py9d11bw1+w3LiAUGZE/z5hBWOFxYtw+w/U/Vx0BwJGYlwU3M2W20uEXe+qxz7wn
+akygKjmLiD2z4njfKjcNCiV3FmXrpmWgADln1c4jfxDh0NrndrsM8FPDf1TMPtOZ
+gFDkKripc9xkZ/25P6xn27oTOHWKcAC0QhxSH+HuVBBRk8AgF+zAbDZe4/L6+kan
+SrycIXW+wCzwBq61aWsz2QhhuKjozVkhk4dRG+CfjzAFjnyxwYERn3uXVKQAwTwc
+dNcTI9RV98IsNrw9Y4lJEAg6CjNPmiD5+EASycqaOuToRSGukr8sOQLWLPyTnez/
+aG8Xf7a+fntWzK2HuDYoSDhJJrylWw/lMklOBm4wtMeNA0zcQH6AQV/GzQVQkSGq
+rLuMVIV/
+=llGw
+-----END PGP PUBLIC KEY BLOCK-----
+    &lt;/CRED&gt;
+  &lt;/KEY&gt;
+  &lt;DESC&gt;
+    More information about me is located on my
+    personal website: https://stpeter.im/
+  &lt;/DESC&gt;
+&lt;/vCard&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="migration-vcard4">12.3 Example of vCard4 XML Data<a class="anchor-link" href="#migration-vcard4"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0"&gt;
+  &lt;fn&gt;
+    &lt;text&gt;Peter Saint-Andre&lt;/text&gt;
+  &lt;/fn&gt;
+  &lt;n&gt;
+    &lt;surname&gt;Saint-Andre&lt;/surname&gt;
+    &lt;given&gt;Peter&lt;/given&gt;
+    &lt;additional&gt;&lt;/additional&gt;
+  &lt;/n&gt;
+  &lt;nickname&gt;
+    &lt;text&gt;stpeter&lt;/text&gt;
+  &lt;/nickname&gt;
+  &lt;nickname&gt;
+    &lt;text&gt;psa&lt;/text&gt;
+  &lt;/nickname&gt;
+  &lt;photo&gt;
+    &lt;uri&gt;http://stpeter.im/images/stpeter_oscon.jpg&lt;/uri&gt;
+  &lt;/photo&gt;
+  &lt;photo&gt;
+    &lt;uri&gt;http://stpeter.im/images/stpeter_hell.jpg&lt;/uri&gt;
+  &lt;/photo&gt;
+  &lt;bday&gt;
+    &lt;date&gt;1966-08-06&lt;/date&gt;
+  &lt;/bday&gt;
+  &lt;adr&gt;
+    &lt;parameters&gt;
+      &lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;/type&gt;
+      &lt;pref&gt;&lt;integer&gt;1&lt;/integer&gt;&lt;/pref&gt;
+    &lt;/parameters&gt;
+    &lt;ext&gt;Suite 600&lt;/ext&gt;
+    &lt;street&gt;1899 Wynkoop Street&lt;/street&gt;
+    &lt;locality&gt;Denver&lt;/locality&gt;
+    &lt;region&gt;CO&lt;/region&gt;
+    &lt;code&gt;80202&lt;/code&gt;
+    &lt;country&gt;USA&lt;/country&gt;
+  &lt;/adr&gt;
+  &lt;adr&gt;
+    &lt;parameters&gt;&lt;type&gt;&lt;text&gt;home&lt;/text&gt;&lt;/type&gt;&lt;/parameters&gt;
+    &lt;ext&gt;&lt;/ext&gt;
+    &lt;street&gt;&lt;/street&gt;
+    &lt;locality&gt;Parker&lt;/locality&gt;
+    &lt;region&gt;CO&lt;/region&gt;
+    &lt;code&gt;80138&lt;/code&gt;
+    &lt;country&gt;USA&lt;/country&gt;
+  &lt;/adr&gt;
+  &lt;tel&gt;
+    &lt;parameters&gt;
+      &lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;text&gt;voice&lt;/text&gt;&lt;/type&gt;
+      &lt;pref&gt;&lt;integer&gt;1&lt;/integer&gt;&lt;/pref&gt;
+    &lt;/parameters&gt;
+    &lt;uri&gt;tel:+1-303-308-3282&lt;/uri&gt;
+  &lt;/tel&gt;
+  &lt;tel&gt;
+    &lt;parameters&gt;
+      &lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;text&gt;fax&lt;/text&gt;&lt;/type&gt;
+    &lt;/parameters&gt;
+    &lt;uri&gt;tel:+1-303-308-3219&lt;/uri&gt;
+  &lt;/tel&gt;
+  &lt;tel&gt;
+    &lt;parameters&gt;
+      &lt;type&gt;&lt;text&gt;cell&lt;/text&gt;&lt;text&gt;voice&lt;/text&gt;&lt;text&gt;text&lt;/text&gt;&lt;/type&gt;
+    &lt;/parameters&gt;
+    &lt;uri&gt;tel:+1-720-256-6756&lt;/uri&gt;
+  &lt;/tel&gt;
+  &lt;tel&gt;
+    &lt;parameters&gt;
+      &lt;type&gt;&lt;text&gt;home&lt;/text&gt;&lt;text&gt;voice&lt;/text&gt;&lt;/type&gt;
+    &lt;/parameters&gt;
+    &lt;uri&gt;tel:+1-303-555-1212&lt;/uri&gt;
+  &lt;/tel&gt;
+  &lt;email&gt;
+    &lt;text&gt;stpeter@jabber.org&lt;/text&gt;
+  &lt;/email&gt;
+  &lt;email&gt;
+    &lt;parameters&gt;
+      &lt;type&gt;&lt;text&gt;work&lt;/text&gt;&lt;/type&gt;
+    &lt;/parameters&gt;
+    &lt;text&gt;psaintan@cisco.com&lt;/text&gt;
+  &lt;/email&gt;
+  &lt;impp&gt;
+    &lt;uri&gt;xmpp:stpeter@jabber.org&lt;/uri&gt;
+   &lt;/impp&gt;
+   &lt;tz&gt;
+     &lt;text&gt;America/Denver&lt;/text&gt;
+   &lt;/tz&gt;
+   &lt;geo&gt;
+     &lt;uri&gt;geo:39.59,-105.01&lt;/uri&gt;
+   &lt;/geo&gt;
+   &lt;title&gt;
+     &lt;text&gt;Executive Director&lt;/text&gt;
+   &lt;/title&gt;
+   &lt;role&gt;
+     &lt;text&gt;Patron Saint&lt;/text&gt;
+   &lt;/role&gt;
+   &lt;logo&gt;
+     &lt;uri&gt;data:image/jpeg;base64,
+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
+0vx/+oqw7D4D8qysrzcv7jro/9k=
+      &lt;/uri&gt;
+    &lt;/logo&gt;
+    &lt;org&gt;
+      &lt;text&gt;XMPP Standards Foundation&lt;/text&gt;
+    &lt;/org&gt;
+    &lt;url&gt;
+      &lt;uri&gt;https://stpeter.im/&lt;/uri&gt;
+    &lt;/url&gt;
+    &lt;url&gt;
+      &lt;uri&gt;http://www.saint-andre.com/&lt;/uri&gt;
+    &lt;/url&gt;
+    &lt;key&gt;
+      &lt;text&gt;
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+Version: GnuPG/MacGPG2 v2.0.18 (Darwin)
+
+mQINBFETDzsBEAC0FOv1N3ZJzIIxN6cKD475KVS9CHDPeYpegcOIPnL5eY1DCHeh
+/IwS1S7RCePtmiybNoV9FsI4PKUknzXQxA6LVEdAR/LUlhgJKjq+gsgp8lqbEILh
+g13ecH66HwLS9rarbQkC47T7kL8miIPBFC6E3A4Lq1L+eueO6UcLhKgoYkMxOjdi
+WrMgKTnVpch5ydLkPm/z0Zo8zRgqlPuTLeCrXXZYnjHXLVFN2xy04UzOs7P5u5KV
+fx5Z7uQisr8pXtyLd6SpTZo6SHgKBv15uz0rqXhsJojiGtOXfWznAjaS5FUOORq9
+CklG5cMOUAT8TNftv0ktsxaWDL1ELDVQPy1m7mtzo+VREG+0xmU6AjMo/GHblW1U
+U7MI9yCiuMLsp/HLrFuiosqLVZ85wuLQ2junPe3tK8h15UcxIXAcpQ1VqIaDQFbe
+uLOXJTF8YHpHdpHYt/ZM1ll7ZBKGAo8yd7uF7wJ9D3gUazwdz9fFjWV7oIk7ATwO
+lFllzmWDn+M2ygbHOGUGMX5hSaa8eDSieiR2QoLdn27Fip7kMBTJ2+GISrfnJTN/
+OQvmj0DXXAdxHmu2C4QgmZbkge35n129yzXn9NcqzrGLroV62lL3LgX6cSbiH5i7
+GgWY6CAPb1pMogV0K475n9FvOSDRiG4QSO5yqKiA3OP5aKrIRp2TNAk4IwARAQAB
+tCZQZXRlciBTYWludC1BbmRyZSA8c3RwZXRlckBzdHBldGVyLmltPokCOQQTAQIA
+IwUCURMPOwIbAwcLCQgHAwIBBhUIAgkKCwQWAgMBAh4BAheAAAoJEOoGpJErxa2p
+6bgQAKpxu07cMDOLc4+EG8H19NWXIVVybOEvfGuHYZaLKkPrhrMZwJiOwBpyISNR
+t9qzX1eLCVaojaoEVX6kD8MGc5zKFfiJZy3j7lBWl+Ybr7FfXYy2BbAXKx49e1n6
+ci9LmBrmVfAEaxtDNPITZ9N9oUAb9vS0nrG036EwteEHAveQvlDjO7lhz6+Cv7lZ
+QgBj9rZ6khfcQ4S3nSCQaKLQ9Iav4fqxI7SfuPKnx6quHX3JNLGnVo3wl+j/foCK
+0iTrmtHxCI3kc/bx6g32pRjHEPX0ALMBhmzU2uca+TE0zCEC96mgYXAUCwdnCFWy
+beIEbt6pz65iML13kAVAq0H/GqncnMGN0MbOatnw1Tdz/vkLojIy7QbPcQ0plUFx
+v5491xPfIrHhOWdRXp6WUt88fcqhT6MHZpVRtusj2ornKVVn+Y0GLsMMCTcrXJRG
+7Ao1YV72t/pJpzfGWSaaxolxDIZ6B+76jrIhUhiWgo/4nf+DN6BIlCZQ6j6xxjjx
+462cu02kuhIILTk2pzaMOufTBWx0uJhZk/KP2Fay/41pX7pvVOwRC4uIlKsLnJKL
+PS7EDa4BUUxENfd/9LqOGwlII8BbSe98PLMI8sXkcigc3UXMVda9ll0YhQa+lbP1
+NaszmnBhwuiCsgnPGbImsJuRzgEEgckwP/dNeyr6MlFMyfaeuQINBFETDzsBEADB
+zOsEHpUmhkRUjH9Tek87dn5P/Yh/L/HptgCGk40TL/C+kYdkd3HyteMEf061PNms
+S/Rq8k37Fu3VODYb9SPYKxtgksKSYUtIkPKvao09K9QNWPqyWuNf0F+iAjVMUuda
+EVFJ7bHF310RDwLY5IvLeCXxtvG+Vv/i+g77d2WdPDp+zLJ8306C4yBKjSJV8xW0
+cn2fd7NviIEN6cNHTsZNDZVMlgYPrxnwSq8GTEPGC7HsLIwGcx3hIe9QjnPw9CpA
+mQENpDEyWcxgF5uwo2NJECoDswKz1Nb0gfawF3ZIbD+GcLujTu94iJuVg25jATWm
+9wTgcfZo4UPllRGXdIb8uWwUFQlLQgd4ROLZZtXNGmHIymJrV2crx53gxup+1j0X
+qhlzKg8xbImWhEfS9oHZkRK8VHgmWSIt7TNwNir6N5j3lqwWVBhnu6GzF01sKGNy
+SlqNRbd0fqhakCkK71b8ot8tYTcYG5Lg10z6HTbgQx2UwLthUjqbblDQ+GLmrOhi
+WklLXRsnlnPMwnEyFePAnsT5tasy2Cn9qjpttNDah7PB8iFUi9mtTF/XDVgpFaB5
+G3CDV7Q2NgbAI6g6QhLIAmXzSP635G83mda0TKXHQXHDyLJTTn+WVFU7t4m4uLt+
+0DsWU8jXHQWyUTNG9WPUrXhusDUAPHxFCQ/n/lQVBwARAQABiQIfBBgBAgAJBQJR
+Ew87AhsMAAoJEOoGpJErxa2pqfgP/ApN+TRu2bBIgaw1dr3AznSSha84DIpXUDh3
+udZvQrGbUtz8/mA+e3iZEN/cmmBw2LGlAuQoJNILTZQ318yTP+E5QU7fJH7FVsoh
+UyvrMfyt3IMA9jg0Z9MuloLezvIjjMfFeNa0ROgDb/ubOT7JQzi1kwN8Lu3lO80H
+wqBHXEeOLoislUSnZajRKvITbKWkZ6PHRjlMw1Wk4oIi6VLHgGgj79zzL3uhML26
+63m7imShvz1QcHTwvyR5i8cZbNOEkotZyERiA1p7YHuruS+QvTi3ZPoQbnMUB3a7
+py9d11bw1+w3LiAUGZE/z5hBWOFxYtw+w/U/Vx0BwJGYlwU3M2W20uEXe+qxz7wn
+akygKjmLiD2z4njfKjcNCiV3FmXrpmWgADln1c4jfxDh0NrndrsM8FPDf1TMPtOZ
+gFDkKripc9xkZ/25P6xn27oTOHWKcAC0QhxSH+HuVBBRk8AgF+zAbDZe4/L6+kan
+SrycIXW+wCzwBq61aWsz2QhhuKjozVkhk4dRG+CfjzAFjnyxwYERn3uXVKQAwTwc
+dNcTI9RV98IsNrw9Y4lJEAg6CjNPmiD5+EASycqaOuToRSGukr8sOQLWLPyTnez/
+aG8Xf7a+fntWzK2HuDYoSDhJJrylWw/lMklOBm4wtMeNA0zcQH6AQV/GzQVQkSGq
+rLuMVIV/
+=llGw
+-----END PGP PUBLIC KEY BLOCK-----
+      &lt;/text&gt;
+    &lt;/key&gt;
+    &lt;note&gt;
+      &lt;text&gt;
+More information about me is located on my
+personal website: https://stpeter.im/
+    &lt;/text&gt;
+  &lt;/note&gt;
+&lt;/vcard&gt;
+</pre></figure>
+  </div>
+<h2 id="acks">13.
+       Acknowledgements<a class="anchor-link" href="#acks"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Thanks to Dave Cridland, Todd Herman, Joe Hildebrand, Waqas Hussain, and Matt Miller for their feedback.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0292</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Experimental">Experimental</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.12.0</dd><dt>Last Updated</dt><dd>2023-03-14</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, <a href="https://datatracker.ietf.org/doc/html/rfc6350">RFC 6350</a>, <a href="https://datatracker.ietf.org/doc/html/rfc6351">RFC 6351</a></dd><dt>Supersedes</dt><dd><a href="xep-0054.html">XEP-0054</a></dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>NOT_YET_ASSIGNED</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0292.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0292.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0292.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Peter Saint-Andre</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:stpeter@stpeter.im">stpeter@stpeter.im</a></dd><dt>JabberID</dt><dd><a href="xmpp:stpeter@jabber.org">stpeter@jabber.org</a></dd><dt>URI</dt><dd><a href="https://stpeter.im/">https://stpeter.im/</a></dd></dl><h5>Samantha Mizzi</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:samizzi@cisco.com">samizzi@cisco.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:samizzi@cisco.com">samizzi@cisco.com</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Given that this XMPP Extension Protocol normatively references IETF technologies, discussion on the &lt;<a href="https://mail.jabber.org/mailman/listinfo/xsf-ietf">xsf-ietf@xmpp.org</a>&gt; list might also be appropriate.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45456480468768">1</a>. XEP-0054: vcard-temp &lt;<a href="https://xmpp.org/extensions/xep-0054.html">https://xmpp.org/extensions/xep-0054.html</a>&gt;.</p><p><a name="nt-idm45456480459936">2</a>. RFC 6350: vCard Format Specification &lt;<a href="http://tools.ietf.org/html/rfc6350">http://tools.ietf.org/html/rfc6350</a>&gt;.</p><p><a name="nt-idm45456480463424">3</a>. RFC 6351: vCard XML Representation &lt;<a href="http://tools.ietf.org/html/rfc6351">http://tools.ietf.org/html/rfc6351</a>&gt;.</p><p><a name="nt-idm45456480443568">4</a>. XEP-0163: Personal Eventing Protocol &lt;<a href="https://xmpp.org/extensions/xep-0163.html">https://xmpp.org/extensions/xep-0163.html</a>&gt;.</p><p><a name="nt-idm45456480433088">5</a>. XEP-0045: Multi-User Chat &lt;<a href="https://xmpp.org/extensions/xep-0045.html">https://xmpp.org/extensions/xep-0045.html</a>&gt;.</p><p><a name="nt-idm45456480424592">6</a>. XEP-0222: Best Practices for Persistent Storage of Public Data via Publish-Subscribe &lt;<a href="https://xmpp.org/extensions/xep-0222.html">https://xmpp.org/extensions/xep-0222.html</a>&gt;.</p><p><a name="nt-idm45456480397120">7</a>. XEP-0115: Entity Capabilities &lt;<a href="https://xmpp.org/extensions/xep-0115.html">https://xmpp.org/extensions/xep-0115.html</a>&gt;.</p><p><a name="nt-idm45456480386880">8</a>. XEP-0060: Publish-Subscribe &lt;<a href="https://xmpp.org/extensions/xep-0060.html">https://xmpp.org/extensions/xep-0060.html</a>&gt;.</p><p><a name="nt-idm45456480377152">9</a>. RFC 6121: Extensible Messaging and Presence Protocol (XMPP): Instant Messaging and Presence &lt;<a href="http://tools.ietf.org/html/rfc6121">http://tools.ietf.org/html/rfc6121</a>&gt;.</p><p><a name="nt-idm45456480372224">10</a>. XEP-0145: Annotations &lt;<a href="https://xmpp.org/extensions/xep-0145.html">https://xmpp.org/extensions/xep-0145.html</a>&gt;.</p><p><a name="nt-idm45456480363936">11</a>. XEP-0223: Best Practices for Persistent Storage of Private Data via Publish-Subscribe &lt;<a href="https://xmpp.org/extensions/xep-0223.html">https://xmpp.org/extensions/xep-0223.html</a>&gt;.</p><p><a name="nt-idm45456481761456">12</a>. RFC 6473: vCard KIND:application &lt;<a href="http://tools.ietf.org/html/rfc6473">http://tools.ietf.org/html/rfc6351</a>&gt;.</p><p><a name="nt-idm45456480331072">13</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm45456480316656">14</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm45456480309200">15</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p><p><a name="nt-idm45456480292064">16</a>. RFC 4770: vCard Extensions for Instant Messaging (IM) &lt;<a href="http://tools.ietf.org/html/rfc4770">http://tools.ietf.org/html/rfc4770</a>&gt;.</p><p><a name="nt-idm45456480225168">17</a>. RFC 2397: The data: URL scheme &lt;<a href="http://tools.ietf.org/html/rfc2397">http://tools.ietf.org/html/rfc2397</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.12.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.12.0.html">0.12.0</a> (2023-03-14)<a class="anchor-link" href="#revision-history-v0.12.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Removes raw-IQ mode and specifies the reuse of PEP</p><div class="revision-author">spw</div></li><li id="revision-history-v0.11"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.11.html">0.11</a> (2020-06-08)<a class="anchor-link" href="#revision-history-v0.11"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Recommend use of contact bare JIDs for item IDs</p><div class="revision-author">ka</div></li><li id="revision-history-v0.10"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.10.html">0.10</a> (2013-09-12)<a class="anchor-link" href="#revision-history-v0.10"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added information about determining support; corrected the XSLT; corrected data: URL example and added reference to RFC 2397; corrected mapping of middle name property.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.9"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.9.html">0.9</a> (2011-10-09)<a class="anchor-link" href="#revision-history-v0.9"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Described how to use the vCard format for storing private data about one's contacts; added XMPP Registrar considerations.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.8"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.8.html">0.8</a> (2011-08-31)<a class="anchor-link" href="#revision-history-v0.8"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Updated to reflect RFC 6350, RFC 6351, and draft-ietf-vcarddav-kind-app.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.7"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.7.html">0.7</a> (2011-07-10)<a class="anchor-link" href="#revision-history-v0.7"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Updated to reflect draft-saintandre-vcarddav-thing-02.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.6"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.6.html">0.6</a> (2011-06-27)<a class="anchor-link" href="#revision-history-v0.6"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified status of VERSION and TZ properties.</p><div class="revision-author">sm/psa</div></li><li id="revision-history-v0.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.5.html">0.5</a> (2011-06-24)<a class="anchor-link" href="#revision-history-v0.5"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Corrected XSLT script; provided detailed examples of the vcard-temp and vCard4 XML formats.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.4.html">0.4</a> (2011-06-20)<a class="anchor-link" href="#revision-history-v0.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Defined provisional mapping from vcard-temp to vCard4.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.3.html">0.3</a> (2011-04-07)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Updated to track base vCard4 specs; defined IQ transport, with pubsub for notifications; added examples for server vCards; described several problematic aspects of mapping from vcard-temp.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.2.html">0.2</a> (2011-04-07)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Updated to track base vCard4 specs; defined IQ transport, with pubsub for notifications; added examples for server vCards; specified mapping from vcard-temp.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.1.html">0.1</a> (2011-03-02)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial published version.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.0.5.html">0.0.5</a> (2011-02-28)<a class="anchor-link" href="#revision-history-v0.0.5"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Corrected more errors in the examples.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.0.4.html">0.0.4</a> (2011-02-25)<a class="anchor-link" href="#revision-history-v0.0.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Corrected some errors in the examples.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.0.3.html">0.0.3</a> (2011-02-12)<a class="anchor-link" href="#revision-history-v0.0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Third draft.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.0.2.html">0.0.2</a> (2011-01-31)<a class="anchor-link" href="#revision-history-v0.0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Second draft.</p><div class="revision-author">srm</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0292-0.0.1.html">0.0.1</a> (2010-11-30)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">srm</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{saint-andre2010xep0292,
+  title = {vCard4 Over XMPP},
+  author = {Saint-Andre, Peter and Mizzi, Samantha},
+  type = {XEP},
+  number = {0292},
+  version = {0.12.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0292.html},
+  date = {2010-11-30/2023-03-14},
+}</pre><p>END</p></body></html>

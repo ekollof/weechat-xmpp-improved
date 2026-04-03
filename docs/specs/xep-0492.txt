@@ -1,0 +1,176 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0492: Chat notification settings</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0492";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Chat notification settings"><meta name="DC.Creator" content="Nicolas Cedilnik"><meta name="DC.Creator" content="Thilo Molitor"><meta name="DC.Description" content="This document defines an XMPP protocol extension to synchronise per-chat notification settings across different clients."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2025-10-25"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0492"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0492: Chat notification settings</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This document defines an XMPP protocol extension to synchronise per-chat notification settings across different clients.</dd><dt>Authors</dt><dd><ul class="authors"><li>Nicolas Cedilnik</li><li>Thilo Molitor</li></ul></dd><dt>Copyright</dt><dd>© 2024 – 2025 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Experimental</p><div id="status-notice" class="experimental standards track">WARNING: This Standards-Track document is Experimental. Publication as an XMPP Extension Protocol does not imply approval of this proposal by the XMPP Standards Foundation. Implementation of the protocol described herein is encouraged in exploratory implementations, but production systems are advised to carefully consider whether it is appropriate to deploy implementations of this protocol before it advances to a status of Draft.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.2.0 (2025-10-25)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li class="current">Experimental</li><li>Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#protocol">Protocol</a><ol><li><a href="#notify">The notify element</a></li><li><a href="#identities">Identities</a></li><li><a href="#advanced">Advanced notification settings</a></li></ol></li><li><a href="#rules">Business Rules</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#registrar-ns">Protocol Namespaces</a></li><li><a href="#registrar-versioning">Protocol Versioning</a></li></ol></li><li><a href="#schema">XML Schema</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">"Notifications" are (usually) pop-up windows that appear in a visible area of the screen even when the emitting application is in the background, often triggering a sound alert. <em>Instant</em> messaging clients expectedly use notifications to inform users when they receive a message.</p>
+  <p class="" style="">Users may want to customise which conversations should trigger notifications and under which conditions. In practice, this is already implemented in many instant messaging clients, including XMPP clients. This specification proposes a mechanism to synchronise per-discussion notification settings across different XMPP clients and other XMPP based applications.</p>
+<h2 id="protocol">2.
+       Protocol<a class="anchor-link" href="#protocol"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="notify">2.1 The notify element<a class="anchor-link" href="#notify"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+  <p class="" style="">Notification settings are represented by the &lt;notify&gt; element. This element MUST be a child of an element identifying a specific chat by its JID, such as a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0402.html">PEP Native Bookmarks (XEP-0402)</a></span>  [<a href="#nt-idm44945437181088">1</a>] &lt;extensions&gt;.</p>
+  <p class="" style="">This protocol specifies three notification elements as children for the &lt;notify&gt; element, each corresponding to a notification setting: &lt;always&gt; &lt;on-mention&gt; and &lt;never&gt;. A notification element without attributes is called a "fallback element".</p>
+<figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Most basic example<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;notify xmlns='urn:xmpp:notification-settings:1'&gt;
+  &lt;never /&gt;
+&lt;/notify&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="identities">2.2 Identities<a class="anchor-link" href="#identities"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Applications MAY choose different notification settings depending on their own Service Discovery Identity. In this case, the two optional attributes '<code>identity-category</code>' and '<code>identity-type</code>' MAY be added to the notification element, using values registered in the Service Discovery Identities registry at &lt;<a href="https://xmpp.org/registrar/disco-categories.html">https://xmpp.org/registrar/disco-categories.html</a>&gt;.</p>
+    <p class="" style="">The '<code>identity-type</code>' attribute MAY be omitted, if the notification setting should apply to a whole Identity Category. You MUST NOT add the '<code>identity-type</code>' attribute without an accompanying '<code>identity-category</code>' attribute.</p>
+<figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> An example of notification settings by identity<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;notify xmlns='urn:xmpp:notification-settings:1'&gt;
+  &lt;never identity-category="client" identity-type="pc" /&gt;
+  &lt;on-mention identity-category="client" identity-type="phone" /&gt;
+  &lt;on-mention identity-category="gateway" /&gt;
+  &lt;always /&gt;
+&lt;/notify&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="advanced">2.3 Advanced notification settings<a class="anchor-link" href="#advanced"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+  <p class="" style="">Finally, clients can use this specification to synchronise finer-grained notification settings using custom namespaces in the optional &lt;advanced/&gt; child of the notification elements.</p>
+  <p class="" style="">The &lt;advanced/&gt; element SHOULD NOT be empty.</p>
+<figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Complex example of finer-grained notification settings<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;notify xmlns='urn:xmpp:notification-settings:1'&gt;
+  &lt;never identity-category="client" identity-type="pc"&gt;
+    &lt;advanced&gt;
+      &lt;my-custom-extension xmlns="custom:ns-1"&gt;
+        &lt;when day-of-week="monday"&gt;night-time-only&lt;/day-of-week&gt;
+        ...
+      &lt;/custom&gt;
+      &lt;cool-custom-extension-2 xmlns="custom:ns-2"&gt;
+        &lt;weather&gt;raining&lt;/weather&gt;
+        ...
+      &lt;/custom&gt;
+      ...
+    &lt;/advanced&gt;
+  &lt;/never&gt;
+  &lt;on-mention identity-category="client" identity-type="phone" /&gt;
+  &lt;on-mention identity-category="gateway" /&gt;
+  &lt;always&gt;
+    &lt;advanced&gt;
+      &lt;better-custom-extension xmlns="custom:ns-3"&gt;
+        &lt;when day-of-week="saturday" /&gt;
+        &lt;when day-of-week="sunday" /&gt;
+        ...
+      &lt;/custom&gt;
+      ...
+    &lt;/advanced&gt;
+  &lt;/always&gt;
+&lt;/notify&gt;
+</pre></figure>
+  </div>
+<h2 id="rules">3.
+       Business Rules<a class="anchor-link" href="#rules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Applications implementing this specification MUST NOT delete or alter the &lt;advanced /&gt; notification settings they do not support when updating the notification settings for a given conversation.</p>
+  <p class="" style="">When reading the notification settings for a given conversation, applications implementing this specification MUST use the element most specific to their own application identity. Sorted from high to low specifity, this is:</p>
+  <ol start="" class="" style="">
+    <li class="" style="">Matching '<code>identity-category</code>' and '<code>identity-type</code>' attributes</li>
+    <li class="" style="">Matching '<code>identity-category</code>' attribute</li>
+    <li class="" style="">Fallback element without '<code>identity-category</code>' and '<code>identity-type</code>' attributes</li>
+  </ol>
+  <p class="" style="">When writing the notification settings, applications MAY use the '<code>identity-category</code>' and '<code>identity-type</code>' attributes as described in the <a href="#identities">Identities</a> section. If a fallback element without any attributes isn't present, the application SHOULD add it with the same settings. As secondary fallback, it MAY also add a notification setting having only the '<code>identity-category</code>' attribute, if not already present.</p>
+  <p class="" style="">There SHALL NOT be more than one notification element having the same name, attributes and attribute values.</p>
+  <p class="" style="">Applications using the &lt;advanced/&gt; child SHOULD attempt to choose the parent notification element being the closest to what they offer as a fallback for other applications not supporting the advanced settings.</p>
+  <p class="" style="">In the absence of any notification settings for a given conversation, "always" SHOULD be assumed for direct chats and private group chats, and <code>on-mention</code> for public group chats.</p>
+  <p class="" style="">The "on-mention" notification MAY rely on the user's nickname being spelled out in an incoming message in a group chat, but SHOULD rely on mechanisms to explicitly "ping" the user, such as a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0461.html">Message Replies (XEP-0461)</a></span>  [<a href="#nt-idm44945437145488">2</a>] element referring a user's previous message or a specific mention, such as a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0372.html">References (XEP-0372)</a></span>  [<a href="#nt-idm44945437136400">3</a>] mention.</p>
+<h2 id="security">4.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">See considerations in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0402.html">PEP Native Bookmarks (XEP-0402)</a></span>  [<a href="#nt-idm44945437181088">1</a>].</p>
+<h2 id="iana">5.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm44945437130336">4</a>].</p>
+<h2 id="registrar">6.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="registrar-ns">6.1 Protocol Namespaces<a class="anchor-link" href="#registrar-ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">This specification defines the following XML namespace:</p>
+    <ul class="" style="">
+      <li class="" style="">urn:xmpp:notification-settings:1</li>
+    </ul>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm44945437119440">5</a>] includes this namespace in the registry located at &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt;, as described in Section 4 of <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0053.html">XMPP Registrar Function (XEP-0053)</a></span>  [<a href="#nt-idm44945437112864">6</a>].</p>
+  </div>
+  <div class="indent"><h3 id="registrar-versioning">6.2 Protocol Versioning<a class="anchor-link" href="#registrar-versioning"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">If the protocol defined in this specification undergoes a revision that is not fully backwards-compatible with an older version, the XMPP Registrar shall increment the protocol version number found at the end of the XML namespaces defined herein, as described in Section 4 of <span class="ref">XEP-0053</span>.</p>
+  </div>
+<h2 id="schema">7.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='urn:xmpp:notification-settings:1'
+    xmlns='urn:xmpp:notification-settings:1'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+      The protocol documented by this schema is defined in
+      XEP-0492: http://www.xmpp.org/extensions/xep-0492.html
+    &lt;/xs:documentation&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:element name='notify'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:sequence&gt;
+        &lt;xs:element name='always' type='setting' minOccurs='0' maxOccurs='unbounded'/&gt;
+        &lt;xs:element name='on-mention' type='setting' minOccurs='0' maxOccurs='unbounded'/&gt;
+        &lt;xs:element name='never' type='setting' minOccurs='0' maxOccurs='unbounded'/&gt;
+      &lt;/xs:sequence&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+  &lt;xs:complexType name="setting"&gt;
+    &lt;xs:sequence&gt;
+      &lt;xs:element name='advanced' minOccurs='0' maxOccurs='1'&gt;
+        &lt;xs:complexType&gt;
+          &lt;xs:sequence&gt;
+            &lt;xs:any namespace='##other' minOccurs='1' maxOccurs='unbounded' processContents='lax'/&gt;
+          &lt;/xs:sequence&gt;
+        &lt;/xs:complexType&gt;
+      &lt;/xs:element&gt;
+    &lt;/xs:sequence&gt;
+    &lt;xs:attribute name='identity-category' type='xs:string' use='optional'/&gt;
+    &lt;xs:attribute name='identity-type' type='xs:string' use='optional'/&gt;
+  &lt;/xs:complexType&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0492</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Experimental">Experimental</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.2.0</dd><dt>Last Updated</dt><dd>2025-10-25</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, XMPP IM, <a href="xep-0402.html">XEP-0402</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>notification-settings</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0492.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0492.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0492.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Nicolas Cedilnik</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:nicoco@nicoco.fr">nicoco@nicoco.fr</a></dd><dt>JabberID</dt><dd><a href="xmpp:nicoco@nicoco.fr">nicoco@nicoco.fr</a></dd></dl><h5>Thilo Molitor</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:thilo+xmpp@eightysoft.de">thilo+xmpp@eightysoft.de</a></dd><dt>JabberID</dt><dd><a href="xmpp:thilo.molitor@juforum.de">thilo.molitor@juforum.de</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm44945437181088">1</a>. XEP-0402: PEP Native Bookmarks &lt;<a href="https://xmpp.org/extensions/xep-0402.html">https://xmpp.org/extensions/xep-0402.html</a>&gt;.</p><p><a name="nt-idm44945437145488">2</a>. XEP-0461: Message Replies &lt;<a href="https://xmpp.org/extensions/xep-0461.html">https://xmpp.org/extensions/xep-0461.html</a>&gt;.</p><p><a name="nt-idm44945437136400">3</a>. XEP-0372: References &lt;<a href="https://xmpp.org/extensions/xep-0372.html">https://xmpp.org/extensions/xep-0372.html</a>&gt;.</p><p><a name="nt-idm44945437130336">4</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm44945437119440">5</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p><p><a name="nt-idm44945437112864">6</a>. XEP-0053: XMPP Registrar Function &lt;<a href="https://xmpp.org/extensions/xep-0053.html">https://xmpp.org/extensions/xep-0053.html</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.2.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0492-0.2.0.html">0.2.0</a> (2025-10-25)<a class="anchor-link" href="#revision-history-v0.2.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <ul class="" style="">
+        <li class="" style="">Rework the spec to use more of the Service Discovery Identities registry</li>
+        <li class="" style="">Fix the XML schema</li>
+        <li class="" style="">Move the &lt;advanced/&gt; element into the notification setting element</li>
+        <li class="" style="">Bump the namespace</li>
+      </ul>
+    <div class="revision-author">tm</div></li><li id="revision-history-v0.1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0492-0.1.0.html">0.1.0</a> (2024-07-01)<a class="anchor-link" href="#revision-history-v0.1.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <ul class="" style="">
+        <li class="" style="">Promoted to Experimental</li>
+      </ul>
+    <div class="revision-author">XEP Editor: dg</div></li><li id="revision-history-v0.0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0492-0.0.2.html">0.0.2</a> (2024-06-08)<a class="anchor-link" href="#revision-history-v0.0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Update after discussions on the standards@ mailing list.</p><div class="revision-author">nc</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0492-0.0.1.html">0.0.1</a> (2024-06-06)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial version.</p><div class="revision-author">nc</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{cedilnik2024notification-settings,
+  title = {Chat notification settings},
+  author = {Cedilnik, Nicolas and Molitor, Thilo},
+  type = {XEP},
+  number = {0492},
+  version = {0.2.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0492.html},
+  date = {2024-06-06/2025-10-25},
+}</pre><p>END</p></body></html>

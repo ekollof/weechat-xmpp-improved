@@ -1,0 +1,517 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0450: Automatic Trust Management (ATM)</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0450";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Automatic Trust Management (ATM)"><meta name="DC.Creator" content="Melvin Keskin"><meta name="DC.Description" content="
+		This document specifies a way to automatically manage the trust in public long-term keys used by end-to-end encryption protocols.
+	"><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2021-10-04"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0450"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0450: Automatic Trust Management (ATM)</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>
+		This document specifies a way to automatically manage the trust in public long-term keys used by end-to-end encryption protocols.
+	</dd><dt>Author</dt><dd>Melvin Keskin</dd><dt>Copyright</dt><dd>© 2020 – 2021 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Experimental</p><div id="status-notice" class="experimental standards track">WARNING: This Standards-Track document is Experimental. Publication as an XMPP Extension Protocol does not imply approval of this proposal by the XMPP Standards Foundation. Implementation of the protocol described herein is encouraged in exploratory implementations, but production systems are advised to carefully consider whether it is appropriate to deploy implementations of this protocol before it advances to a status of Draft.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.4.0 (2021-10-04)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li class="current">Experimental</li><li>Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#introduction">Introduction</a></li><li><a href="#glossary">Glossary</a></li><li><a href="#details">Details</a></li><li><a href="#use-cases">Use Cases</a><ol><li><a href="#use-case-authentication-contact-endpoint">Authenticating the Key of a Contact's Endpoint</a><ol><li><a href="#use-case-authentication-contact-endpoint-sending">Sending</a><ol><li><a href="#use-case-authentication-contact-endpoint-sending-to-own-endpoints">To Own Endpoints (OOK)</a></li><li><a href="#use-case-authentication-contact-endpoint-sending-to-contact-endpoint">To Contact's Endpoint</a></li></ol></li><li><a href="#use-case-authentication-contact-endpoint-receiving">Receiving</a><ol><li><a href="#use-case-authentication-contact-endpoint-receiving-from-own-endpoint">From Own Endpoint (OOK)</a></li><li><a href="#use-case-authentication-contact-endpoint-receiving-from-contact-endpoint">From Contact's Endpoint</a></li></ol></li></ol></li><li><a href="#use-case-authentication-own-endpoint">Authenticating the Key of an Own Endpoint</a><ol><li><a href="#use-case-authentication-own-endpoint-sending">Sending</a><ol><li><a href="#use-case-authentication-own-endpoint-sending-to-other-endpoints">To All Other Endpoints</a></li><li><a href="#use-case-authentication-own-endpoint-sending-to-endpoint-key-authenticated">To Endpoint Whose Key Has Been Authenticated</a></li></ol></li><li><a href="#use-case-authentication-own-endpoint-receiving">Receiving</a></li></ol></li><li><a href="#use-case-distrusting-own-endpoint">Distrusting the Key of an Own Endpoint</a><ol><li><a href="#use-case-distrusting-own-endpoint-sending">Sending</a></li><li><a href="#use-case-distrusting-own-endpoint-receiving">Receiving</a></li></ol></li><li><a href="#use-case-distrusting-contact-endpoint">Distrusting the Key of a Contact's Endpoint</a><ol><li><a href="#use-case-distrusting-contact-endpoint-sending">Sending (OOK)</a></li><li><a href="#use-case-distrusting-contact-endpoint-receiving">Receiving</a><ol><li><a href="#use-case-distrusting-contact-endpoint-receiving-from-contact-endpoint">From Contact's Endpoint</a></li><li><a href="#use-case-distrusting-contact-endpoint-receiving-from-own-endpoint">From Own Endpoint (OOK)</a></li></ol></li></ol></li></ol></li><li><a href="#implementation-notes">Implementation Notes</a><ol><li><a href="#implementation-notes-storing-trust-message-information-unauthenticated-keys">Storing Trust Message Information from Endpoints with Unauthenticated Keys</a></li><li><a href="#implementation-notes-storing-trust-message-information-unknown-keys">Storing Trust Message Information for Unknown Keys</a></li><li><a href="#implementation-notes-gui-considerations">GUI Considerations</a></li></ol></li><li><a href="#security-considerations">Security Considerations</a><ol><li><a href="#security-considerations-notification-and-confirmation">Notification and Confirmation</a></li><li><a href="#security-considerations-recommended-security-policy-trust-only-authenticated-keys-after-first-authentication-toakafa">Recommended Security Policy - Trust Only Authenticated Keys After First Authentication (TOAKAFA)</a></li></ol></li><li><a href="#iana-considerations">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#xmpp-registrar-considerations-protocol-namespaces">Protocol Namespaces</a></li><li><a href="#xmpp-registrar-considerations-protocol-versioning">Protocol Versioning</a></li></ol></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="introduction">1.
+       Introduction<a class="anchor-link" href="#introduction"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<p class="" style="">
+		End-to-end encryption can easily be used to protect most of the communication nowadays.
+		However, the management of trust in long-term keys used for encryption is still a manual task.
+		With ATM, many steps that can be automated for the trust management are no longer a manual task the users have to take care of.
+	</p>
+	<p class="" style="">
+		ATM reduces the steps needed for authenticating or distrusting keys of endpoints between two identities (XMPP accounts / bare JIDs).
+		It uses <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0434.html">Trust Messages (XEP-0434)</a></span>  [<a href="#nt-idm45419645176064">1</a>] for automatically establishing secure channels protected against active attacks between a new endpoint and existing ones after an initial mutual authentication between the new endpoint and one of the existing ones.
+	</p>
+	<p class="" style="">
+		Trust messages are sent encrypted only to endpoints with authenticated keys.
+		ATM preserves the security level as if all endpoints of the two identities authenticated or distrusted their keys manually.
+		It can be used especially for end-to-end encryption protocols such as <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0384.html">OMEMO Encryption (XEP-0384)</a></span>  [<a href="#nt-idm45419645165680">2</a>] that use one key per endpoint of the same identity.
+	</p>
+<h2 id="glossary">2.
+       Glossary<a class="anchor-link" href="#glossary"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<div class="indent"><dl>
+		
+			<dt><strong>External glossary</strong></dt>
+			<dd>
+				The terms of <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0434.html">Trust Messages (XEP-0434)</a></span>  [<a href="#nt-idm45419645176064">1</a>]'s glossary are also relevant for this XEP.
+			</dd>
+		
+		
+			<dt><strong>Manual key authentication</strong></dt>
+			<dd>Key authentication with user interaction (e.g., QR code scanning, fingerprint verification)</dd>
+		
+		
+			<dt><strong>Automatic key authentication</strong></dt>
+			<dd>Key authentication without user interaction (e.g., via ATM)</dd>
+		
+		
+			<dt><strong>Initial key authentication</strong></dt>
+			<dd>Key authentication needed for all further automatic key authentications made by ATM</dd>
+		
+		
+			<dt><strong>Mutual key authentication</strong></dt>
+			<dd>Key authentication in which two endpoints authenticate each other's key</dd>
+		
+		
+			<dt><strong>Key distrusting</strong></dt>
+			<dd>Revoking the trust in a key</dd>
+		
+		
+			<dt><strong>Manual key distrusting</strong></dt>
+			<dd>Key distrusting with user interaction (e.g., clicking a "Distrust" button)</dd>
+		
+		
+			<dt><strong>Automatic key distrusting</strong></dt>
+			<dd>Key distrusting without user interaction (e.g., via ATM)</dd>
+		
+		
+			<dt><strong>Authentication message</strong></dt>
+			<dd>
+				Trust message that only contains key identifiers for authentication.
+				If a trust message contains authentication and distrusting parts, the term authentication message is used for referring to the trust message without the distrusting parts.
+			</dd>
+		
+		
+			<dt><strong>Distrust message</strong></dt>
+			<dd>
+				Trust message that only contains key identifiers for distrusting.
+				If a trust message contains authentication and distrusting parts, the term distrust message is used for referring to the trust message without the authentication parts.
+			</dd>
+		
+	</dl></div>
+<h2 id="details">3.
+       Details<a class="anchor-link" href="#details"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<p class="" style="">
+		The goal of key authentication is to create an end-to-end encrypted communication network exclusively of endpoints with authenticated keys.
+		As a result, every communication channel between those endpoints is resistant against active attacks.
+	</p>
+	<p class="" style="">
+		The network of endpoints that authenticated each other's keys can be seen as a complete graph where each endpoint is a node and each mutual authentication is an edge.
+		The number of edges grows for each new endpoint by the number of existing nodes.
+		This is due to the fact that in order to sustain secure channels between all endpoints, a new key has to be authenticated by all n existing endpoints and vice versa.
+	</p>
+	<p class="" style="">
+		One of those n mutual authentications requires a third party or user interaction like scanning each other's QR code or comparing each other's key identifier by hand.
+		That is the initial mutual authentication.
+		A trusted third party MAY be used for the initial authentication but a manual authentication SHOULD be preferred since it does not depend on the trust in the third party.
+		The remaining authentications can be automated relying on the secure channel established by the initial mutual authentication and the secure channels already created by the same procedure between the rest of the endpoints.
+	</p>
+	<p class="" style="">
+		For creating the described complete graph with n nodes, a total of T(n) = (n*(n-1))/2 ∊ O(n²) mutual authentications are needed.
+		When using ATM, only T(n) = n-1 ∊ O(n) of them have to be made as initial mutual authentications.
+		All remaining authentications can be performed automatically by ATM.
+		Thus, less user interaction is needed for authenticating all keys involved in the secure communication while preserving the same security level as the manual authentication.
+	</p>
+<h2 id="use-cases">4.
+       Use Cases<a class="anchor-link" href="#use-cases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<p class="" style="">
+		Everything that is RECOMMENDED by <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0434.html">Trust Messages (XEP-0434)</a></span>  [<a href="#nt-idm45419645176064">1</a>] MUST be applied.
+		Trust Message URIs as specified by <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0434.html">Trust Messages (XEP-0434)</a></span>  [<a href="#nt-idm45419645176064">1</a>] SHOULD be used for the initial authentications.
+	</p>
+	<p class="" style="">
+		The examples contain <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0384.html">OMEMO Encryption (XEP-0384)</a></span>  [<a href="#nt-idm45419645165680">2</a>] as the encryption protocol because it uses one key per endpoint of the same identity.
+		Nevertheless, other encryption protocols MAY be used as stated in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0434.html">Trust Messages (XEP-0434)</a></span>  [<a href="#nt-idm45419645176064">1</a>].
+	</p>
+	<p class="" style="">
+		If the encryption protocol used with ATM involves only one key for all endpoints of the same identity, only the use cases for authenticating and distrusting keys of a contact's endpoint are relevant.
+		Those use cases are marked with OOK for <em>only one key</em>.
+		Additionally, the trust messages are always sent to own endpoints because they use the same key as the sending endpoint.
+		Therefore, the parts <em>..., to each (other) own endpoint with an already authenticated key.</em> and <em>... as soon as X authenticated Y's key</em> are not of interest.
+	</p>
+	<p class="" style="">
+		Note that the examples in the following use cases are consecutive and therefore must be read chronologically to properly understand them.
+		Since ATM uses <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0420.html">Stanza Content Encryption (XEP-0420)</a></span>  [<a href="#nt-idm45419645126448">3</a>], only the SCE &lt;envelope/&gt; elements are shown.
+	</p>
+	<p class="" style="">
+		Alice would like to use OMEMO when communicating with Bob.
+		Alice has the endpoints A1, A2 and A3.
+		Bob has the endpoint B1.
+		A1 has already authenticated A2's key.
+		The other endpoints have not authenticated each other's key.
+	</p>
+	<div class="indent"><h3 id="use-case-authentication-contact-endpoint">4.1 Authenticating the Key of a Contact's Endpoint<a class="anchor-link" href="#use-case-authentication-contact-endpoint"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<div class="indent"><h4 id="use-case-authentication-contact-endpoint-sending">4.1.1 Sending<a class="anchor-link" href="#use-case-authentication-contact-endpoint-sending"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+			<p class="" style="">
+				Example:
+				Remember that A1 has already authenticated A2's key.
+				A1 authenticates B1's key.
+			</p>
+			<p class="" style="">
+				An endpoint that initially authenticates the key of a contact's endpoint MUST send an authentication message for ...
+			</p>
+			<div class="indent"><h5 id="use-case-authentication-contact-endpoint-sending-to-own-endpoints">4.1.1.1 To Own Endpoints (OOK)</h5>
+				<p class="" style="">
+					... the key that has been authenticated, to each own endpoint with an already authenticated key.
+				</p>
+				<figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> A1 sends an authentication message for B1's key to A2<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;envelope xmlns='urn:xmpp:sce:1'&gt;
+  &lt;rpad&gt;QHqW2arWFewoERL1a43wonBKpTmsrBWnc1d66HSDq85NgMLmjrDJV9lV&lt;/rpad&gt;
+  &lt;time stamp='2020-01-01T12:00:00'/&gt;
+  &lt;from jid='alice@example.org/A1'/&gt;
+  &lt;to jid='alice@example.org'/&gt;
+  &lt;content&gt;
+    &lt;trust-message xmlns='urn:xmpp:tm:1' usage='urn:xmpp:atm:1' encryption='urn:xmpp:omemo:2'&gt;
+      &lt;key-owner jid='bob@example.com'&gt;
+        &lt;trust&gt;YjVI04NcbTPvXLaA95RO84HPcSvyOgEZ2r5cTyUs0C8=&lt;/trust&gt;
+      &lt;/key-owner&gt;
+    &lt;/trust-message&gt;
+  &lt;/content&gt;
+&lt;/envelope&gt;
+</pre></figure>
+			</div>
+			<div class="indent"><h5 id="use-case-authentication-contact-endpoint-sending-to-contact-endpoint">4.1.1.2 To Contact's Endpoint</h5>
+				<p class="" style="">
+					... each already authenticated key of all own endpoints, to the endpoint whose key has been authenticated.
+				</p>
+				<figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> A1 sends an authentication message for A2's key to B1<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;envelope xmlns='urn:xmpp:sce:1'&gt;
+  &lt;rpad&gt;Wvj25aDkNbAnSxMIDQo1pjIKRowIMGrF72hSJeXS&lt;/rpad&gt;
+  &lt;time stamp='2020-01-01T12:00:01'/&gt;
+  &lt;from jid='alice@example.org/A1'/&gt;
+  &lt;to jid='bob@example.com'/&gt;
+  &lt;content&gt;
+    &lt;trust-message xmlns='urn:xmpp:tm:1' usage='urn:xmpp:atm:1' encryption='urn:xmpp:omemo:2'&gt;
+      &lt;key-owner jid='alice@example.org'&gt;
+        &lt;trust&gt;aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=&lt;/trust&gt;
+      &lt;/key-owner&gt;
+    &lt;/trust-message&gt;
+  &lt;/content&gt;
+&lt;/envelope&gt;
+</pre></figure>
+			</div>
+		</div>
+		<div class="indent"><h4 id="use-case-authentication-contact-endpoint-receiving">4.1.2 Receiving<a class="anchor-link" href="#use-case-authentication-contact-endpoint-receiving"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+			<p class="" style="">
+				An endpoint that receives an authentication message for a key of a contact's endpoint from ...
+			</p>
+			<div class="indent"><h5 id="use-case-authentication-contact-endpoint-receiving-from-own-endpoint">4.1.2.1 From Own Endpoint (OOK)</h5>
+				<p class="" style="">
+					 ... an own endpoint ...
+				</p>
+				<p class="" style="">
+					Example:
+					A2 authenticates B1's key by the authentication message from A1 (see <a href="#example-1">Example 1</a> for the corresponding authentication message) as soon as A2 authenticated A1's key.
+				</p>
+			</div>
+			<div class="indent"><h5 id="use-case-authentication-contact-endpoint-receiving-from-contact-endpoint">4.1.2.2 From Contact's Endpoint</h5>
+				<p class="" style="">
+					... or another endpoint of that contact ...
+				</p>
+				<p class="" style="">
+					Example:
+					B1 authenticates A2's key by the authentication message from A1 (see <a href="#example-2">Example 2</a> for the corresponding authentication message) as soon as B1 authenticated A1's key.
+				</p>
+			</div>
+			<p class="" style="">
+				... MUST authenticate the key as soon as the receiving endpoint authenticated the key of the endpoint that sent the authentication message.
+			</p>
+		</div>
+	</div>
+	<div class="indent"><h3 id="use-case-authentication-own-endpoint">4.2 Authenticating the Key of an Own Endpoint<a class="anchor-link" href="#use-case-authentication-own-endpoint"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<div class="indent"><h4 id="use-case-authentication-own-endpoint-sending">4.2.1 Sending<a class="anchor-link" href="#use-case-authentication-own-endpoint-sending"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+			<p class="" style="">
+				Example:
+				Remember that A2 has already authenticated A1's and B1's key.
+				A2 authenticates A3's key.
+			</p>
+			<p class="" style="">
+				An endpoint that initially authenticates the key of an own endpoint MUST send an authentication message for ...
+			</p>
+			<div class="indent"><h5 id="use-case-authentication-own-endpoint-sending-to-other-endpoints">4.2.1.1 To All Other Endpoints</h5>
+				<p class="" style="">
+					... the key that has been authenticated to each other endpoint with an already authenticated key.
+				</p>
+				<figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> A2 sends an authentication message for A3's key to B1 and by using Message Carbons also to A1<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;envelope xmlns='urn:xmpp:sce:1'&gt;
+  &lt;rpad&gt;O2vRKkmtsXsKSk2hPDkrpQQ4Og272qFGB1Srp64vaDrMTNhrV6&lt;/rpad&gt;
+  &lt;time stamp='2020-01-01T14:00:01'/&gt;
+  &lt;from jid='alice@example.org/A2'/&gt;
+  &lt;to jid='bob@example.com'/&gt;
+  &lt;content&gt;
+    &lt;trust-message xmlns='urn:xmpp:tm:1' usage='urn:xmpp:atm:1' encryption='urn:xmpp:omemo:2'&gt;
+      &lt;key-owner jid='alice@example.org'&gt;
+        &lt;trust&gt;IhpPjiKLchgrAG5cpSfTvdzPjZ5v6vTOluHEUehkgCA=&lt;/trust&gt;
+      &lt;/key-owner&gt;
+    &lt;/trust-message&gt;
+  &lt;/content&gt;
+&lt;/envelope&gt;
+</pre></figure>
+				<figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> A2 would send an authentication message for A3's key only to A1 if there were no contacts with authenticated keys<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;envelope xmlns='urn:xmpp:sce:1'&gt;
+  &lt;rpad&gt;s5jP95kvpRNg92XLLo8OkLCvUDT53S&lt;/rpad&gt;
+  &lt;time stamp='2020-01-01T14:00:00'/&gt;
+  &lt;from jid='alice@example.org/A2'/&gt;
+  &lt;to jid='alice@example.org'/&gt;
+  &lt;content&gt;
+    &lt;trust-message xmlns='urn:xmpp:tm:1' usage='urn:xmpp:atm:1' encryption='urn:xmpp:omemo:2'&gt;
+      &lt;key-owner jid='alice@example.org'&gt;
+        &lt;trust&gt;IhpPjiKLchgrAG5cpSfTvdzPjZ5v6vTOluHEUehkgCA=&lt;/trust&gt;
+      &lt;/key-owner&gt;
+    &lt;/trust-message&gt;
+  &lt;/content&gt;
+&lt;/envelope&gt;
+</pre></figure>
+			</div>
+			<div class="indent"><h5 id="use-case-authentication-own-endpoint-sending-to-endpoint-key-authenticated">4.2.1.2 To Endpoint Whose Key Has Been Authenticated</h5>
+				<p class="" style="">
+					... each already authenticated key of all endpoints to the endpoint whose key has been authenticated.
+				</p>
+				<figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> A2 sends an authentication message for A1's and B1's key to A3<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;envelope xmlns='urn:xmpp:sce:1'&gt;
+  &lt;rpad&gt;98WA6U92twcVkAXM44UU&lt;/rpad&gt;
+  &lt;time stamp='2020-01-01T14:00:02'/&gt;
+  &lt;from jid='alice@example.org/A2'/&gt;
+  &lt;to jid='alice@example.org'/&gt;
+  &lt;content&gt;
+    &lt;trust-message xmlns='urn:xmpp:tm:1' usage='urn:xmpp:atm:1' encryption='urn:xmpp:omemo:2'&gt;
+      &lt;key-owner jid='alice@example.org'&gt;
+        &lt;trust&gt;883dkfJVAmUkg74v1fqqoA+AhorA1R1+67GwijiS4z0=&lt;/trust&gt;
+      &lt;/key-owner&gt;
+      &lt;key-owner jid='bob@example.com'&gt;
+        &lt;trust&gt;YjVI04NcbTPvXLaA95RO84HPcSvyOgEZ2r5cTyUs0C8=&lt;/trust&gt;
+      &lt;/key-owner&gt;
+    &lt;/trust-message&gt;
+  &lt;/content&gt;
+&lt;/envelope&gt;
+</pre></figure>
+			</div>
+		</div>
+		<div class="indent"><h4 id="use-case-authentication-own-endpoint-receiving">4.2.2 Receiving<a class="anchor-link" href="#use-case-authentication-own-endpoint-receiving"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+			<p class="" style="">
+				An endpoint that receives an authentication message for a key of an own endpoint from another own endpoint MUST authenticate the key as soon as the receiving endpoint authenticated the key of the endpoint that sent the authentication message.
+			</p>
+			<p class="" style="">
+				Example:
+				A1 authenticates A3's key by the authentication message from A2 (see <a href="#example-3">Example 3</a> or <a href="#example-4">Example 4</a> for the corresponding authentication message) as soon as A1 authenticated A2's key.
+			</p>
+		</div>
+	</div>
+	<div class="indent"><h3 id="use-case-distrusting-own-endpoint">4.3 Distrusting the Key of an Own Endpoint<a class="anchor-link" href="#use-case-distrusting-own-endpoint"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<div class="indent"><h4 id="use-case-distrusting-own-endpoint-sending">4.3.1 Sending<a class="anchor-link" href="#use-case-distrusting-own-endpoint-sending"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+			<p class="" style="">
+				Example:
+				Remember that A1 has already authenticated A2's, A3's and B1's key.
+				A1 distrusts A3's key.
+			</p>
+			<p class="" style="">
+				An endpoint that initially distrusts the key of an own endpoint MUST send a distrust message for that key to each other endpoint with an already authenticated key.
+			</p>
+			<figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> A1 sends a distrust message for A3's key to B1 and by using Message Carbons also to A2<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;envelope xmlns='urn:xmpp:sce:1'&gt;
+  &lt;rpad&gt;NF5MOJdt8TBbItt4AHXOUKWncRmw5B&lt;/rpad&gt;
+  &lt;time stamp='2020-01-01T16:00:01'/&gt;
+  &lt;from jid='alice@example.org/A1'/&gt;
+  &lt;to jid='bob@example.com'/&gt;
+  &lt;content&gt;
+    &lt;trust-message xmlns='urn:xmpp:tm:1' usage='urn:xmpp:atm:1' encryption='urn:xmpp:omemo:2'&gt;
+      &lt;key-owner jid='alice@example.org'&gt;
+        &lt;distrust&gt;IhpPjiKLchgrAG5cpSfTvdzPjZ5v6vTOluHEUehkgCA=&lt;/distrust&gt;
+      &lt;/key-owner&gt;
+    &lt;/trust-message&gt;
+  &lt;/content&gt;
+&lt;/envelope&gt;
+</pre></figure>
+			<figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> A1 would send a distrust message for A3's key only to A2 if there were no contacts with authenticated keys<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;envelope xmlns='urn:xmpp:sce:1'&gt;
+  &lt;rpad&gt;798BFSTQqPjVtiLok3EGtQ7VgB3GGP7eT9P4FhO5&lt;/rpad&gt;
+  &lt;time stamp='2020-01-01T16:00:00'/&gt;
+  &lt;from jid='alice@example.org/A1'/&gt;
+  &lt;to jid='alice@example.org'/&gt;
+  &lt;content&gt;
+    &lt;trust-message xmlns='urn:xmpp:tm:1' usage='urn:xmpp:atm:1' encryption='urn:xmpp:omemo:2'&gt;
+      &lt;key-owner jid='alice@example.org'&gt;
+        &lt;distrust&gt;IhpPjiKLchgrAG5cpSfTvdzPjZ5v6vTOluHEUehkgCA=&lt;/distrust&gt;
+      &lt;/key-owner&gt;
+    &lt;/trust-message&gt;
+  &lt;/content&gt;
+&lt;/envelope&gt;
+</pre></figure>
+		</div>
+		<div class="indent"><h4 id="use-case-distrusting-own-endpoint-receiving">4.3.2 Receiving<a class="anchor-link" href="#use-case-distrusting-own-endpoint-receiving"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+			<p class="" style="">
+				An endpoint that receives a distrust message for a key of an own endpoint from another own endpoint MUST distrust the key as soon as the receiving endpoint authenticated the key of the endpoint that sent the distrust message.
+			</p>
+			<p class="" style="">
+				Example:
+				A2 distrusts A3's key by the distrust message from A1 (see <a href="#example-6">Example 6</a> or <a href="#example-7">Example 7</a> for the corresponding distrust message) as soon as A2 authenticated A1's key.
+			</p>
+		</div>
+	</div>
+	<div class="indent"><h3 id="use-case-distrusting-contact-endpoint">4.4 Distrusting the Key of a Contact's Endpoint<a class="anchor-link" href="#use-case-distrusting-contact-endpoint"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<div class="indent"><h4 id="use-case-distrusting-contact-endpoint-sending">4.4.1 Sending (OOK)<a class="anchor-link" href="#use-case-distrusting-contact-endpoint-sending"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+			<p class="" style="">
+				Example:
+				Remember that A1 has already authenticated A2's and B1's key but distrusted A3's key.
+				A1 distrusts B1's key.
+			</p>
+			<p class="" style="">
+				An endpoint that distrusts the key of a contact's endpoint MUST send a distrust message for that key to each other own endpoint with an authenticated key.
+			</p>
+			<figure class="code-example" id="example-8"><figcaption><strong>Example 8.</strong> A1 sends a distrust message for B1's key to A2<a class="anchor-link" href="#example-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;envelope xmlns='urn:xmpp:sce:1'&gt;
+  &lt;rpad&gt;x4LJDawLHgnTJRC7T1mndKEQLPR658NQmXAPQRVnhM1QQ861ve&lt;/rpad&gt;
+  &lt;time stamp='2020-01-01T18:00:00'/&gt;
+  &lt;from jid='alice@example.org/A1'/&gt;
+  &lt;to jid='alice@example.org'/&gt;
+  &lt;content&gt;
+    &lt;trust-message xmlns='urn:xmpp:tm:1' usage='urn:xmpp:atm:1' encryption='urn:xmpp:omemo:2'&gt;
+      &lt;key-owner jid='bob@example.com'&gt;
+        &lt;distrust&gt;YjVI04NcbTPvXLaA95RO84HPcSvyOgEZ2r5cTyUs0C8=&lt;/distrust&gt;
+      &lt;/key-owner&gt;
+    &lt;/trust-message&gt;
+  &lt;/content&gt;
+&lt;/envelope&gt;
+</pre></figure>
+		</div>
+		<div class="indent"><h4 id="use-case-distrusting-contact-endpoint-receiving">4.4.2 Receiving<a class="anchor-link" href="#use-case-distrusting-contact-endpoint-receiving"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+			<p class="" style="">
+				An endpoint that receives a distrust message for a key of a contact's endpoint from ...
+			</p>
+			<div class="indent"><h5 id="use-case-distrusting-contact-endpoint-receiving-from-contact-endpoint">4.4.2.1 From Contact's Endpoint</h5>
+				<p class="" style="">
+					... another endpoint of that contact ...
+				</p>
+				<p class="" style="">
+					Example:
+					B1 distrusts A3's key by the distrust message from A1 (see <a href="#example-6">Example 6</a> for the corresponding distrust message) as soon as B1 authenticated A1's key.
+				</p>
+			</div>
+			<div class="indent"><h5 id="use-case-distrusting-contact-endpoint-receiving-from-own-endpoint">4.4.2.2 From Own Endpoint (OOK)</h5>
+				<p class="" style="">
+					 ... or an own endpoint ...
+				</p>
+				<p class="" style="">
+					Example:
+					A2 distrusts B1's key by the distrust message from A1 (see <a href="#example-8">Example 8</a>) as soon as A2 authenticated A1's key.
+				</p>
+			</div>
+			<p class="" style="">
+				... MUST distrust the key as soon as the receiving endpoint authenticated the key of the endpoint that sent the distrust message.
+			</p>
+		</div>
+	</div>
+<h2 id="implementation-notes">5.
+       Implementation Notes<a class="anchor-link" href="#implementation-notes"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<div class="indent"><h3 id="implementation-notes-storing-trust-message-information-unauthenticated-keys">5.1 Storing Trust Message Information from Endpoints with Unauthenticated Keys<a class="anchor-link" href="#implementation-notes-storing-trust-message-information-unauthenticated-keys"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<p class="" style="">
+			A client MUST save the information of a trust message until the key of the endpoint that sent the trust message is authenticated, so that the key can then be authenticated or distrusted.
+			Storing data of a trust message from an endpoint with an unauthenticated key is necessary because the receiving endpoint can only use that data after authenticating the sending endpoint's key and that data might not be received again.
+			Afterwards the information of the trust message MAY be deleted.
+		</p>
+		<p class="" style="">
+			Example:
+			When Alice's endpoint A1 authenticates the key of Bob's endpoint B1, A1 sends a trust message containing the keys of Alice's other endpoint A2 to B1.
+			If B1 has not already authenticated A1's key, B1 stores the information provided by the trust message.
+			B1 authenticates A1's key and is then able to automatically authenticate A2's key.
+		</p>
+	</div>
+	<div class="indent"><h3 id="implementation-notes-storing-trust-message-information-unknown-keys">5.2 Storing Trust Message Information for Unknown Keys<a class="anchor-link" href="#implementation-notes-storing-trust-message-information-unknown-keys"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<p class="" style="">
+			A client MUST save the information of a trust message until it has fetched the corresponding key so that the key can then be authenticated or distrusted.
+			Afterwards the information of the trust message can be deleted.
+		</p>
+		<p class="" style="">
+			Example:
+			Alice's endpoint A1 receives an authentication message from Bob's endpoint B1.
+			That authentication message contains the key for Bob's other endpoint B2.
+			If A1 has not already fetched B2's key, A1 stores the information provided by the trust message.
+			A1 fetches B2's key and is then able to automatically authenticate A2's key.
+		</p>
+	</div>
+	<div class="indent"><h3 id="implementation-notes-gui-considerations">5.3 GUI Considerations<a class="anchor-link" href="#implementation-notes-gui-considerations"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<p class="" style="">
+			A client that receives a trust message SHOULD NOT display its bare content to the user.
+			Instead, the trust message SHOULD be hidden and the automatic authentication or distrusting SHOULD take place in the background.
+		</p>
+	</div>
+<h2 id="security-considerations">6.
+       Security Considerations<a class="anchor-link" href="#security-considerations"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<div class="indent"><h3 id="security-considerations-notification-and-confirmation">6.1 Notification and Confirmation<a class="anchor-link" href="#security-considerations-notification-and-confirmation"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<p class="" style="">
+			After a successful authentication or distrusting, the user MAY be informed of that event.
+			The client MAY offer an option for requesting the user's confirmation before any automatic authentication or automatic distrusting is performed.
+		</p>
+	</div>
+	<div class="indent"><h3 id="security-considerations-recommended-security-policy-trust-only-authenticated-keys-after-first-authentication-toakafa">6.2 Recommended Security Policy - Trust Only Authenticated Keys After First Authentication (TOAKAFA)<a class="anchor-link" href="#security-considerations-recommended-security-policy-trust-only-authenticated-keys-after-first-authentication-toakafa"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<p class="" style="">
+			It is more secure to be protected against passive attacks instead of not using any encryption.
+			If it is not possible to authenticate a key before encrypting with it but it is desired to communicate with the key's endpoint, it is RECOMMENDED to automatically trust new keys until the first authentication has been made.
+		</p>
+		<p class="" style="">
+			Even ATM cannot protect the user against an attacker with an automatically trusted and undetected malicious key.
+			For this reason it is important to take special care of the following security aspects.
+		</p>
+		<p class="" style="">
+			If keys are automatically trusted until the first authentication, keys that are not authenticated by then SHOULD NOT be used any longer for encryption until they have been authenticated too.
+			New keys SHOULD also only be used for encryption after they have been authenticated.
+			Without these two additional precautions it is not possible to protect the user against attackers who introduced malicious keys before or after the first authentication.
+		</p>
+	</div>
+<h2 id="iana-considerations">7.
+       IANA Considerations<a class="anchor-link" href="#iana-considerations"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<p class="" style="">
+		This document requires no interaction with the Internet Assigned Numbers Authority (IANA).
+	</p>
+<h2 id="registrar">8.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<div class="indent"><h3 id="xmpp-registrar-considerations-protocol-namespaces">8.1 Protocol Namespaces<a class="anchor-link" href="#xmpp-registrar-considerations-protocol-namespaces"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<p class="" style="">
+			This specification defines the following XMPP namespaces:
+		</p>
+		<ul class="" style="">
+			<li class="" style="">urn:xmpp:atm:1</li>
+		</ul>
+	</div>
+	<div class="indent"><h3 id="xmpp-registrar-considerations-protocol-versioning">8.2 Protocol Versioning<a class="anchor-link" href="#xmpp-registrar-considerations-protocol-versioning"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<p class="" style="">If the protocol defined in this specification undergoes a revision that is not fully backwards-compatible with an older version, the XMPP Registrar shall increment the protocol version number found at the end of the XML namespaces defined herein, as described in Section 4 of <span class="ref">XEP-0053</span>.</p>
+	</div>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0450</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Experimental">Experimental</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.4.0</dd><dt>Last Updated</dt><dd>2021-10-04</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, <a href="xep-0001.html">XEP-0001</a>, <a href="xep-0280.html">XEP-0280</a>, <a href="xep-0334.html">XEP-0334</a>, <a href="xep-0420.html">XEP-0420</a>, <a href="xep-0434.html">XEP-0434</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>ATM</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0450.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0450.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0450.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Melvin Keskin</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:melvo@olomono.de">melvo@olomono.de</a></dd><dt>JabberID</dt><dd><a href="xmpp:melvo@olomono.de">melvo@olomono.de</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45419645176064">1</a>. XEP-0434: Trust Messages &lt;<a href="https://xmpp.org/extensions/xep-0434.html">https://xmpp.org/extensions/xep-0434.html</a>&gt;.</p><p><a name="nt-idm45419645165680">2</a>. XEP-0384: OMEMO Encryption &lt;<a href="https://xmpp.org/extensions/xep-0384.html">https://xmpp.org/extensions/xep-0384.html</a>&gt;.</p><p><a name="nt-idm45419645126448">3</a>. XEP-0420: Stanza Content Encryption &lt;<a href="https://xmpp.org/extensions/xep-0420.html">https://xmpp.org/extensions/xep-0420.html</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.4.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0450-0.4.0.html">0.4.0</a> (2021-10-04)<a class="anchor-link" href="#revision-history-v0.4.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+			<p class="" style="">Update to XEP-0434 version 0.6.0 and XEP-0384 version 0.8.0:</p>
+			<ul class="" style="">
+				<li class="" style="">Use Base64-encoded key identifiers in examples</li>
+				<li class="" style="">Update TM's namespace to 'urn:xmpp:tm:1'</li>
+				<li class="" style="">Update OMEMO's namespace to 'urn:xmpp:omemo:2'</li>
+			</ul>
+		<div class="revision-author">melvo</div></li><li id="revision-history-v0.3.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0450-0.3.2.html">0.3.2</a> (2021-06-27)<a class="anchor-link" href="#revision-history-v0.3.2"><abbr title="Link to this point in the document">¶</abbr></a></div>Use 'distrusted' consistently<div class="revision-author">melvo</div></li><li id="revision-history-v0.3.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0450-0.3.1.html">0.3.1</a> (2021-05-14)<a class="anchor-link" href="#revision-history-v0.3.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+			<p class="" style="">Improve examples and apply consistent formatting:</p>
+			<ul class="" style="">
+				<li class="" style="">Replace wrong recipient in example by 'alice@example.org'</li>
+				<li class="" style="">Use recipient 'bob@example.com' in examples consistently</li>
+				<li class="" style="">Apply consistent formatting for revision history</li>
+			</ul>
+		<div class="revision-author">melvo</div></li><li id="revision-history-v0.3.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0450-0.3.0.html">0.3.0</a> (2021-04-16)<a class="anchor-link" href="#revision-history-v0.3.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+			<p class="" style="">Update to XEP-0420 version 0.4.0 and XEP-0434 version 0.5.0:</p>
+			<ul class="" style="">
+				<li class="" style="">Replace SCE's old 'content' element by its new 'envelope' element</li>
+				<li class="" style="">Replace SCE's old 'payload' element by its new 'content' element</li>
+				<li class="" style="">Update SCE's namespace to 'urn:xmpp:sce:1'</li>
+				<li class="" style="">Update TM's namespace to 'urn:xmpp:tm:0'</li>
+				<li class="" style="">Update namespace to 'urn:xmpp:atm:1'</li>
+			</ul>
+		<div class="revision-author">melvo</div></li><li id="revision-history-v0.2.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0450-0.2.0.html">0.2.0</a> (2021-04-13)<a class="anchor-link" href="#revision-history-v0.2.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+			<p class="" style="">Add usage of Trust Message URIs, use more precise sentences, apply consistent formatting:</p>
+			<ul class="" style="">
+				<li class="" style="">Add usage of Trust Message URIs for initial authentications</li>
+				<li class="" style="">Use 'that' instead of 'which' for restrictive clauses</li>
+				<li class="" style="">Apply consistent formatting for paragraphs and revision history</li>
+			</ul>
+		<div class="revision-author">melvo</div></li><li id="revision-history-v0.1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0450-0.1.0.html">0.1.0</a> (2020-12-15)<a class="anchor-link" href="#revision-history-v0.1.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Accepted by vote of Council on 2020-12-02<div class="revision-author">XEP Editor (jsc)</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0450-0.0.1.html">0.0.1</a> (2020-11-05)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div>First draft<div class="revision-author">melvo</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{keskin2020atm,
+  title = {Automatic Trust Management (ATM)},
+  author = {Keskin, Melvin},
+  type = {XEP},
+  number = {0450},
+  version = {0.4.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0450.html},
+  date = {2020-11-05/2021-10-04},
+}</pre><p>END</p></body></html>

@@ -1,0 +1,234 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0424: Message Retraction</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0424";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Message Retraction"><meta name="DC.Creator" content="Lance Stout"><meta name="DC.Creator" content="JC Brand"><meta name="DC.Description" content="This specification defines a method for indicating that a message should be retracted."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2025-01-18"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0424"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0424: Message Retraction</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification defines a method for indicating that a message should be retracted.</dd><dt>Authors</dt><dd><ul class="authors"><li>Lance Stout</li><li>JC Brand</li></ul></dd><dt>Copyright</dt><dd>© 2015 – 2025 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Proposed</p><div id="status-notice" class="proposed standards track">NOTICE: This document is currently within Last Call or under consideration by the XMPP Council for advancement to the next stage in the XSF standards process. The Last Call ends on 2025-10-28.
+        Please send your feedback to the <a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a> discussion list.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.4.2 (2025-01-18)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li class="current">Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#disco">Discovering support</a></li><li><a href="#usecase">Use Case</a></li><li><a href="#tombstones">Tombstones</a></li><li><a href="#rules">Business Rules</a><ol><li><a href="#business-id">Using the correct ID</a></li></ol></li><li><a href="#security">Security Considerations</a><ol><li><a href="#message-id-uniqueness">Uniqueness of message IDs</a></li></ol></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#ns">Protocol Namespaces</a></li><li><a href="#registrar-versioning">Protocol Versioning</a></li></ol></li><li><a href="#schema">XML Schema</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">A chat participant might want to retract a message which they've already sent out, for example if they've mistakenly sent it to the wrong recipient or groupchat.</p>
+  <p class="" style="">Due to the federated and extensible nature of XMPP it's not possible to remove a message with full certainty and a retraction can only be considered an <strong>unenforceable request</strong> for such removal. Clients which don't support message retraction are not obligated to enforce the request and people could have seen or copied the message contents already.</p>
+<h2 id="disco">2.
+       Discovering support<a class="anchor-link" href="#disco"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">If a client implements message retractions, it MUST specify the 'urn:xmpp:message-retract:1' feature in its service discovery information features as specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45601236028880">1</a>] and the Entity Capabilities profile specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm45601236019744">2</a>].</p>
+  <p class="" style="">Similarly, a server that is aware of message retractions and will therefore ensure that they're archived for later retrieval (e.g.via <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0313.html">Message Archive Management (XEP-0313)</a></span>  [<a href="#nt-idm45601236017856">3</a>]), MUST also advertise the 'urn:xmpp:message-retract:1' feature.</p>
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Client requests information about a chat partner's client<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get'
+    from='romeo@montague.example/orchard'
+    to='juliet@capulet.example/balcony'
+    id='info1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;</pre></figure>
+    <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Partner's client advertises support for retraction<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result'
+    to='romeo@montague.example/orchard'
+    from='juliet@capulet.example/balcony'
+    id='info1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+...
+    &lt;feature var='urn:xmpp:message-retract:1'/&gt;
+...
+  &lt;/query&gt;
+&lt;/iq&gt;</pre></figure>
+<h2 id="usecase">3.
+       Use Case<a class="anchor-link" href="#usecase"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Consider a situation where a user sends a message to the wrong recipient: </p>
+  <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> The user's client sends a message to the wrong recipient<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message type='chat' to='lord@capulet.example' id='wrong-recipient-1'&gt;
+  &lt;body&gt;Have not saints lips, and holy palmers too?&lt;/body&gt;
+&lt;/message&gt;</pre></figure>
+
+  <p class="" style="">The author notices that the message was sent to the wrong recipient and indicates to their client that it should be retracted.</p>
+  <p class="" style="">The client sends out a retraction message and uses the 'id' attribute of the &lt;message&gt; element in the original message to indicate that it should be removed.</p>
+  <p class="" style="">In the case of a group chat message, for example <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45601236006320">4</a>], instead of the origin ID, the XEP-0359 stanza ID that was assigned by the group chat SHOULD be used.</p>
+
+  <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> The client sends out a retraction<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message type='chat' to='lord@capulet.example' id='retract-message-1'&gt;
+  &lt;retract id="wrong-recipient-1" xmlns='urn:xmpp:message-retract:1'/&gt;
+  &lt;fallback xmlns="urn:xmpp:fallback:0" for='urn:xmpp:message-retract:1'/&gt;
+  &lt;body&gt;/me retracted a previous message, but it's unsupported by your client.&lt;/body&gt;
+  &lt;store xmlns="urn:xmpp:hints"/&gt;
+&lt;/message&gt;</pre></figure>
+
+<p class="" style="">It's RECOMMENDED that you include a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0428.html">Fallback Indication (XEP-0428)</a></span>  [<a href="#nt-idm45601236000480">5</a>] tag with fallback text in the &lt;body/&gt;, so that servers will archive the retraction and non-supporting clients can still indicate that there was an intent to retract. Additionally, you MAY include a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0334.html">Message Processing Hints (XEP-0334)</a></span>  [<a href="#nt-idm45601235993568">6</a>] &lt;store/&gt; hint, to indicate that the stanza needs to be archived.</p>
+
+<h2 id="tombstones">4.
+       Tombstones<a class="anchor-link" href="#tombstones"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">It might be desirable to remove the retracted message from a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0313.html">Message Archive Management (XEP-0313)</a></span>  [<a href="#nt-idm45601236017856">3</a>] service, while still recording the fact that it once existed, in order to aid clients in synchronizing their archives. To do this, the archiving service MAY replace the retracted message contents with a 'tombstone'.</p>
+
+  <p class="" style="">A service which supports tombstones MUST advertise the 'urn:xmpp:message-retract:1#tombstone' feature in its Service Discovery responses.</p>
+
+    <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> Client requests service discovery information from the server<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get'
+    from='romeo@montague.example/orchard'
+    to='romeo@montague.example'
+    id='info1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;</pre></figure>
+    <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> The server advertises support for tombstone retraction<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result'
+    to='romeo@montague.example/orchard'
+    from='romeo@montague.example'
+    id='info1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+...
+    &lt;feature var='urn:xmpp:message-retract:1#tombstone'/&gt;
+...
+  &lt;/query&gt;
+&lt;/iq&gt;</pre></figure>
+
+  <p class="" style="">
+      When replacing the original message with a tombstone, the original contents
+      (i.e. the &lt;body/&gt; and any related elements which might leak information about the original message)
+      get replaced with a &lt;retracted/&gt; element which MUST include an 'id' attribute that's set to the value of the retraction's &lt;message/&gt; element's 'id' attribute,
+      so that clients can match the tombstone to the retraction (which MUST also be stored in the archive).
+  </p>
+  <p class="" style="">The &lt;retracted/&gt; element SHOULD also include a 'stamp' attribute indicating the time at which the retraction took place.</p>
+  <p class="" style="">As with other XEP-0313 archived messages, the <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0203.html">Delayed Delivery (XEP-0203)</a></span>  [<a href="#nt-idm45601235977424">7</a>] &lt;delay/&gt; element is used to indicate when the original message was received.</p>
+
+  <figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> Retracted message tombstone in a MAM result<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message id='aeb213' to='lord@capulet.example/chamber'&gt;
+  &lt;result xmlns='urn:xmpp:mam:2' queryid='f27' id='stanza-id-1'&gt;
+    &lt;forwarded xmlns='urn:xmpp:forward:0'&gt;
+      &lt;delay xmlns='urn:xmpp:delay' stamp='2019-09-20T23:08:25Z'/&gt;
+      &lt;message type='groupchat' from='romeo@montague.example' to='lord@capulet.example' id='wrong-recipient-1'&gt;
+        &lt;retracted stamp='2019-09-20T23:09:32Z' xmlns='urn:xmpp:message-retract:1' id='retract-message-1'/&gt;
+      &lt;/message&gt;
+  &lt;/forwarded&gt;
+&lt;/result&gt;
+&lt;/message&gt;</pre></figure>
+<h2 id="rules">5.
+       Business Rules<a class="anchor-link" href="#rules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">A receiving client can choose to remove the retracted message from whatever display is used for messages, from any stored history, or choose to display the fact that a message has been retracted in another way.</p>
+  <p class="" style="">A MUC or other service that supports message retraction SHOULD prevent further distribution of the message by the service (e.g., by not replaying the message to new occupants joining the room, omitting the message from history archive requests where possible, or replacing the original message with a 'tombstone').</p>
+  <p class="" style="">Some clients may have been offline while the retraction was issued. The archiving service therefore MUST store the retraction message, regardless of whether the original message is deleted or replaced with a tombstone. These clients will then become aware of the retraction as soon as they catch up with the archive.</p>
+  <p class="" style="">A client MAY inform the user that a no-longer displayed message did previously exist and has been removed.</p>
+  <p class="" style="">Supporting clients MUST set a unique 'id' on the &lt;message&gt; element in outgoing stanzas (as per <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0359.html">Unique and Stable Stanza IDs (XEP-0359)</a></span>  [<a href="#nt-idm45601235964080">8</a>]), to make them suitable for retraction.</p>
+  <p class="" style="">The Sender MUST NOT send a retraction request for a message with non-messaging payloads. For example, a sender MUST NOT send a retraction for a roster item exchange request or a file transfer part.</p>
+  <p class="" style="">A retraction (that's not part of a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0425.html">Message Moderation (XEP-0425)</a></span>  [<a href="#nt-idm45601235957664">9</a>] operation) MUST only be processed when both the original message and the retraction request are received from the same bare-JID (in a one-on-one conversation) or full-JID (in a non-anonymous MUC from <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45601236006320">4</a>]).</p>
+  <p class="" style="">When used in a semi-anonymous MUC, the recipient client MUST check that a message retraction was sent by the author of the retracted message by checking the occupant id from <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0421.html">Anonymous unique occupant identifiers for MUCs (XEP-0421)</a></span>  [<a href="#nt-idm45601235948448">10</a>].</p>
+
+  <div class="indent"><h3 id="business-id">5.1 Using the correct ID<a class="anchor-link" href="#business-id"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">
+      For messages of type 'groupchat', the ID assigned to
+      the stanza by the group chat itself must be used. This is discovered in a
+      &lt;stanza-id&gt; element with a 'by' attribute that matches the bare JID
+      of the group chat, as defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0359.html">Unique and Stable Stanza IDs (XEP-0359)</a></span>  [<a href="#nt-idm45601235964080">8</a>].
+    </p>
+    <p class="" style="">
+      If a group chat does not support <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0359.html">Unique and Stable Stanza IDs (XEP-0359)</a></span>  [<a href="#nt-idm45601235964080">8</a>], a client can still opt to include an &lt;origin-id&gt; element in the message stanza,
+      which can be used to refer to the message in a retraction.
+    </p>
+    <p class="" style="">
+      For other message types the sender should use the value of the 'id' attribute on the &lt;message&gt; element. See however the <a href="#security">Security Considerations</a> below.
+    </p>
+  </div>
+<h2 id="security">6.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">There can never be a guarantee that a retracted message was never seen or otherwise distributed, and it is encouraged for clients and services when possible to inform users that no such guarantee exists.</p>
+  <p class="" style="">
+   If message retraction results in the complete removal of any record of the original message's body, for example to be replaced by a tombstone, then this could be used to hide messages that moderators might want to be notified of.
+  </p>
+  <p class="" style="">To prevent message spoofing, it's very important that the sender's JID or XEP-0421 occupant id of message retractions are checked (as explained in the <a href="#rules">Business Rules</a> section).</p>
+  <div class="indent"><h3 id="message-id-uniqueness">6.1 Uniqueness of message IDs<a class="anchor-link" href="#message-id-uniqueness"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+  <p class="" style="">
+  Clients that don't support <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0359.html">Unique and Stable Stanza IDs (XEP-0359)</a></span>  [<a href="#nt-idm45601235964080">8</a>] (and therefore don't support <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0424.html">Message Retraction (XEP-0424)</a></span>  [<a href="#nt-idm45601235924784">11</a>]), are not guaranteed to have a unique 'id' attribute on their &lt;message&gt; elements.
+  This means that when someone is using a supporting client, and attempts to retract a message from a different, non-supporting client,
+  it might not be possible to uniquely indentify the message being retracted, as more than one message could have the same 'id' attribute.
+  </p>
+  <p class="" style="">
+  To mitigate this, clients can do a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45601236028880">1</a>] request to check if the other client supports XEP-0359, and if not,
+  they can choose to not support retraction for messages from that client, or otherwise warn the client about this limitation.
+  However, the other client might not be online to respond to a disco request, so this is not a foolproof method.
+  </p>
+  </div>
+<h2 id="iana">7.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">None.</p>
+<h2 id="registrar">8.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="ns">8.1 Protocol Namespaces<a class="anchor-link" href="#ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45601235910544">12</a>] includes 'urn:xmpp:message-retract:1' in its registry of protocol namespaces (see &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt;).</p>
+    <ul class="" style="">
+      <li class="" style="">urn:xmpp:message-retract:1</li>
+    </ul>
+  </div>
+  <div class="indent"><h3 id="registrar-versioning">8.2 Protocol Versioning<a class="anchor-link" href="#registrar-versioning"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">If the protocol defined in this specification undergoes a revision that is not fully backwards-compatible with an older version, the XMPP Registrar shall increment the protocol version number found at the end of the XML namespaces defined herein, as described in Section 4 of <span class="ref">XEP-0053</span>.</p>
+  </div>
+<h2 id="schema">9.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='urn:xmpp:message-retract:1'
+    xmlns='urn:xmpp:message-retract:1'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:element name='retract'&gt;
+    &lt;xs:attribute name='id' type='xs:string' use='required'/&gt;
+  &lt;/xs:element&gt;
+
+  &lt;xs:element name='retracted'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:simpleContent&gt;
+        &lt;xs:extension base='xs:string'&gt;
+          &lt;xs:attribute name='by' type='xs:string' use='optional'/&gt;
+          &lt;xs:attribute name='id' type='xs:string' use='required'/&gt;
+          &lt;xs:attribute name='stamp' type='xs:dateTime' use='optional'/&gt;
+        &lt;/xs:extension&gt;
+      &lt;/xs:simpleContent&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+&lt;/xs:schema&gt;
+    </pre></figure>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0424</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Proposed">Proposed</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.4.2</dd><dt>Last Updated</dt><dd>2025-01-18</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, XMPP IM, <a href="xep-0245.html">XEP-0245</a>, <a href="xep-0313.html">XEP-0313</a>, <a href="xep-0359.html">XEP-0359</a>, <a href="xep-0421.html">XEP-0421</a>, <a href="xep-0428.html">XEP-0428</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>message-retract</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0424.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0424.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0424.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Lance Stout</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:lance@andyet.com">lance@andyet.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:lance@lance.im">lance@lance.im</a></dd></dl><h5>JC Brand</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:jc@opkode.com">jc@opkode.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:jc@opkode.com">jc@opkode.com</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45601236028880">1</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm45601236019744">2</a>. XEP-0115: Entity Capabilities &lt;<a href="https://xmpp.org/extensions/xep-0115.html">https://xmpp.org/extensions/xep-0115.html</a>&gt;.</p><p><a name="nt-idm45601236017856">3</a>. XEP-0313: Message Archive Management &lt;<a href="https://xmpp.org/extensions/xep-0313.html">https://xmpp.org/extensions/xep-0313.html</a>&gt;.</p><p><a name="nt-idm45601236006320">4</a>. XEP-0045: Multi-User Chat &lt;<a href="https://xmpp.org/extensions/xep-0045.html">https://xmpp.org/extensions/xep-0045.html</a>&gt;.</p><p><a name="nt-idm45601236000480">5</a>. XEP-0428: Fallback Indication &lt;<a href="https://xmpp.org/extensions/xep-0428.html">https://xmpp.org/extensions/xep-0428.html</a>&gt;.</p><p><a name="nt-idm45601235993568">6</a>. XEP-0334: Message Processing Hints &lt;<a href="https://xmpp.org/extensions/xep-0334.html">https://xmpp.org/extensions/xep-0334.html</a>&gt;.</p><p><a name="nt-idm45601235977424">7</a>. XEP-0203: Delayed Delivery &lt;<a href="https://xmpp.org/extensions/xep-0203.html">https://xmpp.org/extensions/xep-0203.html</a>&gt;.</p><p><a name="nt-idm45601235964080">8</a>. XEP-0359: Unique and Stable Stanza IDs &lt;<a href="https://xmpp.org/extensions/xep-0359.html">https://xmpp.org/extensions/xep-0359.html</a>&gt;.</p><p><a name="nt-idm45601235957664">9</a>. XEP-0425: Message Moderation &lt;<a href="https://xmpp.org/extensions/xep-0425.html">https://xmpp.org/extensions/xep-0425.html</a>&gt;.</p><p><a name="nt-idm45601235948448">10</a>. XEP-0421: Anonymous unique occupant identifiers for MUCs &lt;<a href="https://xmpp.org/extensions/xep-0421.html">https://xmpp.org/extensions/xep-0421.html</a>&gt;.</p><p><a name="nt-idm45601235924784">11</a>. XEP-0424: Message Retraction &lt;<a href="https://xmpp.org/extensions/xep-0424.html">https://xmpp.org/extensions/xep-0424.html</a>&gt;.</p><p><a name="nt-idm45601235910544">12</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.4.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0424-0.4.2.html">0.4.2</a> (2025-01-18)<a class="anchor-link" href="#revision-history-v0.4.2"><abbr title="Link to this point in the document">¶</abbr></a></div>
+        <ul class="" style="">
+          <li class="" style="">Use a XEP-0425 /me command in the fallback body</li>
+          <li class="" style="">State that a tombstone's &lt;retracted/&gt; element's 'id' attribute should match the retraction message's 'id'.</li>
+          <li class="" style="">Specify XEP-0359 as a dependency and require that the stanza 'id' be used instead of the origin-id.</li>
+          <li class="" style="">Update the "Security Considerations" to mention the risk of non-unique message IDs.</li>
+        </ul>
+    <div class="revision-author">jcb</div></li><li id="revision-history-v0.4.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0424-0.4.1.html">0.4.1</a> (2024-02-24)<a class="anchor-link" href="#revision-history-v0.4.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+        <ul class="" style="">
+          <li class="" style="">Fix schema.</li>
+          <li class="" style="">Add missing for attribute in fallback element (Example 4).</li>
+        </ul>
+    <div class="revision-author">nc</div></li><li id="revision-history-v0.4.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0424-0.4.0.html">0.4.0</a> (2023-02-19)<a class="anchor-link" href="#revision-history-v0.4.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+        <ul class="" style="">
+          <li class="" style="">Remove the dependency on XEP-0422 Message Fastening.</li>
+          <li class="" style="">Use 'id' attribute on 'retracted' element instead of a child element.</li>
+          <li class="" style="">Clarify business rlies regarding which 'id' to use to refer to the retracted message.</li>
+        </ul>
+    <div class="revision-author">jcb</div></li><li id="revision-history-v0.3.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0424-0.3.0.html">0.3.0</a> (2020-05-17)<a class="anchor-link" href="#revision-history-v0.3.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+        <ul class="" style="">
+            <li class="" style="">Clarify when a service must advertise support via disco.</li>
+            <li class="" style="">Add another service discovery URN for tombstones.</li>
+        </ul>
+    <div class="revision-author">jcb</div></li><li id="revision-history-v0.2.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0424-0.2.1.html">0.2.1</a> (2020-03-25)<a class="anchor-link" href="#revision-history-v0.2.1"><abbr title="Link to this point in the document">¶</abbr></a></div>Recommend XEP-0428 fallback body and XEP-0334 store hint<div class="revision-author">jcb</div></li><li id="revision-history-v0.2.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0424-0.2.0.html">0.2.0</a> (2019-11-11)<a class="anchor-link" href="#revision-history-v0.2.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Replace the message contents with a tombstone (instead of the message itself) and require an origin-id in tombstone<div class="revision-author">jcb</div></li><li id="revision-history-v0.1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0424-0.1.0.html">0.1.0</a> (2019-11-01)<a class="anchor-link" href="#revision-history-v0.1.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Accepted by vote of Council on 2019-10-23.<div class="revision-author">XEP Editor (jcb)</div></li><li id="revision-history-v0.0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0424-0.0.4.html">0.0.4</a> (2019-09-25)<a class="anchor-link" href="#revision-history-v0.0.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Remove MUC moderation use-case which will go into a separate XEP</p><div class="revision-author">jcb</div></li><li id="revision-history-v0.0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0424-0.0.3.html">0.0.3</a> (2016-10-19)<a class="anchor-link" href="#revision-history-v0.0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Fix the XEP title to be Message Retraction.</p><div class="revision-author">ljts</div></li><li id="revision-history-v0.0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0424-0.0.2.html">0.0.2</a> (2016-10-12)<a class="anchor-link" href="#revision-history-v0.0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Use the term 'retraction' instead of 'deletion'. Added tombstone marker.</p><div class="revision-author">ljts</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0424-0.0.1.html">0.0.1</a> (2015-07-07)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">ljts</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{stout2015message-retract,
+  title = {Message Retraction},
+  author = {Stout, Lance and Brand, JC},
+  type = {XEP},
+  number = {0424},
+  version = {0.4.2},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0424.html},
+  date = {2015-07-07/2025-01-18},
+}</pre><p>END</p></body></html>

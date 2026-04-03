@@ -1,0 +1,541 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0393: Message Styling</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0393";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Message Styling"><meta name="DC.Creator" content="Sam Whited"><meta name="DC.Description" content="
+    This specification defines a formatted text syntax for use in instant
+    messages with simple text styling.
+  "><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2021-04-04"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0393"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0393: Message Styling</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>
+    This specification defines a formatted text syntax for use in instant
+    messages with simple text styling.
+  </dd><dt>Author</dt><dd>Sam Whited</dd><dt>Copyright</dt><dd>© 2017 – 2021 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Stable</p><div id="status-notice" class="draft standards track">NOTICE: The protocol defined herein is a <strong>Stable Standard</strong> of the XMPP Standards Foundation. Implementations are encouraged and the protocol is appropriate for deployment in production systems, but some changes to the protocol are possible before it becomes a Final Standard.</div></dd><dt>Supersedes</dt><dd><a href="xep-0071.html">XEP-0071</a></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>1.1.1 (2021-04-04)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li class="current">Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#reqs">Requirements</a></li><li><a href="#usecases">Use Cases</a></li><li><a href="#glossary">Glossary</a></li><li><a href="#disco">Discovering Support</a></li><li><a href="#rules">Business Rules</a><ol><li><a href="#block">Blocks</a><ol><li><a href="#line-block">Plain</a></li><li><a href="#pre-block">Preformatted Text</a></li><li><a href="#quote">Quotations</a></li></ol></li><li><a href="#span">Spans</a><ol><li><a href="#plain">Plain</a></li><li><a href="#emph">Emphasis</a></li><li><a href="#strong">Strong Emphasis</a></li><li><a href="#strike">Strike through</a></li><li><a href="#mono">Preformatted Span</a></li></ol></li></ol></li><li><a href="#disable">Disabling Styling</a></li><li><a href="#impl">Implementation Notes</a></li><li><a href="#access">Accessibility Considerations</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#registrar-ns">Protocol Namespaces</a></li><li><a href="#registrar-versioning">Namespace Versioning</a></li></ol></li><li><a href="#schema">XML Schema</a></li><li><a href="#ack">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">
+    Historically, XMPP has had no system for simple text styling.
+    Instead, specifications like <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0071.html">XHTML-IM (XEP-0071)</a></span>  [<a href="#nt-idm46104044041984">1</a>] that require full layout engines have
+    been used, leading to numerous security issues with implementations.
+    Some entities have also performed their own styling based on identifiers in
+    the body.
+    While this has worked well in the past, it is not interoperable and leads to
+    entities each supporting their own informal styling languages.
+  </p>
+  <p class="" style="">
+    This specification aims to provide a single, interoperable formatted text
+    syntax that can be used by entities that do not require full layout engines.
+  </p>
+<h2 id="reqs">2.
+       Requirements<a class="anchor-link" href="#reqs"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <ul class="" style="">
+    <li class="" style="">
+      Clients that do not support this specification MUST still be able to
+      receive messages sent by clients using this specification and display them
+      in a human-readable form.
+    </li>
+    <li class="" style="">
+      Clients that support this specification MUST NOT be required to use a
+      layout engine such as HTML or LaTeX.
+    </li>
+    <li class="" style="">
+      Messages formatted using this specification MUST NOT hinder readability on
+      receiving clients regardless of client background color, contrast, or
+      window size.
+    </li>
+    <li class="" style="">
+      Messages formatted using this specification MUST NOT hinder readability by
+      users with color vision deficiency or impaired vision.
+    </li>
+    <li class="" style="">
+      Messages formatted with this specification MUST render correctly in
+      locales with right-to-left (RTL) layouts without causing confusion.
+    </li>
+    <li class="" style="">
+      Clients that support this specification MUST NOT be required to extract
+      metadata unrelated to formatting or text style from the message.
+    </li>
+    <li class="" style="">
+      Servers MUST NOT need to implement any new functionality for this
+      specification to be supported.
+    </li>
+  </ul>
+<h2 id="usecases">3.
+       Use Cases<a class="anchor-link" href="#usecases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <ul class="" style="">
+    <li class="" style="">
+      As a user sending an instant message to a friend, I want to be able to
+      emphasize an important part of my message.
+    </li>
+    <li class="" style="">
+      As a software developer, I want to be able to send code as pre-formatted,
+      monospace, block or inline text to another developer.
+    </li>
+    <li class="" style="">
+      As a multi-user chat user I want to add context to my reply by quoting an
+      earlier message in the chat.
+    </li>
+  </ul>
+<h2 id="glossary">4.
+       Glossary<a class="anchor-link" href="#glossary"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">
+    Many important terms used in this document are defined in <span class="ref" style="">Unicode</span>  [<a href="#nt-idm46104044020960">2</a>].
+    The terms "left-to-right" (LTR) and "right-to-left" (RTL) are defined in
+    <span class="ref" style="">Unicode Standard Annex #9</span>  [<a href="#nt-idm46104044017248">3</a>].
+    The term "formatted text" is defined in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc7764">RFC 7764</a></span>  [<a href="#nt-idm46104044012928">4</a>].
+  </p>
+  <div class="indent"><dl>
+    
+      <dt><strong>Block</strong></dt>
+      <dd>
+        Any chunk of text that can be parsed unambiguously in one pass.
+        Blocks may contain one or more children which may be other blocks or
+        spans.
+        For example:
+        <ul class="" style="">
+          <li class="" style="">A single line of text comprising one or more spans</li>
+          <li class="" style="">A block quotation</li>
+          <li class="" style="">A preformatted code block</li>
+        </ul>
+      </dd>
+    
+    
+      <dt><strong>Formal markup language</strong></dt>
+      <dd>
+        A structured markup language such as LaTeX, SGML, HTML, or XML that is
+        formally defined and may include metadata unrelated to formatting or
+        text style.
+      </dd>
+    
+    
+      <dt><strong>Plain text</strong></dt>
+      <dd>
+        Text that does not convey any particular formatting or interpretation of
+        the text by computer programs.
+      </dd>
+    
+    
+      <dt><strong>Span</strong></dt>
+      <dd>
+        A group of text that may be rendered inline alongside other spans.
+        Spans may be either plain text with no formatting applied, or may be
+        formatted text that is enclosed by two styling directives.
+        Some spans may contain child spans.
+      </dd>
+    
+    
+      <dt><strong>Styling directive</strong></dt>
+      <dd>
+        A character or set of characters that indicates the beginning of a span
+        or block.
+        For example, in certain contexts the characters '*' (U+002A ASTERISK),
+        and '_' (U+005F LOW LINE) may be styling directives that indicate the
+        beginning of a strong or emphasis span and the string '```'  (U+0060
+        GRAVE ACCENT) may be a styling directive that indicate the beginning of
+        a preformatted code block.
+      </dd>
+    
+    
+      <dt><strong>Whitespace character</strong></dt>
+      <dd>
+        Any Unicode scalar value which has the property "White_Space" or is in
+        category Z in the Unicode Character Database.
+      </dd>
+    
+  </dl></div>
+<h2 id="disco">5.
+       Discovering Support<a class="anchor-link" href="#disco"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">
+    Clients that support message styling MUST advertise the fact by including a
+    feature of "urn::xmpp:styling:0" in response to <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm46104043993376">5</a>] information
+    requests and in their <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm46104043983888">6</a>] profiles.
+  </p>
+  <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Disco info response<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+  …
+  &lt;feature var='urn:xmpp:styling:0' /&gt;
+  …
+&lt;/query&gt;</pre></figure>
+<h2 id="rules">6.
+       Business Rules<a class="anchor-link" href="#rules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="block">6.1 Blocks<a class="anchor-link" href="#block"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">
+      Parsers implementing message styling will first parse blocks and then
+      parse child blocks or spans if allowed by the specific block type.
+    </p>
+    <div class="indent"><h4 id="line-block">6.1.1 Plain<a class="anchor-link" href="#line-block"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">
+        Individual lines of text that are not inside of a preformatted text
+        block are considered a "plain" block.
+        Plain blocks are not bound by styling directives and do not imply
+        formatting themselves, but they may contain spans which imply
+        formatting.
+        Plain blocks may not contain child blocks.
+      </p>
+      <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Plain block text<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;body&gt;
+  There are three blocks in this body, one per line,
+  but there is no *formatting
+  as spans* may not escape blocks.
+&lt;/body&gt;
+</pre></figure>
+    </div>
+    <div class="indent"><h4 id="pre-block">6.1.2 Preformatted Text<a class="anchor-link" href="#pre-block"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">
+        A preformatted text block is started by a line beginning with "```"
+        (U+0060 GRAVE ACCENT), and ended by a line containing only three grave
+        accents or the end of the parent block (whichever comes first).
+        Preformatted text blocks cannot contain child blocks or spans.
+        Text inside a preformatted block SHOULD be displayed in a monospace font.
+      </p>
+      <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Preformatted block text<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;body&gt;
+  ```ignored
+  (println &amp;quot;Hello, world!&amp;quot;)
+  ```
+
+  This should show up as monospace, preformatted text ⤴
+&lt;/body&gt;
+</pre></figure>
+      <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> No closing preformatted text sequence<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;body&gt;
+  &amp;gt; ```
+  &amp;gt; (println &amp;quot;Hello, world!&amp;quot;)
+
+  The entire blockquote is a preformatted text block, but this line
+  is plaintext!
+&lt;/body&gt;
+</pre></figure>
+    </div>
+    <div class="indent"><h4 id="quote">6.1.3 Quotations<a class="anchor-link" href="#quote"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">
+        A quotation is indicated by one or more lines with a byte stream
+        beginning with a '&gt;' (U+003E GREATER-THAN SIGN).
+        They are terminated by the first new line that is not followed by a
+        greater-than sign, or the end of the parent block (whichever comes
+        first).
+        Block quotes may contain any child block, including other quotations.
+        Lines inside the block quote MUST have the first leading whitespace
+        character trimmed before parsing the child block.
+        It is RECOMMENDED that text inside of a block quote be indented or
+        distinguished from the surrounding text in some other way.
+      </p>
+      <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> Quotation (LTR)<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;body&gt;
+  &amp;gt; That that is, is.
+
+  Said the old hermit of Prague.
+&lt;/body&gt;
+</pre></figure>
+      <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> Nested Quotation<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;body&gt;
+  &amp;gt;&amp;gt; That that is, is.
+  &amp;gt; Said the old hermit of Prague.
+
+  Who?
+&lt;/body&gt;
+</pre></figure>
+    </div>
+  </div>
+  <div class="indent"><h3 id="span">6.2 Spans<a class="anchor-link" href="#span"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">
+      Spans are always the children of blocks and may not escape from their
+      containing block.
+      Matches of spans between two styling directives MUST contain some text
+      between the two directives, otherwise neither directive is valid.
+      The opening styling directive MUST be located at the beginning of the
+      parent block, after a whitespace character, or after a different opening
+      styling directive.
+      The opening styling directive MUST NOT be followed by a whitespace
+      character and the closing styling directive MUST NOT be preceeded by a
+      whitespace character.
+      Spans are always parsed from the beginning of the byte stream to the end
+      and are lazily matched.
+      Characters that would be styling directives but do not follow these rules
+      are not considered when matching and thus may be present between two other
+      styling directives.
+    </p>
+    <p class="" style="">
+      For example, each of the following would be styled as indicated:
+    </p>
+    <ul class="" style="">
+      <li class="" style="">plain span</li>
+      <li class="" style=""><strong>*strong span*</strong></li>
+      <li class="" style="">plain <em>_emphasis_</em> plain</li>
+      <li class="" style=""><code>`pre`</code> plain <strong>*strong*</strong></li>
+      <li class="" style=""><strong>*strong*</strong>plain*</li>
+      <li class="" style="">* plain <strong>*strong*</strong></li>
+    </ul>
+    <p class="" style="">
+      Nothing would be styled in the following messages (where "\n" represents a
+      new line):
+    </p>
+    <ul class="" style="">
+      <li class="" style="">not strong*</li>
+      <li class="" style="">*not strong</li>
+      <li class="" style="">*not \n strong*</li>
+      <li class="" style="">*not *strong</li>
+      <li class="" style="">**</li>
+      <li class="" style="">***</li>
+      <li class="" style="">****</li>
+    </ul>
+    <div class="indent"><h4 id="plain">6.2.1 Plain<a class="anchor-link" href="#plain"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">
+        Any text inside of a block that is not part of another span is
+        implicitly considered to be inside of a "plain text" span.
+        In the following example the plain span is everything before the first
+        "*".
+      </p>
+      <figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> Plain<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;body&gt;
+  Two spans, both *alike in dignity*
+&lt;/body&gt;
+</pre></figure>
+    </div>
+    <div class="indent"><h4 id="emph">6.2.2 Emphasis<a class="anchor-link" href="#emph"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">
+        Text enclosed by '_' (U+005F LOW LINE) is emphasized and SHOULD be
+        displayed in italics.
+      </p>
+      <figure class="code-example" id="example-8"><figcaption><strong>Example 8.</strong> Italic<a class="anchor-link" href="#example-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;body&gt;
+  The full title is _Twelfth Night, or What You Will_ but
+  _most_ people shorten it.
+&lt;/body&gt;
+</pre></figure>
+    </div>
+    <div class="indent"><h4 id="strong">6.2.3 Strong Emphasis<a class="anchor-link" href="#strong"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">
+        Text enclosed by '*' (U+002A ASTERISK) is strongly emphasized and SHOULD
+        be displayed with a heavier font weight than the surrounding text
+        (bold).
+      </p>
+      <figure class="code-example" id="example-9"><figcaption><strong>Example 9.</strong> Strong<a class="anchor-link" href="#example-9"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;body&gt;
+  The full title is "Twelfth Night, or What You Will" but
+  *most* people shorten it.
+&lt;/body&gt;
+</pre></figure>
+    </div>
+    <div class="indent"><h4 id="strike">6.2.4 Strike through<a class="anchor-link" href="#strike"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">
+        Text enclosed by '~' (U+007E TILDE) SHOULD be displayed with a horizontal
+        line through the middle.
+      </p>
+      <figure class="code-example" id="example-10"><figcaption><strong>Example 10.</strong> Strike through<a class="anchor-link" href="#example-10"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;body&gt;
+  Everyone ~dis~likes cake.
+&lt;/body&gt;
+</pre></figure>
+    </div>
+    <div class="indent"><h4 id="mono">6.2.5 Preformatted Span<a class="anchor-link" href="#mono"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">
+        Text enclosed by a '`' (U+0060 GRAVE ACCENT) is a preformatted span SHOULD
+        be displayed inline in a monospace font.
+        A preformatted span may only contain a single plain span.
+        Inline formatting directives inside the preformatted span are not
+        rendered.
+        For example, the following all contain valid preformatted spans:
+      </p>
+      <ul class="" style="">
+        <li class="" style="">This is <code>`monospace`</code></li>
+        <li class="" style="">This is <code>`*monospace*`</code></li>
+        <li class="" style="">This is <strong><code>*`monospace and bold`*</code></strong></li>
+      </ul>
+      <figure class="code-example" id="example-11"><figcaption><strong>Example 11.</strong> Monospace text<a class="anchor-link" href="#example-11"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;body&gt;
+  Wow, I can write in `monospace`!
+&lt;/body&gt;
+</pre></figure>
+    </div>
+  </div>
+<h2 id="disable">7.
+       Disabling Styling<a class="anchor-link" href="#disable"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">
+    On rare occasions styling hints may conflict with the contents of a message.
+    For example, if the user sends the emoji "&gt; _ &lt;" it would be
+    interpreted as a block quote.
+    Senders may indicate to the receiver that a particular message SHOULD NOT be
+    styled by adding an empty &lt;unstyled&gt; element qualified by the
+    "urn:xmpp:styling:0" namespace.
+  </p>
+  <figure class="code-example" id="example-12"><figcaption><strong>Example 12.</strong> Sender indicates that styling is disabled<a class="anchor-link" href="#example-12"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message&gt;
+  &lt;body&gt;&amp;gt; _ &amp;lt;&lt;/body&gt;
+  &lt;unstyled xmlns="urn:xmpp:styling:0"/&gt;
+&lt;/message&gt;
+</pre></figure>
+<h2 id="impl">8.
+       Implementation Notes<a class="anchor-link" href="#impl"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">
+    This document does not define a regular grammar and thus styling cannot be
+    matched by a regular expression.
+    Instead, a simple parser can be constructed by first parsing all text into
+    blocks and then recursively parsing the child-blocks inside block
+    quotations, the spans inside individual lines, and by returning the text
+    inside preformatted blocks without modification.
+  </p>
+  <p class="" style="">
+    It is RECOMMENDED that styling directives be displayed and formatted in the
+    same manner as the text they apply to.
+    For example, the string "*emphasis*" would be rendered as
+    "<strong>*emphasis*</strong>".
+  </p>
+  <p class="" style="">
+    This specification does not provide a mechanism for removing styling from
+    individual spans or blocks within a styled message.
+    Implementations are free to implement their own workarounds, for example by
+    inserting Unicode non-printable characters to invalidate styling directives,
+    but no specific technique is known to be widely supported.
+  </p>
+<h2 id="access">9.
+       Accessibility Considerations<a class="anchor-link" href="#access"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">
+    When displaying styling directives, developers should ensure sufficient
+    contrast so that visually impaired users are able to distinguish the styling
+    directives from the background color.
+    Care should also be taken to ensure that formatting designed to
+    differentiate styling directives from surrounding text does not make the
+    text more difficult to read for visually impaired users.
+  </p>
+  <p class="" style="">
+    Styled text may be rendered poorly by screen readers.
+    When applying formatting it may be desirable to include directives to
+    exclude styling directives from being read, or to add markers to the final
+    output that have semantic meaning for screen readers.
+    For example, in an web based client an emphasis span might be converted to
+    an HTML &lt;em&gt; element.
+  </p>
+<h2 id="security">10.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">
+    Authors of message styling parsers should take care that improperly
+    formatted messages cannot lead to buffer overruns or code execution.
+  </p>
+  <p class="" style="">
+    Though message styling is not compatible with Markdown, some of its styles
+    are similar.
+    Markdown parsers often allow arbitrary HTML to be inserted into documents
+    and therefore MUST NOT be used to parse the format defined in this document
+    even if they are flexible enough to do so.
+  </p>
+<h2 id="iana">11.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">
+    This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm46104043914912">7</a>].
+  </p>
+<h2 id="registrar">12.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="registrar-ns">12.1 Protocol Namespaces<a class="anchor-link" href="#registrar-ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">This specification defines the following XML namespace:</p>
+    <ul class="" style="">
+      <li class="" style="">urn:xmpp:styling:0</li>
+    </ul>
+    <p class="" style="">
+      Upon advancement of this specification from a status of Experimental to a
+      status of Draft, the <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm46104043903840">8</a>] shall add the foregoing namespace to the
+      registries located at &lt;<a href="https://xmpp.org/registrar/disco-features.html">https://xmpp.org/registrar/disco-features.html</a>&gt;, as described in Section 4 of
+      <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0053.html">XMPP Registrar Function (XEP-0053)</a></span>  [<a href="#nt-idm46104043896496">9</a>].
+    </p>
+    <figure class="code"><figcaption>Service Discovery Features Registry Submission</figcaption><pre class="prettyprint">
+&lt;var&gt;
+  &lt;name&gt;urn:xmpp:styling:0&lt;/name&gt;
+  &lt;desc&gt;Support for rendering message styling.&lt;/desc&gt;
+  &lt;doc&gt;&amp;xep0393;&lt;/doc&gt;
+&lt;/var&gt;</pre></figure>
+  <p class="" style="">
+    The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm46104043903840">8</a>] shall also add the foregoing namespace to the Jabber/XMPP
+    Protocol Namespaces Registry located at &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt;.
+    Upon advancement of this specification from a status of Experimental to a
+    status of Draft, the <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm46104043903840">8</a>] shall remove the provisional status from
+    this registry entry.
+  </p>
+  <figure class="code"><figcaption>Jabber/XMPP Protocol Namespaces Registry Submission</figcaption><pre class="prettyprint">
+&lt;ns&gt;
+  &lt;name&gt;urn:xmpp:styling:0&lt;/name&gt;
+  &lt;doc&gt;&amp;xep0393;&lt;/doc&gt;
+  &lt;status&gt;provisional&lt;/status&gt;
+&lt;/ns&gt;</pre></figure>
+  </div>
+  <div class="indent"><h3 id="registrar-versioning">12.2 Namespace Versioning<a class="anchor-link" href="#registrar-versioning"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">If the protocol defined in this specification undergoes a revision that is not fully backwards-compatible with an older version, the XMPP Registrar shall increment the protocol version number found at the end of the XML namespaces defined herein, as described in Section 4 of <span class="ref">XEP-0053</span>.</p>
+  </div>
+<h2 id="schema">13.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document does not define any new XML structure requiring a schema.</p>
+<h2 id="ack">14.
+       Acknowledgements<a class="anchor-link" href="#ack"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The author wishes to thank Kevin Smith for his review and feedback.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0393</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Draft">Stable</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>1.1.1</dd><dt>Last Updated</dt><dd>2021-04-04</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, <a href="xep-0001.html">XEP-0001</a></dd><dt>Supersedes</dt><dd><a href="xep-0071.html">XEP-0071</a></dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>styling</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0393.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0393.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0393.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Sam Whited</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:sam@samwhited.com">sam@samwhited.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:sam@samwhited.com">sam@samwhited.com</a></dd><dt>URI</dt><dd><a href="https://blog.samwhited.com/">https://blog.samwhited.com/</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm46104044041984">1</a>. XEP-0071: XHTML-IM &lt;<a href="https://xmpp.org/extensions/xep-0071.html">https://xmpp.org/extensions/xep-0071.html</a>&gt;.</p><p><a name="nt-idm46104044020960">2</a>. The Unicode Standard, The Unicode Consortium &lt;<a href="http://www.unicode.org/versions/latest/">http://www.unicode.org/versions/latest/</a>&gt;.</p><p><a name="nt-idm46104044017248">3</a>. Unicode Standard Annex #9, "Unicode Bidirectional Algorithm", edited by Mark Davis, Aharon Lanin, and Andrew Glass. An integral part of The Unicode Standard, &lt;<a href="http://unicode.org/reports/tr9/">http://unicode.org/reports/tr9/</a>&gt;.</p><p><a name="nt-idm46104044012928">4</a>. RFC 7764: Guidance on Markdown: Design Philosophies, Stability Strategies, and Select Registrations &lt;<a href="http://tools.ietf.org/html/rfc7764">http://tools.ietf.org/html/rfc7764</a>&gt;.</p><p><a name="nt-idm46104043993376">5</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm46104043983888">6</a>. XEP-0115: Entity Capabilities &lt;<a href="https://xmpp.org/extensions/xep-0115.html">https://xmpp.org/extensions/xep-0115.html</a>&gt;.</p><p><a name="nt-idm46104043914912">7</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm46104043903840">8</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p><p><a name="nt-idm46104043896496">9</a>. XEP-0053: XMPP Registrar Function &lt;<a href="https://xmpp.org/extensions/xep-0053.html">https://xmpp.org/extensions/xep-0053.html</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v1.1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0393-1.1.1.html">1.1.1</a> (2021-04-04)<a class="anchor-link" href="#revision-history-v1.1.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">
+        General readability changes:
+        Copy part of span definition from glossary to business rules and remove
+        parenthesis for marking spans and blocks which was used inconsistently.
+        Also merge two lists of examples.
+      </p>
+    <div class="revision-author">ssw</div></li><li id="revision-history-v1.1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0393-1.1.0.html">1.1.0</a> (2021-01-12)<a class="anchor-link" href="#revision-history-v1.1.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarify parsing rules for span directives</p><div class="revision-author">sw</div></li><li id="revision-history-v1.0.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0393-1.0.0.html">1.0.0</a> (2020-10-13)<a class="anchor-link" href="#revision-history-v1.0.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Accepted as Draft as per Council vote from 2020-10-07.</p><div class="revision-author">XEP Editor (jsc)</div></li><li id="revision-history-v0.4.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0393-0.4.0.html">0.4.0</a> (2020-06-02)<a class="anchor-link" href="#revision-history-v0.4.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">
+        Remove description of mechanism for disabling styling on individual
+        spans and blocks, users can do this themselves without us documenting
+        the use of a codepoint that's not specifically for this purpose.
+      </p>
+    <div class="revision-author">ssw</div></li><li id="revision-history-v0.3.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0393-0.3.0.html">0.3.0</a> (2020-06-02)<a class="anchor-link" href="#revision-history-v0.3.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">
+        Add ability to disable styling, further clarify accessibility
+        considerations, and mention that Styling is not Markdown in the security
+        considerations section.
+      </p>
+    <div class="revision-author">ssw</div></li><li id="revision-history-v0.2.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0393-0.2.2.html">0.2.2</a> (2020-05-20)<a class="anchor-link" href="#revision-history-v0.2.2"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">
+        Clarify accessibility considerations section and be consistent about use
+        of the term "styling directives".
+      </p>
+    <div class="revision-author">ssw</div></li><li id="revision-history-v0.2.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0393-0.2.1.html">0.2.1</a> (2020-01-02)<a class="anchor-link" href="#revision-history-v0.2.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">
+        Make rules consistent with examples that show multiple styling
+        directives being applied to the same text.
+      </p>
+    <div class="revision-author">ssw</div></li><li id="revision-history-v0.2.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0393-0.2.0.html">0.2.0</a> (2019-09-02)<a class="anchor-link" href="#revision-history-v0.2.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">
+        Clarify block quote termination and white space trimming.
+      </p>
+    <div class="revision-author">ssw</div></li><li id="revision-history-v0.1.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0393-0.1.4.html">0.1.4</a> (2018-05-01)<a class="anchor-link" href="#revision-history-v0.1.4"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">
+        Clarify language around strong emphasis.
+      </p>
+    <div class="revision-author">ssw</div></li><li id="revision-history-v0.1.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0393-0.1.3.html">0.1.3</a> (2018-02-14)<a class="anchor-link" href="#revision-history-v0.1.3"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">
+        Reorder block and span sections, simplify block parsing, and update the
+        definition of a span.
+      </p>
+    <div class="revision-author">ssw</div></li><li id="revision-history-v0.1.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0393-0.1.2.html">0.1.2</a> (2018-01-13)<a class="anchor-link" href="#revision-history-v0.1.2"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">
+        Clarify block quote and plain text parsing and formatting behavior.
+      </p>
+    <div class="revision-author">ssw</div></li><li id="revision-history-v0.1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0393-0.1.1.html">0.1.1</a> (2018-01-12)<a class="anchor-link" href="#revision-history-v0.1.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">
+        Minor clarifications and updates, add security considerations, and
+        expand the glossary.
+      </p>
+    <div class="revision-author">ssw</div></li><li id="revision-history-v0.1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0393-0.1.0.html">0.1.0</a> (2017-11-22)<a class="anchor-link" href="#revision-history-v0.1.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft approved by the XMPP Council.</p><div class="revision-author">XEP Editor (ssw)</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0393-0.0.1.html">0.0.1</a> (2017-10-28)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">ssw</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{whited2017styling,
+  title = {Message Styling},
+  author = {Whited, Sam},
+  type = {XEP},
+  number = {0393},
+  version = {1.1.1},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0393.html},
+  date = {2017-10-28/2021-04-04},
+}</pre><p>END</p></body></html>

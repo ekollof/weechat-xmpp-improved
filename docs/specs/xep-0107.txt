@@ -1,0 +1,359 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0107: User Mood</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0107";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="User Mood"><meta name="DC.Creator" content="Peter Saint-Andre"><meta name="DC.Creator" content="Ralph Meijer"><meta name="DC.Description" content="This specification defines a payload format for communicating information about user moods, such as whether a person is currently happy, sad, angry, or annoyed. The payload format is typically transported using the personal eventing protocol, a profile of XMPP publish-subscribe specified in XEP-0163."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2024-06-20"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0107"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0107: User Mood</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification defines a payload format for communicating information about user moods, such as whether a person is currently happy, sad, angry, or annoyed. The payload format is typically transported using the personal eventing protocol, a profile of XMPP publish-subscribe specified in XEP-0163.</dd><dt>Authors</dt><dd><ul class="authors"><li>Peter Saint-Andre</li><li>Ralph Meijer</li></ul></dd><dt>Copyright</dt><dd>© 2003 – 2024 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Stable</p><div id="status-notice" class="draft standards track">NOTICE: The protocol defined herein is a <strong>Stable Standard</strong> of the XMPP Standards Foundation. Implementations are encouraged and the protocol is appropriate for deployment in production systems, but some changes to the protocol are possible before it becomes a Final Standard.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>1.2.2 (2024-06-20)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li class="current">Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#proto">Protocol</a><ol><li><a href="#proto-format">Data Format</a></li><li><a href="#proto-pubsub">Pubsub Transport</a></li><li><a href="#proto-message">Including a Mood in a IM Message</a></li></ol></li><li><a href="#moods">Mood Values</a></li><li><a href="#wv-mapping">Mapping to Wireless Village Moods</a></li><li><a href="#i18n">Internationalization Considerations</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#registrar-ns">Protocol Namespaces</a></li></ol></li><li><a href="#schema">XML Schema</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document defines an extension mechanism for capturing "extended presence" data about user moods.</p>
+<h2 id="proto">2.
+       Protocol<a class="anchor-link" href="#proto"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="proto-format">2.1 Data Format<a class="anchor-link" href="#proto-format"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Information about user moods is provided by the user and propagated on the network by the user's client. The information is structured via a &lt;mood/&gt; element that is qualified by the 'http://jabber.org/protocol/mood' namespace. The mood itself is provided as the element name of a defined child element of the &lt;mood/&gt; element (e.g., &lt;happy/&gt;); one such child element is REQUIRED. The user MAY also specify a natural-language description of, or reason for, the mood in the &lt;text/&gt; child of the &lt;mood/&gt; element, which is OPTIONAL. Here is an example:</p>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;mood xmlns='http://jabber.org/protocol/mood'&gt;
+  &lt;happy/&gt;
+  &lt;text&gt;Yay, the mood spec has been approved!&lt;/text&gt;
+&lt;/mood&gt;
+</pre></figure>
+    <p class="" style="">In addition, an application MAY provide a more specific mood value as a properly-namespaced child of the defined element, which extension MUST be ignored if the receiving application does not understand the extended namespace. Here is an example:</p>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;mood xmlns='http://jabber.org/protocol/mood'&gt;
+  &lt;happy&gt;
+    &lt;ecstatic xmlns='https://example.org/'/&gt;
+  &lt;/happy&gt;
+  &lt;text&gt;Yay, the mood spec has been approved!&lt;/text&gt;
+&lt;/mood&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="proto-pubsub">2.2 Pubsub Transport<a class="anchor-link" href="#proto-pubsub"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Mood information SHOULD be communicated and transported by means of the <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm45590416860144">1</a>] subset specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0163.html">Personal Eventing Protocol (XEP-0163)</a></span>  [<a href="#nt-idm45590416851312">2</a>]. Because mood information is not pure presence information and can change independently of the user's availability, it SHOULD NOT be provided as an extension to &lt;presence/&gt;.</p>
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> User Publishes Mood<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='juliet@capulet.lit/balcony'
+    id='publish1'
+    type='set'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='http://jabber.org/protocol/mood'&gt;
+      &lt;item&gt;
+        &lt;mood xmlns='http://jabber.org/protocol/mood'&gt;
+          &lt;annoyed/&gt;
+          &lt;text&gt;curse my nurse!&lt;/text&gt;
+        &lt;/mood&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">The mood is then delivered to all subscribers:</p>
+    <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Mood is Delivered to All Subscribers<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='juliet@capulet.lit'
+    to='romeo@montague.net'&gt;
+  &lt;event xmlns='http://jabber.org/protocol/pubsub#event'&gt;
+    &lt;items node='http://jabber.org/protocol/mood'&gt;
+      &lt;item id='a475804a-0f9c-11dc-98a8-001143d5d5db'&gt;
+        &lt;mood xmlns='http://jabber.org/protocol/mood'&gt;
+          &lt;annoyed/&gt;
+          &lt;text&gt;curse my nurse!&lt;/text&gt;
+        &lt;/mood&gt;
+      &lt;/item&gt;
+    &lt;/items&gt;
+  &lt;/event&gt;
+&lt;/message&gt;
+</pre></figure>
+    <p class="" style="">In order to indicate that the user is no longer publishing moods, the user's client shall send an empty &lt;mood/&gt; element, which can be considered a "stop command" for user moods:</p>
+    <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> User Disables Publishing<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='juliet@capulet.lit/balcony'
+    id='publish1'
+    type='set'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='http://jabber.org/protocol/mood'&gt;
+      &lt;item&gt;
+        &lt;mood xmlns='http://jabber.org/protocol/mood'/&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Empty Mood Information is Delivered to All Subscribers<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='juliet@capulet.lit'
+    to='romeo@montague.net'&gt;
+  &lt;event xmlns='http://jabber.org/protocol/pubsub#event'&gt;
+    &lt;items node='http://jabber.org/protocol/mood'&gt;
+      &lt;item id='a475804a-0f9c-11dc-98a8-001143d5d5db'&gt;
+        &lt;mood xmlns='http://jabber.org/protocol/mood'/&gt;
+      &lt;/item&gt;
+    &lt;/items&gt;
+  &lt;/event&gt;
+&lt;/message&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="proto-message">2.3 Including a Mood in a IM Message<a class="anchor-link" href="#proto-message"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">A user MAY provide a mood extension in a specific IM message in order to lend a defined emotional tone to text of that particular message. (This does not override the user's more general mood and is not intended to replace PEP as a more general transport method for user moods.)</p>
+    <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> User Provides Mood in Message<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message from='romeo@montague.lit/pda'
+         to='juliet@capulet.lit'
+         type='chat'&gt;
+  &lt;body&gt;A thousand times good night!&lt;/body&gt;
+  &lt;mood xmlns='http://jabber.org/protocol/mood'&gt;
+    &lt;sad/&gt;
+  &lt;/mood&gt;
+&lt;/message&gt;
+</pre></figure>
+  </div>
+<h2 id="moods">3.
+       Mood Values<a class="anchor-link" href="#moods"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">There exist various theories of human affect, mood, and emotion, including those promulgated by Frijda  [<a href="#nt-idm45590416842160">3</a>], Ortony et al.  [<a href="#nt-idm45590416841392">4</a>], and Wierzbicka  [<a href="#nt-idm45590416840624">5</a>]. The taxonomy provided here mostly follows the Affective Knowledge Representation that has been defined by Lisetti  [<a href="#nt-idm45590416839728">6</a>] in an effort to harmonize the prevailing theories in this area, as well as some work by Wierzbicka on cross-cultural studies of emotion.  [<a href="#nt-idm45590416838688">7</a>] Furthermore, the taxonomy provided here includes a number of common physical states in addition to moods, and also takes into account the specific context of instant messaging, including work done by other standards development organizations (e.g., the Wireless Village specifications contributed to the <span class="ref" style=""><a href="http://www.openmobilealliance.org/">Open Mobile Alliance (OMA)</a></span>  [<a href="#nt-idm45590416834912">8</a>]) and instant messaging service providers (e.g., ICQ). Finally, lists of moods and physical states have been checked for commonality against studies of word frequency in the English language.  [<a href="#nt-idm45590416832096">9</a>] to remove rarely used terms.</p>
+  <p class="" style="">The following mood values are defined in this taxonomy. Where available as linked below, the definitions are obtained from <a href="http://en.wiktionary.org/">Wiktionary</a>.</p>
+  <ul class="" style="">
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/afraid">afraid</a> -- Impressed with fear or apprehension; in fear; apprehensive.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/amazed">amazed</a> -- Astonished; confounded with fear, surprise or wonder.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/amorous">amorous</a> -- Inclined to love; having a propensity to love, or to sexual enjoyment; loving, fond, affectionate, passionate, lustful, sexual, etc.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/angry">angry</a> -- Displaying or feeling anger, i.e., a strong feeling of displeasure, hostility or antagonism towards someone or something, usually combined with an urge to harm.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/annoyed">annoyed</a> -- To be disturbed or irritated, especially by continued or repeated acts.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/anxious">anxious</a> -- Full of anxiety or disquietude; greatly concerned or solicitous, esp. respecting something future or unknown; being in painful suspense.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/aroused">aroused</a> -- To be stimulated in one's feelings, especially to be sexually stimulated.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/ashamed">ashamed</a> -- Feeling shame or guilt.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/bored">bored</a> -- Suffering from boredom; uninterested, without attention.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/brave">brave</a> -- Strong in the face of fear; courageous. </p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/calm">calm</a> -- Peaceful, quiet.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/cautious">cautious</a> -- Taking care or caution; tentative.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/cold">cold</a> -- Feeling the sensation of coldness, especially to the point of discomfort.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/confident">confident</a> -- Feeling very sure of or positive about something, especially about one's own capabilities.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/confused">confused</a> -- Chaotic, jumbled or muddled.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/contemplative">contemplative</a> -- Feeling introspective or thoughtful.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/contented">contented</a> -- Pleased at the satisfaction of a want or desire; satisfied.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/cranky">cranky</a> -- Grouchy, irritable; easily upset.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/crazy">crazy</a> -- Feeling out of control; feeling overly excited or enthusiastic.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/creative">creative</a> -- Feeling original, expressive, or imaginative.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/curious">curious</a> -- Inquisitive; tending to ask questions, investigate, or explore.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/dejected">dejected</a> -- Feeling sad and dispirited.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/depressed">depressed</a> -- Severely despondent and unhappy.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/disappointed">disappointed</a> -- Defeated of expectation or hope; let down.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/disgusted">disgusted</a> -- Filled with disgust; irritated and out of patience.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/dismayed">dismayed</a> -- Feeling a sudden or complete loss of courage in the face of trouble or danger.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/distracted">distracted</a> -- Having one's attention diverted; preoccupied.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/embarrassed">embarrassed</a> -- Having a feeling of shameful discomfort.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/envious">envious</a> -- Feeling pain by the excellence or good fortune of another.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/excited">excited</a> -- Having great enthusiasm.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/flirtatious">flirtatious</a> -- In the mood for flirting.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/frustrated">frustrated</a> -- Suffering from frustration; dissatisfied, agitated, or discontented because one is unable to perform an action or fulfill a desire.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/grateful">grateful</a> -- Feeling appreciation or thanks.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/grieving">grieving</a> -- Feeling very sad about something, especially something lost; mournful; sorrowful.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/grumpy">grumpy</a> -- Unhappy and irritable.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/guilty">guilty</a> -- Feeling responsible for wrongdoing; feeling blameworthy.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/happy">happy</a> -- Experiencing the effect of favourable fortune; having the feeling arising from the consciousness of well-being or of enjoyment; enjoying good of any kind, as peace, tranquillity, comfort; contented; joyous.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/hopeful">hopeful</a> -- Having a positive feeling, belief, or expectation that something wished for can or will happen.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/hot">hot</a> -- Feeling the sensation of heat, especially to the point of discomfort.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/humbled">humbled</a> -- Having or showing a modest or low estimate of one's own importance; feeling lowered in dignity or importance.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/humiliated">humiliated</a> -- Feeling deprived of dignity or self-respect.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/hungry">hungry</a> -- Having a physical need for food.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/hurt">hurt</a> -- Wounded, injured, or pained, whether physically or emotionally.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/impressed">impressed</a> -- Favourably affected by something or someone.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/awe">in_awe</a> -- Feeling amazement at something or someone; or feeling a combination of fear and reverence.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/in_love">in_love</a> -- Feeling strong affection, care, liking, or attraction..</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/indignant">indignant</a> -- Showing anger or indignation, especially at something unjust or wrong.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/interested">interested</a> -- Showing great attention to something or someone; having or showing interest.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/intoxicated">intoxicated</a> -- Under the influence of alcohol; drunk.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/invincible">invincible</a> -- Feeling as if one cannot be defeated, overcome or denied.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/jealous">jealous</a> -- Fearful of being replaced in position or affection.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/lonely">lonely</a> -- Feeling isolated, empty, or abandoned.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/lost">lost</a> -- Unable to find one's way, either physically or emotionally.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/lucky">lucky</a> -- Feeling as if one will be favored by luck.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/mean">mean</a> -- Causing or intending to cause intentional harm; bearing ill will towards another; cruel; malicious.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/moody">moody</a> -- Given to sudden or frequent changes of mind or feeling; temperamental.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/nervous">nervous</a> -- Easily agitated or alarmed; apprehensive or anxious.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/neutral">neutral</a> -- Not having a strong mood or emotional state.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/offended">offended</a> -- Feeling emotionally hurt, displeased, or insulted. </p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/outraged">outraged</a> -- Feeling resentful anger caused by an extremely violent or vicious attack, or by an offensive, immoral, or indecent act.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/playful">playful</a> -- Interested in play; fun, recreational, unserious, lighthearted; joking, silly.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/proud">proud</a> -- Feeling a sense of one's own worth or accomplishment.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/relaxed">relaxed</a> -- Having an easy-going mood; not stressed; calm.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/relieved">relieved</a> -- Feeling uplifted because of the removal of stress or discomfort.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/remorseful">remorseful</a> -- Feeling regret or sadness for doing something wrong.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/restless">restless</a> -- Without rest; unable to be still or quiet; uneasy; continually moving.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/sad">sad</a> -- Feeling sorrow; sorrowful, mournful.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/sarcastic">sarcastic</a> -- Mocking and ironical.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/satisfied">satisfied</a> -- Pleased at the fulfillment of a need or desire.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/serious">serious</a> -- Without humor or expression of happiness; grave in manner or disposition; earnest; thoughtful; solemn.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/shocked">shocked</a> -- Surprised, startled, confused, or taken aback.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/shy">shy</a> -- Feeling easily frightened or scared; timid; reserved or coy.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/sick">sick</a> -- Feeling in poor health; ill.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/sleepy">sleepy</a> -- Feeling the need for sleep.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/spontaneous">spontaneous</a> -- Acting without planning; natural; impulsive.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/stressed">stressed</a> -- Suffering emotional pressure.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/strong">strong</a> -- Capable of producing great physical force; or, emotionally forceful, able, determined, unyielding.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/surprised">surprised</a> -- Experiencing a feeling caused by something unexpected.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/thankful">thankful</a> -- Showing appreciation or gratitude.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/thirsty">thirsty</a> -- Feeling the need to drink.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/tired">tired</a> -- In need of rest or sleep.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/undefined">undefined</a> -- [Feeling any emotion not defined here.]</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/weak">weak</a> -- Lacking in force or ability, either physical or emotional.</p></li>
+    <li class="" style=""><p class="" style=""><a href="http://en.wiktionary.org/wiki/worried">worried</a> -- Thinking about unpleasant things that have happened or that might happen; feeling afraid and unhappy.</p></li>
+  </ul>
+<h2 id="wv-mapping">4.
+       Mapping to Wireless Village Moods<a class="anchor-link" href="#wv-mapping"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The Wireless Village (now "IMPS") specifications for mobile instant messaging define a number of presence attributes, encapsulated in the "StatusMood" information element  [<a href="#nt-idm45590416651680">10</a>]. The following values are defined for StatusMood in Wireless Village, all of which map one-to-one from Wireless Village to the same values (albeit lowercase) in Jabber:</p>
+  <ul class="" style="">
+    <li class="" style=""><p class="" style="">ANGRY</p></li>
+    <li class="" style=""><p class="" style="">ANXIOUS</p></li>
+    <li class="" style=""><p class="" style="">ASHAMED</p></li>
+    <li class="" style=""><p class="" style="">BORED</p></li>
+    <li class="" style=""><p class="" style="">EXCITED</p></li>
+    <li class="" style=""><p class="" style="">HAPPY</p></li>
+    <li class="" style=""><p class="" style="">IN_LOVE</p></li>
+    <li class="" style=""><p class="" style="">INVINCIBLE</p></li>
+    <li class="" style=""><p class="" style="">JEALOUS</p></li>
+    <li class="" style=""><p class="" style="">SAD</p></li>
+    <li class="" style=""><p class="" style="">SLEEPY</p></li>
+  </ul>
+  <p class="" style="">The full range of moods defined herein is richer than that defined in Wireless Village; no mapping is provided by this specification for mood values that are not present in Wireless Village, and any such mapping is the responsibility of a gateway between the two systems.</p>
+<h2 id="i18n">5.
+       Internationalization Considerations<a class="anchor-link" href="#i18n"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The XML character data values of the &lt;value/&gt; elements is not intended to be presented to a human user and thus there is no special reason to include an 'xml:lang' attribute unless the sender includes a &lt;text/&gt; element as well (as explained in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc2277">RFC 2277</a></span>  [<a href="#nt-idm45590416626720">11</a>], "internationalization is for humans"). It is the responsibility of the receiving application to provide localized text strings associated with the XML character data values defined herein, or some other appropriate presentation (e.g., graphical images that represent the mood).</p>
+<h2 id="security">6.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Because user moods may be published to a large number of pubsub subscribers, users should take care in approving subscribers and in characterizing their current moods.</p>
+<h2 id="iana">7.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm45590416616608">12</a>].</p>
+<h2 id="registrar">8.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="registrar-ns">8.1 Protocol Namespaces<a class="anchor-link" href="#registrar-ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45590416608736">13</a>] includes 'http://jabber.org/protocol/mood' in its registry of protocol namespaces.</p>
+  </div>
+<h2 id="schema">9.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='http://jabber.org/protocol/mood'
+    xmlns='http://jabber.org/protocol/mood'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:element name='mood'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:sequence&gt;
+	&lt;xs:choice minOccurs='0'&gt;
+          &lt;xs:element name='afraid' type='empty'/&gt;
+          &lt;xs:element name='amazed' type='empty'/&gt;
+          &lt;xs:element name='angry' type='empty'/&gt;
+          &lt;xs:element name='amorous' type='empty'/&gt;
+          &lt;xs:element name='annoyed' type='empty'/&gt;
+          &lt;xs:element name='anxious' type='empty'/&gt;
+          &lt;xs:element name='aroused' type='empty'/&gt;
+          &lt;xs:element name='ashamed' type='empty'/&gt;
+          &lt;xs:element name='bored' type='empty'/&gt;
+          &lt;xs:element name='brave' type='empty'/&gt;
+          &lt;xs:element name='calm' type='empty'/&gt;
+          &lt;xs:element name='cautious' type='empty'/&gt;
+          &lt;xs:element name='cold' type='empty'/&gt;
+          &lt;xs:element name='confident' type='empty'/&gt;
+          &lt;xs:element name='confused' type='empty'/&gt;
+          &lt;xs:element name='contemplative' type='empty'/&gt;
+          &lt;xs:element name='contented' type='empty'/&gt;
+          &lt;xs:element name='cranky' type='empty'/&gt;
+          &lt;xs:element name='crazy' type='empty'/&gt;
+          &lt;xs:element name='creative' type='empty'/&gt;
+          &lt;xs:element name='curious' type='empty'/&gt;
+          &lt;xs:element name='dejected' type='empty'/&gt;
+          &lt;xs:element name='depressed' type='empty'/&gt;
+          &lt;xs:element name='disappointed' type='empty'/&gt;
+          &lt;xs:element name='disgusted' type='empty'/&gt;
+          &lt;xs:element name='dismayed' type='empty'/&gt;
+          &lt;xs:element name='distracted' type='empty'/&gt;
+          &lt;xs:element name='embarrassed' type='empty'/&gt;
+          &lt;xs:element name='envious' type='empty'/&gt;
+          &lt;xs:element name='excited' type='empty'/&gt;
+          &lt;xs:element name='flirtatious' type='empty'/&gt;
+          &lt;xs:element name='frustrated' type='empty'/&gt;
+          &lt;xs:element name='grumpy' type='empty'/&gt;
+          &lt;xs:element name='guilty' type='empty'/&gt;
+          &lt;xs:element name='happy' type='empty'/&gt;
+          &lt;xs:element name='hopeful' type='empty'/&gt;
+          &lt;xs:element name='hot' type='empty'/&gt;
+          &lt;xs:element name='humbled' type='empty'/&gt;
+          &lt;xs:element name='humiliated' type='empty'/&gt;
+          &lt;xs:element name='hungry' type='empty'/&gt;
+          &lt;xs:element name='hurt' type='empty'/&gt;
+          &lt;xs:element name='impressed' type='empty'/&gt;
+          &lt;xs:element name='in_awe' type='empty'/&gt;
+          &lt;xs:element name='in_love' type='empty'/&gt;
+          &lt;xs:element name='indignant' type='empty'/&gt;
+          &lt;xs:element name='interested' type='empty'/&gt;
+          &lt;xs:element name='intoxicated' type='empty'/&gt;
+          &lt;xs:element name='invincible' type='empty'/&gt;
+          &lt;xs:element name='jealous' type='empty'/&gt;
+          &lt;xs:element name='lonely' type='empty'/&gt;
+          &lt;xs:element name='lucky' type='empty'/&gt;
+          &lt;xs:element name='mean' type='empty'/&gt;
+          &lt;xs:element name='moody' type='empty'/&gt;
+          &lt;xs:element name='nervous' type='empty'/&gt;
+          &lt;xs:element name='neutral' type='empty'/&gt;
+          &lt;xs:element name='offended' type='empty'/&gt;
+          &lt;xs:element name='outraged' type='empty'/&gt;
+          &lt;xs:element name='playful' type='empty'/&gt;
+          &lt;xs:element name='proud' type='empty'/&gt;
+          &lt;xs:element name='relaxed' type='empty'/&gt;
+          &lt;xs:element name='relieved' type='empty'/&gt;
+          &lt;xs:element name='remorseful' type='empty'/&gt;
+          &lt;xs:element name='restless' type='empty'/&gt;
+          &lt;xs:element name='sad' type='empty'/&gt;
+          &lt;xs:element name='sarcastic' type='empty'/&gt;
+          &lt;xs:element name='serious' type='empty'/&gt;
+          &lt;xs:element name='shocked' type='empty'/&gt;
+          &lt;xs:element name='shy' type='empty'/&gt;
+          &lt;xs:element name='sick' type='empty'/&gt;
+          &lt;xs:element name='sleepy' type='empty'/&gt;
+          &lt;xs:element name='spontaneous' type='empty'/&gt;
+          &lt;xs:element name='stressed' type='empty'/&gt;
+          &lt;xs:element name='strong' type='empty'/&gt;
+          &lt;xs:element name='surprised' type='empty'/&gt;
+          &lt;xs:element name='thankful' type='empty'/&gt;
+          &lt;xs:element name='thirsty' type='empty'/&gt;
+          &lt;xs:element name='tired' type='empty'/&gt;
+          &lt;xs:element name='undefined' type='empty'/&gt;
+          &lt;xs:element name='weak' type='empty'/&gt;
+          &lt;xs:element name='worried' type='empty'/&gt;
+	&lt;/xs:choice&gt;
+        &lt;xs:element name='text' minOccurs='0' type='xs:string'/&gt;
+      &lt;/xs:sequence&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+  &lt;xs:simpleType name='empty'&gt;
+    &lt;xs:restriction base='xs:string'&gt;
+      &lt;xs:enumeration value=''/&gt;
+    &lt;/xs:restriction&gt;
+  &lt;/xs:simpleType&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0107</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Draft">Stable</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>1.2.2</dd><dt>Last Updated</dt><dd>2024-06-20</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, <a href="xep-0163.html">XEP-0163</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>mood</dd><dt>Schema</dt><dd>
+        &lt;<a href="http://www.xmpp.org/schemas/mood.xsd">http://www.xmpp.org/schemas/mood.xsd</a>&gt;<br></dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0107.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0107.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0107.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Peter Saint-Andre</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:stpeter@stpeter.im">stpeter@stpeter.im</a></dd><dt>JabberID</dt><dd><a href="xmpp:stpeter@jabber.org">stpeter@jabber.org</a></dd><dt>URI</dt><dd><a href="https://stpeter.im/">https://stpeter.im/</a></dd></dl><h5>Ralph Meijer</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:ralphm@ik.nu">ralphm@ik.nu</a></dd><dt>JabberID</dt><dd><a href="xmpp:ralphm@ik.nu">ralphm@ik.nu</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45590416860144">1</a>. XEP-0060: Publish-Subscribe &lt;<a href="https://xmpp.org/extensions/xep-0060.html">https://xmpp.org/extensions/xep-0060.html</a>&gt;.</p><p><a name="nt-idm45590416851312">2</a>. XEP-0163: Personal Eventing Protocol &lt;<a href="https://xmpp.org/extensions/xep-0163.html">https://xmpp.org/extensions/xep-0163.html</a>&gt;.</p><p><a name="nt-idm45590416842160">3</a>. Frijda, N. 1986. <span class="ref">The Emotions</span>. New York: Cambridge University Press.</p><p><a name="nt-idm45590416841392">4</a>. Ortony, A., Clore, G., and Collins, A. 1988. <span class="ref">The Cognitive Structure of Emotions</span>. Hillsdale, NJ:  Erlbaum.</p><p><a name="nt-idm45590416840624">5</a>. Wierzbicka, A. 1992. Defining Emotion Concepts. <span class="ref">Cognitive Science</span> 16: 539-581.</p><p><a name="nt-idm45590416839728">6</a>. Lisetti, C. 2002. Personality, Affect, and Emotion Taxonomy for Socially Intelligent Agents. In <span class="ref">Proceedings of FLAIRS 2002</span>. Menlo Park, CA: AAAI Press.</p><p><a name="nt-idm45590416838688">7</a>. Wierzbicka, A. 1999. <span class="ref">Emotions across Languages and Cultures</span>. Cambridge: Cambridge University Press.</p><p><a name="nt-idm45590416834912">8</a>. The Open Mobile Alliance is the focal point for the development of mobile service enabler specifications, which support the creation of interoperable end-to-end mobile services. For further information, see &lt;<a href="http://www.openmobilealliance.org/">http://www.openmobilealliance.org/</a>&gt;.</p><p><a name="nt-idm45590416832096">9</a>. Leech, G., Rayson, P., and Wilson, A. 2001. <span class="ref">Word Frequencies in Written and Spoken English</span>. Harlow, England: Pearson Education.</p><p><a name="nt-idm45590416651680">10</a>. The Wireless Village Initiative: Presence Attributes v1.1 (WV-029); for further information, visit &lt;<a href="http://www.openmobilealliance.org/tech/affiliates/wv/wvindex.html">http://www.openmobilealliance.org/tech/affiliates/wv/wvindex.html</a>&gt;.</p><p><a name="nt-idm45590416626720">11</a>. RFC 2277: IETF Policy on Character Sets and Languages &lt;<a href="http://tools.ietf.org/html/rfc2277">http://tools.ietf.org/html/rfc2277</a>&gt;.</p><p><a name="nt-idm45590416616608">12</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm45590416608736">13</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v1.2.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0107-1.2.2.html">1.2.2</a> (2024-06-20)<a class="anchor-link" href="#revision-history-v1.2.2"><abbr title="Link to this point in the document">¶</abbr></a></div>Fixed typo<div class="revision-author">XEP Editor (dg)</div></li><li id="revision-history-v1.2.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0107-1.2.1.html">1.2.1</a> (2018-03-13)<a class="anchor-link" href="#revision-history-v1.2.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Changed the namespace of an example of proprietary extensibility.</p><div class="revision-author">egp</div></li><li id="revision-history-v1.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0107-1.2.html">1.2</a> (2008-10-29)<a class="anchor-link" href="#revision-history-v1.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Allowed empty mood element to signify a pause in publishing; added undefined element to handle any unspecified mood; also added more moods: amorous, cautious, confident, contemplative, crazy, creative, dejected, dismayed, envious, hopeful, lucky, outraged, relaxed, spontaneous, strong, thankful, tired, weak.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0107-1.1.html">1.1</a> (2007-06-04)<a class="anchor-link" href="#revision-history-v1.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Corrected PEP examples.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0107-1.0.html">1.0</a> (2004-10-20)<a class="anchor-link" href="#revision-history-v1.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the Jabber Council, advanced status to Draft; per Council discussion, also added two additional moods and adjusted structure to use elements rather than XML character data.</p><div class="revision-author">psa/rm</div></li><li id="revision-history-v0.6"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0107-0.6.html">0.6</a> (2004-09-15)<a class="anchor-link" href="#revision-history-v0.6"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added internationalization considerations.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0107-0.5.html">0.5</a> (2004-04-25)<a class="anchor-link" href="#revision-history-v0.5"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Corrected several errors; added reference to XEP-0033.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0107-0.4.html">0.4</a> (2004-02-19)<a class="anchor-link" href="#revision-history-v0.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Minor fixes to text and schema.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0107-0.3.html">0.3</a> (2003-08-01)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added more moods.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0107-0.2.html">0.2</a> (2003-07-23)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Expanded the information format; changed primary container to use pubsub.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0107-0.1.html">0.1</a> (2003-07-22)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial version.</p><div class="revision-author">psa</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{saint-andre2003mood,
+  title = {User Mood},
+  author = {Saint-Andre, Peter and Meijer, Ralph},
+  type = {XEP},
+  number = {0107},
+  version = {1.2.2},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0107.html},
+  date = {2003-07-22/2024-06-20},
+}</pre><p>END</p></body></html>

@@ -1,0 +1,149 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0202: Entity Time</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0202";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Entity Time"><meta name="DC.Creator" content="Peter Saint-Andre"><meta name="DC.Creator" content="Maciej Niedzielski"><meta name="DC.Description" content="This specification defines an XMPP protocol extension for communicating the local time of an entity, including the time in UTC according to the entity as well as the offset from UTC. The time format itself conforms to the dateTime profile of ISO 8601 defined in XEP-0082."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2009-09-11"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0202"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0202: Entity Time</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification defines an XMPP protocol extension for communicating the local time of an entity, including the time in UTC according to the entity as well as the offset from UTC. The time format itself conforms to the dateTime profile of ISO 8601 defined in XEP-0082.</dd><dt>Authors</dt><dd><ul class="authors"><li>Peter Saint-Andre</li><li>Maciej Niedzielski</li></ul></dd><dt>Copyright</dt><dd>© 2006 – 2009 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Final</p><div id="status-notice" class="final standards track">NOTICE: The protocol defined herein is a <strong>Final Standard</strong> of the XMPP Standards Foundation and can be considered a stable technology for implementation and deployment.</div></dd><dt>Supersedes</dt><dd><a href="xep-0090.html">XEP-0090</a></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>2.0 (2009-09-11)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li>Stable</li><li class="current">Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#protocol">Protocol Definition</a></li><li><a href="#examples">Examples</a></li><li><a href="#disco">Service Discovery</a></li><li><a href="#impl">Implementation Notes</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#ns">Protocol Namespace</a></li></ol></li><li><a href="#schema">XML Schema</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Although the XMPP protocol extension defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0090.html">Legacy Entity Time (XEP-0090)</a></span>  [<a href="#nt-idm45052960763584">1</a>] provides a way to discover the time at another entity, it has several limitations:</p>
+  <ul class="" style="">
+    <li class="" style=""><p class="" style="">The 'jabber:iq:time' namespace specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0090.html">Legacy Entity Time (XEP-0090)</a></span>  [<a href="#nt-idm45052960763584">1</a>] requires communication of time only in UTC. While this is useful for UTC synchronization (e.g., if a client wants to synchronize with its server), it does not enable one entity to know the other entity's offset from UTC.</p></li>
+    <li class="" style=""><p class="" style="">The timezone may be specified in a natural language (English) name via the &lt;tz/&gt; element, but not in a numeric offest. The name may be not understood by the requesting entity since there is no reliable and canonical list of timezone names  [<a href="#nt-idm45052960755024">2</a>] and in practice the XML character data of the &lt;tx/&gt; element is effectively useless.</p></li>
+    <li class="" style=""><p class="" style="">The responding entity may provide a user-friendly datetime format via the &lt;display/&gt; element, but this too is effectively useless since datetime formats vary widely by culture and nation.</p></li>
+    <li class="" style=""><p class="" style="">The 'jabber:iq:time' namespace specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0090.html">Legacy Entity Time (XEP-0090)</a></span>  [<a href="#nt-idm45052960763584">1</a>] (first developed in 1999 or 2000) is not consistent with the recommended date and time profiles for XMPP protocols defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0082.html">XMPP Date and Time Profiles (XEP-0082)</a></span>  [<a href="#nt-idm45052960744624">3</a>] (written in 2003).</p></li>
+  </ul>
+  <p class="" style="">To overcome these limitations, this document defines a replacement for <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0090.html">Legacy Entity Time (XEP-0090)</a></span>  [<a href="#nt-idm45052960763584">1</a>] which enables communication of an entity's UTC time and numeric time zone offset while adhering to <span class="ref">XEP-0082</span>.</p>
+<h2 id="protocol">2.
+       Protocol Definition<a class="anchor-link" href="#protocol"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The protocol defined herein provides a standard way for XMPP entities to exchange information about the local time. The information is communicated in a request/response pair using an &lt;iq/&gt; element that contains a &lt;time/&gt; element qualified by the 'urn:xmpp:time' namespace. The following children of the &lt;time/&gt; element are defined for use in IQ stanzas of type 'result':</p>
+  <figure class="table"><figcaption id="table-1"><strong>Table 1:</strong> Child Elements<a class="anchor-link" href="#table-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+    <tr class="body">
+      <th colspan="" rowspan="">Element</th>
+      <th colspan="" rowspan="">Definition</th>
+      <th colspan="" rowspan="">Inclusion</th>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">&lt;tzo/&gt;</td>
+      <td align="" colspan="" rowspan="">The entity's numeric time zone offset from UTC. The format MUST conform to the Time Zone Definition (TZD) specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0082.html">XMPP Date and Time Profiles (XEP-0082)</a></span>  [<a href="#nt-idm45052960744624">3</a>].</td>
+      <td align="" colspan="" rowspan="">REQUIRED</td>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">&lt;utc/&gt;</td>
+      <td align="" colspan="" rowspan="">The UTC time according to the responding entity. The format MUST conform to the dateTime profile specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0082.html">XMPP Date and Time Profiles (XEP-0082)</a></span>  [<a href="#nt-idm45052960744624">3</a>] and MUST be expressed in UTC.</td>
+      <td align="" colspan="" rowspan="">REQUIRED</td>
+    </tr>
+  </table></figure>
+<h2 id="examples">3.
+       Examples<a class="anchor-link" href="#examples"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Querying Another Entity for the Local Time<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get'
+    from='romeo@montague.net/orchard'
+    to='juliet@capulet.com/balcony'
+    id='time_1'&gt;
+  &lt;time xmlns='urn:xmpp:time'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> A Response to the Query<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result'
+    from='juliet@capulet.com/balcony'
+    to='romeo@montague.net/orchard'
+    id='time_1'&gt;
+  &lt;time xmlns='urn:xmpp:time'&gt;
+    &lt;tzo&gt;-06:00&lt;/tzo&gt;
+    &lt;utc&gt;2006-12-19T17:58:35Z&lt;/utc&gt;
+  &lt;/time&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">The standard error conditions described in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0086.html">Error Condition Mappings (XEP-0086)</a></span>  [<a href="#nt-idm45052960713712">4</a>] apply (e.g., &lt;service-unavailable/&gt; if the entity does not support the namespace).</p>
+<h2 id="disco">4.
+       Service Discovery<a class="anchor-link" href="#disco"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">If an entity supports the Entity Time protocol, it MUST report that by including a service discovery feature of "urn:xmpp:time" in response to a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45052960709680">5</a>] information request:</p>
+  <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Service Discovery information request<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get'
+    from='romeo@montague.net/orchard'
+    to='juliet@capulet.com/balcony'
+    id='disco1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Service Discovery information response<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result'
+    from='juliet@capulet.com/balcony'
+    to='romeo@montague.net/orchard'
+    id='disco1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+    ...
+    &lt;feature var='urn:xmpp:time'/&gt;
+    ...
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+<h2 id="impl">5.
+       Implementation Notes<a class="anchor-link" href="#impl"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This protocol was designed in a way that makes migration from <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0090.html">Legacy Entity Time (XEP-0090)</a></span>  [<a href="#nt-idm45052960763584">1</a>] straightforward. This document specifies a different format for the XML character data of the &lt;utc&gt; element (compliant with <span class="ref">XEP-0082</span>) and specifies a new &lt;tzo&gt; element for the numeric offset from UTC, while removing the formerly optional and effectively useless &lt;display/&gt; and &lt;tz/&gt; elements.</p>
+  <p class="" style="">Implementations that support <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0090.html">Legacy Entity Time (XEP-0090)</a></span>  [<a href="#nt-idm45052960763584">1</a>] should support the protocol defined herein as soon as possible, but should continue to support the protocol defined in <span class="ref">XEP-0090</span> for backwards compatibility until the status of that specification is changed to Obsolete.</p>
+<h2 id="security">6.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Revealing an entity's numeric time zone offset may leak limited information about the entity's current location. If the entity's understanding of UTC is far off from actual UTC, revealing that discrepancy may make it possible for an attacker to send XML stanzas that appear to be in the past or future even though they are not; therefore an entity should use the Network Time Protocol (<span class="ref" style=""><a href="http://tools.ietf.org/html/rfc0958">RFC 958</a></span>  [<a href="#nt-idm45052960688576">6</a>]) or a similar technology to stay synchronized with actual UTC.</p>
+<h2 id="iana">7.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm45052960683312">7</a>].</p>
+<h2 id="registrar">8.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="ns">8.1 Protocol Namespace<a class="anchor-link" href="#ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45052960673840">8</a>] includes 'urn:xmpp:time' in its registry of protocol namespaces (see &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt;).</p>
+  </div>
+<h2 id="schema">9.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='urn:xmpp:time'
+    xmlns='urn:xmpp:time'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+      The protocol documented by this schema is defined in
+      XEP-0202: http://www.xmpp.org/extensions/xep-0202.html
+    &lt;/xs:documentation&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:element name='time'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:sequence minOccurs='0'&gt;
+        &lt;xs:element name='tzo' type='xs:string'/&gt;
+        &lt;xs:element name='utc' type='xs:string'/&gt;
+      &lt;/xs:sequence&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0202</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Final">Final</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>2.0</dd><dt>Last Updated</dt><dd>2009-09-11</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, <a href="xep-0082.html">XEP-0082</a></dd><dt>Supersedes</dt><dd><a href="xep-0090.html">XEP-0090</a></dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>time</dd><dt>Schema</dt><dd>
+        &lt;<a href="http://www.xmpp.org/schemas/time.xsd">http://www.xmpp.org/schemas/time.xsd</a>&gt;<br></dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0202.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0202.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0202.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Peter Saint-Andre</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:stpeter@stpeter.im">stpeter@stpeter.im</a></dd><dt>JabberID</dt><dd><a href="xmpp:stpeter@jabber.org">stpeter@jabber.org</a></dd><dt>URI</dt><dd><a href="https://stpeter.im/">https://stpeter.im/</a></dd></dl><h5>Maciej Niedzielski</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:machekku@uaznia.net">machekku@uaznia.net</a></dd><dt>JabberID</dt><dd><a href="xmpp:machekku@uaznia.net">machekku@uaznia.net</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45052960763584">1</a>. XEP-0090: Legacy Entity Time &lt;<a href="https://xmpp.org/extensions/xep-0090.html">https://xmpp.org/extensions/xep-0090.html</a>&gt;.</p><p><a name="nt-idm45052960755024">2</a>. A list of English-language time zone names and abbreviations is located at &lt;<a href="http://www.timeanddate.com/library/abbreviations/timezones/">http://www.timeanddate.com/library/abbreviations/timezones/</a>&gt;, but it is not a canonical list and there are no such localized lists for all languages.</p><p><a name="nt-idm45052960744624">3</a>. XEP-0082: XMPP Date and Time Profiles &lt;<a href="https://xmpp.org/extensions/xep-0082.html">https://xmpp.org/extensions/xep-0082.html</a>&gt;.</p><p><a name="nt-idm45052960713712">4</a>. XEP-0086: Error Condition Mappings &lt;<a href="https://xmpp.org/extensions/xep-0086.html">https://xmpp.org/extensions/xep-0086.html</a>&gt;.</p><p><a name="nt-idm45052960709680">5</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm45052960688576">6</a>. RFC 958: Network Time Protocol (NTP) &lt;<a href="http://tools.ietf.org/html/rfc0958">http://tools.ietf.org/html/rfc0958</a>&gt;.</p><p><a name="nt-idm45052960683312">7</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm45052960673840">8</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v2.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0202-2.0.html">2.0</a> (2009-09-11)<a class="anchor-link" href="#revision-history-v2.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the XMPP Council, advanced specification from Draft to Final.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0202-1.0.html">1.0</a> (2007-03-28)<a class="anchor-link" href="#revision-history-v1.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the XMPP Council, advanced from Experimental to Draft.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0202-0.2.html">0.2</a> (2007-03-19)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added service discovery section.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0202-0.1.html">0.1</a> (2006-12-20)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial version; further specified security considerations; per Council feedback, removed tz and display elements.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0202-0.0.2.html">0.0.2</a> (2006-12-19)<a class="anchor-link" href="#revision-history-v0.0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified text; adjusted protocol definition; corrected schema.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0202-0.0.1.html">0.0.1</a> (2006-12-05)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">mn</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{saint-andre2006time,
+  title = {Entity Time},
+  author = {Saint-Andre, Peter and Niedzielski, Maciej},
+  type = {XEP},
+  number = {0202},
+  version = {2.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0202.html},
+  date = {2006-12-05/2009-09-11},
+}</pre><p>END</p></body></html>

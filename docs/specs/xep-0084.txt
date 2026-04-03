@@ -1,0 +1,519 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0084: User Avatar</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0084";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="User Avatar"><meta name="DC.Creator" content="Peter Saint-Andre"><meta name="DC.Creator" content="Peter Millard"><meta name="DC.Creator" content="Thomas Muldowney"><meta name="DC.Creator" content="Julian Missig"><meta name="DC.Description" content="This document defines an XMPP protocol extension for exchanging user avatars, which are small images or icons associated with human users. The protocol specifies payload formats for both avatar metadata and the image data itself. The payload formats are typically transported using the personal eventing profile of XMPP publish-subscribe as specified in XEP-0163."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2019-09-20"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0084"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0084: User Avatar</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This document defines an XMPP protocol extension for exchanging user avatars, which are small images or icons associated with human users. The protocol specifies payload formats for both avatar metadata and the image data itself. The payload formats are typically transported using the personal eventing profile of XMPP publish-subscribe as specified in XEP-0163.</dd><dt>Authors</dt><dd><ul class="authors"><li>Peter Saint-Andre</li><li>Peter Millard</li><li>Thomas Muldowney</li><li>Julian Missig</li></ul></dd><dt>Copyright</dt><dd>© 2003 – 2019 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Stable</p><div id="status-notice" class="draft standards track">NOTICE: The protocol defined herein is a <strong>Stable Standard</strong> of the XMPP Standards Foundation. Implementations are encouraged and the protocol is appropriate for deployment in production systems, but some changes to the protocol are possible before it becomes a Final Standard.</div></dd><dt>Supersedes</dt><dd><a href="xep-0008.html">XEP-0008</a>, <a href="xep-0153.html">XEP-0153</a></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>1.1.4 (2019-09-20)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li class="current">Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#reqs">Requirements</a></li><li><a href="#process">Basic Process Flow</a><ol><li><a href="#process-pubdata">User Publishes Data</a></li><li><a href="#process-pubmeta">User Publishes Metadata Notification</a></li><li><a href="#process-subnotify">Subscribers Receive Metadata Notification</a></li><li><a href="#process-subretrieve">Subscribers Retrieve Data</a></li><li><a href="#pub-disable">Publisher Disables Avatar Publishing</a></li></ol></li><li><a href="#proto">Protocol Syntax</a><ol><li><a href="#proto-data">Data Element</a></li><li><a href="#proto-meta">Metadata Element</a><ol><li><a href="#proto-info">Info Element</a></li><li><a href="#proto-pointer">Pointer Element</a></li></ol></li></ol></li><li><a href="#examples">Additional Examples</a><ol><li><a href="#examples-multiple">Metadata With Multiple Content-Types</a></li><li><a href="#examples-pointer">Metadata With Pointer</a></li></ol></li><li><a href="#disco">Service Discovery</a><ol><li><a href="#disco-sub">Discovering Avatar Availability</a></li></ol></li><li><a href="#impl">Implementation Notes</a><ol><li><a href="#impl-resources">Multiple Resources</a></li><li><a href="#impl-sync">Avatar Synchronization</a></li><li><a href="#impl-images">Image Handling</a></li></ol></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#ns">Protocol Namespaces</a></li></ol></li><li><a href="#schema">XML Schema</a><ol><li><a href="#schema-data">Data Namespace</a></li><li><a href="#schema-metadata">Metadata Namespace</a></li></ol></li><li><a href="#authornote">Author Note</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Many communication applications allow for the association of a small image or icon with a user of that application. Usually, such an "avatar" is not intended to be an accurate picture of the user's actual physical appearance, but rather a representation (often fanciful) of the user's desired self-image or a transient state of the user (such as a mood or activity). This document defines a way to incorporate avatars into current Jabber/XMPP systems by layering this functionality on top of the XMPP <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm45097514420992">1</a>] extension ("pubsub"), specifically the <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0163.html">Personal Eventing Protocol (XEP-0163)</a></span>  [<a href="#nt-idm45097514412000">2</a>] subset ("PEP"), which is designed for use in the context of XMPP instant messaging and presence systems that conform to <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc3921">RFC 3921</a></span>  [<a href="#nt-idm45097514415008">3</a>].</p>
+  <p class="" style="">The protocol defined herein uses two pubsub nodes: one node for "metadata" about the avatar state (called the "metadata node") and one for the avatar data itself (called the "data node"). This separation of metadata from data conserves bandwidth and enables both the publisher and the subscriber to cache the avatar data. (For example, a user might toggle between two or three avatars, in which case the user's contacts can display a locally cached version of the images without having to retrieve or receive the full image each time.)</p>
+  <p class="" style="">This protocol also allows storage of avatar data at a URL accessible via HTTP (see <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc2616">RFC 2616</a></span>  [<a href="#nt-idm45097514404304">4</a>]).  [<a href="#nt-idm45097514402320">5</a>] This can be helpful as a fallback mechanism if a pubsub-aware data repository is not available. It also makes it possible for avatar images to be hosted on public websites (e.g., an end-user-oriented community site) and retrieved from that site rather than handled directly by the publishing client in any fashion.</p>
+  <p class="" style="">Finally, this protocol also enables XMPP applications to optionally integrate with third-party services that host user avatars (e.g., online gaming systems and virtual worlds).</p>
+  <p class="" style="">It is intended that this specification will supersede both <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0008.html">IQ-Based Avatars (XEP-0008)</a></span>  [<a href="#nt-idm45097514396624">6</a>] and <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0153.html">vCard-Based Avatars (XEP-0153)</a></span>  [<a href="#nt-idm45097514387024">7</a>] once the PEP subset of XMPP publish-subscribe is implemented and deployed widely enough.</p>
+<h2 id="reqs">2.
+       Requirements<a class="anchor-link" href="#reqs"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document addresses the following use cases for avatar publishers:</p>
+  <ol start="" class="" style="">
+    <li class="" style="">Publishing avatar data</li>
+    <li class="" style="">Updating metadata about the current avatar</li>
+    <li class="" style="">Disabling avatars</li>
+  </ol>
+  <p class="" style="">This document addresses the following use cases for avatar subscribers:</p>
+  <ol start="" class="" style="">
+    <li class="" style="">Discovering avatar availability</li>
+    <li class="" style="">Receiving notification of avatar changes</li>
+    <li class="" style="">Retrieving avatar data via pubsub</li>
+    <li class="" style="">Retrieving avatar data via HTTP</li>
+  </ol>
+<h2 id="process">3.
+       Basic Process Flow<a class="anchor-link" href="#process"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The process for publishing and updating user avatars is as follows:</p>
+  <ol start="" class="" style="">
+    <li class="" style="">User publishes avatar data for "image/png" content-type to data node and optionally publishes other content-types to HTTP URLs.</li>
+    <li class="" style="">User publishes notification of updated avatar to metadata node, with ItemID that matches SHA-1 hash of image data for "image/png" content-type (note: this is a hash of the image data itself, not the base64-encoded version).</li>
+    <li class="" style="">Subscribers receive notification.</li>
+    <li class="" style="">Optionally (and if necessary), subscribers retrieve avatar data identified by ItemID from data node using pubsub retrieve-items feature (or via HTTP).</li>
+    <li class="" style="">Optionally, user disables avatar display.</li>
+  </ol>
+  <p class="" style="">This process flow is described more fully in the following sections.</p>
+  <p class="" style="">Note: Before publishing avatar data and metadata, the user MUST determine if his or her server supports the PEP subset of pubsub by following the procedures specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0163.html">Personal Eventing Protocol (XEP-0163)</a></span>  [<a href="#nt-idm45097514412000">2</a>], since such support simplifies avatar publication. The following examples assume the availability of a PEP service.</p>
+  <div class="indent"><h3 id="process-pubdata">3.1 User Publishes Data<a class="anchor-link" href="#process-pubdata"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Before updating the avatar metadata node, the publisher MUST make sure that the avatar data is available at the data node or URL. When publishing the avatar data to the data node, the publisher MUST ensure that the value of the pubsub ItemID is a SHA-1 hash of the data for the "image/png" content-type (this is used by the subscriber to determine if a locally cached copy can be displayed).</p>
+    <p class="" style="">The following example illustrates the XML structure to be sent when publishing avatar data to the data node.</p>
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Publishing avatar data to data node<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' from='juliet@capulet.lit/chamber' id='publish1'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:avatar:data'&gt;
+      &lt;item id='111f4b3c50d7b0df729d299bc6f8e9ef9066971f'&gt;
+        &lt;data xmlns='urn:xmpp:avatar:data'&gt;
+          qANQR1DBwU4DX7jmYZnncm...
+        &lt;/data&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Pubsub service replies with success<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result' to='juliet@capulet.lit/chamber' id='publish1'/&gt;
+</pre></figure>
+    <p class="" style="">If the avatar will be made available via HTTP instead of a pubsub data node, the publisher MUST either verify that the avatar exists at the HTTP URL or publish it via standard HTTP methods (such methods are out of scope for this specification; refer to <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc2616">RFC 2616</a></span>  [<a href="#nt-idm45097514404304">4</a>]).</p>
+  </div>
+  <div class="indent"><h3 id="process-pubmeta">3.2 User Publishes Metadata Notification<a class="anchor-link" href="#process-pubmeta"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Whenever the publisher wishes to change its current avatar, it MUST update the metadata node. As with the data node, the publisher MUST ensure that the value of the pubsub ItemID is a SHA-1 hash of the data for the "image/png" content-type (the match between the ItemID of the data node and metadata node is used by the subscriber to determine if a locally cached copy can be displayed).</p>
+    <p class="" style="">The following example shows metadata specifying avatar data that is available in only one format ("image/png") and accessible only at the data node.</p>
+    <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Publishing avatar metadata<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' from='juliet@capulet.lit/chamber' id='publish2'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:avatar:metadata'&gt;
+      &lt;item id='111f4b3c50d7b0df729d299bc6f8e9ef9066971f'&gt;
+        &lt;metadata xmlns='urn:xmpp:avatar:metadata'&gt;
+          &lt;info bytes='12345'
+                id='111f4b3c50d7b0df729d299bc6f8e9ef9066971f'
+                height='64'
+                type='image/png'
+                width='64'/&gt;
+        &lt;/metadata&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">The following example shows metadata specifying avatar data that is available at an HTTP URL.</p>
+    <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Publishing avatar metadata<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' from='juliet@capulet.lit/chamber' id='publish2'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:avatar:metadata'&gt;
+      &lt;item id='111f4b3c50d7b0df729d299bc6f8e9ef9066971f'&gt;
+        &lt;metadata xmlns='urn:xmpp:avatar:metadata'&gt;
+          &lt;info bytes='23456'
+                height='64'
+                id='357a8123a30844a3aa99861b6349264ba67a5694'
+                type='image/gif'
+                url='http://avatars.example.org/happy.gif'
+                width='64'/&gt;
+        &lt;/metadata&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="process-subnotify">3.3 Subscribers Receive Metadata Notification<a class="anchor-link" href="#process-subnotify"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The user's virtual pubsub service would then send the metadata notification to entities that have subscribed to the user's metadata node or contacts who have advertised an interest in receiving avatar metadata by including a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm45097514345296">8</a>] feature of "urn:xmpp:avatar:metadata+notify".</p>
+    <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> Subscribers receive avatar metadata notification<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='romeo@montague.lit/home' from='juliet@capulet.lit'&gt;
+  &lt;event xmlns='http://jabber.org/protocol/pubsub#event'&gt;
+    &lt;items node='urn:xmpp:avatar:metadata'&gt;
+      &lt;item id='111f4b3c50d7b0df729d299bc6f8e9ef9066971f'&gt;
+        &lt;metadata xmlns='urn:xmpp:avatar:metadata'&gt;
+          &lt;info bytes='12345'
+                height='64'
+                id='111f4b3c50d7b0df729d299bc6f8e9ef9066971f'
+                type='image/png'
+                width='64'/&gt;
+        &lt;/metadata&gt;
+      &lt;/item&gt;
+    &lt;/items&gt;
+  &lt;/event&gt;
+  &lt;addresses xmlns='http://jabber.org/protocol/address'&gt;
+    &lt;address type='replyto' jid='juliet@capulet.lit/chamber'/&gt;
+  &lt;/addresses&gt;
+&lt;/message&gt;
+</pre></figure>
+    <p class="" style="">As shown, depending on node configuration, the item may include <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0033.html">Extended Stanza Addressing (XEP-0033)</a></span>  [<a href="#nt-idm45097514338432">9</a>] information about the publishing resource (see <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm45097514420992">1</a>] for details).</p>
+  </div>
+  <div class="indent"><h3 id="process-subretrieve">3.4 Subscribers Retrieve Data<a class="anchor-link" href="#process-subretrieve"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Upon receiving the notification, each subscriber SHOULD determine if it has a locally cached copy of that avatar (which it can do by searching for an image identified by the ItemID). If the subscriber already has a locally cached copy of the avatar image, it MUST NOT retrieve the image data.</p>
+    <p class="" style="">If the subscriber does not have a locally cached copy of the avatar image, it SHOULD retrieve the data. It can do this by sending a pubsub retrieve-items request to the data node, specifying the appropriate ItemID.</p>
+    <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> Subscriber requests last item by ItemID<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get'
+    from='romeo@montague.lit/home'
+    to='juliet@capulet.lit'
+    id='retrieve1'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;items node='urn:xmpp:avatar:data'&gt;
+      &lt;item id='111f4b3c50d7b0df729d299bc6f8e9ef9066971f'/&gt;
+    &lt;/items&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">The PEP service running at the user's server then SHOULD return the avatar data.</p>
+    <figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> PEP service returns avatar data<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result'
+    from='juliet@capulet.lit'
+    to='romeo@montague.lit/home'
+    id='retrieve1'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;items node='urn:xmpp:avatar:data'&gt;
+      &lt;item id='111f4b3c50d7b0df729d299bc6f8e9ef9066971f'&gt;
+        &lt;data xmlns='urn:xmpp:avatar:data'&gt;
+          qANQR1DBwU4DX7jmYZnncm...
+        &lt;/data&gt;
+      &lt;/item&gt;
+    &lt;/items&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">If the &lt;info/&gt; element sent to the metadata node possesses a 'url' attribute, the avatar data is hosted at a URL. Therefore, in order to retrieve the avatar image data for that content-type, the requesting entity MUST send an HTTP request to the specified URL. Methods for doing so are out of scope for this specification (see <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc2616">RFC 2616</a></span>  [<a href="#nt-idm45097514404304">4</a>]).</p>
+  </div>
+  <div class="indent"><h3 id="pub-disable">3.5 Publisher Disables Avatar Publishing<a class="anchor-link" href="#pub-disable"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">In order to temporarily disable avatar publishing, the user publishes an empty &lt;metadata/&gt; element to the metadata node.</p>
+    <figure class="code-example" id="example-8"><figcaption><strong>Example 8.</strong> Temporarily disabling avatar publishing<a class="anchor-link" href="#example-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' from='juliet@capulet.lit/chamber' id='publish3'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:avatar:metadata'&gt;
+      &lt;item&gt;
+        &lt;metadata xmlns='urn:xmpp:avatar:metadata'/&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">As before, subscribers to the metadata node would then receive the notification.</p>
+    <figure class="code-example" id="example-9"><figcaption><strong>Example 9.</strong> Subscribers receive avatar metadata notification<a class="anchor-link" href="#example-9"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='romeo@montague.lit/home' from='juliet@capulet.lit'&gt;
+  &lt;event xmlns='http://jabber.org/protocol/pubsub#event'&gt;
+    &lt;items node='urn:xmpp:avatar:metadata'&gt;
+      &lt;item&gt;
+        &lt;metadata xmlns='urn:xmpp:avatar:metadata'/&gt;
+      &lt;/item&gt;
+    &lt;/items&gt;
+  &lt;/event&gt;
+&lt;/message&gt;
+</pre></figure>
+    <p class="" style="">Note: In an earlier version of this specification, the user indicated that it wanted to disable publishing by sending a &lt;metadata/&gt; element containing a &lt;stop/&gt; child element. For consistency with other PEP payload formats, support for the &lt;stop/&gt; element is <em>deprecated</em>.</p>
+  </div>
+<h2 id="proto">4.
+       Protocol Syntax<a class="anchor-link" href="#proto"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The PEP subset of pubsub requires that there shall exist a one-to-one relationship between namespaces and nodes. Because the protocol defined herein stipulates the use of two nodes (one for avatar data and one for avatar metadata), we define two namespaces, each with a corresponding root element:</p>
+  <ul class="" style="">
+    <li class="" style="">&lt;data xmlns='urn:xmpp:avatar:data'/&gt;</li>
+    <li class="" style="">&lt;metadata xmlns='urn:xmpp:avatar:metadata'/&gt;</li>
+  </ul>
+  <p class="" style="">These are further specified below.</p>
+  <div class="indent"><h3 id="proto-data">4.1 Data Element<a class="anchor-link" href="#proto-data"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The &lt;data/&gt; element is used to communicate the avatar data itself, and only for the "image/png" content-type (support for which is REQUIRED).</p>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;data xmlns='urn:xmpp:avatar:data'&gt;
+  IMAGE DATA
+&lt;/data&gt;
+</pre></figure>
+    <p class="" style="">The XML character data MUST represent the image data for the avatar with a content-type of "image/png", Base64-encoded in accordance with Section 4 of <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc4648">RFC 4648</a></span>  [<a href="#nt-idm45097514304176">10</a>]. (Note: Line feeds SHOULD NOT be added but MUST be accepted.)</p>
+    <p class="" style="">The &lt;data/&gt; element MUST NOT possess any attributes.</p>
+    <p class="" style="">Support for the &lt;data/&gt; element is REQUIRED.</p>
+  </div>
+  <div class="indent"><h3 id="proto-meta">4.2 Metadata Element<a class="anchor-link" href="#proto-meta"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The &lt;metadata/&gt; element is used to communicate information about the avatar. There are two allowable children of the &lt;metadata/&gt; element:</p>
+    <ul class="" style="">
+      <li class="" style="">&lt;info/&gt;</li>
+      <li class="" style="">&lt;pointer/&gt;</li>
+    </ul>
+    <p class="" style="">These are further specified below.</p>
+    <p class="" style="">In addition, the &lt;metadata/&gt; element MAY be empty (i.e., contain no child elements); this form is used to disable avatar publishing.</p>
+    <div class="indent"><h4 id="proto-info">4.2.1 Info Element<a class="anchor-link" href="#proto-info"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">The &lt;info/&gt; child element is used to communicate avatar metadata. Support for the &lt;info/&gt; element is REQUIRED.</p>
+      <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;metadata xmlns='urn:xmpp:avatar:metadata'&gt;
+  &lt;info bytes='size-of-image-data-in-bytes'
+        height='image-height-in-pixels'
+        id='SHA-1-hash-of-image-data'
+        type='content-type-of-image-data'
+        url='HTTP-URL-for-image-data'
+        width='image-width-in-pixels'/&gt;
+&lt;/metadata&gt;
+</pre></figure>
+      <p class="" style="">The &lt;info/&gt; child element MUST be empty.</p>
+      <p class="" style="">The defined attributes of the &lt;info/&gt; element are specified in the following table.</p>
+      <figure class="table"><figcaption id="table-1"><strong>Table 1:</strong> Info Attributes<a class="anchor-link" href="#table-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+        <tr class="body">
+          <th colspan="" rowspan="">Name</th>
+          <th colspan="" rowspan="">Definition</th>
+          <th colspan="" rowspan="">Inclusion</th>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">bytes</td>
+          <td align="" colspan="" rowspan="">The size of the image data in bytes.</td>
+          <td align="" colspan="" rowspan="">REQUIRED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">height</td>
+          <td align="" colspan="" rowspan="">The height of the image in pixels, if available.</td>
+          <td align="" colspan="" rowspan="">RECOMMENDED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">id</td>
+          <td align="" colspan="" rowspan="">A hash of the image data for the specified content-type, where the hash is produced in accordance with the SHA-1 algorithm as specified in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc3174">RFC 3174</a></span>  [<a href="#nt-idm45097514271776">11</a>] (with binary output).</td>
+          <td align="" colspan="" rowspan="">REQUIRED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">type</td>
+          <td align="" colspan="" rowspan="">The IANA-registered content type of the image data.</td>
+          <td align="" colspan="" rowspan="">REQUIRED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">url</td>
+          <td align="" colspan="" rowspan="">The http: or https: URL at which the image data file is hosted; this attribute MUST NOT be included unless the image data file can be retrieved via HTTP.</td>
+          <td align="" colspan="" rowspan="">OPTIONAL</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">width</td>
+          <td align="" colspan="" rowspan="">The width of the image in pixels, if available.</td>
+          <td align="" colspan="" rowspan="">RECOMMENDED</td>
+        </tr>
+      </table></figure>
+      <p class="" style="">The &lt;metadata/&gt; root element MAY contain more than one &lt;info/&gt; element. Each &lt;info/&gt; element MUST specify metadata for the same avatar image but in alternate content-types (e.g., "image/png", "image/gif", and "image/jpeg"), and one of the formats MUST be "image/png" to ensure interoperability. The value of the 'type' attribute MUST be an IANA-registered content type of type "image" or "video".  [<a href="#nt-idm45097514254720">12</a>] Support for the "image/png" content type is REQUIRED. Support for the "image/gif" and "image/jpeg" content types is RECOMMENDED. Support for any other content type is OPTIONAL.</p>
+    </div>
+    <div class="indent"><h4 id="proto-pointer">4.2.2 Pointer Element<a class="anchor-link" href="#proto-pointer"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">The &lt;pointer/&gt; child element is used to point to an avatar that is not published via pubsub or HTTP, but rather is provided by a third-party service such as an online gaming system or virtual world.</p>
+      <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;metadata xmlns='urn:xmpp:avatar:metadata'&gt;
+  &lt;pointer&gt;
+    ... APPLICATION-SPECIFIC DATA ...
+  &lt;/pointer&gt;
+&lt;/metadata&gt;
+</pre></figure>
+      <p class="" style="">The &lt;pointer/&gt; element MAY possess the following attributes if the publishing application has the relevant information:</p>
+      <ul class="" style="">
+        <li class="" style=""><em>bytes</em> -- The size of the image data in bytes.</li>
+        <li class="" style=""><em>height</em> -- The height of the image in pixels, if available.</li>
+        <li class="" style=""><em>id</em> -- The SHA-1 hash of the image data for the specified content-type.</li>
+        <li class="" style=""><em>type</em> -- The IANA-registered content type of the image data.</li>
+        <li class="" style=""><em>width</em> -- The width of the image in pixels, if available.</li>
+      </ul>
+      <p class="" style="">The content of the &lt;pointer/&gt; element MUST be a properly-namespaced child element that specifies information about how to retrieve the avatar from the third-party service. The structure for any such child element is out of scope for this document.</p>
+      <p class="" style="">Even if the &lt;pointer&gt; element is included, it MUST be preceded by at least one instance of the &lt;info/&gt; element so that implementations that do not support the &lt;pointer/&gt; element can display a "fallback" format of the avatar (at a minimum, "image/png").</p>
+      <p class="" style="">Support for the &lt;pointer/&gt; element is OPTIONAL.</p>
+    </div>
+  </div>
+<h2 id="examples">5.
+       Additional Examples<a class="anchor-link" href="#examples"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="examples-multiple">5.1 Metadata With Multiple Content-Types<a class="anchor-link" href="#examples-multiple"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The following example shows metadata specifying avatar data that is available in multiple formats ("image/png", "image/gif", and "image/mng"), where the "image/png" content-type is available only at the data node and the other content-types are available HTTP URLs.</p>
+    <figure class="code-example" id="example-10"><figcaption><strong>Example 10.</strong> Publishing avatar metadata (multiple formats)<a class="anchor-link" href="#example-10"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' from='juliet@capulet.lit/chamber' id='publish3'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:avatar:metadata'&gt;
+      &lt;item id='111f4b3c50d7b0df729d299bc6f8e9ef9066971f'&gt;
+        &lt;metadata xmlns='urn:xmpp:avatar:metadata'&gt;
+          &lt;info bytes='12345'
+                height='64'
+                id='111f4b3c50d7b0df729d299bc6f8e9ef9066971f'
+                type='image/png'
+                width='64'/&gt;
+          &lt;info bytes='12345'
+                height='64'
+                id='e279f80c38f99c1e7e53e262b440993b2f7eea57'
+                type='image/png'
+                url='http://avatars.example.org/happy.png'
+                width='64'/&gt;
+          &lt;info bytes='23456'
+                height='64'
+                id='357a8123a30844a3aa99861b6349264ba67a5694'
+                type='image/gif'
+                url='http://avatars.example.org/happy.gif'
+                width='64'/&gt;
+          &lt;info bytes='78912'
+                height='64'
+                id='03a179fe37bd5d6bf9c2e1e592a14ae7814e31da'
+                type='image/mng'
+                url='http://avatars.example.org/happy.mng'
+                width='64'/&gt;
+        &lt;/metadata&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">In the foregoing example, the image encapsulated in the "image/png" content type is available both at a pubsub data node and at an HTTP URL; therefore it is included twice (the second time with a 'url' attribute).</p>
+  </div>
+  <div class="indent"><h3 id="examples-pointer">5.2 Metadata With Pointer<a class="anchor-link" href="#examples-pointer"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The following example shows metadata specifying avatar data that is available in "image/png" at the data node and also with a pointer to an external service.</p>
+    <figure class="code-example" id="example-11"><figcaption><strong>Example 11.</strong> Publishing avatar metadata (with pointer)<a class="anchor-link" href="#example-11"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' from='juliet@capulet.lit/chamber' id='publish4'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:avatar:metadata'&gt;
+      &lt;item id='111f4b3c50d7b0df729d299bc6f8e9ef9066971f'&gt;
+        &lt;metadata xmlns='urn:xmpp:avatar:metadata'&gt;
+          &lt;info bytes='12345'
+                height='64'
+                id='111f4b3c50d7b0df729d299bc6f8e9ef9066971f'
+                type='image/png'
+                width='64'/&gt;
+          &lt;pointer&gt;
+            &lt;x xmlns='http://example.com/virtualworlds'&gt;
+              &lt;game&gt;Ancapistan&lt;/game&gt;
+              &lt;character&gt;Kropotkin&lt;/character&gt;
+            &lt;/x&gt;
+          &lt;/pointer&gt;
+        &lt;/metadata&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+  </div>
+<h2 id="disco">6.
+       Service Discovery<a class="anchor-link" href="#disco"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="disco-sub">6.1 Discovering Avatar Availability<a class="anchor-link" href="#disco-sub"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The pubsub "auto-subscribe" and "filtered-notifications" features enable a contact to automatically subscribe to a user's avatar. However, a contact can also explicitly determine if another user publishes avatars using this protocol by sending a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45097514223664">13</a>] items ("disco#items") request to the user's bare JID &lt;localpart@domain.tld&gt;.</p>
+    <figure class="code-example" id="example-12"><figcaption><strong>Example 12.</strong> Disco items request<a class="anchor-link" href="#example-12"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get'
+    from='romeo@montague.lit/orchard'
+    to='juliet@capulet.lit'
+    id='items1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#items'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">If the user publishes avatar data to an PEP node, the result MUST contain the appropriate items.</p>
+    <figure class="code-example" id="example-13"><figcaption><strong>Example 13.</strong> Disco items result<a class="anchor-link" href="#example-13"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result'
+    from='juliet@capulet.lit'
+    to='romeo@montague.lit/orchard'
+    id='items1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#items'&gt;
+    &lt;item jid='juliet@capulet.lit' node='urn:xmpp:avatar:data'/&gt;
+    &lt;item jid='juliet@capulet.lit' node='urn:xmpp:avatar:metadata'/&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">The contact then MAY subscribe to the metadata node following the protocol specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm45097514420992">1</a>]. However, the contact SHOULD NOT subscribe to the data node (instead, it SHOULD simply retrieve items from that node when needed, as described above).</p>
+  </div>
+<h2 id="impl">7.
+       Implementation Notes<a class="anchor-link" href="#impl"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="impl-resources">7.1 Multiple Resources<a class="anchor-link" href="#impl-resources"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">If a user has multiple online resources at the same time, each resource MAY publish a different avatar. The PEP service SHOULD include the "replyto" address of the publishing resource as shown above in order to facilitate differentiation between per-resource avatars.</p>
+  </div>
+  <div class="indent"><h3 id="impl-sync">7.2 Avatar Synchronization<a class="anchor-link" href="#impl-sync"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">When a user logs in with a new resource and before publishing an avatar, its client SHOULD retrieve its last published avatar, either automatically by sending presence with the appropriate entity capabilities information (see <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm45097514345296">8</a>]) or using the "retrieve-items" method described in <span class="ref">XEP-0060</span>.</p>
+  </div>
+  <div class="indent"><h3 id="impl-images">7.3 Image Handling<a class="anchor-link" href="#impl-images"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">It is the responsibility of the receiving application to determine which avatar format to retrieve (e.g., "image/gif" rather than "image/png") and to determine the appropriate method for retrieval (e.g., HTTP rather than pubsub).</p>
+    <p class="" style="">The receiving application SHOULD NOT scale up an image when displaying it.</p>
+    <p class="" style="">If an avatar is not available for a contact, the receiving application MAY display the contact's photo, e.g., as provided in the contact's vCard (see <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0054.html">vcard-temp (XEP-0054)</a></span>  [<a href="#nt-idm45097514200256">14</a>]) or other profile information.</p>
+  </div>
+<h2 id="security">8.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">See <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm45097514420992">1</a>] and <span class="ref">XEP-0163</span> regarding security considerations related to the underlying transport protocol.</p>
+  <p class="" style="">It is possible that output of the SHA-1 hashing algorithm can result in collisions; however, the use of SHA-1 in producing a hash of the avatar data is not security-critical.</p>
+<h2 id="iana">9.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document makes use of IANA-registered content types, but requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm45097514187120">15</a>].</p>
+<h2 id="registrar">10.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="ns">10.1 Protocol Namespaces<a class="anchor-link" href="#ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45097514179712">16</a>] includes "urn:xmpp:avatar:data" and "urn:xmpp:avatar:metadata" in its registry of protocol namespaces (see &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt;).</p>
+  </div>
+<h2 id="schema">11.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="schema-data">11.1 Data Namespace<a class="anchor-link" href="#schema-data"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='urn:xmpp:avatar:data'
+    xmlns='urn:xmpp:avatar:data'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+      The protocol documented by this schema is defined in
+      XEP-0084: http://www.xmpp.org/extensions/xep-0084.html
+    &lt;/xs:documentation&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:element name='data' type='xs:base64Binary'/&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="schema-metadata">11.2 Metadata Namespace<a class="anchor-link" href="#schema-metadata"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='urn:xmpp:avatar:metadata'
+    xmlns='urn:xmpp:avatar:metadata'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+      The protocol documented by this schema is defined in
+      XEP-0084: http://www.xmpp.org/extensions/xep-0084.html
+    &lt;/xs:documentation&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:element name='metadata'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:choice&gt;
+        &lt;xs:sequence minOccurs='0' maxOccurs='1'&gt;
+          &lt;xs:element ref='info' minOccurs='1' maxOccurs='unbounded'/&gt;
+          &lt;xs:element ref='pointer' minOccurs='0' maxOccurs='unbounded'/&gt;
+        &lt;/xs:sequence&gt;
+      &lt;/xs:choice&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+  &lt;xs:element name='info'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:simpleContent&gt;
+        &lt;xs:extension base='empty'&gt;
+          &lt;xs:attribute name='bytes' type='xs:unsignedInt' use='required'/&gt;
+          &lt;xs:attribute name='height' type='xs:unsignedShort' use='optional'/&gt;
+          &lt;xs:attribute name='id' type='xs:string' use='required'/&gt;
+          &lt;xs:attribute name='type' type='xs:string' use='required'/&gt;
+          &lt;xs:attribute name='url' type='xs:anyURI' use='optional'/&gt;
+          &lt;xs:attribute name='width' type='xs:unsignedShort' use='optional'/&gt;
+        &lt;/xs:extension&gt;
+      &lt;/xs:simpleContent&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+  &lt;xs:element name='pointer'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:sequence&gt;
+        &lt;xs:any namespace='##other'/&gt;
+      &lt;/xs:sequence&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+  &lt;xs:simpleType name='empty'&gt;
+    &lt;xs:restriction base='xs:string'&gt;
+      &lt;xs:enumeration value=''/&gt;
+    &lt;/xs:restriction&gt;
+  &lt;/xs:simpleType&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+  </div>
+<h2 id="authornote">12.
+       Author Note<a class="anchor-link" href="#authornote"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Peter Millard, a co-author of this specification from version 0.1 through version 0.7, died on April 26, 2006. The remaining authors are thankful for his work on user avatars.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0084</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Draft">Stable</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>1.1.4</dd><dt>Last Updated</dt><dd>2019-09-20</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, <a href="xep-0030.html">XEP-0030</a>, <a href="xep-0060.html">XEP-0060</a>, <a href="xep-0163.html">XEP-0163</a></dd><dt>Supersedes</dt><dd><a href="xep-0008.html">XEP-0008</a>, <a href="xep-0153.html">XEP-0153</a></dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>avatar</dd><dt>Schema</dt><dd>
+        XML Schema for the 'data' namespace: &lt;<a href="http://www.xmpp.org/schemas/avatar-data.xsd">http://www.xmpp.org/schemas/avatar-data.xsd</a>&gt;<br></dd><dd>
+        XML Schema for the 'metadata' namespace: &lt;<a href="http://www.xmpp.org/schemas/avatar-metadata.xsd">http://www.xmpp.org/schemas/avatar-metadata.xsd</a>&gt;<br></dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0084.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0084.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0084.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Peter Saint-Andre</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:stpeter@stpeter.im">stpeter@stpeter.im</a></dd><dt>JabberID</dt><dd><a href="xmpp:stpeter@jabber.org">stpeter@jabber.org</a></dd><dt>URI</dt><dd><a href="https://stpeter.im/">https://stpeter.im/</a></dd></dl><h5>Peter Millard</h5>
+      See <a href="#authornote">Author Note</a><br><dl class="compact"></dl><h5>Thomas Muldowney</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:temas@jabber.org">temas@jabber.org</a></dd><dt>JabberID</dt><dd><a href="xmpp:temas@jabber.org">temas@jabber.org</a></dd></dl><h5>Julian Missig</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:julian@jabber.org">julian@jabber.org</a></dd><dt>JabberID</dt><dd><a href="xmpp:julian@jabber.org">julian@jabber.org</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45097514420992">1</a>. XEP-0060: Publish-Subscribe &lt;<a href="https://xmpp.org/extensions/xep-0060.html">https://xmpp.org/extensions/xep-0060.html</a>&gt;.</p><p><a name="nt-idm45097514412000">2</a>. XEP-0163: Personal Eventing Protocol &lt;<a href="https://xmpp.org/extensions/xep-0163.html">https://xmpp.org/extensions/xep-0163.html</a>&gt;.</p><p><a name="nt-idm45097514415008">3</a>. RFC 3921: Extensible Messaging and Presence Protocol (XMPP): Instant Messaging and Presence &lt;<a href="http://tools.ietf.org/html/rfc3921">http://tools.ietf.org/html/rfc3921</a>&gt;.</p><p><a name="nt-idm45097514404304">4</a>. RFC 2616: Hypertext Transport Protocol -- HTTP/1.1 &lt;<a href="http://tools.ietf.org/html/rfc2616">http://tools.ietf.org/html/rfc2616</a>&gt;.</p><p><a name="nt-idm45097514402320">5</a>. By "accessible via HTTP" is meant that the data is available at an http: or https: URI.</p><p><a name="nt-idm45097514396624">6</a>. XEP-0008: IQ-Based Avatars &lt;<a href="https://xmpp.org/extensions/xep-0008.html">https://xmpp.org/extensions/xep-0008.html</a>&gt;.</p><p><a name="nt-idm45097514387024">7</a>. XEP-0153: vCard-Based Avatars &lt;<a href="https://xmpp.org/extensions/xep-0153.html">https://xmpp.org/extensions/xep-0153.html</a>&gt;.</p><p><a name="nt-idm45097514345296">8</a>. XEP-0115: Entity Capabilities &lt;<a href="https://xmpp.org/extensions/xep-0115.html">https://xmpp.org/extensions/xep-0115.html</a>&gt;.</p><p><a name="nt-idm45097514338432">9</a>. XEP-0033: Extended Stanza Addressing &lt;<a href="https://xmpp.org/extensions/xep-0033.html">https://xmpp.org/extensions/xep-0033.html</a>&gt;.</p><p><a name="nt-idm45097514304176">10</a>. RFC 4648: The Base16, Base32, and Base64 Data Encodings &lt;<a href="http://tools.ietf.org/html/rfc4648">http://tools.ietf.org/html/rfc4648</a>&gt;.</p><p><a name="nt-idm45097514271776">11</a>. RFC 3174: US Secure Hash Algorithm 1 (SHA1) &lt;<a href="http://tools.ietf.org/html/rfc3174">http://tools.ietf.org/html/rfc3174</a>&gt;.</p><p><a name="nt-idm45097514254720">12</a>. The IANA registry of content types is located at &lt;<a href="http://www.iana.org/assignments/media-types/">http://www.iana.org/assignments/media-types/</a>&gt;.</p><p><a name="nt-idm45097514223664">13</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm45097514200256">14</a>. XEP-0054: vcard-temp &lt;<a href="https://xmpp.org/extensions/xep-0054.html">https://xmpp.org/extensions/xep-0054.html</a>&gt;.</p><p><a name="nt-idm45097514187120">15</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm45097514179712">16</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v1.1.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-1.1.4.html">1.1.4</a> (2019-09-20)<a class="anchor-link" href="#revision-history-v1.1.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Use xs:unsignedInt for bytes, the previous revision introduced xs:unsignedInteger which isn’t a valid XML Schema data type.</p><div class="revision-author">egp</div></li><li id="revision-history-v1.1.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-1.1.3.html">1.1.3</a> (2019-09-11)<a class="anchor-link" href="#revision-history-v1.1.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Use unsignedInteger instead of unsignedShort in schema for bytes.</p><div class="revision-author">vv</div></li><li id="revision-history-v1.1.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-1.1.2.html">1.1.2</a> (2019-01-27)<a class="anchor-link" href="#revision-history-v1.1.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Bump the maximum value 'width' and 'height' attributes from 255 to 65535 in the schema, to accomodate current usage.</p><div class="revision-author">egp</div></li><li id="revision-history-v1.1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-1.1.1.html">1.1.1</a> (2016-07-09)<a class="anchor-link" href="#revision-history-v1.1.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Fix namespace in example (thanks to Huan Nguyen for pointing out the error).</p><div class="revision-author">XEP Editor: ssw</div></li><li id="revision-history-v1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-1.1.html">1.1</a> (2008-11-05)<a class="anchor-link" href="#revision-history-v1.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">For consistency with other PEP payload formats, changed stop semantics to use an empty &lt;metadata/&gt; element rather than a &lt;stop/&gt; child element.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-1.0.html">1.0</a> (2007-11-07)<a class="anchor-link" href="#revision-history-v1.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the XMPP Council, advanced status to Draft; concurrently, the XMPP Registrar issued the urn:xmpp:avatar:data and urn:xmpp:avatar:metadata namespaces.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.12"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-0.12.html">0.12</a> (2007-08-31)<a class="anchor-link" href="#revision-history-v0.12"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified HTTP publishing; completed copy edit.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.11"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-0.11.html">0.11</a> (2007-07-25)<a class="anchor-link" href="#revision-history-v0.11"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Removed image size requirements.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.10"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-0.10.html">0.10</a> (2007-06-18)<a class="anchor-link" href="#revision-history-v0.10"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Changed height and width attributes from required to recommended; updated security considerations to reflect problems with SHA-1; further specified datatypes.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.9"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-0.9.html">0.9</a> (2007-02-01)<a class="anchor-link" href="#revision-history-v0.9"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Updated to reflect pubsub and PEP changes; added implementation notes about multiple resources and avatar synchronization; modified experimental namespaces to conform to XEP-0053.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.8"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-0.8.html">0.8</a> (2006-06-19)<a class="anchor-link" href="#revision-history-v0.8"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Updated to reflect pubsub and PEP changes; added implementation notes about multiple resources and avatar synchronization.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.7"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-0.7.html">0.7</a> (2006-01-17)<a class="anchor-link" href="#revision-history-v0.7"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Updated to use PEP.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.6"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-0.6.html">0.6</a> (2005-04-13)<a class="anchor-link" href="#revision-history-v0.6"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Major modification per list discussion: specified that metadata may include the same avatar in multiple alternate formats; allowed pointers to third-party avatars not available via pubsub or HTTP; changed pixel size restrictions; specified that bytes, content-type, height, id, and width are required metadata; changed type attribute to content-type; made explicit that URLs can be http: or https: URIs; more fully specified protocol, updated the examples, updated the schemas.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-0.5.html">0.5</a> (2005-03-28)<a class="anchor-link" href="#revision-history-v0.5"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Friendly fork per Council discussion: allowed data to be stored in a pubsub data repository or at a URL accessible via HTTP; also split text into publisher and subscriber use cases, specified requirements, added more examples, etc.</p><div class="revision-author">psa/pgm</div></li><li id="revision-history-v0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-0.4.html">0.4</a> (2003-05-20)<a class="anchor-link" href="#revision-history-v0.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Lessen the image requirements. Include the content type in info.</p><div class="revision-author">tjm</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-0.3.html">0.3</a> (2003-05-08)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Drastic change to use two nodes on pubsub, allowing for hash updates independently of the data. This makes client caching much easier. Allow only PNG and MNG currently.</p><div class="revision-author">tjm</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-0.2.html">0.2</a> (2003-05-07)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified the use of "current" as the item id. Fixed some example errors. Made the interaction with disco more clear. The reason to use pubsub is made more clear as well.</p><div class="revision-author">tjm</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0084-0.1.html">0.1</a> (2003-05-07)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial version.</p><div class="revision-author">tjm</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{saint-andre2003avatar,
+  title = {User Avatar},
+  author = {Saint-Andre, Peter and Millard, Peter and Muldowney, Thomas and Missig, Julian},
+  type = {XEP},
+  number = {0084},
+  version = {1.1.4},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0084.html},
+  date = {2003-05-07/2019-09-20},
+}</pre><p>END</p></body></html>

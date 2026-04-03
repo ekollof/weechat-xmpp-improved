@@ -1,0 +1,486 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0433: Extended Channel Search</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0433";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Extended Channel Search"><meta name="DC.Creator" content="Jonas Schäfer"><meta name="DC.Description" content="This specification provides a standardised protocol to search for public group chats. In contrast to XEP-0030 (Service Discovery), it works across multiple domains and in contrast to XEP-0055 (Jabber Search) it more clearly handles extensibility."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2020-02-27"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0433"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0433: Extended Channel Search</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification provides a standardised protocol to search for public group chats. In contrast to XEP-0030 (Service Discovery), it works across multiple domains and in contrast to XEP-0055 (Jabber Search) it more clearly handles extensibility.</dd><dt>Author</dt><dd>Jonas Schäfer</dd><dt>Copyright</dt><dd>© 2020 – 2020 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Deferred</p><div id="status-notice" class="deferred standards track">WARNING: This document has been automatically Deferred after 12 months of inactivity in its previous Experimental state. Implementation of the protocol described herein is not recommended for production systems. However, exploratory implementations are encouraged to resume the standards process.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.1.0 (2020-02-27)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li class="current inserted">Deferred</li><li>Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction &amp; Motivation</a></li><li><a href="#reqs">Requirements</a></li><li><a href="#glossary">Glossary</a></li><li><a href="#usecases">Use Cases</a><ol><li><a href="#usecases-support">Announcing/discovering support</a></li><li><a href="#usecases-search">Executing a keyword search</a><ol><li><a href="#usecases-search-form">Requesting the search form</a></li><li><a href="#usecases-search-request">Send a search request</a><ol><li><a href="#usecase-search-request-success">Success Case</a></li><li><a href="#usecases-search-request-unsuppsortkey">Unsupported Sort Key</a></li><li><a href="#usecases-search-request-searchinvalid">Invalid Search Terms</a></li><li><a href="#usecases-support-request-ratelimit">Rate Limiting</a></li><li><a href="#usecases-support-request-nofulllist">Rejection of Full List Retrieval</a></li><li><a href="#usecases-support-request-conflictingoptions">Conflicting Field Options</a></li><li><a href="#usecases-search-request-nosearch">No Search Conditions</a></li></ol></li></ol></li></ol></li><li><a href="#rules">Business Rules</a></li><li><a href="#impl">Implementation Notes</a><ol><li><a href="#impl-searchformfields">Search Form Fields</a><ol><li><a href="#impl-searchformfields-extensibility">Extensibility of the Search Form Fields</a></li></ol></li><li><a href="#impl-resultitemformat">Result Item Format</a><ol><li><a href="#impl-resultitemformat-extensibility">Extensibility</a></li></ol></li></ol></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a></li><li><a href="#schema">XML Schema</a></li><li><a href="#design">Design Considerations</a></li><li><a href="#acks">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction &amp; Motivation<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The XMPP instant messaging ecosystem is a federated one. This leads to many different group chat service providers existing and interesting public group chats being spread out across them. In order to provide users with a way to find public group chats (henceforth called channels) of interest to them, there needs to be a way to execute a cross-domain search based on keywords.</p>
+  <p class="" style="">The protocol in this document provides a general and extensible search for channels across different domains and service types (e.g. MUC vs. MIX). It provides meta-information right in the result set, which allows searching entities to skip additional <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45588937498240">1</a>] queries against the channels themselves.</p>
+  <p class="" style="">The protocol is not only useful for cross-domain search, but also as an alternative to using a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45588937498240">1</a>] disco#items request followed by many disco#info requests on a group chat service.</p>
+<h2 id="reqs">2.
+       Requirements<a class="anchor-link" href="#reqs"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The protocol:</p>
+  <ul class="" style="">
+    <li class="" style="">must work without state on the server side. This is to allow stateless proxies to be used for pseudonymisation or anonymisation.</li>
+    <li class="" style="">must allow searching the list using a free-text keyword-based search.</li>
+    <li class="" style="">must allow future extensions to the search query and the result.</li>
+    <li class="" style="">must allow retrieving the entire data set (although, for clarification, an operator may choose to turn this off).</li>
+    <li class="" style="">must use completely machine-readable and machine-writable data.</li>
+  </ul>
+<h2 id="glossary">3.
+       Glossary<a class="anchor-link" href="#glossary"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><dl>
+    
+      <dt><strong>Channel</strong></dt>
+      <dd>A public group chat hosted on a Group Chat Service. This can either be a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45588936295488">2</a>] room, a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0369.html">Mediated Information eXchange (MIX) (XEP-0369)</a></span>  [<a href="#nt-idm45588936285968">3</a>] channel or something else entirely.</dd>
+    
+    
+      <dt><strong>Group Chat Service</strong></dt>
+      <dd>An entity or deployment which offers multi-user chat relay, such as by <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45588936295488">2</a>] or <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0369.html">Mediated Information eXchange (MIX) (XEP-0369)</a></span>  [<a href="#nt-idm45588936285968">3</a>].</dd>
+    
+    
+      <dt><strong>Search Service</strong></dt>
+      <dd>An entity which offers the service described in this specification.</dd>
+    
+    
+      <dt><strong>Searcher</strong></dt>
+      <dd>An entity which requests information from the Search Service.</dd>
+    
+  </dl></div>
+<h2 id="usecases">4.
+       Use Cases<a class="anchor-link" href="#usecases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="usecases-support">4.1 Announcing/discovering support<a class="anchor-link" href="#usecases-support"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">An entity annouces that it supports serving search queries by publishing
+      the <code>urn:xmpp:channel-search:0:search</code> feature via <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45588937498240">1</a>]:</p>
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> XEP-0030 disco#info response<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='search.service.example' to='client@user.example' id='id1' type='result'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+    &lt;!-- ... --&gt;
+    &lt;feature var='urn:xmpp:channel-search:0:search'/&gt;
+    &lt;!-- ... --&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+  </div>
+
+  <div class="indent"><h3 id="usecases-search">4.2 Executing a keyword search<a class="anchor-link" href="#usecases-search"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">To execute a keyword search, the Searcher MAY first request the search form from the Search Service. Alternatively, the Searcher MAY use the form specified in this document with only the fields which must be implemented by the Search Service.</p>
+    <p class="" style="">After obtaining the search form, the Searcher completes the form and sends it back to the Search Service. The Search Service replies with a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0059.html">Result Set Management (XEP-0059)</a></span>  [<a href="#nt-idm45588936265680">4</a>] paginated list of results.</p>
+    <p class="" style="">The search form is a form conforming to <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0068.html">Field Standardization for Data Forms (XEP-0068)</a></span>  [<a href="#nt-idm45588936260336">5</a>].</p>
+    <div class="indent"><h4 id="usecases-search-form">4.2.1 Requesting the search form<a class="anchor-link" href="#usecases-search-form"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">To request the search form, an entity sends an empty <code>search</code> element qualified by the <code>urn:xmpp:channel-search:0:search</code> namespace:</p>
+      <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Searcher requests form from the Search Service<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='client@user.example' to='search.service.example' id='id2' type='get' xml:lang='en'&gt;
+  &lt;search xmlns='urn:xmpp:channel-search:0:search'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+      <p class="" style="">The Search Service replies with the form as in the following example:</p>
+      <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Search Service returns the search form<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='search.service.example' to='client@user.example' id='id2' type='result' xml:lang='en'&gt;
+  &lt;search xmlns='urn:xmpp:channel-search:0:search'&gt;
+    &lt;x xmlns='jabber:x:data' type='form'&gt;
+      &lt;field type='hidden' var='FORM_TYPE'&gt;
+        &lt;value&gt;urn:xmpp:channel-search:0:search-params&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field type='text-single' var='q' label='Search for'/&gt;
+      &lt;field type='boolean' var='all' label='Return all entries (ignore search terms)'/&gt;
+      &lt;field type='boolean' var='sinname' label='Search in name'&gt;
+        &lt;value&gt;true&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field type='boolean' var='sindescription' label='Search in description'&gt;
+        &lt;value&gt;true&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field type='boolean' var='sinaddr' label='Search in address'&gt;
+        &lt;value&gt;true&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field type='text-single' var='min_users' label='Minimum number of users'&gt;
+        &lt;value&gt;1&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var="types" type="list-multi" label="Service types"&gt;
+        &lt;value&gt;xep-0045&lt;/value&gt;
+        &lt;option label='XEP-0045 Multi User Chats'&gt;&lt;value&gt;xep-0045&lt;/value&gt;&lt;/option&gt;
+        &lt;option label='XEP-0369 MIX channels'&gt;&lt;value&gt;xep-0369&lt;/value&gt;&lt;/option&gt;
+      &lt;/field&gt;
+      &lt;field type='list-single' var='key' label='Sort results by'&gt;
+        &lt;value&gt;{urn:xmpp:channel-search:0:order}nusers&lt;/value&gt;
+        &lt;option label='Number of online users'&gt;&lt;value&gt;{urn:xmpp:channel-search:0:order}nusers&lt;/value&gt;&lt;/option&gt;
+        &lt;option label='Address'&gt;&lt;value&gt;{urn:xmpp:channel-search:0:order}address&lt;/value&gt;&lt;/option&gt;
+      &lt;/field&gt;
+    &lt;/x&gt;
+&lt;/search&gt;
+&lt;/iq&gt;
+</pre></figure>
+      <p class="" style=""><strong>Note:</strong> Not all of the fields shown above are mandatory to implement. See <a href="#impl-searchformfields">Search Form Fields</a> for a list of fields and their implementation status.</p>
+    </div>
+
+    <div class="indent"><h4 id="usecases-search-request">4.2.2 Send a search request<a class="anchor-link" href="#usecases-search-request"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">To request the result list for a given search query, a Searcher submits a form with the urn:xmpp:channel-search:0:search-params <code>FORM_TYPE</code>. The Searcher MAY include a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0059.html">Result Set Management (XEP-0059)</a></span>  [<a href="#nt-idm45588936265680">4</a>] <code>&lt;set/&gt;</code> element inside the <code>&lt;search/&gt;</code> element. In either case, the Search Service may reply with a RSM-paginated result and the Searcher MUST be able to process that.</p>
+      <p class="" style="">If a Searcher composes a search request using a search form template obtained by the Search Service, it MAY omit all fields it does not know or where it does not change the value already supplied by the Search Service.</p>
+      <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Searcher submits a form to the Search Service<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='client@user.example' to='search.service.example' id='id3' type='get' xml:lang='en'&gt;
+  &lt;search xmlns='urn:xmpp:channel-search:0:search'&gt;
+    &lt;set xmlns="http://jabber.org/protocol/rsm"&gt;
+      &lt;max&gt;5&lt;/max&gt;
+    &lt;/set&gt;
+    &lt;x xmlns="jabber:x:data" type="submit"&gt;
+      &lt;field type='hidden' var='FORM_TYPE'&gt;
+        &lt;value&gt;urn:xmpp:channel-search:0:search-params&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var="q" type="text-single" label="Search for"&gt;
+        &lt;value&gt;xmpp.org&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var="key" type="list-single" label="Sort results by"&gt;
+        &lt;value&gt;{urn:xmpp:channel-search:0:order}address&lt;/value&gt;
+        &lt;option label='Number of online users'&gt;&lt;value&gt;{urn:xmpp:channel-search:0:order}nusers&lt;/value&gt;&lt;/option&gt;
+        &lt;option label='Address'&gt;&lt;value&gt;{urn:xmpp:channel-search:0:order}address&lt;/value&gt;&lt;/option&gt;
+      &lt;/field&gt;
+    &lt;/x&gt;
+  &lt;/search&gt;
+&lt;/iq&gt;
+</pre></figure>
+      <div class="indent"><h5 id="usecase-search-request-success">4.2.2.1 Success Case</h5>
+        <p class="" style="">The Search Service calculates the result, paginates it according to its own policy (possibly taking into account the pagination request from the client) and returns a single result page in the response IQ.</p>
+        <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> Searcher submits a form to the Search Service<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='search.service.example' to='client@user.example' id='id3' type='result' xml:lang='en'&gt;
+  &lt;result xmlns='urn:xmpp:channel-search:0:search'&gt;
+    &lt;item address='commteam@muc.xmpp.org'&gt;
+      &lt;name&gt;commteam&lt;/name&gt;
+      &lt;nusers&gt;10&lt;/nusers&gt;
+      &lt;is-open/&gt;
+    &lt;/item&gt;
+    &lt;!-- three more items --&gt;
+    &lt;item address='operators@muc.xmpp.org'&gt;
+      &lt;name&gt;XMPP Service Operators&lt;/name&gt;
+      &lt;description&gt;Discussion venue for operators of federated XMPP services&lt;/description&gt;
+      &lt;nusers&gt;43&lt;/nusers&gt;
+      &lt;is-open/&gt;
+    &lt;/item&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;first&gt;opaque-string-1&lt;/first&gt;
+      &lt;last&gt;opaque-string-2&lt;/last&gt;
+      &lt;max&gt;5&lt;/max&gt;
+    &lt;/set&gt;
+  &lt;/result&gt;
+&lt;/iq&gt;
+</pre></figure>
+        <p class="" style="">The result items are <code>&lt;item/&gt;</code> elements wrapped in a <code>&lt;result/&gt;</code> element qualified by the <code>urn:xmpp:channel-search:0:search</code> namespace. The schema, along with extension rules, is described in <a href="#impl-resultitemformat">Result Item Format</a>.</p>
+        <p class="" style="">To obtain further results, the Searcher re-submits the identical form with an appropriate <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0059.html">Result Set Management (XEP-0059)</a></span>  [<a href="#nt-idm45588936265680">4</a>] pagination request, using the information provided by the Search Service in the result <code>&lt;set/&gt;</code> element.</p>
+      </div>
+      <div class="indent"><h5 id="usecases-search-request-unsuppsortkey">4.2.2.2 Unsupported Sort Key</h5>
+        <p class="" style="">If the sort <code>key</code> requested by the Searcher is not supported by the Search Service, the Search Service MUST reply with <code>&lt;feature-not-implemented/&gt;</code> and the <code>&lt;invalid-sort-key&gt;</code> application defined condition and a <code>modify</code> type:</p>
+        <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> Search Service replies with feature-not-implemented<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='search.service.example' to='client@user.example' id='id3' type='error' xml:lang='en'&gt;
+  &lt;error type='modify'&gt;
+    &lt;feature-not-implemented xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+    &lt;invalid-sort-key xmlns='urn:xmpp:channel-search:0:error'/&gt;
+  &lt;/error&gt;
+&lt;/iq&gt;
+</pre></figure>
+      </div>
+      <div class="indent"><h5 id="usecases-search-request-searchinvalid">4.2.2.3 Invalid Search Terms</h5>
+        <p class="" style="">If the <code>q</code> field was supplied by the Searcher and the contents of the <code>q</code> field did not yield any term suitable for search, the Search Service MUST reply with an <code>&lt;bad-request/&gt;</code> error and the <code>&lt;invalid-search-terms/&gt;</code> application defined condition. The error type MUST be <code>modify</code>.</p>
+        <p class="" style="">The server SHOULD include a human-readable description of the constraints for search terms which were not met in the <code>&lt;text/&gt;</code> element of the error.</p>
+        <figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> Search Service replies with the invalid-search-terms error<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='search.service.example' to='client@user.example' id='id3' type='error' xml:lang='en'&gt;
+  &lt;error type='modify'&gt;
+    &lt;bad-request xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+    &lt;text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'&gt;
+      Search terms must have at least three characters.
+    &lt;/text&gt;
+    &lt;invalid-search-terms xmlns='urn:xmpp:channel-search:0:error'/&gt;
+  &lt;/error&gt;
+&lt;/iq&gt;
+</pre></figure>
+      </div>
+      <div class="indent"><h5 id="usecases-support-request-ratelimit">4.2.2.4 Rate Limiting</h5>
+        <p class="" style="">If the Search Service can not or does (by policy) not want to process the request due to excessive amounts of requests (either by the requesting entity, their domain or any other criteria), it MUST reply with an <code>&lt;resource-constraint/&gt;</code> error with type <code>wait</code>.</p>
+        <p class="" style="">The application defined error condition <code>&lt;rate-limit/&gt;</code> MUST be included. This error condition has a RECOMMENDED attribute, <code>retry-after</code>, which provides the amount of seconds after which the Searcher MAY retry the request.</p>
+        <p class="" style="">The Search Service MAY include a human-readable description of the rate limit and when to retry in the <code>&lt;text/&gt;</code> element.</p>
+        <figure class="code-example" id="example-8"><figcaption><strong>Example 8.</strong> Search Service replies with a rate limit notification<a class="anchor-link" href="#example-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='search.service.example' to='client@user.example' id='id3' type='error' xml:lang='en'&gt;
+  &lt;error type='wait'&gt;
+    &lt;resource-constraint xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+    &lt;rate-limit xmlns='urn:xmpp:channel-search:0:error' retry-after='30'/&gt;
+  &lt;/error&gt;
+&lt;/iq&gt;
+</pre></figure>
+        <p class="" style=""><strong>Note:</strong> See also the rate-limiting related business rules for Searcher entities.</p>
+      </div>
+      <div class="indent"><h5 id="usecases-support-request-nofulllist">4.2.2.5 Rejection of Full List Retrieval</h5>
+        <p class="" style="">If the Search Service can not or does (by policy) not want to allow a Searcher to retrieve the entire database of channels, it MUST reject queries which set the <code>all</code> field to true with an error as follows:</p>
+        <ul class="" style="">
+          <li class="" style="">If the feature is generally disabled: <code>&lt;not-allowed/&gt;</code> with type <code>cancel</code></li>
+          <li class="" style="">If the feature is not offered to the Searcher based on its identity: <code>&lt;forbidden/&gt;</code> with type <code>auth</code></li>
+        </ul>
+        <p class="" style="">In all cases, the application defined condition <code>&lt;full-set-retrieval-rejected/&gt;</code> MUST be included.</p>
+        <p class="" style="">The Search Service MAY include a human-readable description of the restrictions around full-list retrieval.</p>
+        <p class="" style="">For example, if the full set retrieval had been disabled service-wide by configuration, the Search Service would reply with the following error:</p>
+        <figure class="code-example" id="example-9"><figcaption><strong>Example 9.</strong> Search Service replies with a full-set-retrieval-rejected error<a class="anchor-link" href="#example-9"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='search.service.example' to='client@user.example' id='id3' type='error' xml:lang='en'&gt;
+  &lt;error type='cancel'&gt;
+    &lt;not-allowed xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+    &lt;text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'&gt;
+      Retrieval of the full database is not allowed.
+    &lt;/text&gt;
+    &lt;full-set-retrieval-rejected xmlns='urn:xmpp:channel-search:0:error'/&gt;
+  &lt;/error&gt;
+&lt;/iq&gt;
+</pre></figure>
+      </div>
+      <div class="indent"><h5 id="usecases-support-request-conflictingoptions">4.2.2.6 Conflicting Field Options</h5>
+        <p class="" style="">If the Searcher provides form fields which are conflicting, the Search Service MUST reply with a <code>&lt;bad-request/&gt;</code> error of type <code>modify</code>. In addition, the <code>&lt;conflicting-fields/&gt;</code> application specific condition MUST be included.</p>
+        <p class="" style="">Conflicting field values are those which fundamentally cannot be used in the same query in such a way that the definition of their function is still adhered to. For example, <code>q</code> restricts the results by keywords, but <code>all</code> specifies that <em>all</em> entries are returned.</p>
+        <p class="" style="">The Search Service SHOULD include a human-readable description of the conflicting fields, referencing to the <code>label</code> values of the involved fields.</p>
+        <p class="" style="">The <code>&lt;conflicting-fields/&gt;</code> element MAY have one or more <code>&lt;var/&gt;</code> child elements which refer to <code>var</code> values of the submitted fields. At least one of the referenced fields must be changed in order for a follow-up query to succeed.`</p>
+        <p class="" style="">For example, if the Searcher has set <code>all</code> to true and provided a query in <code>q</code>, the Search Service would reply with an error similar to the following:</p>
+        <figure class="code-example" id="example-10"><figcaption><strong>Example 10.</strong> Search Service replies with a conflicting-fields error<a class="anchor-link" href="#example-10"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='search.service.example' to='client@user.example' id='id3' type='error' xml:lang='en'&gt;
+  &lt;error type='cancel'&gt;
+    &lt;not-allowed xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+    &lt;text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'&gt;
+      Cannot both return all results and search by keywords.
+    &lt;/text&gt;
+    &lt;conflicting-fields xmlns='urn:xmpp:channel-search:0:error'&gt;
+      &lt;var&gt;all&lt;/var&gt;
+      &lt;var&gt;q&lt;/var&gt;
+    &lt;/conflicting-fields&gt;
+  &lt;/error&gt;
+&lt;/iq&gt;
+</pre></figure>
+      </div>
+      <div class="indent"><h5 id="usecases-search-request-nosearch">4.2.2.7 No Search Conditions</h5>
+        <p class="" style="">If no field which would define a result set and which is understood by the Search Service is present, it MUST reply with a <code>&lt;bad-request/&gt;</code> error of type <code>cancel</code>.</p>
+        <p class="" style="">In addition, the <code>&lt;no-search-conditions/&gt;</code> application defined condition MUST be included.</p>
+        <figure class="code-example" id="example-11"><figcaption><strong>Example 11.</strong> Search Service replies with the no-search-conditions error<a class="anchor-link" href="#example-11"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='search.service.example' to='client@user.example' id='id3' type='error' xml:lang='en'&gt;
+  &lt;error type='modify'&gt;
+    &lt;bad-request xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+    &lt;no-search-conditions xmlns='urn:xmpp:channel-search:0:error'/&gt;
+  &lt;/error&gt;
+&lt;/iq&gt;
+</pre></figure>
+        <p class="" style="">An example of this situation would be a form where neither <code>q</code> nor <code>all</code> are given.</p>
+      </div>
+    </div>
+  </div>
+<h2 id="rules">5.
+       Business Rules<a class="anchor-link" href="#rules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <ul class="" style="">
+    <li class="" style="">When sending the form template, the Search Service MUST include all fields it supports with their respective default values.</li>
+    <li class="" style="">When submitting a form to the Search Service, a Searcher MAY omit all fields it either does not understand or it has left unchanged.</li>
+    <li class="" style="">When submitting a form to the Search Service, a Searcher MAY omit the <code>&lt;option/&gt;</code> elements.</li>
+    <li class="" style="">When receiving a search form, the Search Service MUST ignore fields with a <code>var</code> value it does not understand.</li>
+    <li class="" style="">When executing a keyword search, the service may process the keyword string in implementation-defined ways. This may include interpreting quotes and other "special" characters, removing keywords which do not fit internal criteria for suitability and others.</li>
+    <li class="" style="">If the Searcher receives a <code>&lt;rate-limit/&gt;</code> error, the behaviour of the Searcher depends on the <code>retry-after</code> attribute:
+      <ul class="" style="">
+        <li class="" style="">If the <code>retry-after</code> attribute is present, the Searcher MUST NOT send another search request before the amount of seconds indicated in the <code>retry-after</code> attribute have elapsed. There is no guarantee that the request will be accepted at that time.</li>
+        <li class="" style="">If the <code>retry-after</code> attribute is <em>not</em> present, the Searcher should wait for an implementation-defined amount of time and SHOULD back off exponentially on each subsequent <code>&lt;rate-limit/&gt;</code> error.</li>
+      </ul>
+    </li>
+    <li class="" style="">If a search request does not yield any results, the Search Service MUST reply with a <code>&lt;result/&gt;</code> without any <code>&lt;item/&gt;</code> children in a <code>type='result'</code> IQ. Specifically, it MUST NOT reply with an <code>&lt;item-not-found/&gt;</code> error.</li>
+    <li class="" style="">If the <code>all</code> field is set to true and the Search Service allows this operation, all results MUST be included in the result set (and then paginated using <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0059.html">Result Set Management (XEP-0059)</a></span>  [<a href="#nt-idm45588936265680">4</a>]).</li>
+  </ul>
+<h2 id="impl">6.
+       Implementation Notes<a class="anchor-link" href="#impl"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="impl-searchformfields">6.1 Search Form Fields<a class="anchor-link" href="#impl-searchformfields"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The search form is extensible as per <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0068.html">Field Standardization for Data Forms (XEP-0068)</a></span>  [<a href="#nt-idm45588936260336">5</a>]. Implementations are free to add fields on both sides of the exchange, as long as they are properly namespaced using Clark Notation.</p>
+    <p class="" style="">The following fields are specified by this document:</p>
+    <figure class="table"><figcaption id="table-1"><strong>Table 1:</strong> Search Form Field Summary<a class="anchor-link" href="#table-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+      <tr class="body">
+        <th colspan="" rowspan="">var</th>
+        <th colspan="" rowspan="">type</th>
+        <th colspan="" rowspan="">Support level</th>
+        <th colspan="" rowspan="">Description</th>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>q</code></td>
+        <td align="" colspan="" rowspan=""><code>text-single</code></td>
+        <td align="" colspan="" rowspan="">RECOMMENDED</td>
+        <td align="" colspan="" rowspan="">Input for the keyword-based search. Conflicts with <code>all</code>.</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>all</code></td>
+        <td align="" colspan="" rowspan=""><code>boolean</code></td>
+        <td align="" colspan="" rowspan="">OPTIONAL</td>
+        <td align="" colspan="" rowspan="">Return all results, ignoring text search terms. This does not influence the restrictions imposed by the <code>types</code> field. Conflicts with <code>q</code>.</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>sinaddress</code></td>
+        <td align="" colspan="" rowspan=""><code>boolean</code></td>
+        <td align="" colspan="" rowspan="">RECOMMENDED if <code>q</code> is supported</td>
+        <td align="" colspan="" rowspan="">Control whether the keyword search searches in the address of the channel.</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>sinname</code></td>
+        <td align="" colspan="" rowspan=""><code>boolean</code></td>
+        <td align="" colspan="" rowspan="">REQUIRED if <code>q</code> is supported</td>
+        <td align="" colspan="" rowspan="">Control whether the keyword search searches in the name of the channel.</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>sindescription</code></td>
+        <td align="" colspan="" rowspan=""><code>boolean</code></td>
+        <td align="" colspan="" rowspan="">REQUIRED if <code>q</code> is supported</td>
+        <td align="" colspan="" rowspan="">Control whether the keyword search searches in the textual description of the channel.</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>types</code></td>
+        <td align="" colspan="" rowspan=""><code>list-multi</code></td>
+        <td align="" colspan="" rowspan="">RECOMMENDED</td>
+        <td align="" colspan="" rowspan="">Constrain the service types of channels to return. If not supported, the search MUST only cover <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45588936295488">2</a>] group chats.</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>key</code></td>
+        <td align="" colspan="" rowspan=""><code>list-single</code></td>
+        <td align="" colspan="" rowspan="">REQUIRED</td>
+        <td align="" colspan="" rowspan="">Select how the results are ordered.</td>
+      </tr>
+    </table></figure>
+    <p class="" style="">The sort keys specified by this document are the following:</p>
+    <figure class="table"><figcaption id="table-2"><strong>Table 2:</strong> Sort Key Values<a class="anchor-link" href="#table-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+      <tr class="body">
+        <th colspan="" rowspan="">Value</th>
+        <th colspan="" rowspan="">Description</th>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>{urn:xmpp:channel-search:0:order}address</code></td>
+        <td align="" colspan="" rowspan="">Order the results by the address of the channel. This ordering mode guarantees that the Searcher gets a duplicate-free view without omissions when paginating.</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>{urn:xmpp:channel-search:0:order}nusers</code></td>
+        <td align="" colspan="" rowspan="">Order the results descendingly by the number of users. This mode does not guarantee that all channels in the database are returned, nor does it guarantee that no duplicates occur across multiple pages.</td>
+      </tr>
+    </table></figure>
+    <div class="indent"><h4 id="impl-searchformfields-extensibility">6.1.1 Extensibility of the Search Form Fields<a class="anchor-link" href="#impl-searchformfields-extensibility"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">Search Service implementations may offer custom values for the <code>key</code> field, provided Clark Notation is used to namespace the values.</p>
+    </div>
+  </div>
+  <div class="indent"><h3 id="impl-resultitemformat">6.2 Result Item Format<a class="anchor-link" href="#impl-resultitemformat"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The result items are <code>&lt;item/&gt;</code> elements qualified by the <code>urn:xmpp:channel-search:0:search</code> namespace.</p>
+    <p class="" style="">Each <code>&lt;item/&gt;</code> element MUST have an <code>address</code> attribute whose value is a proper JID (as per either <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6122">RFC 6122</a></span>  [<a href="#nt-idm45588936088832">6</a>] or <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc7622">RFC 7622</a></span>  [<a href="#nt-idm45588936079008">7</a>]). It identifies the channel uniquely.</p>
+    <p class="" style="">The following child elements of <code>&lt;item/&gt;</code> are defined by this specification. They are all qualified by the same namespace as <code>&lt;item/&gt;</code> itself.</p>
+    <figure class="table"><figcaption id="table-3"><strong>Table 3:</strong> Child elements of result items<a class="anchor-link" href="#table-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+      <tr class="body">
+        <th colspan="" rowspan="">Element name</th>
+        <th colspan="" rowspan="">Content model</th>
+        <th colspan="" rowspan="">Occurences</th>
+        <th colspan="" rowspan="">Description</th>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>name</code></td>
+        <td align="" colspan="" rowspan="">text character data</td>
+        <td align="" colspan="" rowspan="">1</td>
+        <td align="" colspan="" rowspan="">The human-readable name of the channel.</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>description</code></td>
+        <td align="" colspan="" rowspan="">text character data</td>
+        <td align="" colspan="" rowspan="">1</td>
+        <td align="" colspan="" rowspan="">The human-readable description of the channel.</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>language</code></td>
+        <td align="" colspan="" rowspan="">text character data</td>
+        <td align="" colspan="" rowspan="">1</td>
+        <td align="" colspan="" rowspan="">A valid <code>xml:lang</code> code which indicates the primary language of the channel.</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>nusers</code></td>
+        <td align="" colspan="" rowspan="">non-negative integer character data</td>
+        <td align="" colspan="" rowspan="">1</td>
+        <td align="" colspan="" rowspan="">Number of occupants</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>service-type</code></td>
+        <td align="" colspan="" rowspan="">enumeration character data</td>
+        <td align="" colspan="" rowspan="">1</td>
+        <td align="" colspan="" rowspan="">The type of the service which hosts the channel. See below for values and semantics.</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>is-open</code></td>
+        <td align="" colspan="" rowspan="">boolean character data</td>
+        <td align="" colspan="" rowspan="">1</td>
+        <td align="" colspan="" rowspan="">If set to true, it indicates that the channel can be joined without extra credentials.</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>anonymity-mode</code></td>
+        <td align="" colspan="" rowspan="">enumeration character data</td>
+        <td align="" colspan="" rowspan="">1</td>
+        <td align="" colspan="" rowspan="">Anonymity level of participation. See below for values and semantics.</td>
+      </tr>
+    </table></figure>
+    <p class="" style=""><strong>Notes:</strong></p>
+    <ol start="" class="" style="">
+      <li class="" style="">Any child element may be omitted by a Search Service if the data is not available for any or all rooms.</li>
+      <li class="" style="">The number of occupants may be stale by an undefined amount of time.</li>
+      <li class="" style="">A service MAY return future versions of those elements alongside with past versions. Entities need to treat elements with the same name, but different namespace, as entirely different elements.</li>
+    </ol>
+    <figure class="table"><figcaption id="table-4"><strong>Table 4:</strong> Anonymity modes<a class="anchor-link" href="#table-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+      <tr class="body">
+        <th colspan="" rowspan="">Value</th>
+        <th colspan="" rowspan="">Description</th>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>{urn:xmpp:channel-search:0:anonymity}none</code></td>
+        <td align="" colspan="" rowspan="">The bare JID of the account or the full JID of one or more devices of each occupant is visible to every other occupant.</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>muc_semianonymous</code></td>
+        <td align="" colspan="" rowspan="">As specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45588936295488">2</a>]</td>
+      </tr>
+    </table></figure>
+    <figure class="table"><figcaption id="table-5"><strong>Table 5:</strong> Service types<a class="anchor-link" href="#table-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+      <tr class="body">
+        <th colspan="" rowspan="">Value</th>
+        <th colspan="" rowspan="">Description</th>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>xep-0045</code></td>
+        <td align="" colspan="" rowspan="">A <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45588936295488">2</a>] service.</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan=""><code>xep-0369</code></td>
+        <td align="" colspan="" rowspan="">A <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0369.html">Mediated Information eXchange (MIX) (XEP-0369)</a></span>  [<a href="#nt-idm45588936285968">3</a>] service.</td>
+      </tr>
+    </table></figure>
+    <p class="" style="">If a Search Service would return entries with the same address with different service types, it SHOULD prefer <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0369.html">Mediated Information eXchange (MIX) (XEP-0369)</a></span>  [<a href="#nt-idm45588936285968">3</a>] over <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45588936295488">2</a>]. Note that a Search Service MUST NOT return service types the client has not asked for.</p>
+    <div class="indent"><h4 id="impl-resultitemformat-extensibility">6.2.1 Extensibility<a class="anchor-link" href="#impl-resultitemformat-extensibility"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">Search Service implementations are free to add custom child elements to <code>&lt;item/&gt;</code> elements. Searcher implementations MUST be prepared to handle any unknown elements in <code>&lt;item/&gt;</code>, for example by ignoring them.</p>
+      <p class="" style="">Additional values for the <code>&lt;anonymity-mode/&gt;</code> element may be specified by future extensions. If an implementation encounters an unknown value on this field, it is RECOMMENDED to either treat it as synonymous to <code>{urn:xmpp:channel-search:0:anonymity}none</code> or request the anonymity mode from the <code>address</code> using a protocol appropriate for the channel's service.</p>
+    </div>
+  </div>
+<h2 id="security">7.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">When sending a search form with a <code>q</code> field, the Searcher transmits potentially sensitive information to a third party.</p>
+<h2 id="iana">8.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This specification does not require any interaction with the IANA.</p>
+<h2 id="registrar">9.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This specification should probably create registries for the various fields it defines, as well as register a form type.</p>
+<h2 id="schema">10.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">To be done.</p>
+<h2 id="design">11.
+       Design Considerations<a class="anchor-link" href="#design"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Instead of rolling a custom protocol for the result items, <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0055.html">Jabber Search (XEP-0055)</a></span>  [<a href="#nt-idm45588935983344">8</a>] could have been used.</p>
+  <p class="" style="">While the result format of <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0055.html">Jabber Search (XEP-0055)</a></span>  [<a href="#nt-idm45588935983344">8</a>] allows for some generality, it does so in a rather restricted way. It is limited by the data formats and types expressable in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0004.html">Data Forms (XEP-0004)</a></span>  [<a href="#nt-idm45588935973584">9</a>]. Sturctured data, beyond lists of text and JIDs, can not be represented with <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0004.html">Data Forms (XEP-0004)</a></span>  [<a href="#nt-idm45588935973584">9</a>] at all. Machine-readable data would also have to be human-readable at the same time to provide a fallback view for human users. Interationalization of such human-readable data in field values is not possible with <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0004.html">Data Forms (XEP-0004)</a></span>  [<a href="#nt-idm45588935973584">9</a>].</p>
+  <p class="" style="">The advantage of entities being able to process unknown fields in a degraded manner is, principally, still present in the current proposal (although with a different kind of degration).</p>
+  <p class="" style="">Given the complexity of fully and correctly processing <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0004.html">Data Forms (XEP-0004)</a></span>  [<a href="#nt-idm45588935973584">9</a>] report data, the slim benefits did, in the eyes of the authors, not outweigh the costs.</p>
+<h2 id="acks">12.
+       Acknowledgements<a class="anchor-link" href="#acks"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The basis for this protocol was developed for the search.jabber.network public group chat search service. It has been cleaned up for publication as a Standards Track XEP by the author and modified to support more use-cases.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0433</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Deferred">Deferred</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.1.0</dd><dt>Last Updated</dt><dd>2020-02-27</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, <a href="xep-0004.html">XEP-0004</a>, <a href="xep-0030.html">XEP-0030</a>, <a href="xep-0059.html">XEP-0059</a>, <a href="xep-0068.html">XEP-0068</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>ECS</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0433.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0433.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0433.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Jonas Schäfer</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:jonas@wielicki.name">jonas@wielicki.name</a></dd><dt>JabberID</dt><dd><a href="xmpp:jonas@wielicki.name">jonas@wielicki.name</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45588937498240">1</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm45588936295488">2</a>. XEP-0045: Multi-User Chat &lt;<a href="https://xmpp.org/extensions/xep-0045.html">https://xmpp.org/extensions/xep-0045.html</a>&gt;.</p><p><a name="nt-idm45588936285968">3</a>. XEP-0369: Mediated Information eXchange (MIX) &lt;<a href="https://xmpp.org/extensions/xep-0369.html">https://xmpp.org/extensions/xep-0369.html</a>&gt;.</p><p><a name="nt-idm45588936265680">4</a>. XEP-0059: Result Set Management &lt;<a href="https://xmpp.org/extensions/xep-0059.html">https://xmpp.org/extensions/xep-0059.html</a>&gt;.</p><p><a name="nt-idm45588936260336">5</a>. XEP-0068: Field Data Standardization for Data Forms &lt;<a href="https://xmpp.org/extensions/xep-0068.html">https://xmpp.org/extensions/xep-0068.html</a>&gt;.</p><p><a name="nt-idm45588936088832">6</a>. RFC 6122: Extensible Messaging and Presence Protocol (XMPP): Address Format &lt;<a href="http://tools.ietf.org/html/rfc6122">http://tools.ietf.org/html/rfc6122</a>&gt;.</p><p><a name="nt-idm45588936079008">7</a>. RFC 7622: Extensible Messaging and Presence Protocol (XMPP): Address Format &lt;<a href="http://tools.ietf.org/html/rfc7622">http://tools.ietf.org/html/rfc7622</a>&gt;.</p><p><a name="nt-idm45588935983344">8</a>. XEP-0055: Jabber Search &lt;<a href="https://xmpp.org/extensions/xep-0055.html">https://xmpp.org/extensions/xep-0055.html</a>&gt;.</p><p><a name="nt-idm45588935973584">9</a>. XEP-0004: Data Forms &lt;<a href="https://xmpp.org/extensions/xep-0004.html">https://xmpp.org/extensions/xep-0004.html</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0433-0.1.0.html">0.1.0</a> (2020-02-27)<a class="anchor-link" href="#revision-history-v0.1.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Accepted by vote of Council on 2020-02-26.<div class="revision-author">XEP Editor (jsc)</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0433-0.0.1.html">0.0.1</a> (2020-02-19)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">jsc</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{schäfer2020ecs,
+  title = {Extended Channel Search},
+  author = {Schäfer, Jonas},
+  type = {XEP},
+  number = {0433},
+  version = {0.1.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0433.html},
+  date = {2020-02-19/2020-02-27},
+}</pre><p>END</p></body></html>

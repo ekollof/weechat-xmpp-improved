@@ -1,0 +1,464 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0059: Result Set Management</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0059";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Result Set Management"><meta name="DC.Creator" content="Ian Paterson"><meta name="DC.Creator" content="Peter Saint-Andre"><meta name="DC.Creator" content="Valerie Mercier"><meta name="DC.Creator" content="Jean-Louis Seguineau"><meta name="DC.Description" content="This specification defines an XMPP protocol extension that enables an entity to page through and otherwise manage the receipt of large result sets. The protocol can be used in the context of any XMPP protocol that might send large result sets (such as service discovery, multi-user chat, and publish-subscribe). While the requesting entity in such an interaction can explicitly request the use of result set management, an indication that result set management is in use can also be proactively included by the responding entity when returning a limited result set in response to a query."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2006-09-20"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0059"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0059: Result Set Management</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification defines an XMPP protocol extension that enables an entity to page through and otherwise manage the receipt of large result sets. The protocol can be used in the context of any XMPP protocol that might send large result sets (such as service discovery, multi-user chat, and publish-subscribe). While the requesting entity in such an interaction can explicitly request the use of result set management, an indication that result set management is in use can also be proactively included by the responding entity when returning a limited result set in response to a query.</dd><dt>Authors</dt><dd><ul class="authors"><li>Ian Paterson</li><li>Peter Saint-Andre</li><li>Valerie Mercier</li><li>Jean-Louis Seguineau</li></ul></dd><dt>Copyright</dt><dd>© 2002 – 2006 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Stable</p><div id="status-notice" class="draft standards track">NOTICE: The protocol defined herein is a <strong>Stable Standard</strong> of the XMPP Standards Foundation. Implementations are encouraged and the protocol is appropriate for deployment in production systems, but some changes to the protocol are possible before it becomes a Final Standard.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>1.0 (2006-09-20)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li class="current">Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#usecases">Use Cases</a><ol><li><a href="#limit">Limiting the Number of Items</a></li><li><a href="#forwards">Paging Forwards Through a Result Set</a></li><li><a href="#backwards">Paging Backwards Through a Result Set</a></li><li><a href="#notfound">Page Not Found</a></li><li><a href="#last">Requesting the Last Page in a Result Set</a></li><li><a href="#jump">Retrieving a Page Out of Order</a></li><li><a href="#count">Getting the Item Count</a></li></ol></li><li><a href="#examples">Examples</a></li><li><a href="#support">Determining Support</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#registrar-ns">Protocol Namespaces</a></li></ol></li><li><a href="#schema">XML Schema</a></li><li><a href="#ack">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">In <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0055.html">Jabber Search (XEP-0055)</a></span>  [<a href="#nt-idm46014260207968">1</a>], <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm46014260199136">2</a>], <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm46014260202624">3</a>], <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0136.html">Message Archiving (XEP-0136)</a></span>  [<a href="#nt-idm46014260194112">4</a>], and probably other future XMPP extensions, it is possible to receive large dynamic result sets in response to information requests (e.g., a user directory search on a common first name or a service discovery items request sent to a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm46014260184592">5</a>] service). This XMPP protocol extension enables the following functionality for use by other XMPP protocols:</p>
+  <ol start="" class="" style="">
+    <li class="" style="">Limit the number of items returned.</li>
+    <li class="" style="">Page forwards or backwards through a result set by retrieving the items in smaller subsets.</li>
+    <li class="" style="">Discover the size of a result set without retrieving the items themselves.</li>
+    <li class="" style="">Retrieve a page (subset) of items starting at any point in a result set.</li>
+  </ol>
+<h2 id="usecases">2.
+       Use Cases<a class="anchor-link" href="#usecases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="limit">2.1 Limiting the Number of Items<a class="anchor-link" href="#limit"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">In order to limit the number of items of a result set to be returned, the requesting entity specifies a request type of "set" and the maximum size of the desired subset (via the XML character data of the &lt;max/&gt; element):</p>
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Requesting a Limit to the Result Set<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' from='stpeter@jabber.org/roundabout' to='users.jabber.org' id='limit1'&gt;
+  &lt;query xmlns='jabber:iq:search'&gt;
+    &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;max&gt;10&lt;/max&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">The responding entity then returns the first items of the result set in order. The number of items is limited to the requested size:</p>
+    <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Returning a Limited Result Set<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result' from='users.jabber.org' to='stpeter@jabber.org/roundabout' id='limit1'&gt;
+  &lt;query xmlns='jabber:iq:search'&gt;
+    &lt;item jid='stpeter@jabber.org'&gt;
+      &lt;first&gt;Peter&lt;/first&gt;
+      &lt;last&gt;Saint-Andre&lt;/last&gt;
+      &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;/item&gt;
+    .
+    [8 more items]
+    .
+    &lt;item jid='peterpan@neverland.lit'&gt;
+      &lt;first&gt;Peter&lt;/first&gt;
+      &lt;last&gt;Pan&lt;/last&gt;
+      &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;/item&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="forwards">2.2 Paging Forwards Through a Result Set<a class="anchor-link" href="#forwards"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">An entity often needs to retrieve a page of items adjacent to a page it has already received. For examples, when retrieving a complete result set in order page by page, or when a user 'scrolls' forwards one page.</p>
+    <p class="" style="">The set of items that match a query MAY change over time, even during the time that a requesting entity pages through the result set (e.g., a set of chatrooms, since rooms can be created and destroyed at any time). The paging protocol outlined in this section is designed so that entities MAY provide the following features:</p>
+    <ul class="" style="">
+      <li class="" style="">Each page of the result set is up-to-date at the time it is sent (not just at the time the first page was sent).</li>
+      <li class="" style="">No items will be omitted from pages not yet sent (even if, after earlier pages were sent, some of the items they contained were removed from the set).</li>
+      <li class="" style="">When paging through the list in order, duplicate items are never received.</li>
+      <li class="" style="">The responding entity maintains no state (or a single minimal state for all requesting entities containing the positions of all recently deleted items).</li>
+      <li class="" style="">Rapid calculation of which items should appear on a requested page by responding entity (even for large result sets).</li>
+    </ul>
+    <p class="" style="">Note: If a responding entity implements dynamic result sets then receiving entities paging through the complete result set should be aware that it may not correspond to the result set as it existed at any one point in time.</p>
+    <p class="" style="">The request for the first page is the same as when <a href="#limit">Limiting the Number of Items</a>:</p>
+    <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Requesting the First Page of a Result Set<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' from='stpeter@jabber.org/roundabout' to='users.jabber.org' id='page1'&gt;
+  &lt;query xmlns='jabber:iq:search'&gt;
+    &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;max&gt;10&lt;/max&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">Responding entity support for paging through a result set is optional. If it does support paging (not just <a href="#limit">Limiting the Number of Items</a>), then in each page it returns, the responding entity MUST include &lt;first/&gt; and &lt;last/&gt; elements that specify the unique ID (UID) for the first and last items in the page. If there is only one item in the page, then the first and last UIDs MUST be the same. If there are no items in the page, then the &lt;first/&gt; and &lt;last/&gt; elements MUST NOT be included.</p>
+    <p class="" style="">The responding entity may generate these UIDs in any way, as long as the UIDs are unique in the context of all possible members of the full result set. Each UID MAY be based on part of the content of its associated item, as shown below, or on an internal table index. Another possible method is to serialize the XML of the item and then hash it to generate the UID. Note: The requesting entity MUST treat all UIDs as opaque.</p>
+    <p class="" style="">The responding entity SHOULD also include the number of items in the full result set (which MAY be approximate) encapsulated in a &lt;count/&gt; element. The &lt;first/&gt; element SHOULD include an 'index' attribute. This integer specifies the position within the full set (which MAY be approximate) of the first item in the page. If that item is the first in the full set, then the index SHOULD be '0'. If the last item in the page is the last item in the full set, then the value of the &lt;first/&gt; element's 'index' attribute SHOULD be the specified count minus the number of items in the last page.</p>
+    <p class="" style="">Note: The &lt;count/&gt; element and 'index' attribute enable important functionality for requesting entities (for example, a scroll-bar user-interface component). They MAY be omitted, but <em>only</em> if it would be either impossible or exceptionally resource intensive to calculate reasonably accurate values.</p>
+    <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Returning the First Page of a Result Set<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result' from='users.jabber.org' to='stpeter@jabber.org/roundabout' id='page1'&gt;
+  &lt;query xmlns='jabber:iq:search'&gt;
+    &lt;item jid='stpeter@jabber.org'&gt;
+      &lt;first&gt;Peter&lt;/first&gt;
+      &lt;last&gt;Saint-Andre&lt;/last&gt;
+      &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;/item&gt;
+    .
+    [8 more items]
+    .
+    &lt;item jid='peterpan@neverland.lit'&gt;
+      &lt;first&gt;Peter&lt;/first&gt;
+      &lt;last&gt;Pan&lt;/last&gt;
+      &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;/item&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;first index='0'&gt;stpeter@jabber.org&lt;/first&gt;
+      &lt;last&gt;peterpan@neverland.lit&lt;/last&gt;
+      &lt;count&gt;800&lt;/count&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">The requesting entity can then ask for the next page in the result set by including in its request the UID of the <em>last</em> item from the previous page (encapsulated in an &lt;after/&gt; element), along with the maximum number of items to return. Note: If no &lt;after/&gt; element is specified, then the UID defaults to "before the first item in the result set" (i.e., effectively an index of negative one).</p>
+    <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> Requesting the Second Page of a Result Set<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' from='stpeter@jabber.org/roundabout' to='users.jabber.org' id='page2'&gt;
+  &lt;query xmlns='jabber:iq:search'&gt;
+    &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;max&gt;10&lt;/max&gt;
+      &lt;after&gt;peterpan@neverland.lit&lt;/after&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">The <em>first</em> item in the page returned by the responding entity MUST be the item that immediately <em>follows</em> the item that the requesting entity indicated in the &lt;after/&gt; element:</p>
+    <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> Returning the Second Page of a Result Set<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result' from='users.jabber.org' to='stpeter@jabber.org/roundabout' id='page2'&gt;
+  &lt;query xmlns='jabber:iq:search'&gt;
+    &lt;item jid='peter@pixyland.org'&gt;
+      &lt;first&gt;Peter&lt;/first&gt;
+      &lt;last&gt;Pan&lt;/last&gt;
+      &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;/item&gt;
+    .
+    [8 more items]
+    .
+    &lt;item jid='peter@rabbit.lit'&gt;
+      &lt;first&gt;Peter&lt;/first&gt;
+      &lt;last&gt;Rabbit&lt;/last&gt;
+      &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;/item&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;first index='10'&gt;peter@pixyland.org&lt;/first&gt;
+      &lt;last&gt;peter@rabbit.lit&lt;/last&gt;
+      &lt;count&gt;800&lt;/count&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">It may sometimes be necessary to return an empty <em>page</em> to the requesting entity. For example, with dynamic result sets the responding entity MAY delete some items from the full result set between requests. Another example occurs when the requesting entity specifies "0" for the maximum number items to return (see <a href="#count">Getting the Item Count</a>).</p>
+    <figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> Returning an Empty Page<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result' from='users.jabber.org' to='stpeter@jabber.org/roundabout' id='page80'&gt;
+  &lt;query xmlns='jabber:iq:search'&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;count&gt;790&lt;/count&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">If there are no items whatsoever in the <em>full</em> result set, the responding entity MUST return a response that adheres to the definition of the wrapper protocol (e.g., "jabber:iq:search", "http://jabber.org/protocol/disco#items", or "http://jabber.org/protocol/pubsub"). For both <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0055.html">Jabber Search (XEP-0055)</a></span>  [<a href="#nt-idm46014260207968">1</a>] and <span class="ref">XEP-0030</span>, that means the responding entity shall return an empty &lt;query/&gt; element; for <span class="ref">XEP-0060</span>, that means the responding entity shall return an empty &lt;pubsub/&gt; element; for <span class="ref">XEP-0136</span>, that means the responding entity shall return an empty &lt;list/&gt; or &lt;store/&gt; element.</p>
+  </div>
+  <div class="indent"><h3 id="backwards">2.3 Paging Backwards Through a Result Set<a class="anchor-link" href="#backwards"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The requesting entity MAY ask for the previous page in a result set by including in its request the UID of the <em>first</em> item from the page that has already been received (encapsulated in a &lt;before/&gt; element), along with the maximum number of items to return.</p>
+    <figure class="code-example" id="example-8"><figcaption><strong>Example 8.</strong> Requesting the Previous Page of a Result Set<a class="anchor-link" href="#example-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' from='stpeter@jabber.org/roundabout' to='users.jabber.org' id='back1'&gt;
+  &lt;query xmlns='jabber:iq:search'&gt;
+    &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;max&gt;10&lt;/max&gt;
+      &lt;before&gt;peter@pixyland.org&lt;/before&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">The <em>last</em> item in the page returned by the responding entity MUST be the item that immediately <em>preceeds</em> the item that the requesting entity indicated it has already received:</p>
+    <figure class="code-example" id="example-9"><figcaption><strong>Example 9.</strong> Returning the Previous Page of a Result Set<a class="anchor-link" href="#example-9"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result' from='users.jabber.org' to='stpeter@jabber.org/roundabout' id='back1'&gt;
+  &lt;query xmlns='jabber:iq:search'&gt;
+    &lt;item jid='stpeter@jabber.org'&gt;
+      &lt;first&gt;Peter&lt;/first&gt;
+      &lt;last&gt;Saint-Andre&lt;/last&gt;
+      &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;/item&gt;
+    .
+    [8 more items]
+    .
+    &lt;item jid='peterpan@neverland.lit'&gt;
+      &lt;first&gt;Peter&lt;/first&gt;
+      &lt;last&gt;Pan&lt;/last&gt;
+      &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;/item&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;first index='0'&gt;stpeter@jabber.org&lt;/first&gt;
+      &lt;last&gt;peterpan@neverland.lit&lt;/last&gt;
+      &lt;count&gt;800&lt;/count&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="notfound">2.4 Page Not Found<a class="anchor-link" href="#notfound"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The responding entity MUST reply with an 'item-not-found' error if <em>all</em> the following circumstances apply:</p>
+    <ol start="" class="" style="">
+      <li class="" style=""><p class="" style="">The item specified by the requesting entity via the UID in the &lt;after/&gt; or &lt;before/&gt; element no longer exists (it was deleted after the previous page was sent).</p></li>
+      <li class="" style=""><p class="" style="">The UID itself cannot be used to derive directly the next item within the set (e.g. the alphabetical or numerical order of the UIDs do not specify the order of the items).</p></li>
+      <li class="" style=""><p class="" style="">The responding entity does not remember the position of the deleted item within the full list. (Even if the responding entity bothers to remember the position of each deleted item, it will typically be necessary to expire that 'state' after an implementation-specific period of time.)</p></li>
+    </ol>
+    <figure class="code-example" id="example-10"><figcaption><strong>Example 10.</strong> Returning a Page-Not-Found Error<a class="anchor-link" href="#example-10"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='error' from='users.jabber.org' to='stpeter@jabber.org/roundabout' id='page2'&gt;
+  &lt;query xmlns='jabber:iq:search'&gt;
+    &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;max&gt;10&lt;/max&gt;
+      &lt;after&gt;peterpan@neverland.lit&lt;/after&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+  &lt;error type='cancel'&gt;
+    &lt;item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+  &lt;/error&gt;
+&lt;/iq&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="last">2.5 Requesting the Last Page in a Result Set<a class="anchor-link" href="#last"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The requesting entity MAY ask for the last page in a result set by including in its request an empty &lt;before/&gt; element, and the maximum number of items to return.</p>
+    <figure class="code-example" id="example-11"><figcaption><strong>Example 11.</strong> Requesting the Last Page of a Result Set<a class="anchor-link" href="#example-11"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' from='stpeter@jabber.org/roundabout' to='users.jabber.org' id='page1'&gt;
+  &lt;query xmlns='jabber:iq:search'&gt;
+    &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;max&gt;10&lt;/max&gt;
+      &lt;before/&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="jump">2.6 Retrieving a Page Out of Order<a class="anchor-link" href="#jump"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The requesting entity MAY choose not to retrieve pages from the result set in order. (For example, when its user drags a user-interface slider to a radically new position within a very large result set.)</p>
+    <p class="" style="">Only if the UID before the start (or after the end) of a desired result set page is not known, then the requesting entity MAY request the page that <em>starts</em> at a particular index within the result set. It does that by including in its request the index of the <em>first</em> item to be returned (encapsulated in an &lt;index/&gt; element), as well as the maximum number of items to return. Note: For reasons mentioned in <a href="#forwards">Paging Forwards Through a Result Set</a> requesting entities SHOULD, where possible, specify pages using a UID instead of an index.</p>
+    <p class="" style="">Note: If the responding entity omitted the &lt;count/&gt; element from previous responses for this result set, then the requesting entity SHOULD assume that the responding entity does not support page retrieval by index for this result set (see error below).</p>
+    <figure class="code-example" id="example-12"><figcaption><strong>Example 12.</strong> Requesting a Result Page by Index<a class="anchor-link" href="#example-12"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' from='stpeter@jabber.org/roundabout' to='users.jabber.org' id='index10'&gt;
+  &lt;query xmlns='jabber:iq:search'&gt;
+    &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;max&gt;10&lt;/max&gt;
+      &lt;index&gt;371&lt;/index&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">The responding entity SHOULD derive the first UID from the specified index (the method used MAY be approximate) before returning the requested result set page in the normal way. If the specified index was "0" then the responding entity SHOULD derive the UID that is the first in the full result set.</p>
+    <p class="" style="">Note: The 'index' attribute of the &lt;first/&gt; element MUST be the same as the index specified in the request. If the index specified by the requesting entity is greater than or equal to the number of items in the full set then the responding entity MUST return an empty page (see <a href="#forwards">Paging Forwards Through a Result Set</a>).</p>
+    <figure class="code-example" id="example-13"><figcaption><strong>Example 13.</strong> Returning a Result Page at an Index<a class="anchor-link" href="#example-13"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result' from='users.jabber.org' to='stpeter@jabber.org/roundabout' id='index10'&gt;
+  &lt;query xmlns='jabber:iq:search'&gt;
+    &lt;item jid='peter@pixyland.org'&gt;
+      &lt;first&gt;Peter&lt;/first&gt;
+      &lt;last&gt;Pan&lt;/last&gt;
+      &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;/item&gt;
+    .
+    [8 more items]
+    .
+    &lt;item jid='peter@rabbit.lit'&gt;
+      &lt;first&gt;Peter&lt;/first&gt;
+      &lt;last&gt;Rabbit&lt;/last&gt;
+      &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;/item&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;first index='371'&gt;peter@pixyland.org&lt;/first&gt;
+      &lt;last&gt;peter@rabbit.lit&lt;/last&gt;
+      &lt;count&gt;800&lt;/count&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">If it would be either impossible or exceptionally resource intensive for the responding entity to derive the first UID from the specified index with reasonable accuracy then the responding entity MAY return a &lt;feature-not-implemented/&gt; error.</p>
+    <figure class="code-example" id="example-14"><figcaption><strong>Example 14.</strong> Returning a Feature-not-Implemented Error<a class="anchor-link" href="#example-14"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='error' from='users.jabber.org' to='stpeter@jabber.org/roundabout' id='index10'&gt;
+  &lt;query xmlns='jabber:iq:search'&gt;
+    &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;max&gt;10&lt;/max&gt;
+      &lt;index&gt;371&lt;/index&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+  &lt;error type='cancel'&gt;
+    &lt;feature-not-implemented xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+  &lt;/error&gt;
+&lt;/iq&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="count">2.7 Getting the Item Count<a class="anchor-link" href="#count"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">In order to get the item count of a result set without retrieving the items themselves, the requesting entity simply specifies zero for the maximum size of the result set page:</p>
+    <figure class="code-example" id="example-15"><figcaption><strong>Example 15.</strong> Requesting the Item Count<a class="anchor-link" href="#example-15"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' from='stpeter@jabber.org/roundabout' to='users.jabber.org' id='count1'&gt;
+  &lt;query xmlns='jabber:iq:search'&gt;
+    &lt;nick&gt;Pete&lt;/nick&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;max&gt;0&lt;/max&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">The responding entity then returns the item count, which MAY be approximate rather than precise if determining the exact number of items would be resource-intensive:</p>
+    <figure class="code-example" id="example-16"><figcaption><strong>Example 16.</strong> Returning the Item Count<a class="anchor-link" href="#example-16"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result' from='users.jabber.org' to='stpeter@jabber.org/roundabout' id='count1'&gt;
+  &lt;query xmlns='jabber:iq:search'&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;count&gt;800&lt;/count&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">Note: The &lt;count/&gt; element MAY be omitted, but <em>only</em> if it would be either impossible or exceptionally resource intensive to calculate reasonably accurate values.</p>
+    <p class="" style="">Note: If there are no items in the <em>full</em> result set then the responding entity MUST return a response that adheres to the definition of the wrapper protocol (see <a href="#forwards">Paging Forwards Through a Result Set</a>).</p>
+  </div>
+<h2 id="examples">3.
+       Examples<a class="anchor-link" href="#examples"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The foregoing examples show the use of result set management in the context of <span class="ref">Jabber Search</span>. In the following examples we show the use of this protocol in the context of <span class="ref">Service Discovery</span>. <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0136.html">Message Archiving (XEP-0136)</a></span>  [<a href="#nt-idm46014260194112">4</a>] ("Message Archiving") includes more examples. A future version of this document may also include examples from <span class="ref">Publish-Subscribe</span> and other XMPP protocol extensions.</p>
+  <figure class="code-example" id="example-17"><figcaption><strong>Example 17.</strong> Requesting a Limit to the Result Set<a class="anchor-link" href="#example-17"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get' from='stpeter@jabber.org/roundabout' to='conference.jabber.org' id='ex2'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#items'&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;max&gt;20&lt;/max&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <figure class="code-example" id="example-18"><figcaption><strong>Example 18.</strong> Returning a Limited Result Set<a class="anchor-link" href="#example-18"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result' from='conference.jabber.org' to='stpeter@jabber.org/roundabout' id='ex2'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#items'&gt;
+    &lt;item jid='12@conference.jabber.org'/&gt;
+    &lt;item jid='adium@conference.jabber.org'/&gt;
+    &lt;item jid='airhitch@conference.jabber.org'/&gt;
+    &lt;item jid='alphaville@conference.jabber.org'/&gt;
+    &lt;item jid='apache@conference.jabber.org'/&gt;
+    &lt;item jid='argia@conference.jabber.org'/&gt;
+    &lt;item jid='armagetron@conference.jabber.org'/&gt;
+    &lt;item jid='atticroom123@conference.jabber.org'/&gt;
+    &lt;item jid='banquise@conference.jabber.org'/&gt;
+    &lt;item jid='bar_paradise@conference.jabber.org'/&gt;
+    &lt;item jid='beer@conference.jabber.org'/&gt;
+    &lt;item jid='blondie@conference.jabber.org'/&gt;
+    &lt;item jid='bpnops@conference.jabber.org'/&gt;
+    &lt;item jid='brasileiros@conference.jabber.org'/&gt;
+    &lt;item jid='bulgaria@conference.jabber.org'/&gt;
+    &lt;item jid='cantinalivre@conference.jabber.org'/&gt;
+    &lt;item jid='casablanca@conference.jabber.org'/&gt;
+    &lt;item jid='chinortpcrew@conference.jabber.org'/&gt;
+    &lt;item jid='coffeetalk@conference.jabber.org'/&gt;
+    &lt;item jid='council@conference.jabber.org'/&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;first index='0'&gt;acc3594e844c77696f7a7ba9367ae324b6b958ad&lt;/first&gt;
+      &lt;last&gt;4da91d4b330112f683dddaebf93180b1bd25e95f&lt;/last&gt;
+      &lt;count&gt;150&lt;/count&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <figure class="code-example" id="example-19"><figcaption><strong>Example 19.</strong> Requesting a Page Beginning After the Last Item Received<a class="anchor-link" href="#example-19"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' from='stpeter@jabber.org/roundabout' to='conference.jabber.org' id='ex3'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#items'&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;max&gt;20&lt;/max&gt;
+      &lt;after&gt;4da91d4b330112f683dddaebf93180b1bd25e95f&lt;/after&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+<h2 id="support">4.
+       Determining Support<a class="anchor-link" href="#support"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">In order for a requesting entity to determine if a responding entity supports result set management, it SHOULD send a <span class="ref">Service Discovery</span> information request to the responding entity:</p>
+  <figure class="code-example" id="example-20"><figcaption><strong>Example 20.</strong> Requesting entity queries responding entity regarding protocol support<a class="anchor-link" href="#example-20"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='stpeter@jabber.org/roundabout'
+    to='conference.jabber.org'
+    type='get'
+    id='disco1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <figure class="code-example" id="example-21"><figcaption><strong>Example 21.</strong> Responding entity communicates protocol support<a class="anchor-link" href="#example-21"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='conference.jabber.org'
+    to='stpeter@jabber.org/roundabout'
+    type='result'
+    id='disco1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+    &lt;feature var='http://jabber.org/protocol/rsm'/&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <p class="" style="">An entity SHOULD NOT include the result set management extensions defined in this document in its requests if it does not have positive knowledge that the responding entity supports the protocol defined herein. If the responding entity does not understand result set management, it MUST ignore such extensions.</p>
+  <p class="" style="">Note: Even if a responding entity understands the result set management protocol, its support for result set management in the context of any given "using protocol" is OPTIONAL (e.g., an implementation could support it in the context of the 'jabber:iq:search' namespace but not in the context of the 'http://jabber.org/protocol/disco#items' namespace). Currently the only way for a requesting entity to determine if a responding entity supports result set management in the context of a given "using protocol" is to include result set management extensions in its request. If the responding entity does not include result set management extensions in its response, then the requesting entity SHOULD NOT include such extensions in future requests wrapped by the "using protocol" namespace.</p>
+<h2 id="security">5.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Security considerations are the responsibility of the using ("wrapper") protocol, such as <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm46014260199136">2</a>] for the 'http://jabber.org/protocol/disco#items' namespace, <span class="ref">XEP-0055</span> for the 'jabber:iq:search' namespace, and <span class="ref">XEP-0136</span> for the 'http://jabber.org/protocol/archive' namespace.</p>
+<h2 id="iana">6.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm46014260069360">6</a>].</p>
+<h2 id="registrar">7.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="registrar-ns">7.1 Protocol Namespaces<a class="anchor-link" href="#registrar-ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm46014260061584">7</a>] includes 'http://jabber.org/protocol/rsm' in its registry of protocol namespaces.</p>
+  </div>
+<h2 id="schema">8.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='http://jabber.org/protocol/rsm'
+    xmlns='http://jabber.org/protocol/rsm'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+      The protocol documented by this schema is defined in
+      XEP-0059: http://www.xmpp.org/extensions/xep-0059.html
+    &lt;/xs:documentation&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:element name='set'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:sequence&gt;
+        &lt;xs:element name='after' type='xs:string' minOccurs='0' maxOccurs='1'/&gt;
+        &lt;xs:element name='before' type='xs:string' minOccurs='0' maxOccurs='1'/&gt;
+        &lt;xs:element name='count' type='xs:int' minOccurs='0' maxOccurs='1'/&gt;
+        &lt;xs:element ref='first' minOccurs='0' maxOccurs='1'/&gt;
+        &lt;xs:element name='index' type='xs:int' minOccurs='0' maxOccurs='1'/&gt;
+        &lt;xs:element name='last' type='xs:string' minOccurs='0' maxOccurs='1'/&gt;
+        &lt;xs:element name='max' type='xs:int' minOccurs='0' maxOccurs='1'/&gt;
+      &lt;/xs:sequence&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+  &lt;xs:element name='first'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:simpleContent&gt;
+        &lt;xs:extension base='xs:string'&gt;
+          &lt;xs:attribute name='index' type='xs:int' use='optional'/&gt;
+        &lt;/xs:extension&gt;
+      &lt;/xs:simpleContent&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+<h2 id="ack">9.
+       Acknowledgements<a class="anchor-link" href="#ack"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Thanks to Olivier Goffart, Jon Perlow, and Andrew Plotkin for their feedback.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0059</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Draft">Stable</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>1.0</dd><dt>Last Updated</dt><dd>2006-09-20</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, XMPP IM, <a href="xep-0030.html">XEP-0030</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>rsm</dd><dt>Schema</dt><dd>
+        &lt;<a href="http://www.xmpp.org/schemas/rsm.xsd">http://www.xmpp.org/schemas/rsm.xsd</a>&gt;<br></dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0059.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0059.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0059.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Ian Paterson</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:ian.paterson@clientside.co.uk">ian.paterson@clientside.co.uk</a></dd><dt>JabberID</dt><dd><a href="xmpp:ian@zoofy.com">ian@zoofy.com</a></dd></dl><h5>Peter Saint-Andre</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:stpeter@stpeter.im">stpeter@stpeter.im</a></dd><dt>JabberID</dt><dd><a href="xmpp:stpeter@jabber.org">stpeter@jabber.org</a></dd><dt>URI</dt><dd><a href="https://stpeter.im/">https://stpeter.im/</a></dd></dl><h5>Valerie Mercier</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:valerie.mercier@orange-ftgroup.com">valerie.mercier@orange-ftgroup.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:vmercier@jabber.com">vmercier@jabber.com</a></dd></dl><h5>Jean-Louis Seguineau</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:jls@antepo.com">jls@antepo.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:jlseguineau@im.antepo.com">jlseguineau@im.antepo.com</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm46014260207968">1</a>. XEP-0055: Jabber Search &lt;<a href="https://xmpp.org/extensions/xep-0055.html">https://xmpp.org/extensions/xep-0055.html</a>&gt;.</p><p><a name="nt-idm46014260199136">2</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm46014260202624">3</a>. XEP-0060: Publish-Subscribe &lt;<a href="https://xmpp.org/extensions/xep-0060.html">https://xmpp.org/extensions/xep-0060.html</a>&gt;.</p><p><a name="nt-idm46014260194112">4</a>. XEP-0136: Message Archiving &lt;<a href="https://xmpp.org/extensions/xep-0136.html">https://xmpp.org/extensions/xep-0136.html</a>&gt;.</p><p><a name="nt-idm46014260184592">5</a>. XEP-0045: Multi-User Chat &lt;<a href="https://xmpp.org/extensions/xep-0045.html">https://xmpp.org/extensions/xep-0045.html</a>&gt;.</p><p><a name="nt-idm46014260069360">6</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm46014260061584">7</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0059-1.0.html">1.0</a> (2006-09-20)<a class="anchor-link" href="#revision-history-v1.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the Jabber Council, advanced status to Draft.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.14"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0059-0.14.html">0.14</a> (2006-09-13)<a class="anchor-link" href="#revision-history-v0.14"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified terminology regarding pages and result sets.</p><div class="revision-author">ip</div></li><li id="revision-history-v0.13"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0059-0.13.html">0.13</a> (2006-09-07)<a class="anchor-link" href="#revision-history-v0.13"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Reverted to v0.11 with slight wording changes.</p><div class="revision-author">ip/psa</div></li><li id="revision-history-v0.12"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0059-0.12.html">0.12</a> (2006-09-06)<a class="anchor-link" href="#revision-history-v0.12"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added index attribute to before element; removed index element (use after or before instead).</p><div class="revision-author">psa/vm</div></li><li id="revision-history-v0.11"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0059-0.11.html">0.11</a> (2006-08-25)<a class="anchor-link" href="#revision-history-v0.11"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Made count and index optional, changed protocol for getting count, more clarifications and examples.</p><div class="revision-author">ip</div></li><li id="revision-history-v0.10"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0059-0.10.html">0.10</a> (2006-08-24)<a class="anchor-link" href="#revision-history-v0.10"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added before and first elements, specified how to return an empty page and how to request the last page, removed reverse order sets, added out-of-order page access.</p><div class="revision-author">ip</div></li><li id="revision-history-v0.9"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0059-0.9.html">0.9</a> (2006-08-23)<a class="anchor-link" href="#revision-history-v0.9"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Eliminated static result sets, justified expanded and clarified dynamic result sets, added page-not-found error, described when minimal state is necessary, added reverse order sets.</p><div class="revision-author">ip</div></li><li id="revision-history-v0.8"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0059-0.8.html">0.8</a> (2006-08-22)<a class="anchor-link" href="#revision-history-v0.8"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added optional method for handling dynamic result sets.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.7"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0059-0.7.html">0.7</a> (2006-08-10)<a class="anchor-link" href="#revision-history-v0.7"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Updated implementation note to clarify handling of result sets (static vs. dynamic).</p><div class="revision-author">psa</div></li><li id="revision-history-v0.6"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0059-0.6.html">0.6</a> (2006-07-12)<a class="anchor-link" href="#revision-history-v0.6"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Updated implementation note to clarify handling of result sets (static vs. dynamic).</p><div class="revision-author">psa</div></li><li id="revision-history-v0.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0059-0.5.html">0.5</a> (2006-05-02)<a class="anchor-link" href="#revision-history-v0.5"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified error handling, determination of support in the context of using protocols, and security considerations.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0059-0.4.html">0.4</a> (2006-04-24)<a class="anchor-link" href="#revision-history-v0.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Specified that an item count may be approximate; specified that an item count may be returned with a page of results.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0059-0.3.html">0.3</a> (2006-04-21)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added &lt;end/&gt; element to specify last result set; added service discovery information; added more examples.</p><div class="revision-author">psa/vm</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0059-0.2.html">0.2</a> (2005-12-22)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Revived and renamed the XEP; modified syntax; added use case for getting number of items; defined XML schema.</p><div class="revision-author">psa/vm</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0059-0.1.html">0.1</a> (2002-11-12)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial version.</p><div class="revision-author">jls</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{paterson2002rsm,
+  title = {Result Set Management},
+  author = {Paterson, Ian and Saint-Andre, Peter and Mercier, Valerie and Seguineau, Jean-Louis},
+  type = {XEP},
+  number = {0059},
+  version = {1.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0059.html},
+  date = {2002-11-12/2006-09-20},
+}</pre><p>END</p></body></html>

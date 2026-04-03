@@ -1,0 +1,451 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0280: Message Carbons</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0280";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Message Carbons"><meta name="DC.Creator" content="Joe Hildebrand"><meta name="DC.Creator" content="Matthew Miller"><meta name="DC.Creator" content="Georg Lukas"><meta name="DC.Description" content="In order to keep all IM clients for a user engaged in a conversation, outbound messages are carbon-copied to all interested resources."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2021-12-26"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0280"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0280: Message Carbons</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>In order to keep all IM clients for a user engaged in a conversation, outbound messages are carbon-copied to all interested resources.</dd><dt>Authors</dt><dd><ul class="authors"><li>Joe Hildebrand</li><li>Matthew Miller</li><li>Georg Lukas</li></ul></dd><dt>Copyright</dt><dd>© 2010 – 2021 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Stable</p><div id="status-notice" class="draft standards track">NOTICE: The protocol defined herein is a <strong>Stable Standard</strong> of the XMPP Standards Foundation. Implementations are encouraged and the protocol is appropriate for deployment in production systems, but some changes to the protocol are possible before it becomes a Final Standard.</div></dd><dt>Supersedes</dt><dd><a href="xep-0259.html">XEP-0259</a></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>1.0.1 (2021-12-26)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li class="current">Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#reqs">Requirements</a></li><li><a href="#disco">Discovering Support</a></li><li><a href="#enabling">Enabling Carbons</a><ol><li><a href="#enabling-errors">Recommended Error Conditions</a></li></ol></li><li><a href="#disabling">Disabling Carbons</a><ol><li><a href="#disabling-errors">Recommended Error Conditions</a></li></ol></li><li><a href="#which-messages">Messages Eligible for Carbons Delivery</a><ol><li><a href="#recommended-rules">Recommended Rules</a></li><li><a href="#mandatory-support">Mandatory Support</a></li></ol></li><li><a href="#inbound">Receiving Messages</a></li><li><a href="#outbound">Sending Messages</a></li><li><a href="#avoiding">Avoiding Carbons for a single message</a></li><li><a href="#bizrules">Business Rules</a><ol><li><a href="#bizrules-multi">Handling Multiple Enable/Disable Requests</a></li><li><a href="#bizrules-chatstates">Interaction with Chat States</a></li><li><a href="#bizrules-errors">Handling of Errors</a></li><li><a href="#bizrules-autoresponses">Auto-responses</a></li><li><a href="#bizrules-mobile">Mobile Considerations</a></li></ol></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#registrar-ns">Protocol Namespaces</a></li><li><a href="#registrar-versioning">Protocol Versioning</a></li></ol></li><li><a href="#schema">XML Schema</a></li><li><a href="#ack">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">At the time of original writing of this XEP, many XMPP servers handle message stanzas sent to a user@host (or "bare") JID with no resource by delivering that message only to the resource with the highest priority for the target user. Some server implementations, however, have chosen to send these messages to all of the online resources for the target user. If the target user is online with multiple resources when the original message is sent, a conversation ensues on one of the user's devices; if the user subsequently
+  switches devices, parts of the conversation may end up on the alternate device, causing the user to be confused, misled, or annoyed.</p>
+
+  <p class="" style="">This XEP defines an approach for ensuring that all of my devices get both sides of all conversations in order to avoid user confusion.  As a pleasant side-effect, information about the current state of a conversation is shared between all of a user's clients that implement this protocol.</p>
+<h2 id="reqs">2.
+       Requirements<a class="anchor-link" href="#reqs"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <ul class="" style="">
+    <li class="" style="">Large changes SHOULD NOT be required to existing servers</li>
+    <li class="" style="">Clients that do not implement the new protocol MUST be able
+    participate in conversations</li>
+    <li class="" style="">Clients that do not implement the new protocol MUST NOT
+    receive a large number of new partial conversations</li>
+    <li class="" style="">Clients that do not implement the new protocol MUST NOT
+    receive protocol they do not expect</li>
+    <li class="" style="">All clients that turn on the new protocol MUST be able to see
+    all inbound instant messaging messages.</li>
+    <li class="" style="">All clients that turn on the new protocol MUST be able to see
+    all outbound instant messaging messages from all of the resources of the
+    user, regardless of whether the clients for the other resources
+    have implemented the new protocol.</li>
+  </ul>
+<h2 id="disco">3.
+       Discovering Support<a class="anchor-link" href="#disco"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">An entity advertises support for this protocol by including the "urn:xmpp:carbons:2" feature in its service discovery information features as specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm46279603994800">2</a>] or section 6.3 of <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm46279603985152">3</a>].</p>
+  <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Client requests information about its own server<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq xmlns='jabber:client'
+    from='romeo@montague.example/garden'
+    id='info1'
+    to='montague.example'
+    type='get'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;</pre></figure>
+    <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Server responds with Carbons feature<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq xmlns='jabber:client'
+    from='montague.example'
+    id='info1'
+    to='romeo@montague.example/garden'
+    type='result'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+    ...
+    &lt;feature var='urn:xmpp:carbons:2'/&gt;
+    &lt;feature var='urn:xmpp:carbons:rules:0'/&gt;
+    ...
+  &lt;/query&gt;
+&lt;/iq&gt;</pre></figure>
+<h2 id="enabling">4.
+       Enabling Carbons<a class="anchor-link" href="#enabling"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">When a client wants to participate in the Carbons protocol, it enables the protocol by sending an IQ-set containing a child element &lt;enable/&gt; qualified by the namespace "urn:xmpp:carbons:2":</p>
+  <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Client enables Carbons<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq xmlns='jabber:client'
+    from='romeo@montague.example/garden'
+    id='enable1'
+    type='set'&gt;
+  &lt;enable xmlns='urn:xmpp:carbons:2'/&gt;
+&lt;/iq&gt;</pre></figure>
+    <p class="" style="">The server will respond with an IQ-result when Carbons are enabled:</p>
+    <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Server acknowledges enabling Carbons<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq xmlns='jabber:client'
+    from='romeo@montague.example'
+    id='enable1'
+    to='romeo@montague.example/garden'
+    type='result'/&gt;</pre></figure>
+  <p class="" style="">If the server cannot enable Carbons for this client, it sends an IQ-error to the client, with an appropriate error condition (e.g., &lt;forbidden/&gt; if local policy forbids the client from enabling):</p>
+    <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> Server forbids client from enabling Carbons<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq xmlns='jabber:client'
+    from='romeo@montague.example'
+    id='enable1'
+    to='romeo@montague.example/garden'
+    type='error'&gt;
+  &lt;error type='auth'&gt;
+    &lt;forbidden xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+  &lt;/error&gt;
+&lt;/iq&gt;</pre></figure>
+  <div class="indent"><h3 id="enabling-errors">4.1 Recommended Error Conditions<a class="anchor-link" href="#enabling-errors"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">There are various reasons why a server might not be able to enable Carbons for a client.  The RECOMMENDED error conditions to return for some reasons are:</p>
+    <ul class="" style="">
+      <li class="" style=""><strong>&lt;forbidden/&gt;</strong> if the server's policy forbids the client from enabling Carbons.</li>
+      <li class="" style=""><strong>&lt;not-allowed/&gt;</strong> if the request is from a client that is not hosted on this server.</li>
+    </ul>
+    <p class="" style="">See the section <a href="#bizrules-multi">Handling Multiple Enable/Disable Requests</a> for considerations when a client attempts to enable Carbons multiple times.</p>
+  </div>
+<h2 id="disabling">5.
+       Disabling Carbons<a class="anchor-link" href="#disabling"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Some clients might want to disable Carbons.  To disable Carbons, the client sends an IQ-set containing a child element &lt;disable/&gt; qualified by the namespace "urn:xmpp:carbons:2":</p>
+  <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> Client disables Carbons<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq xmlns='jabber:client'
+    from='romeo@montague.example/garden'
+    id='disable1'
+    type='set'&gt;
+  &lt;disable xmlns='urn:xmpp:carbons:2'/&gt;
+&lt;/iq&gt;</pre></figure>
+  <p class="" style="">The server will respond with an IQ-result when Carbons are disabled:</p>
+  <figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> Server acknowledges disabling Carbons<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq xmlns='jabber:client'
+    from='romeo@montague.example'
+    id='disable1'
+    to='romeo@montague.example/garden'
+    type='result'/&gt;</pre></figure>
+  <p class="" style="">If the server cannot disable Carbons for this client, it sends an IQ-error to the client, with an appropriate error condition (e.g., &lt;not-allowed/&gt; if trying to disable another client's Carbons):</p>
+  <figure class="code-example" id="example-8"><figcaption><strong>Example 8.</strong> Server informs client cannot disable Carbons<a class="anchor-link" href="#example-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq xmlns='jabber:client'
+    from='romeo@montague.example'
+    id='disable1'
+    to='juliet@capulet.example/balcony'
+    type='error'&gt;
+  &lt;error type='cancel'&gt;
+    &lt;not-allowed xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+  &lt;/error&gt;
+&lt;/iq&gt;</pre></figure>
+  <div class="indent"><h3 id="disabling-errors">5.1 Recommended Error Conditions<a class="anchor-link" href="#disabling-errors"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">There are various reasons why a server might not be able to disable Carbons for a client.  The RECOMMENDED error conditions to return for some reasons are:</p>
+    <ul class="" style="">
+      <li class="" style=""><strong>&lt;not-allowed/&gt;</strong> if the request is from a client that is not hosted on this server.</li>
+    </ul>
+    <p class="" style="">See the section <a href="#bizrules-multi">Handling Multiple Enable/Disable Requests</a> for considerations when a client attempts to disable Carbons multiple times.</p>
+  </div>
+<h2 id="which-messages">6.
+       Messages Eligible for Carbons Delivery<a class="anchor-link" href="#which-messages"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The focus of this specification is instant messaging applications and so those (and only those) &lt;message/&gt; stanzas used for instant messaging SHOULD be delivered as Carbons.</p>
+
+  <p class="" style="">The following is the set of rules that a server implementation SHOULD use to determine which messages should be carbon-copied. Future specifications MAY add or override rules, though they are generally advised to <a href="#avoiding">use the &lt;private/&gt; element</a>.</p>
+  <div class="indent"><h3 id="recommended-rules">6.1 Recommended Rules<a class="anchor-link" href="#recommended-rules"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+  <p class="" style="">A &lt;message/&gt; is eligible for carbons delivery if it does not contain a &lt;private/&gt; child element and if at least one of the following is true:</p>
+    <ul class="" style="">
+      <li class="" style="">it is of type "chat".</li>
+      <li class="" style="">it is of type "normal" and contains a &lt;body&gt; element.</li>
+      <li class="" style="">it contains payload elements typically used in IM (<span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0184.html">Message Delivery Receipts  (XEP-0184)</a></span>  [<a href="#nt-idm46279603949168">4</a>], <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0085.html">Chat State Notifications (XEP-0085)</a></span>  [<a href="#nt-idm46279603942800">5</a>], <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0333.html">Displayed Markers (XEP-0333)</a></span>  [<a href="#nt-idm46279603933568">6</a>]).</li>
+      <li class="" style="">it is of type "error" and it was sent in response to a &lt;message/&gt; that was eligible for carbons delivery.</li>
+      <li class="" style="">it matches the MUC-related rules outlined below.</li>
+    </ul>
+    <p class="" style="">To properly handle messages exchanged with a MUC (or similar service), the server must be able to identify MUC-related messages. This can be accomplished by tracking the clients' presence in MUCs, or by checking for the <code>&lt;x xmlns="http://jabber.org/protocol/muc#user"&gt;</code> element in messages. The following rules apply to MUC-related messages:
+    </p>
+    <ul class="" style="">
+      <li class="" style="">A &lt;message/&gt; of type "groupchat" SHOULD NOT be carbon-copied.</li>
+      <li class="" style="">A &lt;message/&gt; containing a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0249.html">Direct MUC Invitations (XEP-0249)</a></span>  [<a href="#nt-idm46279603926640">7</a>] SHOULD be carbon-copied.</li>
+      <li class="" style="">A &lt;message/&gt; containing a <a href="https://xmpp.org/extensions/xep-0045.html#invite-mediated">Mediated Invitation</a> SHOULD be carbon-copied.</li>
+      <li class="" style="">A private &lt;message/&gt; from a local user to a MUC participant (sent to a full JID) SHOULD be carbon-copied [<a href="#nt-idm46279603922192">8</a>].</li>
+      <li class="" style="">A private &lt;message/&gt; from a MUC participant (received from a full JID) to a local user SHOULD NOT be carbon-copied (these messages are already replicated by the MUC service to all joined client instances).</li>
+    </ul>
+    <p class="" style="">As the above is an implementation detail of servers, clients MUST NOT rely on the server implementing a particular set of rules for which messages are eligible for Carbons delivery.</p>
+    <p class="" style="">Future specifications may have more precise requirements on which messages need to be eligible for carbons delivery; such future specifications will provide their own discovery and negotiation mechanisms, such that a client negotiating Carbons using the protocol defined in this specification will cause the server to consider messages eligible for Carbons delivery based on the requirements described herein.</p>
+    <p class="" style=""><strong>Note:</strong> previous versions of this specification limited eligible messages to those of type "chat" - however, this was generally found to be inadequate due to the proliferation of type "normal" messages used in instant messaging.</p>
+  </div>
+  <div class="indent"><h3 id="mandatory-support">6.2 Mandatory Support<a class="anchor-link" href="#mandatory-support"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">A server implementation can choose to advertise full support of all the rules in §6.1 by including the "urn:xmpp:carbons:rules:0" feature in its service discovery information. If that feature is advertised, the rules above must be treated as REQUIRED and not merely as RECOMMENDED.</p>
+    <p class="" style="">Accordingly, if this feature is advertised, a client MAY rely on the server supporting this exact set of rules.</p>
+    <p class="" style="">While future versions of this specification (or other specifications) might use a different set of delivery rules, they would signify this by advertising a namespace other than "urn:xmpp:carbons:rules:0".</p>
+  </div>
+<h2 id="inbound">7.
+       Receiving Messages<a class="anchor-link" href="#inbound"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">When the server receives a &lt;message/&gt; <a href="#which-messages">eligible for carbons delivery</a> addressed to a client JID (either bare or full), it delivers the &lt;message/&gt; according to <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6121">RFC 6121</a></span>  [<a href="#nt-idm46279603906048">9</a>] § 8.5.3, and then delivers a forwarded copy to each Carbons-enabled resource for the matching bare JID recipient that did not receive it under the RFC 6121 delivery rules.</p>
+  <p class="" style="">Each forwarded copy is wrapped using <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0297.html">Stanza Forwarding (XEP-0297)</a></span>  [<a href="#nt-idm46279603899936">10</a>] with the following properties:</p>
+  <ul class="" style="">
+    <li class="" style="">The wrapping message SHOULD maintain the same 'type' attribute value;</li>
+    <li class="" style="">the 'from' attribute MUST be the Carbons-enabled user's bare JID (e.g., "localpart@domainpart");</li>
+    <li class="" style="">and the 'to' attribute MUST be the full JID of the resource receiving the copy.</li>
+    <li class="" style="">The content of the wrapping message MUST contain a &lt;received/&gt; element qualified by the namespace "urn:xmpp:carbons:2", which itself contains a &lt;forwarded/&gt; element qualified by the namespace "urn:xmpp:forward:0" that contains the original &lt;message/&gt;.</li>
+  </ul>
+
+  <p class="" style="">The receiving server MUST NOT send a forwarded copy to the client(s) the original &lt;message/&gt; stanza was addressed to, as these recipients receive the original &lt;message/&gt; stanza.</p>
+
+  <figure class="code-example" id="example-9"><figcaption><strong>Example 9.</strong> Juliet sends Romeo a directed message<a class="anchor-link" href="#example-9"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message xmlns='jabber:client'
+         from='juliet@capulet.example/balcony'
+         to='romeo@montague.example/garden'
+         type='chat'&gt;
+  &lt;body&gt;What man art thou that, thus bescreen'd in night, so stumblest on my counsel?&lt;/body&gt;
+  &lt;thread&gt;0e3141cd80894871a68e6fe6b1ec56fa&lt;/thread&gt;
+&lt;/message&gt;
+</pre></figure>
+  <figure class="code-example" id="example-10"><figcaption><strong>Example 10.</strong> Server sends carbon to Romeo's other clients<a class="anchor-link" href="#example-10"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message xmlns='jabber:client'
+         from='romeo@montague.example'
+         to='romeo@montague.example/home'
+         type='chat'&gt;
+  &lt;received xmlns='urn:xmpp:carbons:2'&gt;
+    &lt;forwarded xmlns='urn:xmpp:forward:0'&gt;
+      &lt;message xmlns='jabber:client'
+               from='juliet@capulet.example/balcony'
+               to='romeo@montague.example/garden'
+               type='chat'&gt;
+        &lt;body&gt;What man art thou that, thus bescreen'd in night, so stumblest on my counsel?&lt;/body&gt;
+        &lt;thread&gt;0e3141cd80894871a68e6fe6b1ec56fa&lt;/thread&gt;
+      &lt;/message&gt;
+    &lt;/forwarded&gt;
+  &lt;/received&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">A client MUST NOT accept Carbons that originate from a different JID than the own account (See <a href="#security">Security Considerations</a>).</p>
+  <figure class="code-example" id="example-11"><figcaption><strong>Example 11.</strong> Tybalt attempts Carbons impersonation attack on Romeo<a class="anchor-link" href="#example-11"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message xmlns='jabber:client'
+         from='tybalt@capulet.example/home'
+         to='romeo@montague.example'
+         type='chat'&gt;
+  &lt;received xmlns='urn:xmpp:carbons:2'&gt;
+    &lt;forwarded xmlns='urn:xmpp:forward:0'&gt;
+      &lt;message xmlns='jabber:client'
+               from='juliet@capulet.example/balcony'
+               to='romeo@montague.example/garden'
+               type='chat'&gt;
+        &lt;body&gt;Thou shall meet me tonite, at our house's hall!&lt;/body&gt;
+      &lt;/message&gt;
+    &lt;/forwarded&gt;
+  &lt;/received&gt;
+&lt;/message&gt;
+</pre></figure>
+
+<h2 id="outbound">8.
+       Sending Messages<a class="anchor-link" href="#outbound"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">When a client sends a &lt;message/&gt; <a href="#which-messages">eligible for carbons delivery</a>, its sending server delivers the &lt;message/&gt; according to <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6120">RFC 6120</a></span>  [<a href="#nt-idm46279603881216">11</a>] and <span class="ref">RFC 6121</span>, and delivers a forwarded copy to each Carbons-enabled resource for the matching bare JID sender, excluding the sending client. Note that this happens irrespective of whether the sending client has carbons enabled.</p>
+  <p class="" style="">Each forwarded copy is wrapped using <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0297.html">Stanza Forwarding (XEP-0297)</a></span>  [<a href="#nt-idm46279603899936">10</a>] with the following properties:</p>
+  <ul class="" style="">
+    <li class="" style="">The wrapping message SHOULD maintain the same 'type' attribute value;</li>
+    <li class="" style="">the 'from' attribute MUST be the Carbons-enabled user's bare JID (e.g., "localpart@domainpart");</li>
+    <li class="" style="">and the 'to' attribute SHOULD be the full JID of the resource receiving the copy.</li>
+    <li class="" style="">The content of the wrapping message MUST contain a &lt;sent/&gt; element qualified by the namespace "urn:xmpp:carbons:2", which itself contains a &lt;forwarded/&gt; qualified by the namespace "urn:xmpp:forward:0" that contains the original &lt;message/&gt; stanza.</li>
+  </ul>
+
+  <p class="" style="">The sending server SHOULD NOT send a forwarded copy to the sending full JID if it is a Carbons-enabled resource.</p>
+
+  <figure class="code-example" id="example-12"><figcaption><strong>Example 12.</strong> Romeo responds to Juliet<a class="anchor-link" href="#example-12"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message xmlns='jabber:client'
+         from='romeo@montague.example/home'
+         to='juliet@capulet.example/balcony'
+         type='chat'&gt;
+  &lt;body&gt;Neither, fair saint, if either thee dislike.&lt;/body&gt;
+  &lt;thread&gt;0e3141cd80894871a68e6fe6b1ec56fa&lt;/thread&gt;
+&lt;/message&gt;</pre></figure>
+
+  <figure class="code-example" id="example-13"><figcaption><strong>Example 13.</strong> Romeo's other Carbons-enabled clients                     receive a copy<a class="anchor-link" href="#example-13"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message xmlns='jabber:client'
+        from='romeo@montague.example'
+        to='romeo@montague.example/garden'
+        type='chat'&gt;
+  &lt;sent xmlns='urn:xmpp:carbons:2'&gt;
+    &lt;forwarded xmlns='urn:xmpp:forward:0'&gt;
+      &lt;message xmlns='jabber:client'
+               to='juliet@capulet.example/balcony'
+               from='romeo@montague.example/home'
+               type='chat'&gt;
+        &lt;body&gt;Neither, fair saint, if either thee dislike.&lt;/body&gt;
+        &lt;thread&gt;0e3141cd80894871a68e6fe6b1ec56fa&lt;/thread&gt;
+      &lt;/message&gt;
+    &lt;/forwarded&gt;
+  &lt;/sent&gt;
+&lt;/message&gt;</pre></figure>
+
+
+<h2 id="avoiding">9.
+       Avoiding Carbons for a single message<a class="anchor-link" href="#avoiding"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">
+    Some clients might want to avoid Carbons on a single message, while still
+    keeping all of the other semantics of Carbon support.
+    This might be useful for clients sending end-to-end encrypted messages.
+  </p>
+
+  <ul class="" style="">
+    <li class="" style=""> The sending client MAY exclude a &lt;message/&gt; from being forwarded to other Carbons-enabled resources, by adding a &lt;private/&gt; element qualified by the namespace "urn:xmpp:carbons:2" and a &lt;no-copy/&gt; hint as described in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0334.html">Message Processing Hints (XEP-0334)</a></span>  [<a href="#nt-idm46279603860288">12</a>] as child elements of the &lt;message/&gt; stanza.</li>
+    <li class="" style="">The sending server MUST NOT deliver forwarded &lt;message/&gt;s to the other Carbons-enabled resources of the sender.</li>
+    <li class="" style="">The receiving server MUST NOT deliver forwarded &lt;message/&gt;s to the other Carbons-enabled resource of the recipient,</li>
+  </ul>
+
+  <p class="" style="">Interoperability note: earlier versions of this XEP required or recommended the removal of the &lt;private/&gt; element (albeit not of the &lt;no-copy/&gt; hint) by one of the involved servers, but this behavior was considered as a potential security issue as the sender could silently manipulate the delivery of messages, so that the requirement was lifted. However, clients MUST NOT assume that a message without the element was actually routed to all other resources of the account.</p>
+  <p class="" style=""><strong>Note:</strong>
+    Use of the private mechanism might lead to partial conversations on other devices. This is the intended effect.
+    If the private &lt;message/&gt; stanza is addressed to a bare JID, the receiving server still delivers it according to <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6121">RFC 6121</a></span>  [<a href="#nt-idm46279603906048">9</a>]. This might result in a copy being delivered to each resource for the recipient, which effectively negates the behavior of the &lt;private/&gt; element for recipients.</p>
+
+  <figure class="code-example" id="example-14"><figcaption><strong>Example 14.</strong> Romeo sends to Juliet, excluding Carbons<a class="anchor-link" href="#example-14"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message xmlns='jabber:client'
+         from='romeo@montague.example/home'
+         to='juliet@capulet.example/home'
+         type='chat'&gt;
+  &lt;body&gt;Neither, fair saint, if either thee dislike.&lt;/body&gt;
+  &lt;thread&gt;0e3141cd80894871a68e6fe6b1ec56fa&lt;/thread&gt;
+  &lt;private xmlns='urn:xmpp:carbons:2'/&gt;
+  &lt;no-copy xmlns='urn:xmpp:hints'/&gt;
+&lt;/message&gt;</pre></figure>
+
+  <figure class="code-example" id="example-15"><figcaption><strong>Example 15.</strong> Romeo's server delivers original message, without creating Carbon copies<a class="anchor-link" href="#example-15"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message xmlns='jabber:client'
+         from='romeo@montague.example/home'
+         to='juliet@capulet.example/home'
+         type='chat'&gt;
+  &lt;body&gt;Neither, fair saint, if either thee dislike.&lt;/body&gt;
+  &lt;thread&gt;0e3141cd80894871a68e6fe6b1ec56fa&lt;/thread&gt;
+  &lt;private xmlns='urn:xmpp:carbons:2'/&gt;
+  &lt;no-copy xmlns='urn:xmpp:hints'/&gt;
+&lt;/message&gt;</pre></figure>
+<h2 id="bizrules">10.
+       Business Rules<a class="anchor-link" href="#bizrules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="bizrules-multi">10.1 Handling Multiple Enable/Disable Requests<a class="anchor-link" href="#bizrules-multi"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Handling multiple enable/disable request must adhere to the following rules:</p>
+    <ul class="" style="">
+      <li class="" style="">If a client is permitted to enable Carbons during its login session, the server MUST allow the client to enable and disable the protocol multiple times within a session.</li>
+      <li class="" style="">The server SHOULD NOT treat multiple enable requests (without an intermediate disable request) as an error;</li>
+      <li class="" style="">the server SHOULD simply return an IQ-result (if the protocol is already enabled) or an IQ-error (if the client is not permitted to enable Carbons) for any subsequent requests after the first.</li>
+      <li class="" style="">Similarly, the server SHOULD NOT treat multiple disable requests (without an intermediate enable request) as an error;</li>
+      <li class="" style="">the server SHOULD return an IQ-result (if the protocols is already disabled) or an IQ-error (if the client's request failed previously) for any subsequent requests after the first.</li>
+    </ul>
+  </div>
+  <div class="indent"><h3 id="bizrules-chatstates">10.2 Interaction with Chat States<a class="anchor-link" href="#bizrules-chatstates"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style=""><strong>Note: </strong><span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0085.html">Chat State Notifications (XEP-0085)</a></span>  [<a href="#nt-idm46279603942800">5</a>] recommends sending chat state notifications as chat type messages, which means that they will be subject to Carbon-copying.  This is intentional.</p>
+    <p class="" style="">Additionally, there are other considerations for clients that implement Carbons and <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0085.html">Chat State Notifications (XEP-0085)</a></span>  [<a href="#nt-idm46279603942800">5</a>]:</p>
+    <ul class="" style="">
+      <li class="" style="">Upon receiving an inbound or outbound &lt;gone/&gt; chat state (as a carbon copy) for a given conversation, the client SHOULD visually indicate the conversation is terminated.</li>
+      <li class="" style="">In order to prevent unwanted termination of conversations on other resources, clients SHOULD NOT send &lt;gone/&gt; chat states on logout, instead</li>
+      <li class="" style="">clients SHOULD count on the broadcast of unavailable presence to convey the change in attention.</li>
+      <li class="" style="">Upon receiving an outbound notification of any chat state other than &lt;gone/&gt;, the copied client MAY conclude that the sending client has taken responsibility for the conversation, and make appropriate user interface modifications.  For example, notifications could be suppressed on devices receiving the Carbon copies.</li>
+    </ul>
+  </div>
+  <div class="indent"><h3 id="bizrules-errors">10.3 Handling of Errors<a class="anchor-link" href="#bizrules-errors"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The following rules prevent some of the half-failure modes that have been an issue in other protocols:</p>
+    <ul class="" style="">
+      <li class="" style="">When a server attempts to deliver a (locally generated) carbon copy, and that carbon copy bounces with an error for any reason, the server MUST NOT forward that error back to the original sender.</li>
+      <li class="" style="">The server MUST NOT rely on the &lt;sent/&gt; or &lt;received/&gt; elements in the bounce to determine that an error is from a carbon-copied message, because entities are not required to include the original XML in their error replies as per <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6120">RFC 6120</a></span>  [<a href="#nt-idm46279603881216">11</a>], §8.3.1.</li>
+    </ul>
+  </div>
+  <div class="indent"><h3 id="bizrules-autoresponses">10.4 Auto-responses<a class="anchor-link" href="#bizrules-autoresponses"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Clients that automatically respond to messages for any reason (e.g., when in the "dnd" presence show state) MUST take adequate care when enabling Carbons in order to prevent storms or loops.</p>
+    <p class="" style="">Forwarded outbound messages MUST NOT be auto-replied to under any circumstances.</p>
+    <p class="" style="">Forwarded inbound messages MUST NOT be auto-replied to unless the client has some way of ensuring no more than one auto-reply is sent from all of its user's resources.</p>
+  </div>
+  <div class="indent"><h3 id="bizrules-mobile">10.5 Mobile Considerations<a class="anchor-link" href="#bizrules-mobile"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Mobile clients are often connected to the server in parallel to another (desktop) client. Therefore, it is highly recommended for mobile clients to implement this protocol to receive all live traffic, and to generally follow the <a href="https://xmpp.org/about/compliance-suites-current#mobile">Mobile Compliance Suite</a> recommendations.</p>
+  </div>
+<h2 id="security">11.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The security model assumed by this document is that all of the resources for a single user are in the same trust boundary.</p>
+  <ul class="" style="">
+    <li class="" style="">Any forwarded copies received by a Carbons-enabled client MUST be from that user's bare JID;</li>
+    <li class="" style="">any copies that do not meet this requirement MUST be ignored.</li>
+  </ul>
+  <p class="" style="">Outbound chat messages that are encrypted end-to-end are not often useful to receive on other resources.  As such, they should use the &lt;private/&gt; element specified above to avoid such copying, unless the encryption mechanism is able to accommodate this protocol.</p>
+  <figure class="cve"><figcaption>CVE-2017-5589
+	(<a href="https://nvd.nist.gov/vuln/detail/CVE-2017-5589">NIST</a>,
+	<a href="https://cve.mitre.org/cgi-bin/cvename.cgi?name=2017-5589">Mitre</a>)
+      </figcaption><a href="https://rt-solutions.de/en/cve-2017-5589_xmpp_carbons/">Multiple XMPP Clients User Impersonation Vulnerability</a></figure>
+  <figure class="cve"><figcaption>CVE-2019-16235
+	(<a href="https://nvd.nist.gov/vuln/detail/CVE-2019-16235">NIST</a>,
+	<a href="https://cve.mitre.org/cgi-bin/cvename.cgi?name=2019-16235">Mitre</a>)
+      </figcaption><a href="https://gultsch.de/dino_multiple.html">Multiple Vulnerabilities found in Dino</a></figure>
+  <figure class="cve"><figcaption>CVE-2020-26547
+	(<a href="https://nvd.nist.gov/vuln/detail/CVE-2020-26547">NIST</a>,
+	<a href="https://cve.mitre.org/cgi-bin/cvename.cgi?name=2020-26547">Mitre</a>)
+      </figcaption><a href="https://monal.im/blog/cve-2020-26547/">Missing sender verification for Carbons and MAM in Monal before 4.9</a></figure>
+<h2 id="iana">12.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm46279603797728">13</a>].</p>
+<h2 id="registrar">13.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="registrar-ns">13.1 Protocol Namespaces<a class="anchor-link" href="#registrar-ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">This specification defines the following XML namespace:</p>
+    <ul class="" style="">
+      <li class="" style="">urn:xmpp:carbons:2</li>
+    </ul>
+    <p class="" style="">Upon advancement of this specification from a status of Experimental to a status of Draft, the <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm46279603786432">14</a>] shall add the foregoing namespace to the registry located at &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt;, as described in Section 4 of <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0053.html">XMPP Registrar Function (XEP-0053)</a></span>  [<a href="#nt-idm46279603779888">15</a>].</p>
+  </div>
+  <div class="indent"><h3 id="registrar-versioning">13.2 Protocol Versioning<a class="anchor-link" href="#registrar-versioning"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">If the protocol defined in this specification undergoes a revision that is not fully backwards-compatible with an older version, the XMPP Registrar shall increment the protocol version number found at the end of the XML namespaces defined herein, as described in Section 4 of <span class="ref">XEP-0053</span>.</p>
+  </div>
+<h2 id="schema">14.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='urn:xmpp:carbons:2'
+    xmlns='urn:xmpp:carbons:2'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:element name='disable' type='empty'/&gt;
+
+  &lt;xs:element name='enable' type='empty'/&gt;
+
+  &lt;xs:element name='private' type='empty'/&gt;
+
+  &lt;xs:element name='received' type='forward-container'/&gt;
+
+  &lt;xs:element name='sent' type='forward-container'/&gt;
+
+  &lt;xs:simpleType name='empty' abstract='true'&gt;
+    &lt;xs:restriction base='xs:string'&gt;
+      &lt;xs:enumeration value=''/&gt;
+    &lt;/xs:restriction&gt;
+  &lt;/xs:simpleType&gt;
+
+  &lt;xs:complexType name='forward-container' abstract='true'&gt;
+    &lt;xs:choice&gt;
+      &lt;xs:element name='forwarded'
+                  namespace='urn:xmpp:forward:0'
+                  minOccurs='1'
+                  maxOccurs='1'/&gt;
+    &lt;/xs:choice&gt;
+  &lt;/xs:complexType&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+<h2 id="ack">15.
+       Acknowledgements<a class="anchor-link" href="#ack"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The authors wish to thank Patrick Barry, Teh Chang, Jack Erwin, Craig Kaes, Kathleen McMurry, Tory Patnoe, Peter Saint-Andre, Ben Schumacher, and Kevin Smith for their feedback.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0280</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Draft">Stable</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>1.0.1</dd><dt>Last Updated</dt><dd>2021-12-26</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, XMPP IM, <a href="xep-0001.html">XEP-0001</a>, <a href="xep-0030.html">XEP-0030</a>, <a href="xep-0085.html">XEP-0085</a>, <a href="xep-0297.html">XEP-0297</a></dd><dt>Supersedes</dt><dd><a href="xep-0259.html">XEP-0259</a></dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>carbons</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0280.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0280.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0280.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Joe Hildebrand</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:jhildebr@cisco.com">jhildebr@cisco.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:hildjj@jabber.org">hildjj@jabber.org</a></dd></dl><h5>Matthew Miller</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:linuxwolf@outer-planes.net">linuxwolf@outer-planes.net</a></dd><dt>JabberID</dt><dd><a href="xmpp:linuxwolf@outer-planes.net">linuxwolf@outer-planes.net</a></dd></dl><h5>Georg Lukas</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:georg@op-co.de">georg@op-co.de</a></dd><dt>JabberID</dt><dd><a href="xmpp:georg@yax.im">georg@yax.im</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm46279604040016">1</a>. RFC 2119: Key words for use in RFCs to Indicate Requirement Levels &lt;<a href="http://tools.ietf.org/html/rfc2119">http://tools.ietf.org/html/rfc2119</a>&gt;.</p><p><a name="nt-idm46279603994800">2</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm46279603985152">3</a>. XEP-0115: Entity Capabilities &lt;<a href="https://xmpp.org/extensions/xep-0115.html">https://xmpp.org/extensions/xep-0115.html</a>&gt;.</p><p><a name="nt-idm46279603949168">4</a>. XEP-0184: Message Delivery Receipts &lt;<a href="https://xmpp.org/extensions/xep-0184.html">https://xmpp.org/extensions/xep-0184.html</a>&gt;.</p><p><a name="nt-idm46279603942800">5</a>. XEP-0085: Chat State Notifications &lt;<a href="https://xmpp.org/extensions/xep-0085.html">https://xmpp.org/extensions/xep-0085.html</a>&gt;.</p><p><a name="nt-idm46279603933568">6</a>. XEP-0333: Displayed Markers &lt;<a href="https://xmpp.org/extensions/xep-0333.html">https://xmpp.org/extensions/xep-0333.html</a>&gt;.</p><p><a name="nt-idm46279603926640">7</a>. XEP-0249: Direct MUC Invitations &lt;<a href="https://xmpp.org/extensions/xep-0249.html">https://xmpp.org/extensions/xep-0249.html</a>&gt;.</p><p><a name="nt-idm46279603922192">8</a>. The server SHOULD limit carbon-copying to the clients sharing a <strong>Multi-Session Nick</strong> in that MUC, and MAY inject the &lt;x/&gt; element into such carbon copies. Clients can not respond to carbon-copies of MUC-PMs related to a MUC they are not joined to. Therefore, they SHOULD either ignore such carbon copies, or provide a way for the user to join the MUC before answering.</p><p><a name="nt-idm46279603906048">9</a>. RFC 6121: Extensible Messaging and Presence Protocol (XMPP): Instant Messaging and Presence &lt;<a href="http://tools.ietf.org/html/rfc6121">http://tools.ietf.org/html/rfc6121</a>&gt;.</p><p><a name="nt-idm46279603899936">10</a>. XEP-0297: Stanza Forwarding &lt;<a href="https://xmpp.org/extensions/xep-0297.html">https://xmpp.org/extensions/xep-0297.html</a>&gt;.</p><p><a name="nt-idm46279603881216">11</a>. RFC 6120: Extensible Messaging and Presence Protocol (XMPP): Core &lt;<a href="http://tools.ietf.org/html/rfc6120">http://tools.ietf.org/html/rfc6120</a>&gt;.</p><p><a name="nt-idm46279603860288">12</a>. XEP-0334: Message Processing Hints &lt;<a href="https://xmpp.org/extensions/xep-0334.html">https://xmpp.org/extensions/xep-0334.html</a>&gt;.</p><p><a name="nt-idm46279603797728">13</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm46279603786432">14</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p><p><a name="nt-idm46279603779888">15</a>. XEP-0053: XMPP Registrar Function &lt;<a href="https://xmpp.org/extensions/xep-0053.html">https://xmpp.org/extensions/xep-0053.html</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v1.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-1.0.1.html">1.0.1</a> (2021-12-26)<a class="anchor-link" href="#revision-history-v1.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Fix indentation in examples.</p><div class="revision-author">egp</div></li><li id="revision-history-v1.0.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-1.0.0.html">1.0.0</a> (2021-10-12)<a class="anchor-link" href="#revision-history-v1.0.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Advance to Stable as per Council Vote from 2021-09-29. Unbelievable.</p><div class="revision-author">jsc (XEP Editor)</div></li><li id="revision-history-v0.14.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.14.0.html">0.14.0</a> (2021-09-28)<a class="anchor-link" href="#revision-history-v0.14.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Incorporate LC feedback: Remove requirement to remove "private" elements (and add interop note), completely reword mobile considerations to fit modern reality.</p><div class="revision-author">gl</div></li><li id="revision-history-v0.13.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.13.4.html">0.13.4</a> (2021-05-25)<a class="anchor-link" href="#revision-history-v0.13.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Add CVE references</p><div class="revision-author">gl</div></li><li id="revision-history-v0.13.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.13.3.html">0.13.3</a> (2021-03-23)<a class="anchor-link" href="#revision-history-v0.13.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Add Georg as author as discussed on-list.</p><div class="revision-author">gl</div></li><li id="revision-history-v0.13.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.13.2.html">0.13.2</a> (2019-12-16)<a class="anchor-link" href="#revision-history-v0.13.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Typographical fix.</p><div class="revision-author">sp</div></li><li id="revision-history-v0.13.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.13.1.html">0.13.1</a> (2019-09-11)<a class="anchor-link" href="#revision-history-v0.13.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Add clear example on problematic (spoofed) carbon messages and that they need to be handled.</p><div class="revision-author">gl</div></li><li id="revision-history-v0.13.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.13.0.html">0.13.0</a> (2019-04-24)<a class="anchor-link" href="#revision-history-v0.13.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Create more explicit and more binding copying rules under the "urn:xmpp:carbons:rules:0" namespace:</p>
+      <ul class="" style="">
+	<li class="" style="">Replace MAY with MUST if feature is advertised.</li>
+	<li class="" style="">Include XEP-0085 and XEP-0184 as eligible for carbon-copying.</li>
+	<li class="" style="">Specify explicit rules for MUC related messages.</li>
+      </ul>
+    <div class="revision-author">gl</div></li><li id="revision-history-v0.12.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.12.1.html">0.12.1</a> (2019-03-14)<a class="anchor-link" href="#revision-history-v0.12.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Fix off-by-one in dependencies.</p>
+    <div class="revision-author">ka</div></li><li id="revision-history-v0.12.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.12.0.html">0.12.0</a> (2017-02-16)<a class="anchor-link" href="#revision-history-v0.12.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Improved readability by restructuring long sentences (Stefan Haun).</p>
+      <p class="" style="">Removed ambiguous "forking" term; forbidden the reliance of error handling on the content of a bounced message.</p>
+    <div class="revision-author">gl</div></li><li id="revision-history-v0.11.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.11.0.html">0.11.0</a> (2017-01-27)<a class="anchor-link" href="#revision-history-v0.11.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Added &lt;no-copy/&gt; hint.</p>
+    <div class="revision-author">gl (XEP Editor: ssw)</div></li><li id="revision-history-v0.10.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.10.1.html">0.10.1</a> (2016-02-16)<a class="anchor-link" href="#revision-history-v0.10.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Fixed typo in XML Schema ("dx").</p>
+    <div class="revision-author">mm (editor)</div></li><li id="revision-history-v0.10"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.10.html">0.10</a> (2015-08-24)<a class="anchor-link" href="#revision-history-v0.10"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Removed distinction between full-JID and bare-JID when receiving messages (Georg Lukas).</p>
+      <p class="" style="">Define rules around "eligible messages", and provide reasonable default guidelines (Kevin Smith).</p>
+    <div class="revision-author">mm (editor)</div></li><li id="revision-history-v0.9"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.9.html">0.9</a> (2013-10-17)<a class="anchor-link" href="#revision-history-v0.9"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Reorganized to emphasize uses; removed discussion on error conditions required of "non-supporting" entities; relaxed multiple enables/disables to effectively no-ops; removed requirement for &lt;private/&gt; to be stripped from messages processed by the sending server; reworded "Interaction with Chat States" to be consistent with <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc2119">RFC 2119</a></span>  [<a href="#nt-idm46279604040016">1</a>] language; updated mobile considerations to include battery life; changed all examples to use ".example" for the domainpart.</p><div class="revision-author">mm</div></li><li id="revision-history-v0.8"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.8.html">0.8</a> (2012-10-09)<a class="anchor-link" href="#revision-history-v0.8"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Updated use case text to match schema and examples.</p><div class="revision-author">mm</div></li><li id="revision-history-v0.7"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.7.html">0.7</a> (2012-10-08)<a class="anchor-link" href="#revision-history-v0.7"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Moved carbons &lt;received/&gt; and &lt;sent/&gt; flags from being a sibling of &lt;forwarded/&gt; to being a parent of &lt;forwarded/&gt;, in compliance with XEP-0297.</p><div class="revision-author">mm</div></li><li id="revision-history-v0.6"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.6.html">0.6</a> (2012-01-06)<a class="anchor-link" href="#revision-history-v0.6"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Moved carbons flags from being a child of &lt;forwarded/&gt; to being a sibling of &lt;forwarded/&gt;; updating business rules regarding the &lt;gone/&gt; chat state.</p><div class="revision-author">mm</div></li><li id="revision-history-v0.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.5.html">0.5</a> (2011-10-31)<a class="anchor-link" href="#revision-history-v0.5"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Fixed more typos in examples; clarified that each resource only receives one copy of the message (forked or wrapped)</p><div class="revision-author">mm</div></li><li id="revision-history-v0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.4.html">0.4</a> (2011-08-29)<a class="anchor-link" href="#revision-history-v0.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Fixed typos in examples.</p><div class="revision-author">mm</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.3.html">0.3</a> (2011-07-11)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Required the wrapping message to use the carbon user's bare JID; added to the security concerns about rejecting carbon copies not from the carbon user's bare JID.</p><div class="revision-author">mm</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.2.html">0.2</a> (2011-07-10)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Changed enabling and disabling to use separate elements rather than attributes; ensured all elements in the examples have their namespaces more explicitly defined; used message forwarding for carbon copies.</p><div class="revision-author">mm</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.1.html">0.1</a> (2010-05-03)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial published version.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.0.2.html">0.0.2</a> (2010-04-21)<a class="anchor-link" href="#revision-history-v0.0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Updated after further analysis of edge cases.</p><div class="revision-author">jjh</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0280-0.0.1.html">0.0.1</a> (2010-02-25)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">jjh</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{hildebrand2010carbons,
+  title = {Message Carbons},
+  author = {Hildebrand, Joe and Miller, Matthew and Lukas, Georg},
+  type = {XEP},
+  number = {0280},
+  version = {1.0.1},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0280.html},
+  date = {2010-02-25/2021-12-26},
+}</pre><p>END</p></body></html>

@@ -1,0 +1,454 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0085: Chat State Notifications</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0085";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Chat State Notifications"><meta name="DC.Creator" content="Peter Saint-Andre"><meta name="DC.Creator" content="Dave Smith"><meta name="DC.Description" content="This document defines an XMPP protocol extension for communicating the status of a user in a chat session, thus indicating whether a chat partner is actively engaged in the chat, composing a message, temporarily paused, inactive, or gone. The protocol can be used in the context of a one-to-one chat session or a multi-user chat room."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2009-09-23"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0085"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0085: Chat State Notifications</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This document defines an XMPP protocol extension for communicating the status of a user in a chat session, thus indicating whether a chat partner is actively engaged in the chat, composing a message, temporarily paused, inactive, or gone. The protocol can be used in the context of a one-to-one chat session or a multi-user chat room.</dd><dt>Authors</dt><dd><ul class="authors"><li>Peter Saint-Andre</li><li>Dave Smith</li></ul></dd><dt>Copyright</dt><dd>© 2003 – 2009 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Final</p><div id="status-notice" class="final standards track">NOTICE: The protocol defined herein is a <strong>Final Standard</strong> of the XMPP Standards Foundation and can be considered a stable technology for implementation and deployment.</div></dd><dt>Supersedes</dt><dd><a href="xep-0022.html">XEP-0022</a></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>2.1 (2009-09-23)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li>Stable</li><li class="current">Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#definitions">Definitions</a></li><li><a href="#statechart">State Chart</a></li><li><a href="#support">Determining Support</a></li><li><a href="#bizrules">Business Rules</a><ol><li><a href="#bizrules-gen">Generation of Notifications</a></li><li><a href="#bizrules-support">Support Requirements</a></li><li><a href="#bizrules-rep">Repetition</a></li><li><a href="#bizrules-context">Context of Usage</a></li><li><a href="#bizrules-groupchat">Use in Groupchat</a></li><li><a href="#bizrules-syntax">Syntax of Notifications</a></li><li><a href="#bizrules-threads">Threads</a></li><li><a href="#bizrules-notify">Server Handling of Notifications</a></li></ol></li><li><a href="#example-basic">A Simple Example</a></li><li><a href="#example-detail">A Detailed Conversation</a></li><li><a href="#impl">Implementation Notes</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#registrar-ns">Protocol Namespaces</a></li></ol></li><li><a href="#schema">XML Schema</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Many instant messaging systems include notifications about the state of one's conversation partner in a one-to-one chat (or, sometimes, in a many-to-many chat). Usually these are limited to notification that one's partner is currently typing -- e.g., the Composing event in the older (deprecated) <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0022.html">Message Events (XEP-0022)</a></span>  [<a href="#nt-idm46258234947552">1</a>] protocol. However, a composing event is essentially information about a person's participation in or involvement with the chat "session" and therefore is really a session-level state rather than a per-message event (in contrast to the Delivered and Displayed events in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0022.html">Message Events (XEP-0022)</a></span>  [<a href="#nt-idm46258234947552">1</a>]). While the composing event is interesting, the concept of a session-level state can be extended to answer a variety of questions about the participation of a person in a real-time chat conversation, such as:</p>
+  <ul class="" style="">
+    <li class="" style="">Has this person paused the composition?</li>
+    <li class="" style="">Is this person actively paying attention to the chat?</li>
+    <li class="" style="">Is this person temporarily inactive (i.e., not paying attention right now)?</li>
+    <li class="" style="">Is this person simply gone (i.e., no longer participating in the chat)?</li>
+  </ul>
+  <p class="" style="">To answer such questions, this document supplements the traditional composing state by defining four additional chat states (paused, active, inactive, gone), for a total of five states that (it is hoped) together fully describe the possible states of a person's participation in or involvement with a chat conversation.  [<a href="#nt-idm46258234937392">2</a>]</p>
+<h2 id="definitions">2.
+       Definitions<a class="anchor-link" href="#definitions"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">In essence, chat state notifications can be thought of as a form of chat-specific presence. For example, consider what might happen if a user "loses" a chat window on his desktop; the user might still be interacting with his messaging client (thus never automatically changing his basic presence to "away"), but the user's state with regard to the chat session might change progressively from active to inactive to gone. This information would help the user's conversation partner understand why she has not received a response to her messages in the chat session.</p>
+  <p class="" style="">Chat state notifications can appear in two kinds of &lt;message/&gt; stanzas:</p>
+  <ul class="" style="">
+    <li class="" style="">A "content message" -- that is, a message stanza whose primary meaning is contained in standard messaging content such as the XMPP &lt;body/&gt; or any other properly-namespaced child element(s) other than those defined for chat state notifications in this specification.</li>
+    <li class="" style="">A "standalone notification" -- that is, a message stanza that does not contain standard messaging content but instead is intended to specify only the chat state since it contains only a child element qualified by the "http://jabber.org/protocol/chatstates" namespace (or possibly also the XMPP &lt;thread/&gt; element; see the <a href="#bizrules-threads">Threads</a> section below).</li>
+  </ul>
+  <p class="" style="">The five chat states specified in this document are described below. The suggested triggers are simply that: <em>suggestions</em>. It is up to the implementation to determine when to generate chat state notifications and which notifications to generate.</p>
+  <figure class="table"><figcaption id="table-1"><strong>Table 1:</strong> Chat States<a class="anchor-link" href="#table-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+    <tr class="body">
+      <th colspan="" rowspan="">State</th>
+      <th colspan="" rowspan="">Definition</th>
+      <th colspan="" rowspan="">Suggested Triggers</th>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">&lt;active/&gt;</td>
+      <td align="" colspan="" rowspan="">User is actively participating in the chat session.</td>
+      <td align="" colspan="" rowspan="">User accepts an initial content message, sends a content message, gives focus to the chat session interface (perhaps after being inactive), or is otherwise paying attention to the conversation.</td>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">&lt;inactive/&gt;</td>
+      <td align="" colspan="" rowspan="">User has not been actively participating in the chat session.</td>
+      <td align="" colspan="" rowspan="">User has not interacted with the chat session interface for an intermediate period of time (e.g., 2 minutes).</td>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">&lt;gone/&gt;</td>
+      <td align="" colspan="" rowspan="">User has effectively ended their participation in the chat session.</td>
+      <td align="" colspan="" rowspan="">User has not interacted with the chat session interface, system, or device for a relatively long period of time (e.g., 10 minutes).</td>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">&lt;composing/&gt;</td>
+      <td align="" colspan="" rowspan="">User is composing a message.</td>
+      <td align="" colspan="" rowspan="">User is actively interacting with a message input interface specific to this chat session (e.g., by typing in the input area of a chat window).</td>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">&lt;paused/&gt;</td>
+      <td align="" colspan="" rowspan="">User had been composing but now has stopped.</td>
+      <td align="" colspan="" rowspan="">User was composing but has not interacted with the message input interface for a short period of time (e.g., 30 seconds).</td>
+    </tr>
+  </table></figure>
+  <p class="" style="">Note that the &lt;active/&gt;, &lt;inactive/&gt;, and &lt;gone/&gt; states refer to the overall chat session interface whereas the &lt;composing/&gt; and &lt;paused/&gt; states refer to the message input interface (and are in some sense a subset of &lt;active/&gt;). Some implementations might support only events related to the message input interface, some implementations might support only events related to the overall chat session interface, and some implementations might support both kinds of events.</p>
+<h2 id="statechart">3.
+       State Chart<a class="anchor-link" href="#statechart"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The following figure attempts to capture the most common state transitions in visual form (all four of the states shown can also transition to the GONE state).</p>
+  <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+
+                o (start)
+                |
+                |
+INACTIVE &lt;--&gt; ACTIVE &lt;--&gt; COMPOSING &lt;--&gt; PAUSED
+    |                                       |
+    |                                       |
+    +---&lt;---&lt;---&lt;---&lt;---&lt;---&lt;---&lt;---&lt;---&lt;---+
+</pre></figure>
+  <p class="" style="">Note: Other transitions are not forbidden if the developers of an implementation feel that such transitions are desirable (e.g., INACTIVE to PAUSED if a user returns to a chat session interface containing an unfinished message).</p>
+<h2 id="support">4.
+       Determining Support<a class="anchor-link" href="#support"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">If an entity supports the Chat State Notifications protocol, it MUST advertise that fact in its responses to <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm46258234885760">3</a>] information ("disco#info") requests by returning a feature of "http://jabber.org/protocol/chatstates":</p>
+  <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> A disco#info query<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='romeo@shakespeare.lit/orchard'
+    id='disco1'
+    to='juliet@capulet.com/balcony'
+    type='get'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> A disco#info response<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='juliet@capulet.com/balcony'
+    id='disco1'
+    to='romeo@shakespeare.lit/orchard'
+    type='result'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+    &lt;feature var='http://jabber.org/protocol/chatstates'/&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <p class="" style="">In order for an application to determine whether an entity supports this protocol, where possible it SHOULD use the dynamic, presence-based profile of service discovery defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm46258234878048">4</a>]. However, if an application has not received entity capabilities information from an entity, it SHOULD use explicit service discovery instead.</p>
+<h2 id="bizrules">5.
+       Business Rules<a class="anchor-link" href="#bizrules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="bizrules-gen">5.1 Generation of Notifications<a class="anchor-link" href="#bizrules-gen"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Before generating chat state notifications, a User SHOULD explicitly discover whether the Contact supports the protocol defined herein (as described in the <a href="#disco">Discovering Support</a> section of this document) or explicitly negotiate the use of chat state notifications with the Contact (e.g., via <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0155.html">Stanza Session Negotiation (XEP-0155)</a></span>  [<a href="#nt-idm46258234869152">5</a>]).</p>
+    <p class="" style="">In the absence of explicit discovery or negotiation, the User MAY implicitly request and discover the use of chat state notifications in a one-to-one chat session by adhering to the following business rules:</p>
+    <ol start="1" class="" style="">
+      <li class="" style="">If the User desires chat state notifications, the message(s) that it sends to the Contact before receiving a reply MUST contain a chat state notification extension, which SHOULD be &lt;active/&gt;.</li>
+      <li class="" style="">If the Contact replies but does not include a chat state notification extension, the User MUST NOT send subsequent chat state notifications to the Contact.</li>
+      <li class="" style="">If the Contact replies and includes an &lt;active/&gt; notification (or sends a standalone notification to the User), the User and Contact SHOULD send subsequent notifications for supported chat states (as specified in the next subsection) by including an &lt;active/&gt; notification in each content message and sending standalone notifications for the chat states they support (at a minimum, the &lt;composing/&gt; state).</li>
+    </ol>
+    <p class="" style="">The foregoing rules imply that the sending of chat state notifications is bidirectional (i.e., both User and Contact will either send or not send chat state notifications) rather than unidirectional (i.e., one of the conversation partners will send chat state notifications but the other will not); this is by design.</p>
+  </div>
+  <div class="indent"><h3 id="bizrules-support">5.2 Support Requirements<a class="anchor-link" href="#bizrules-support"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <figure class="table"><figcaption id="table-2"><strong>Table 2:</strong> Requirements for Supporting Each Chat State<a class="anchor-link" href="#table-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+      <tr class="body">
+        <th colspan="" rowspan="">Chat State</th>
+        <th colspan="" rowspan="">Requirement</th>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;active/&gt;</td>
+        <td align="" colspan="" rowspan="">MUST</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;composing/&gt;</td>
+        <td align="" colspan="" rowspan="">MUST</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;paused/&gt;</td>
+        <td align="" colspan="" rowspan="">SHOULD</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;inactive/&gt;</td>
+        <td align="" colspan="" rowspan="">SHOULD</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;gone/&gt;</td>
+        <td align="" colspan="" rowspan="">SHOULD</td>
+      </tr>
+    </table></figure>
+    <p class="" style="">A client MUST allow users to configure whether they want to send chat state notifications.</p>
+    <p class="" style="">Note: Support for only &lt;active/&gt; and &lt;composing/&gt; is functionally equivalent to supporting the Composing event from <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0022.html">Message Events (XEP-0022)</a></span>  [<a href="#nt-idm46258234947552">1</a>].</p>
+  </div>
+  <div class="indent"><h3 id="bizrules-rep">5.3 Repetition<a class="anchor-link" href="#bizrules-rep"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Even if the user types continuously for a long time (e.g., while composing a lengthy reply), the client MUST NOT send more than one standalone &lt;composing/&gt; notification in a row. More generally, a client MUST NOT send a second instance of any given standalone notification (i.e., a standalone notification MUST be followed by a different state, not repetition of the same state). However, every content message SHOULD contain an &lt;active/&gt; notification.</p>
+  </div>
+  <div class="indent"><h3 id="bizrules-context">5.4 Context of Usage<a class="anchor-link" href="#bizrules-context"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <ol start="" class="" style="">
+      <li class="" style="">This protocol MUST NOT be used with stanzas other than &lt;message/&gt;.</li>
+      <li class="" style="">This protocol SHOULD NOT be used with message types other than "chat" or "groupchat".</li>
+      <li class="" style="">The 'type' attribute for content messages and standalone notifications SHOULD be set to a value of "chat" (for one-to-one sessions) or "groupchat" (for many-to-many sessions).</li>
+      <li class="" style="">A chat session MAY span multiple user sessions (i.e., chat state is orthogonal to the presence of one's conversation partner), although this is unlikely given the suggested timing of event triggers.</li>
+    </ol>
+  </div>
+  <div class="indent"><h3 id="bizrules-groupchat">5.5 Use in Groupchat<a class="anchor-link" href="#bizrules-groupchat"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Chat state notifications MAY be sent in the context of groupchat rooms (e.g., as defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm46258234825008">6</a>]). The following business rules apply:</p>
+    <ol start="" class="" style="">
+      <li class="" style="">A client MAY send chat state notifications even if not all room occupants do so.</li>
+      <li class="" style="">A client SHOULD NOT generate &lt;gone/&gt; notifications.</li>
+      <li class="" style="">A client SHOULD ignore &lt;gone/&gt; notifications received from other room occupants.</li>
+    </ol>
+    <p class="" style="">Note: Use of chat state notifications in the context of groupchat can result in multicasting of such notifications. Forewarned is forearmed.</p>
+  </div>
+  <div class="indent"><h3 id="bizrules-syntax">5.6 Syntax of Notifications<a class="anchor-link" href="#bizrules-syntax"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <ol start="" class="" style="">
+      <li class="" style="">A message stanza MUST NOT contain more than one child element qualified by the 'http://jabber.org/protocol/chatstates' namespace.</li>
+      <li class="" style="">A message stanza that contains standard instant messaging content SHOULD NOT contain a chat state notification extension other than &lt;active/&gt;, where "standard instant messaging content" is taken to mean the &lt;body/&gt;, &lt;subject/&gt;, and &lt;thread/&gt; child elements defined in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6121">XMPP IM</a></span>  [<a href="#nt-idm46258234810304">7</a>] or any other child element that would lead the recipient to treat the stanza as an instant message as explained in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0226.html">Message Stanza Profiles (XEP-0226)</a></span>  [<a href="#nt-idm46258234800560">8</a>].</li>
+      <li class="" style="">A message stanza that does not contain standard messaging content and is intended to specify only the chat state MUST NOT contain any child elements other than the chat state notification extension, which SHOULD be a state other than &lt;active/&gt;; however, if threads are used (see below) then the standalone notification MUST also contain the &lt;thread/&gt; element.</li>
+    </ol>
+  </div>
+  <div class="indent"><h3 id="bizrules-threads">5.7 Threads<a class="anchor-link" href="#bizrules-threads"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">While chat state notifications provide a mechanism for managing chat threads as communicated by inclusion of the XMPP &lt;thread/&gt; element, support for threads is OPTIONAL (for further information about threads, refer to <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0201.html">Best Practices for Message Threads (XEP-0201)</a></span>  [<a href="#nt-idm46258234796448">9</a>]). However, if all of the clients participating in a chat both support and use threads, the following additional business rules apply:</p>
+    <ol start="" class="" style="">
+      <li class="" style="">Clients MUST copy back Thread IDs (i.e., the value of the &lt;thread/&gt; element) in any replies.</li>
+      <li class="" style="">When a client terminates a one-to-one chat session (e.g., when a user closes the chat session interface), it MUST generate a &lt;gone/&gt; event.</li>
+      <li class="" style="">Upon receiving a &lt;gone/&gt; event, a client MUST NOT re-use the same Thread ID and MUST generate a new Thread ID for any subsequent chat messages sent to the conversation partner.</li>
+    </ol>
+  </div>
+  <div class="indent"><h3 id="bizrules-notify">5.8 Server Handling of Notifications<a class="anchor-link" href="#bizrules-notify"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Servers in constrained network environments (e.g., serving small-footprint clients via <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0025.html">Jabber HTTP Polling (XEP-0025)</a></span>  [<a href="#nt-idm46258234783888">10</a>] or <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0124.html">BOSH (XEP-0124)</a></span>  [<a href="#nt-idm46258234779712">11</a>]) and services that rebroadcast message stanzas (e.g., Multi-User Chat services) MAY process standalone notifications differently from other messages. In particular, a server or service MAY refuse to deliver standalone notifications to its users, and SHOULD NOT store them offline. In contrast to <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0022.html">Message Events (XEP-0022)</a></span>  [<a href="#nt-idm46258234947552">1</a>], chat state notifications are completely the responsibility of the client, and MUST NOT be generated by a server or service.</p>
+  </div>
+<h2 id="example-basic">6.
+       A Simple Example<a class="anchor-link" href="#example-basic"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">In the following conversation, both User &lt;bernardo@shakespeare.lit&gt; and Contact &lt;francisco@shakespeare.lit&gt; support chat state notifications.</p>
+  <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> User Sends Initial Content Message With &lt;active/&gt; Notification<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='bernardo@shakespeare.lit/pda'
+    to='francisco@shakespeare.lit'
+    type='chat'&gt;
+  &lt;body&gt;Who's there?&lt;/body&gt;
+  &lt;active xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Contact's Client Sends Content Message Reply With &lt;active/&gt; Notification<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='francisco@shakespeare.lit/elsinore'
+    to='bernardo@shakespeare.lit/pda'
+    type='chat'&gt;
+  &lt;body&gt;Nay, answer me: stand, and unfold yourself.&lt;/body&gt;
+  &lt;active xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">Because the User now knows that the Contact supports chat state notifications, the User can send other notification types.</p>
+  <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> User Sends Standalone &lt;composing/&gt; Notification<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='bernardo@shakespeare.lit/pda'
+    to='francisco@shakespeare.lit/elsinore'
+    type='chat'&gt;
+  &lt;composing xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> User Sends a Content Message Reply With &lt;active/&gt; Notification<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='bernardo@shakespeare.lit/pda'
+    to='francisco@shakespeare.lit/elsinore'
+    type='chat'&gt;
+  &lt;body&gt;Long live the king!&lt;/body&gt;
+  &lt;active xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">And so forth.</p>
+<h2 id="example-detail">7.
+       A Detailed Conversation<a class="anchor-link" href="#example-detail"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The following conversation flow illustrates in more detail the workings of chat state notifications (in this case also using threads) between a User &lt;romeo@shakespeare.lit&gt; and a Contact &lt;juliet@capulet.com&gt;.</p>
+  <figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> User Sends Initial Content Message<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='romeo@shakespeare.lit/orchard'
+    to='juliet@capulet.com'
+    type='chat'&gt;
+  &lt;thread&gt;act2scene2chat1&lt;/thread&gt;
+  &lt;body&gt;
+    I take thee at thy word:
+    Call me but love, and I'll be new baptized;
+    Henceforth I never will be Romeo.
+  &lt;/body&gt;
+  &lt;active xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">At this point Juliet's client knows that Romeo's client supports chat state notifications. Thus she replies to the content message and her client includes a notification that her state is &lt;active/&gt;:</p>
+  <figure class="code-example" id="example-8"><figcaption><strong>Example 8.</strong> Contact's Client Sends Content Message Reply With &lt;active/&gt; Notification<a class="anchor-link" href="#example-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='juliet@capulet.com/balcony'
+    to='romeo@shakespeare.lit/orchard'
+    type='chat'&gt;
+  &lt;thread&gt;act2scene2chat1&lt;/thread&gt;
+  &lt;body&gt;
+    What man art thou that thus bescreen'd in night
+    So stumblest on my counsel?
+  &lt;/body&gt;
+  &lt;active xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">And so the conversation continues. After a while, Juliet asks a question that brings Romeo up short:</p>
+  <figure class="code-example" id="example-9"><figcaption><strong>Example 9.</strong> Contact Sends Another Message<a class="anchor-link" href="#example-9"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='juliet@capulet.com/balcony'
+    to='romeo@shakespeare.lit/orchard'
+    type='chat'&gt;
+  &lt;thread&gt;act2scene2chat1&lt;/thread&gt;
+  &lt;body&gt;Art thou not Romeo, and a Montague?&lt;/body&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">Romeo begins composing a reply to Juliet's heartfelt question, and his client notifies Juliet that he is composing a reply.</p>
+  <figure class="code-example" id="example-10"><figcaption><strong>Example 10.</strong> User's Client Sends Standalone &lt;composing/&gt; Notification<a class="anchor-link" href="#example-10"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='romeo@montague.net/orchard'
+    to='juliet@capulet.com/balcony'
+    type='chat'&gt;
+  &lt;thread&gt;act2scene2chat1&lt;/thread&gt;
+  &lt;composing xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">Romeo realizes his reply is too rash and pauses to choose the right words; after some (configurable) time period, his client senses the delay and sends a state of &lt;paused/&gt;.</p>
+  <figure class="code-example" id="example-11"><figcaption><strong>Example 11.</strong> User's Client Sends Standalone &lt;paused/&gt; Notification<a class="anchor-link" href="#example-11"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='romeo@montague.net/orchard'
+    to='juliet@capulet.com/balcony'
+    type='chat'&gt;
+  &lt;thread&gt;act2scene2chat1&lt;/thread&gt;
+  &lt;paused xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">Romeo starts composing again, and his Jabber client sends a &lt;composing/&gt; notification to Juliet's client.</p>
+  <figure class="code-example" id="example-12"><figcaption><strong>Example 12.</strong> User's Clients Sends Standalone &lt;composing/&gt; Notification<a class="anchor-link" href="#example-12"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='romeo@montague.net/orchard'
+    to='juliet@capulet.com/balcony'
+    type='chat'&gt;
+  &lt;thread&gt;act2scene2chat1&lt;/thread&gt;
+  &lt;composing xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">Romeo finally sends his reply.</p>
+  <figure class="code-example" id="example-13"><figcaption><strong>Example 13.</strong> User Replies<a class="anchor-link" href="#example-13"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='romeo@montague.net/orchard'
+    to='juliet@capulet.com/balcony'
+    type='chat'&gt;
+  &lt;thread&gt;act2scene2chat1&lt;/thread&gt;
+  &lt;body&gt;Neither, fair saint, if either thee dislike.&lt;/body&gt;
+  &lt;active xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">The conversation ebbs and flows, waxes and wanes, until Juliet is called away by her Nurse...</p>
+  <figure class="code-example" id="example-14"><figcaption><strong>Example 14.</strong> Contact's Client Sends Content Message<a class="anchor-link" href="#example-14"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='juliet@capulet.com/balcony'
+    to='romeo@shakespeare.lit/orchard'
+    type='chat'&gt;
+  &lt;thread&gt;act2scene2chat1&lt;/thread&gt;
+  &lt;body&gt;
+    I hear some noise within; dear love, adieu!
+    Anon, good nurse! Sweet Montague, be true.
+    Stay but a little, I will come again.
+  &lt;/body&gt;
+  &lt;active xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">We suppose that Juliet minimizes the chat window, so her client generates an &lt;inactive/&gt; notification:</p>
+  <figure class="code-example" id="example-15"><figcaption><strong>Example 15.</strong> Contact's Client Sends Standalone &lt;inactive/&gt; Notification<a class="anchor-link" href="#example-15"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='juliet@capulet.com/balcony'
+    to='romeo@shakespeare.lit/orchard'
+    type='chat'&gt;
+  &lt;thread&gt;act2scene2chat1&lt;/thread&gt;
+  &lt;inactive xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">When she returns and brings the window up again, her client generates an &lt;active/&gt; notification:</p>
+  <figure class="code-example" id="example-16"><figcaption><strong>Example 16.</strong> Contact's Client Sends Standalone &lt;active/&gt; Notification<a class="anchor-link" href="#example-16"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='juliet@capulet.com/balcony'
+    to='romeo@shakespeare.lit/orchard'
+    type='chat'&gt;
+  &lt;thread&gt;act2scene2chat1&lt;/thread&gt;
+  &lt;active xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">The conversation continues, but Juliet is called away again by that nagging Nurse:</p>
+  <figure class="code-example" id="example-17"><figcaption><strong>Example 17.</strong> Contact's Client Sends Content Message<a class="anchor-link" href="#example-17"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='juliet@capulet.com/balcony'
+    to='romeo@shakespeare.lit/orchard'
+    type='chat'&gt;
+  &lt;thread&gt;act2scene2chat1&lt;/thread&gt;
+  &lt;body&gt;
+    A thousand times good night!
+  &lt;/body&gt;
+  &lt;active xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">We suppose that Juliet closes the chat window, so her client generates a &lt;gone/&gt; notification:</p>
+  <figure class="code-example" id="example-18"><figcaption><strong>Example 18.</strong> Contact's Client Sends Standalone &lt;gone/&gt; Notification<a class="anchor-link" href="#example-18"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='juliet@capulet.com/balcony'
+    to='romeo@shakespeare.lit/orchard'
+    type='chat'&gt;
+  &lt;thread&gt;act2scene2chat1&lt;/thread&gt;
+  &lt;gone xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">Romeo's client now considers the chat thread to be over and generates a new Thread ID when he sends a new message:</p>
+  <figure class="code-example" id="example-19"><figcaption><strong>Example 19.</strong> User's Client Sends Content Message with New Thread ID<a class="anchor-link" href="#example-19"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='romeo@shakespeare.lit/orchard'
+    to='juliet@capulet.com/balcony'
+    type='chat'&gt;
+  &lt;thread&gt;act2scene2chat2&lt;/thread&gt;
+  &lt;body&gt;
+    A thousand times the worse, to want thy light.
+    Love goes toward love, as schoolboys from their books,
+    But love from love, toward school with heavy looks.
+  &lt;/body&gt;
+  &lt;active xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">When Juliet returns to her computer on the balcony, she finds the new message from Romeo. When she finishes her reply, her client includes both an &lt;active/&gt; notification and the new Thread ID with the body of her reply:</p>
+  <figure class="code-example" id="example-20"><figcaption><strong>Example 20.</strong> Contact's Client Sends Content Message<a class="anchor-link" href="#example-20"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='juliet@capulet.com/balcony'
+    to='romeo@shakespeare.lit/orchard'
+    type='chat'&gt;
+  &lt;thread&gt;act2scene2chat2&lt;/thread&gt;
+  &lt;body&gt;
+    Hist! Romeo, hist! O, for a falconer's voice,....
+  &lt;/body&gt;
+  &lt;active xmlns='http://jabber.org/protocol/chatstates'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">And so forth.</p>
+  <p class="" style="">My, these star-crossed lovers do go on, don't they?</p>
+<h2 id="impl">8.
+       Implementation Notes<a class="anchor-link" href="#impl"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">A client that receives a chat state notification might never receive another message or chat state notification from the other entity (e.g., because the other entity crashes or goes offline) and needs to plan accordingly.</p>
+<h2 id="security">9.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The states of a chat thread can reveal information about a user's interaction with his or her computer, including his or her physical presence; such information SHOULD NOT be revealed to conversation partners who are not trusted to know such information. Client implementations MUST provide a mechanism that enables the user to disable chat state notifications if desired.</p>
+<h2 id="iana">10.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm46258234727536">12</a>].</p>
+<h2 id="registrar">11.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="registrar-ns">11.1 Protocol Namespaces<a class="anchor-link" href="#registrar-ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm46258234719792">13</a>] includes 'http://jabber.org/protocol/chatstates' in its registry of protocol namespaces.</p>
+  </div>
+<h2 id="schema">12.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='http://jabber.org/protocol/chatstates'
+    xmlns='http://jabber.org/protocol/chatstates'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+      The protocol documented by this schema is defined in
+      XEP-0085: http://www.xmpp.org/extensions/xep-0085.html
+    &lt;/xs:documentation&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:element name='active' type='empty'/&gt;
+  &lt;xs:element name='composing' type='empty'/&gt;
+  &lt;xs:element name='gone' type='empty'/&gt;
+  &lt;xs:element name='inactive' type='empty'/&gt;
+  &lt;xs:element name='paused' type='empty'/&gt;
+
+  &lt;xs:simpleType name='empty'&gt;
+    &lt;xs:restriction base='xs:string'&gt;
+      &lt;xs:enumeration value=''/&gt;
+    &lt;/xs:restriction&gt;
+  &lt;/xs:simpleType&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0085</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Final">Final</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>2.1</dd><dt>Last Updated</dt><dd>2009-09-23</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, XMPP IM, <a href="xep-0030.html">XEP-0030</a></dd><dt>Supersedes</dt><dd><a href="xep-0022.html">XEP-0022</a></dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>chatstates</dd><dt>Schema</dt><dd>
+        &lt;<a href="http://www.xmpp.org/schemas/chatstates.xsd">http://www.xmpp.org/schemas/chatstates.xsd</a>&gt;<br></dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0085.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0085.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0085.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Peter Saint-Andre</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:stpeter@stpeter.im">stpeter@stpeter.im</a></dd><dt>JabberID</dt><dd><a href="xmpp:stpeter@jabber.org">stpeter@jabber.org</a></dd><dt>URI</dt><dd><a href="https://stpeter.im/">https://stpeter.im/</a></dd></dl><h5>Dave Smith</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:dizzyd@jabber.org">dizzyd@jabber.org</a></dd><dt>JabberID</dt><dd><a href="xmpp:dizzyd@jabber.org">dizzyd@jabber.org</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm46258234947552">1</a>. XEP-0022: Message Events &lt;<a href="https://xmpp.org/extensions/xep-0022.html">https://xmpp.org/extensions/xep-0022.html</a>&gt;.</p><p><a name="nt-idm46258234937392">2</a>. These states do not necessarily refer to the state of the client interface and certainly not to the disposition of a particular message. However, the user's involvement with the system, device, chat session interface, or input interface can provide important clues regarding the user's involvement with the chat session; these clues can be used by the client in determining when to generate chat state notifications.</p><p><a name="nt-idm46258234885760">3</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm46258234878048">4</a>. XEP-0115: Entity Capabilities &lt;<a href="https://xmpp.org/extensions/xep-0115.html">https://xmpp.org/extensions/xep-0115.html</a>&gt;.</p><p><a name="nt-idm46258234869152">5</a>. XEP-0155: Stanza Session Negotiation &lt;<a href="https://xmpp.org/extensions/xep-0155.html">https://xmpp.org/extensions/xep-0155.html</a>&gt;.</p><p><a name="nt-idm46258234825008">6</a>. XEP-0045: Multi-User Chat &lt;<a href="https://xmpp.org/extensions/xep-0045.html">https://xmpp.org/extensions/xep-0045.html</a>&gt;.</p><p><a name="nt-idm46258234810304">7</a>. RFC 6121: Extensible Messaging and Presence Protocol (XMPP): Instant Messaging and Presence &lt;<a href="http://tools.ietf.org/html/rfc6121">http://tools.ietf.org/html/rfc6121</a>&gt;.</p><p><a name="nt-idm46258234800560">8</a>. XEP-0226: Message Stanza Profiles &lt;<a href="https://xmpp.org/extensions/xep-0226.html">https://xmpp.org/extensions/xep-0226.html</a>&gt;.</p><p><a name="nt-idm46258234796448">9</a>. XEP-0201: Best Practices for Message Threads &lt;<a href="https://xmpp.org/extensions/xep-0201.html">https://xmpp.org/extensions/xep-0201.html</a>&gt;.</p><p><a name="nt-idm46258234783888">10</a>. XEP-0025: Jabber HTTP Polling &lt;<a href="https://xmpp.org/extensions/xep-0025.html">https://xmpp.org/extensions/xep-0025.html</a>&gt;.</p><p><a name="nt-idm46258234779712">11</a>. XEP-0124: Bidirectional-streams Over Synchronous HTTP &lt;<a href="https://xmpp.org/extensions/xep-0124.html">https://xmpp.org/extensions/xep-0124.html</a>&gt;.</p><p><a name="nt-idm46258234727536">12</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm46258234719792">13</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v2.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-2.1.html">2.1</a> (2009-09-23)<a class="anchor-link" href="#revision-history-v2.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified that any state change is allowed.</p><div class="revision-author">psa</div></li><li id="revision-history-v2.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-2.0.html">2.0</a> (2008-11-26)<a class="anchor-link" href="#revision-history-v2.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the XMPP Council, advanced specification to Final; clarified the implicit discovery mechanism.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-1.2.html">1.2</a> (2006-07-12)<a class="anchor-link" href="#revision-history-v1.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added service discovery use case.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-1.1.html">1.1</a> (2005-10-05)<a class="anchor-link" href="#revision-history-v1.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified suggested triggers to discourage prospective notifications.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-1.0.html">1.0</a> (2005-08-26)<a class="anchor-link" href="#revision-history-v1.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the Jabber Council, advanced status to Draft.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.14"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-0.14.html">0.14</a> (2005-07-20)<a class="anchor-link" href="#revision-history-v0.14"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified terminology; specified suggested state changes; removed section on superseding XEP-0022.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.13"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-0.13.html">0.13</a> (2005-07-19)<a class="anchor-link" href="#revision-history-v0.13"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Further clarified business rules regarding generation of notifications.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.12"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-0.12.html">0.12</a> (2005-07-15)<a class="anchor-link" href="#revision-history-v0.12"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified business rules regarding generation of notifications; added reference to XEP-0155; rewrote introduction; moved previous introductory text to section on superseding XEP-0022.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.11"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-0.11.html">0.11</a> (2005-07-05)<a class="anchor-link" href="#revision-history-v0.11"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Removed &lt;initial/&gt; state.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.10"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-0.10.html">0.10</a> (2005-06-28)<a class="anchor-link" href="#revision-history-v0.10"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added optional &lt;initial/&gt; state; added business rule on repetition of notifications; added implementation note.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.9"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-0.9.html">0.9</a> (2004-10-28)<a class="anchor-link" href="#revision-history-v0.9"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Made &lt;inactive/&gt; state definition consistent with &lt;paused/&gt; per list discussion; made slight adjustments to wording throughout.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.8"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-0.8.html">0.8</a> (2004-10-28)<a class="anchor-link" href="#revision-history-v0.8"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Further clarified state definitions and adjusted suggested event timing.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.7"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-0.7.html">0.7</a> (2004-10-27)<a class="anchor-link" href="#revision-history-v0.7"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified the meaning of the &lt;gone/&gt; state; adjusted suggested timing for events.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.6"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-0.6.html">0.6</a> (2004-02-19)<a class="anchor-link" href="#revision-history-v0.6"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added &lt;paused/&gt; state; defined the chat states; clarified the state chart; simplified the business rules.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-0.5.html">0.5</a> (2003-09-18)<a class="anchor-link" href="#revision-history-v0.5"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified that 'type' must be "chat" or "groupchat" for chat state notification messages.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-0.4.html">0.4</a> (2003-05-22)<a class="anchor-link" href="#revision-history-v0.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Made Thread IDs optional; made &lt;inactive/&gt; and &lt;gone/&gt; states optional if Thread IDs are not used; removed requirement for explicit service discovery in favor of implicit discovery.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-0.3.html">0.3</a> (2003-05-20)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified terminology; added support for groupchat; added several implementation notes.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-0.2.html">0.2</a> (2003-05-19)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">General cleanup; added schema.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0085-0.1.html">0.1</a> (2003-05-19)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial version.</p><div class="revision-author">dss/psa</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{saint-andre2003chatstates,
+  title = {Chat State Notifications},
+  author = {Saint-Andre, Peter and Smith, Dave},
+  type = {XEP},
+  number = {0085},
+  version = {2.1},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0085.html},
+  date = {2003-05-19/2009-09-23},
+}</pre><p>END</p></body></html>

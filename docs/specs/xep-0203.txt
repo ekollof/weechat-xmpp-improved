@@ -1,0 +1,155 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0203: Delayed Delivery</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0203";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Delayed Delivery"><meta name="DC.Creator" content="Peter Saint-Andre"><meta name="DC.Description" content="This specification defines an XMPP protocol extension for communicating the fact that an XML stanza has been delivered with a delay, for example because a message has been stored on a server while the intended recipient was offline or because a message is contained in the history of a multi-user chat room."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2009-09-15"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0203"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0203: Delayed Delivery</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification defines an XMPP protocol extension for communicating the fact that an XML stanza has been delivered with a delay, for example because a message has been stored on a server while the intended recipient was offline or because a message is contained in the history of a multi-user chat room.</dd><dt>Author</dt><dd>Peter Saint-Andre</dd><dt>Copyright</dt><dd>© 2006 – 2009 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Final</p><div id="status-notice" class="final standards track">NOTICE: The protocol defined herein is a <strong>Final Standard</strong> of the XMPP Standards Foundation and can be considered a stable technology for implementation and deployment.</div></dd><dt>Supersedes</dt><dd><a href="xep-0091.html">XEP-0091</a></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>2.0 (2009-09-15)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li>Stable</li><li class="current">Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#protocol">Protocol Definition</a></li><li><a href="#examples">Examples</a></li><li><a href="#impl">Implementation Notes</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#ns">Protocol Namespace</a></li></ol></li><li><a href="#schema">XML Schema</a></li><li><a href="#ack">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Although the XMPP protocol extension defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0091.html">Legacy Delayed Delivery (XEP-0091)</a></span>  [<a href="#nt-idm45843361497952">1</a>] provides a way to communicate that an XML stanza (typically a &lt;message/&gt; or &lt;presence/&gt; stanza) has been delivered with a delay, the timestamp format defined in that document does not adhere to the recommended date and time profiles for XMPP protocols defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0082.html">XMPP Date and Time Profiles (XEP-0082)</a></span>  [<a href="#nt-idm45843361488064">2</a>]. Therefore, this document defines a replacement for <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0091.html">Legacy Delayed Delivery (XEP-0091)</a></span>  [<a href="#nt-idm45843361497952">1</a>] which enables communication of delayed delivery information while adhering to <span class="ref">XEP-0082</span>.</p>
+<h2 id="protocol">2.
+       Protocol Definition<a class="anchor-link" href="#protocol"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The XML namespace defined herein is used to provide timestamp information about data stored for later delivery. The most common uses of this namespace are to stamp:</p>
+  <ul class="" style="">
+    <li class="" style="">A message that is sent to an offline entity and stored for later delivery (see <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0160.html">Best Practices for Handling Offline Messages (XEP-0160)</a></span>  [<a href="#nt-idm45843361481760">3</a>]).</li>
+    <li class="" style="">The last available presence stanza sent by a connected client to a server.</li>
+    <li class="" style="">Messages cached by a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45843361476304">4</a>] room for delivery to new participants when they join the room.</li>
+  </ul>
+  <p class="" style="">Information about the delivery delay is communicated by adding to the &lt;message/&gt; or &lt;presence/&gt; stanza one and only one &lt;delay/&gt; child qualified by a namespace to be issued when this specification advances to a status of Draft. This information is added by the server or component that delivers the stanza. The following attributes are defined for the &lt;delay/&gt; element:</p>
+  <figure class="table"><figcaption id="table-1"><strong>Table 1:</strong> Defined Attributes<a class="anchor-link" href="#table-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+    <tr class="body">
+      <th colspan="" rowspan="">Attribute</th>
+      <th colspan="" rowspan="">Definition</th>
+      <th colspan="" rowspan="">Inclusion</th>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">from</td>
+      <td align="" colspan="" rowspan="">The Jabber ID of the entity that originally sent the XML stanza or that delayed the delivery of the stanza (e.g., the address of a multi-user chat room).</td>
+      <td align="" colspan="" rowspan="">RECOMMENDED</td>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">stamp</td>
+      <td align="" colspan="" rowspan="">The time when the XML stanza was originally sent. The format MUST adhere to the dateTime format specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0082.html">XMPP Date and Time Profiles (XEP-0082)</a></span>  [<a href="#nt-idm45843361488064">2</a>] and MUST be expressed in UTC.</td>
+      <td align="" colspan="" rowspan="">REQUIRED</td>
+    </tr>
+  </table></figure>
+  <p class="" style="">In addition, the &lt;delay/&gt; element MAY contain XML character data that provides a natural-language description of the reason for the delay.</p>
+<h2 id="examples">3.
+       Examples<a class="anchor-link" href="#examples"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Receiving a Message Sent While Offline<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='romeo@montague.net/orchard'
+    to='juliet@capulet.com'
+    type='chat'&gt;
+  &lt;body&gt;
+    O blessed, blessed night! I am afeard.
+    Being in night, all this is but a dream,
+    Too flattering-sweet to be substantial.
+  &lt;/body&gt;
+  &lt;delay xmlns='urn:xmpp:delay'
+     from='capulet.com'
+     stamp='2002-09-10T23:08:25Z'&gt;
+    Offline Storage
+  &lt;/delay&gt;
+&lt;/message&gt;
+</pre></figure>
+  <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Receiving the Last Presence Update of Another Entity<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;presence from='juliet@capulet.com/balcony' to='romeo@montague.net'&gt;
+  &lt;status&gt;anon!&lt;/status&gt;
+  &lt;show&gt;xa&lt;/show&gt;
+  &lt;priority&gt;1&lt;/priority&gt;
+  &lt;delay xmlns='urn:xmpp:delay'
+     from='juliet@capulet.com/balcony'
+     stamp='2002-09-10T23:41:07Z'/&gt;
+&lt;/presence&gt;
+</pre></figure>
+  <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Receiving Cached Messages from a Conference Room<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='coven@macbeth.shakespeare.lit/secondwitch'
+    to='macbeth@shakespeare.lit/laptop'
+    type='groupchat'&gt;
+  &lt;body&gt;
+    By the pricking of my thumbs,
+    Something wicked this way comes.
+    Open, locks,
+    Whoever knocks!
+  &lt;/body&gt;
+  &lt;delay xmlns='urn:xmpp:delay'
+     from='coven@macbeth.shakespeare.lit'
+     stamp='2002-09-10T23:05:37Z'/&gt;
+&lt;/message&gt;
+</pre></figure>
+<h2 id="impl">4.
+       Implementation Notes<a class="anchor-link" href="#impl"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This protocol was designed in a way that makes migration from <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0091.html">Legacy Delayed Delivery (XEP-0091)</a></span>  [<a href="#nt-idm45843361497952">1</a>] straightforward. All attributes present in the 'jabber:x:delay' namespace are present in the namespace defined herein. However, this document specifies a different format for the value of the &lt;stamp&gt; attribute (compliant with <span class="ref">XEP-0082</span>).</p>
+  <p class="" style="">Implementations that support <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0091.html">Legacy Delayed Delivery (XEP-0091)</a></span>  [<a href="#nt-idm45843361497952">1</a>] should support the protocol defined herein as soon as possible, but should continue to support the protocol defined in <span class="ref">XEP-0091</span> for backwards compatibility until the status of that specification is changed to Obsolete.</p>
+<h2 id="security">5.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Delayed delivery data can expose information about the sender's presence on the network at some time in the past. However, this introduces no new vulnerabilities, since the same information would have been available in real time.</p>
+  <p class="" style="">Absent cryptographic signing of stanzas and parts of stanzas, it is possible for delayed delivery notations to be forged. For example, the originator of a message (or the originator's server) could include a notation that makes it appear as if delivery of the message was delayed by the recipient's server. The same is true of delayed delivery notations putatively added by a Multi-User Chat room, which could be forged by the message originator, the originator's server, the recipient's server, or the server that hosts the chatroom service. Although the recipient's server SHOULD discard a delayed delivery notation whose 'from' attribute matches the server's JabberID (or return a &lt;not-acceptable/&gt; error to the originator), this policy does not guard against forging of notations putatively from other entities (such as a chatroom hosted at a different trust domain). Therefore, a recipient SHOULD NOT rely on delayed delivery notations to provide a completely accurate representation of the delivery path or timing of a stanza it has received.</p>
+<h2 id="iana">6.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm45843361434496">5</a>].</p>
+<h2 id="registrar">7.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="ns">7.1 Protocol Namespace<a class="anchor-link" href="#ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45843361426480">6</a>] includes 'urn:xmpp:delay' in its registry of protocol namespaces (see &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt;).</p>
+  </div>
+<h2 id="schema">8.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='urn:xmpp:delay'
+    xmlns='urn:xmpp:delay'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+      The protocol documented by this schema is defined in
+      XEP-0203: http://www.xmpp.org/extensions/xep-0203.html
+    &lt;/xs:documentation&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:element name='delay'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:simpleContent&gt;
+        &lt;xs:extension base='xs:string'&gt;
+          &lt;xs:attribute name='from' type='xs:string' use='optional'/&gt;
+          &lt;xs:attribute name='stamp' type='xs:dateTime' use='required'/&gt;
+        &lt;/xs:extension&gt;
+      &lt;/xs:simpleContent&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+<h2 id="ack">9.
+       Acknowledgements<a class="anchor-link" href="#ack"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Thanks to Sergei Golovan for his feedback regarding forged timestamps.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0203</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Final">Final</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>2.0</dd><dt>Last Updated</dt><dd>2009-09-15</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, <a href="xep-0082.html">XEP-0082</a></dd><dt>Supersedes</dt><dd><a href="xep-0091.html">XEP-0091</a></dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>delay</dd><dt>Schema</dt><dd>
+        &lt;<a href="http://www.xmpp.org/schemas/delay.xsd">http://www.xmpp.org/schemas/delay.xsd</a>&gt;<br></dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0203.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0203.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0203.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Peter Saint-Andre</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:stpeter@stpeter.im">stpeter@stpeter.im</a></dd><dt>JabberID</dt><dd><a href="xmpp:stpeter@jabber.org">stpeter@jabber.org</a></dd><dt>URI</dt><dd><a href="https://stpeter.im/">https://stpeter.im/</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45843361497952">1</a>. XEP-0091: Legacy Delayed Delivery &lt;<a href="https://xmpp.org/extensions/xep-0091.html">https://xmpp.org/extensions/xep-0091.html</a>&gt;.</p><p><a name="nt-idm45843361488064">2</a>. XEP-0082: XMPP Date and Time Profiles &lt;<a href="https://xmpp.org/extensions/xep-0082.html">https://xmpp.org/extensions/xep-0082.html</a>&gt;.</p><p><a name="nt-idm45843361481760">3</a>. XEP-0160: Best Practices for Handling Offline Messages &lt;<a href="https://xmpp.org/extensions/xep-0160.html">https://xmpp.org/extensions/xep-0160.html</a>&gt;.</p><p><a name="nt-idm45843361476304">4</a>. XEP-0045: Multi-User Chat &lt;<a href="https://xmpp.org/extensions/xep-0045.html">https://xmpp.org/extensions/xep-0045.html</a>&gt;.</p><p><a name="nt-idm45843361434496">5</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm45843361426480">6</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v2.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0203-2.0.html">2.0</a> (2009-09-15)<a class="anchor-link" href="#revision-history-v2.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the XMPP Council, advanced specification from Draft to Final; also addressed a security concern about forged timestamps that was provided during the Call for Experience.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0203-1.0.html">1.0</a> (2007-03-29)<a class="anchor-link" href="#revision-history-v1.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the XMPP Council, advanced from Experimental to Draft.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0203-0.3.html">0.3</a> (2007-03-28)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the XMPP Council, advanced to Draft; also removed service discovery per Council discussion.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0203-0.2.html">0.2</a> (2007-03-19)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added service discovery section.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0203-0.1.html">0.1</a> (2006-12-20)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial version.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0203-0.0.1.html">0.0.1</a> (2006-12-19)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div>First draft.<div class="revision-author">psa</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{saint-andre2006delay,
+  title = {Delayed Delivery},
+  author = {Saint-Andre, Peter},
+  type = {XEP},
+  number = {0203},
+  version = {2.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0203.html},
+  date = {2006-12-19/2009-09-15},
+}</pre><p>END</p></body></html>

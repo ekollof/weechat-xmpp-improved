@@ -1,0 +1,215 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0223: Persistent Storage of Private Data via PubSub</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0223";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Persistent Storage of Private Data via PubSub"><meta name="DC.Creator" content="Peter Saint-Andre"><meta name="DC.Description" content="This specification defines best practices for using the XMPP publish-subscribe extension to persistently store private information such as bookmarks and client configuration options."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2023-03-23"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0223"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0223: Persistent Storage of Private Data via PubSub</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification defines best practices for using the XMPP publish-subscribe extension to persistently store private information such as bookmarks and client configuration options.</dd><dt>Author</dt><dd>Peter Saint-Andre</dd><dt>Copyright</dt><dd>© 2007 – 2023 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Active</p><div id="status-notice" class="active informational">NOTICE: This Informational specification defines a best practice or protocol profile that has been approved by the XMPP Council and/or the XSF Board of Directors. Implementations are encouraged and the best practice or protocol profile is appropriate for deployment in production systems.</div></dd><dt>Type</dt><dd>Informational</dd><dt>Version</dt><dd>1.1.1 (2023-03-23)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li class="current">Active</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a><ol><li><a href="#motivation">Motivation</a></li><li><a href="#howitworks">How It Works</a></li></ol></li><li><a href="#approach">Concepts and Approach</a></li><li><a href="#store">Storing Data</a></li><li><a href="#composition">Composition</a></li><li><a href="#support">Determining Support</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="motivation">1.1 Motivation<a class="anchor-link" href="#motivation"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style=""><span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0163.html">Personal Eventing Protocol (XEP-0163)</a></span>  [<a href="#nt-idm45646425094320">1</a>] introduced the idea of a virtual <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm45646425085328">2</a>] service associated with an IM user's bare JID &lt;localpart@domain.tld&gt;. However, the default configuration of PEP nodes is not optimized for the persistent storage of data objects that are meant to be accessed only by the account owner, à la <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0049.html">Private XML Storage (XEP-0049)</a></span>  [<a href="#nt-idm45646425087632">3</a>]. Therefore this document defines a set of best practices that enable IM users to persistently store private information at their virtual pubsub service; in effect, we "sub-class" PEP by showing how a particular pubsub node can be configured for storing private data.</p>
+  </div>
+  <div class="indent"><h3 id="howitworks">1.2 How It Works<a class="anchor-link" href="#howitworks"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Imagine that you are a Shakespearean character named Juliet and that you want to persistently store some private information such as bookmarks (<span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0048.html">Bookmark Storage (XEP-0048)</a></span>  [<a href="#nt-idm45646425077520">4</a>]).</p>
+    <p class="" style="">We assume that your server (capulet.lit) supports PEP along with the "publish-options" feature, and that your client discovered that support when you logged in.</p>
+    <p class="" style="">You want to start bookmarking <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45646425072048">5</a>] rooms, so your client stores that data privately.</p>
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Storing bookmarks<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='juliet@capulet.lit/balcony' type='set' id='pdp1'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='storage:bookmarks'&gt;
+      &lt;item&gt;
+        &lt;conference xmlns='storage:bookmarks'
+                    autojoin='true'
+                    jid='theplay@conference.shakespeare.lit'
+                    name='The Play&amp;apos;s the Thing'&gt;
+          &lt;nick&gt;JC&lt;/nick&gt;
+          &lt;password&gt;Gl0b3&lt;/password&gt;
+        &lt;/conference&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+    &lt;publish-options&gt;
+      &lt;x xmlns='jabber:x:data' type='submit'&gt;
+        &lt;field var='FORM_TYPE' type='hidden'&gt;
+          &lt;value&gt;http://jabber.org/protocol/pubsub#publish-options&lt;/value&gt;
+        &lt;/field&gt;
+        &lt;field var='pubsub#persist_items'&gt;
+          &lt;value&gt;true&lt;/value&gt;
+        &lt;/field&gt;
+        &lt;field var='pubsub#access_model'&gt;
+          &lt;value&gt;whitelist&lt;/value&gt;
+        &lt;/field&gt;
+      &lt;/x&gt;
+    &lt;/publish-options&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">Your publish request is a standard pubsub request except that:</p>
+    <ol start="1" class="" style="">
+      <li class="" style="">The item is persisted (pubsub#persist_items is set to true).</li>
+      <li class="" style="">In this case, access is limited to yourself (the "whitelist" access model defaults to allowing access for the account owner, i.e., you).</li>
+    </ol>
+    <p class="" style="">If all goes well (see <a href="#publish">Storing Data</a>), your bookmarks will be stored and the information will be pushed out to all of your resources (here "balcony" and "chamber").</p>
+    <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Publisher receives event notification<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message from='juliet@capulet.lit'
+         to='juliet@capulet.lit/balcony'
+         type='headline'
+         id='bmfoo1'&gt;
+  &lt;event xmlns='http://jabber.org/protocol/pubsub#event'&gt;
+    &lt;items node='storage:bookmarks'&gt;
+      &lt;item id='SomeID'&gt;
+        &lt;conference xmlns='storage:bookmarks'
+                    autojoin='true'
+                    jid='theplay@conference.shakespeare.lit'
+                    name='The Play&amp;apos;s the Thing'&gt;
+          &lt;nick&gt;JC&lt;/nick&gt;
+          &lt;password&gt;Gl0b3&lt;/password&gt;
+        &lt;/conference&gt;
+      &lt;/item&gt;
+    &lt;/items&gt;
+  &lt;/event&gt;
+&lt;/message&gt;
+
+&lt;message from='juliet@capulet.lit'
+         to='juliet@capulet.lit/chamber'
+         type='headline'
+         id='bmfoo2'&gt;
+  &lt;event xmlns='http://jabber.org/protocol/pubsub#event'&gt;
+    &lt;items node='storage:bookmarks'&gt;
+      &lt;item id='SomeID'&gt;
+        &lt;conference xmlns='storage:bookmarks'
+                    autojoin='true'
+                    jid='theplay@conference.shakespeare.lit'
+                    name='The Play&amp;apos;s the Thing'&gt;
+          &lt;nick&gt;JC&lt;/nick&gt;
+          &lt;password&gt;Gl0b3&lt;/password&gt;
+        &lt;/conference&gt;
+      &lt;/item&gt;
+    &lt;/items&gt;
+  &lt;/event&gt;
+&lt;/message&gt;
+</pre></figure>
+    <p class="" style="">So that's the general idea.</p>
+  </div>
+<h2 id="approach">2.
+       Concepts and Approach<a class="anchor-link" href="#approach"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The best practices defined herein re-use the concepts already defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm45646425085328">2</a>] and <span class="ref">XEP-0163</span>. In order to optimize for object persistence of private information instead of transient event notifications related to semi-public data, a node MUST be configured as follows:</p>
+  <ol start="1" class="" style="">
+    <li class="" style="">Set pubsub#persist_items to true.</li>
+    <li class="" style="">Set pubsub#access_model to "whitelist".</li>
+  </ol>
+<h2 id="store">3.
+       Storing Data<a class="anchor-link" href="#store"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">An account owner publishes an item to a node by following the protocol specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm45646425085328">2</a>]:</p>
+  <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Account owner stores data<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='juliet@capulet.lit/balcony' type='set' id='pdp1'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='storage:bookmarks'&gt;
+      &lt;item&gt;
+        &lt;conference xmlns='storage:bookmarks'
+                    autojoin='true'
+                    jid='theplay@conference.shakespeare.lit'
+                    name='The Play&amp;apos;s the Thing'&gt;
+          &lt;nick&gt;JC&lt;/nick&gt;
+          &lt;password&gt;Gl0b3&lt;/password&gt;
+        &lt;/conference&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <p class="" style="">If the node does not already exist, the virtual pubsub service MUST create the node. As described in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0163.html">Personal Eventing Protocol (XEP-0163)</a></span>  [<a href="#nt-idm45646425094320">1</a>], this "auto-create" feature (defined in <span class="ref">XEP-0060</span>) MUST be supported by a PEP service. (Naturally, the account owner's client MAY follow the node creation use case specified in <span class="ref">XEP-0060</span> before attempting to publish an item.)</p>
+  <p class="" style="">In order for the client to reliably persist private information, the virtual pubsub service must also support the "publish-options" feature defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm45646425085328">2</a>]. Typically, a client will publish with options so that the object is privately stored.</p>
+    <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Storing bookmarks<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='juliet@capulet.lit/balcony' type='set' id='pdp1'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='storage:bookmarks'&gt;
+      &lt;item&gt;
+        &lt;conference xmlns='storage:bookmarks'
+                    autojoin='true'
+                    jid='theplay@conference.shakespeare.lit'
+                    name='The Play&amp;apos;s the Thing'&gt;
+          &lt;nick&gt;JC&lt;/nick&gt;
+          &lt;password&gt;Gl0b3&lt;/password&gt;
+        &lt;/conference&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+    &lt;publish-options&gt;
+      &lt;x xmlns='jabber:x:data' type='submit'&gt;
+        &lt;field var='FORM_TYPE' type='hidden'&gt;
+          &lt;value&gt;http://jabber.org/protocol/pubsub#publish-options&lt;/value&gt;
+        &lt;/field&gt;
+        &lt;field var='pubsub#persist_items'&gt;
+          &lt;value&gt;true&lt;/value&gt;
+        &lt;/field&gt;
+        &lt;field var='pubsub#access_model'&gt;
+          &lt;value&gt;whitelist&lt;/value&gt;
+        &lt;/field&gt;
+      &lt;/x&gt;
+    &lt;/publish-options&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <p class="" style="">If the publication logic dictates that event notifications shall be sent, the account owner's server generates notifications and sends them to all appropriate entities as described in the Receiving Event Notifications section of <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0163.html">Personal Eventing Protocol (XEP-0163)</a></span>  [<a href="#nt-idm45646425094320">1</a>].</p>
+<h2 id="composition">4.
+       Composition<a class="anchor-link" href="#composition"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Each item published to the node is a logically separate instance of the data to be stored. It is the responsibility of the publishing and receiving entities to construct a complete view of all such items, if desired. For example, each bookmark published to a private data node is a separate piece of data, whereas the history of all items published to the node provides a complete list of the user's bookmarks. This history may include items that are republished with an existing ItemID (thus overwriting the previous version of that item).</p>
+<h2 id="support">5.
+       Determining Support<a class="anchor-link" href="#support"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Before an account owner attempts to complete any of the use cases defined herein, its client MUST verify that the account owner's server supports both PEP and the "publish-options" feature; to do so, it MUST send a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45646425025056">6</a>] information request to the server (or cache <span class="ref">Entity Capabilities</span> information received from the server).</p>
+  <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> Account owner queries server regarding protocol support<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='juliet@capulet.lit/balcony'
+    to='capulet.lit'
+    id='disco1'
+    type='get'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">The server MUST return an identity of "pubsub/pep" and include the "publish-options" feauture in the list of the namespaces and other features it supports:</p>
+    <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> Server communicates protocol support<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='capulet.lit'
+    to='juliet@capulet.lit/balcony'
+    id='disco1'
+    type='result'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+    &lt;identity category='server' type='im'/&gt;
+    &lt;identity category='pubsub' type='pep'/&gt;
+    ...
+    &lt;feature var='http://jabber.org/protocol/pubsub#publish-options'/&gt;
+    ...
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+<h2 id="security">6.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Since private data is to be stored in a mechanism originally intended to <em>publish</em> data, it is REQUIRED for entities to ensure that the restrictive &lt;publish-options/&gt; will actually be honored by the server by performing the feature discovery procedure as specified in <a href="#support">Determining Support</a>. If an entity using that procedure finds that the server does not support &lt;publish-options/&gt;, it MUST NOT store private data in PubSub, unless it can ensure privacy of the data with other means.</p>
+  <p class="" style="">The configuration of a local pubsub node does not prevent an attacker or a contact with a misconfigured node from sending pubsub events with the same payload. Therefore clients MUST verify that the ‘from’ attribute on incoming event messages is either absent or equal to their own account JID.</p>
+  <p class="" style="">The Security Considerations specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm45646425085328">2</a>] and <span class="ref">XEP-0163</span> need to be taken into account.</p>
+<h2 id="iana">7.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm45646425005120">7</a>].</p>
+<h2 id="registrar">8.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45646424998768">8</a>].</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0223</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Active">Active</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Informational">Informational</a></dd><dt>Version</dt><dd>1.1.1</dd><dt>Last Updated</dt><dd>2023-03-23</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, XMPP IM, <a href="xep-0030.html">XEP-0030</a>, <a href="xep-0060.html">XEP-0060</a>, <a href="xep-0115.html">XEP-0115</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>N/A</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0223.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0223.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0223.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Peter Saint-Andre</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:stpeter@stpeter.im">stpeter@stpeter.im</a></dd><dt>JabberID</dt><dd><a href="xmpp:stpeter@jabber.org">stpeter@jabber.org</a></dd><dt>URI</dt><dd><a href="https://stpeter.im/">https://stpeter.im/</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45646425094320">1</a>. XEP-0163: Personal Eventing Protocol &lt;<a href="https://xmpp.org/extensions/xep-0163.html">https://xmpp.org/extensions/xep-0163.html</a>&gt;.</p><p><a name="nt-idm45646425085328">2</a>. XEP-0060: Publish-Subscribe &lt;<a href="https://xmpp.org/extensions/xep-0060.html">https://xmpp.org/extensions/xep-0060.html</a>&gt;.</p><p><a name="nt-idm45646425087632">3</a>. XEP-0049: Private XML Storage &lt;<a href="https://xmpp.org/extensions/xep-0049.html">https://xmpp.org/extensions/xep-0049.html</a>&gt;.</p><p><a name="nt-idm45646425077520">4</a>. XEP-0048: Bookmark Storage &lt;<a href="https://xmpp.org/extensions/xep-0048.html">https://xmpp.org/extensions/xep-0048.html</a>&gt;.</p><p><a name="nt-idm45646425072048">5</a>. XEP-0045: Multi-User Chat &lt;<a href="https://xmpp.org/extensions/xep-0045.html">https://xmpp.org/extensions/xep-0045.html</a>&gt;.</p><p><a name="nt-idm45646425025056">6</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm45646425005120">7</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm45646424998768">8</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v1.1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0223-1.1.1.html">1.1.1</a> (2023-03-23)<a class="anchor-link" href="#revision-history-v1.1.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Add notes about checking event origin (in reaction to CVE-2023-28686).</p><div class="revision-author">ka</div></li><li id="revision-history-v1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0223-1.1.html">1.1</a> (2018-03-28)<a class="anchor-link" href="#revision-history-v1.1"><abbr title="Link to this point in the document">¶</abbr></a></div>Make discovery of support mandatory, add security considerations (in reaction to CVE-2018-6591).<div class="revision-author">jwi</div></li><li id="revision-history-v1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0223-1.0.html">1.0</a> (2008-09-08)<a class="anchor-link" href="#revision-history-v1.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the XMPP Council, advanced specification to Active.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0223-0.3.html">0.3</a> (2008-06-20)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added text about composition model, and modified examples accordingly.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0223-0.2.html">0.2</a> (2008-03-03)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Removed hokey acronym; changed type to Informational; clarified text.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0223-0.1.html">0.1</a> (2007-08-08)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial published version.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0223-0.0.1.html">0.0.1</a> (2007-07-18)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">psa</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{saint-andre2007n/a,
+  title = {Persistent Storage of Private Data via PubSub},
+  author = {Saint-Andre, Peter},
+  type = {XEP},
+  number = {0223},
+  version = {1.1.1},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0223.html},
+  date = {2007-07-18/2023-03-23},
+}</pre><p>END</p></body></html>

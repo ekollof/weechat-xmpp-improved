@@ -1,0 +1,138 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0428: Fallback Indication</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0428";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Fallback Indication"><meta name="DC.Creator" content="Dave Cridland"><meta name="DC.Creator" content="Marvin Wißfeld"><meta name="DC.Description" content="This specification proposes a mechanism by which message bodies or parts thereof can be marked as being for fallback
+    purposes, and therefore to be ignored by anything that understands the original intent of the message."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2024-03-20"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0428"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0428: Fallback Indication</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification proposes a mechanism by which message bodies or parts thereof can be marked as being for fallback
+    purposes, and therefore to be ignored by anything that understands the original intent of the message.</dd><dt>Authors</dt><dd><ul class="authors"><li>Dave Cridland</li><li>Marvin Wißfeld</li></ul></dd><dt>Copyright</dt><dd>© 2019 – 2024 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Experimental</p><div id="status-notice" class="experimental standards track">WARNING: This Standards-Track document is Experimental. Publication as an XMPP Extension Protocol does not imply approval of this proposal by the XMPP Standards Foundation. Implementation of the protocol described herein is encouraged in exploratory implementations, but production systems are advised to carefully consider whether it is appropriate to deploy implementations of this protocol before it advances to a status of Draft.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.2.1 (2024-03-20)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li class="current">Experimental</li><li>Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#overview">Overview</a><ol><li><a href="#feature">Discovering Support</a></li><li><a href="#sect-idm45492605717248">Fallback Indicator</a></li><li><a href="#sect-idm45492605696096">Alternatives</a></li></ol></li><li><a href="#sect-idm45492605686880">Schema</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a></li><li><a href="#ack">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">A common and convenient practise for new extensions is to supply a fallback in the body. This provides immediate backwards
+    compatibility for naive clients, since - not understanding the new protocol - they will gracefully degrade to displaying
+    the body as an instant message.</p>
+  <p class="" style="">By way of example, a recent Reactions proposal suggested including the emoji as a <code>&lt;body/&gt;</code> element, so
+    that existing clients would simply display it as a normal message.</p>
+  <p class="" style="">The downside of this approach is that servers and other intermediaries treat the presence of a <code>&lt;body/&gt;</code>
+    as being an indicator that a message is indeed an instant message. They may errornously treat a message this way 
+    for archival purposes, etc, that only has a <code>&lt;body/&gt;</code> for fallback purposes, which might not be appropriate.</p>
+  <p class="" style="">This specification tackles the problem by providing an element to be used as a hint that parts or all of the supplied
+    <code>&lt;body/&gt;</code> and <code>&lt;subject/&gt;</code> elements are for fallback purposes, and the message may be treated as 
+    if they were not present if the processing entity understands what the message is a fallback for.</p>
+  <p class="" style="">Additionally, the specification allows for transporting information about which parts of a <code>&lt;body/&gt;</code> are used
+    for fallback purposes and for which reason, such that supporting clients can hide or dim those parts when displaying them
+    to the user or otherwise treat those parts special as intended or encouraged by other specifications.</p>
+<h2 id="overview">2.
+       Overview<a class="anchor-link" href="#overview"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="feature">2.1 Discovering Support<a class="anchor-link" href="#feature"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Support for this protocol MAY be advertised by the Service Discovery protocol defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45492605719968">1</a>] using a feature
+      of <code>urn:xmpp:fallback:0</code>. Note that lack of support will result in the desired fallback behaviour.</p>
+  </div>
+  <div class="indent"><h3 id="sect-idm45492605717248">2.2 Fallback Indicator<a class="anchor-link" href="#sect-idm45492605717248"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The fallback indicator is an element <code>&lt;fallback/&gt;</code> qualified by the <code>urn:xmpp:fallback:0</code> namespace. It has an attribute
+      <code>for</code> that indicates the specification that the fallback is meant to replace. This is typically the primary namespace
+      of the respective specification, but may be specified otherwise. The <code>&lt;fallback/&gt;</code> element may have one or multiple
+      <code>&lt;body/&gt;</code> or <code>&lt;subject/&gt;</code> child elements, that indicate the part of the message, that is a fallback. Both
+      of these child elements may have a <code>start</code> and <code>end</code> attribute which point to the start and end of a fallback 
+      character sequence as defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0426.html">Character counting in message bodies (XEP-0426)</a></span>  [<a href="#nt-idm45492605708976">2</a>] in the respective element in the message. If <code>start</code> and <code>end</code> 
+      attribute are not supplied, the whole respective message element should be assumed to be there for fallback purposes. If
+      the <code>&lt;fallback/&gt;</code> element does not have any childs, it is assumed to apply to every message <code>&lt;body/&gt;</code> and
+      <code>&lt;subject/&gt;</code> present in the message.</p>
+    <p class="box" style="">A previous version of this specification had an example using an encrypted message. It is suggested to use <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0380.html">Explicit Message Encryption (XEP-0380)</a></span>  [<a href="#nt-idm45492605701488">3</a>] 
+      instead of this specification for that usecase.</p>
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> <a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='anna@example.com' id='message-id2' type='groupchat'&gt;
+  &lt;body&gt;
+    &gt; Anna wrote:
+    &gt; Hi, how are you?
+    Great
+  &lt;/body&gt;
+  &lt;reply to='anna@example.com' id='message-id1' xmlns='urn:xmpp:reply:0' /&gt;
+  &lt;fallback xmlns='urn:xmpp:fallback:0' for='urn:xmpp:reply:0'&gt;
+    &lt;body start='0' end='33' /&gt;
+  &lt;/fallback&gt;
+&lt;/message&gt;
+</pre></figure>
+    <p class="" style="">Receiving the above message, a naive client will naturally display the full <code>&lt;body/&gt;</code> element text, but
+      a client which supports this specification and the specification for <code>urn:xmpp:reply:0</code> will know that a part of the
+      message is merely a fallback placeholder, and to ignore (and not display) that part, if it has other ways to convey the
+      intended meaning.</p>
+  </div>
+  <div class="indent"><h3 id="sect-idm45492605696096">2.3 Alternatives<a class="anchor-link" href="#sect-idm45492605696096"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <ul class="" style="">
+      <li class="" style=""><span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0334.html">Message Processing Hints (XEP-0334)</a></span>  [<a href="#nt-idm45492605690688">4</a>] was considered to inform intermediaries, and would probably be ideal - servers often examine these elements
+        and alter behaviour accordingly, but the specification was rejected by Council.</li>
+      <li class="" style="">Placing fallback elements within the <code>&lt;fallback/&gt;</code> element would shift the onus from server to
+        client, but this is likely to be less useful.</li>
+    </ul>
+  </div>
+<h2 id="sect-idm45492605686880">3.
+       Schema<a class="anchor-link" href="#sect-idm45492605686880"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+      
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" targetNamespace="urn:xmpp:fallback:0" xmlns="urn:xmpp:fallback:0" xmlns:xs="http://www.w3.org/2001/XMLSchema"&gt;
+  &lt;xs:element name="fallback"&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:sequence&gt;
+        &lt;xs:element name="subject" type="region" minOccurs="0" maxOccurs="unbounded" /&gt;
+        &lt;xs:element name="body" type="region" minOccurs="0" maxOccurs="unbounded" /&gt;
+      &lt;/xs:sequence&gt;
+      &lt;xs:attribute name="for" type="xs:string" /&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+  &lt;xs:complexType name="region"&gt;
+    &lt;xs:attribute name="start" type="xs:unsignedInt" /&gt;
+    &lt;xs:attribute name="end" type="xs:unsignedInt" /&gt;
+  &lt;/xs:complexType&gt;
+&lt;/xs:schema&gt;
+      
+    </pre></figure>
+  <h2 id="security">4.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This specification allows messages with a body (and real message content therein) to be treated by a server as
+  if that body text does not exist. Servers MAY, particularly in a secure setting, wish to archive copies of the message
+  even if they ordinarily would not archive a message with no body.</p>
+<h2 id="iana">5.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This XEP requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm45492605677424">5</a>]. </p>
+<h2 id="registrar">6.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">None.</p>
+<h2 id="ack">7.
+       Acknowledgements<a class="anchor-link" href="#ack"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The author wishes to share any credit with many members of the community.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0428</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Experimental">Experimental</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.2.1</dd><dt>Last Updated</dt><dd>2024-03-20</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core</dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>fallback</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0428.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0428.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0428.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Dave Cridland</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:dave@hellopando.com">dave@hellopando.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:dwd@dave.cridland.net">dwd@dave.cridland.net</a></dd></dl><h5>Marvin Wißfeld</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:xmpp@larma.de">xmpp@larma.de</a></dd><dt>JabberID</dt><dd><a href="xmpp:jabber@larma.de">jabber@larma.de</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45492605719968">1</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm45492605708976">2</a>. XEP-0426: Character counting in message bodies &lt;<a href="https://xmpp.org/extensions/xep-0426.html">https://xmpp.org/extensions/xep-0426.html</a>&gt;.</p><p><a name="nt-idm45492605701488">3</a>. XEP-0380: Explicit Message Encryption &lt;<a href="https://xmpp.org/extensions/xep-0380.html">https://xmpp.org/extensions/xep-0380.html</a>&gt;.</p><p><a name="nt-idm45492605690688">4</a>. XEP-0334: Message Processing Hints &lt;<a href="https://xmpp.org/extensions/xep-0334.html">https://xmpp.org/extensions/xep-0334.html</a>&gt;.</p><p><a name="nt-idm45492605677424">5</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.2.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0428-0.2.1.html">0.2.1</a> (2024-03-20)<a class="anchor-link" href="#revision-history-v0.2.1"><abbr title="Link to this point in the document">¶</abbr></a></div>Change integer type of region start and end attributes in schema to xs:unsignedInt.<div class="revision-author">lnj</div></li><li id="revision-history-v0.2.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0428-0.2.0.html">0.2.0</a> (2022-07-17)<a class="anchor-link" href="#revision-history-v0.2.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <ul class="" style="">
+        <li class="" style="">Add 'for' attribute such that entities can discover what the fallback is for.</li>
+        <li class="" style="">Allow to specify that only one of &lt;subject/&gt; or &lt;body/&gt; is meant as a fallback.</li>
+        <li class="" style="">Allow to specify the part of respective text that is meant as fallback where applicable.</li>
+        <li class="" style="">Don't use encryption example, which should use XEP-0380 instead.</li>
+      </ul>
+    <div class="revision-author">lmw</div></li><li id="revision-history-v0.1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0428-0.1.1.html">0.1.1</a> (2020-03-03)<a class="anchor-link" href="#revision-history-v0.1.1"><abbr title="Link to this point in the document">¶</abbr></a></div>Minor editorial fixes<div class="revision-author">ps</div></li><li id="revision-history-v0.1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0428-0.1.0.html">0.1.0</a> (2020-01-28)<a class="anchor-link" href="#revision-history-v0.1.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Accepted by vote of Council on 2020-01-02.<div class="revision-author">XEP Editor (jsc)</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0428-0.0.1.html">0.0.1</a> (2019-12-30)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <ul class="" style="">
+        <li class="" style="">Initial Revision</li>
+      </ul>
+    <div class="revision-author">dwd</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{cridland2019fallback,
+  title = {Fallback Indication},
+  author = {Cridland, Dave and Wißfeld, Marvin},
+  type = {XEP},
+  number = {0428},
+  version = {0.2.1},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0428.html},
+  date = {2019-12-30/2024-03-20},
+}</pre><p>END</p></body></html>

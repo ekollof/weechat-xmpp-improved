@@ -1,0 +1,414 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0283: Moved</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0283";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Moved"><meta name="DC.Creator" content="Matthew Wild"><meta name="DC.Description" content="This document defines an XMPP protocol extension that enables a user to inform its contacts about a change in JID."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2021-07-20"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0283"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0283: Moved</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This document defines an XMPP protocol extension that enables a user to inform its contacts about a change in JID.</dd><dt>Author</dt><dd>Matthew Wild</dd><dt>Copyright</dt><dd>© 2010 – 2021 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Experimental</p><div id="status-notice" class="experimental standards track">WARNING: This Standards-Track document is Experimental. Publication as an XMPP Extension Protocol does not imply approval of this proposal by the XMPP Standards Foundation. Implementation of the protocol described herein is encouraged in exploratory implementations, but production systems are advised to carefully consider whether it is appropriate to deploy implementations of this protocol before it advances to a status of Draft.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.2.0 (2021-07-20)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li class="current">Experimental</li><li>Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#reqs">Requirements</a></li><li><a href="#glossary">Glossary</a></li><li><a href="#usecases">Use Cases</a><ol><li><a href="#publish-statement">User publishes moved statement</a></li><li><a href="#publish-notification">User notifies contacts of move</a></li><li><a href="#receive-notification-client">Contact receives subscription request with moved notification</a></li><li><a href="#receive-notification-server">Server-side processing of inbound moved notification</a></li></ol></li><li><a href="#impl">Implementation Notes</a><ol><li><a href="#impl-lifetime">Lifetime of moved statement</a></li><li><a href="#impl-alt-verify">Alternative verification methods</a></li></ol></li><li><a href="#security">Security Considerations</a><ol><li><a href="#security-user">User considerations</a></li><li><a href="#security-contact">Contact considerations</a></li></ol></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a></li><li><a href="#design">Design Considerations</a><ol><li><a href="#design-verification">Verification methods</a></li></ol></li><li><a href="#schema">XML Schema</a></li><li><a href="#ack">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">There are a variety of reasons why a user may wish to change
+  their JID. For example, a surname change because of marriage or simply
+  an easier JID to remember. Another common reason is that the provider goes
+  out of service (with a notice).</p>
+
+  <p class="" style="">This XEP defines an approach for communicating that your JID has
+  moved to a new JID, extending the existing subscription protocol documented
+  in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6121">XMPP IM</a></span>  [<a href="#nt-idm46062928936544">1</a>]. The steps outlined here may be done either through a client
+  or automated by a server.</p>
+<h2 id="reqs">2.
+       Requirements<a class="anchor-link" href="#reqs"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document aims to satisfy the following requirements:</p>
+  <ul class="" style="">
+    <li class="" style="">Users should be able to notify their contacts of a change of address.</li>
+    <li class="" style="">Contacts should be able to verify that such a notification is legitimate, to prevent malicious actors from spoofing notifications.</li>
+    <li class="" style="">It should be possible for a contact's server to automatically update the contact's roster for seamless migrations.</li>
+    <li class="" style="">In the absence of a contact's support for this protocol, it should fall back to a simple manual subscription approval.</li>
+  </ul>
+<h2 id="glossary">3.
+       Glossary<a class="anchor-link" href="#glossary"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><dl>
+    
+      <dt><strong>Moved notification</strong></dt>
+      <dd>An XML &lt;moved/&gt; element sent to a contact to inform them that
+          the user is moving to a new address.
+      </dd>
+    
+    
+      <dt><strong>Moved statement</strong></dt>
+      <dd>An XML &lt;moved/&gt; element published by the user on their old
+          account. It is used by contacts to verify that moved notifications
+          are genuine.
+      </dd>
+    
+  </dl></div>
+<h2 id="usecases">4.
+       Use Cases<a class="anchor-link" href="#usecases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">We start with the situation where the user, let's call them Juliet, has two accounts -
+     her original account <code>juliet@im.example.net</code> and a shiny new account on her personal
+     domain, <code>juliet@capulet.example</code>.</p>
+  <p class="" style="">Juliet would like to migrate all her data and contacts to her new account, with minimal
+     disruption.</p>
+  <div class="indent"><h3 id="publish-statement">4.1 User publishes moved statement<a class="anchor-link" href="#publish-statement"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Before notifying contacts of the move, Juliet must connect to her old
+       account and publish a "statement" that the account is no longer in
+       use. This statement includes the address of her new account.
+    </p>
+    <p class="" style="">The statement should be posted to a PEP node with the name 'urn:xmpp:moved:1'. The
+       payload should be a &lt;moved/&gt; element in the 'urn:xmpp:moved:1' namespace. This
+       element should in turn contain a single &lt;new-jid/&gt; element with the user's new JID
+       as its text content.</p>
+
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Juliet's client publishes a moved statement on her old account<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='juliet@im.example.net/VR0sAGae'
+    type='set'
+    id='pub1'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:moved:1'&gt;
+      &lt;item id='current'&gt;
+        &lt;moved xmlns='urn:xmpp:moved:1'&gt;
+          &lt;new-jid&gt;juliet@capulet.example&lt;/new-jid&gt;
+        &lt;/moved&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="publish-notification">4.2 User notifies contacts of move<a class="anchor-link" href="#publish-notification"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">After publishing a moved statement on her old account, Juliet proceeds
+       to notify her contacts about the move.</p>
+
+    <p class="" style="">Juliet connects to her new account, and sends a subscription request to
+       each of her contacts. These subscription requests MUST contain a &lt;moved/&gt;
+       element in the 'urn:xmpp:moved:1' namespace. This element contains a single
+       &lt;old-jid/&gt; element with the old JID as its text content.&gt;</p>
+
+    <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Juliet sends a subscription request to Romeo from her new account<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;presence type='subscribe' to='romeo@montague.example' id='sub1'&gt;
+  &lt;moved xmlns='urn:xmpp:moved:1'&gt;
+    &lt;old-jid&gt;juliet@im.example.net&lt;/old-jid&gt;
+  &lt;/moved&gt;
+&lt;/presence&gt;
+</pre></figure>
+  </div>
+
+  <div class="indent"><h3 id="receive-notification-client">4.3 Contact receives subscription request with moved notification<a class="anchor-link" href="#receive-notification-client"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Juliet's contact, Romeo, receives the subscription request from Juliet's
+       new JID. At this point Romeo has not verified that the new account
+       actually belongs to Juliet, and MUST perform such verification before
+       acting on the request any differently to usual.</p>
+
+    <p class="" style="">If the value of &lt;old-jid/&gt; is not in the roster with an approved
+       incoming subscription ('from' or 'both'), the &lt;moved/&gt; element
+       MUST be ignored entirely.</p>
+
+    <p class="" style="">To verify the request, Romeo makes a request to the JID specified in
+       &lt;old-jid/&gt; (which MUST be a bare JID) to fetch a published move
+       statement.</p>
+
+    <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Romeo requests a moved statement from Juliet's old account<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get'
+    from='romeo@capulet.example/laptop'
+    to='juliet@im.example.net'
+    id='83hKgF'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;items node='urn:xmpp:moved:1'&gt;
+      &lt;item id='current'/&gt;
+    &lt;/items&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+    <p class="" style="">On success, Juliet's server will return the moved statement that Juliet published.</p>
+
+    <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Juliet's old server returns the published moved statement to Romeo<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result'
+    from='juliet@im.example.net'
+    to='romeo@capulet.example/laptop'
+    id='83hKgF'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;items node='urn:xmpp:moved:1'&gt;
+      &lt;item id='current'&gt;
+        &lt;moved xmlns='urn:xmpp:moved:1'&gt;
+          &lt;new-jid&gt;juliet@capulet.example&lt;/new-jid&gt;
+        &lt;/moved&gt;
+      &lt;/item&gt;
+    &lt;/items&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+    <p class="" style="">Romeo MUST now verify that the received subscription request was from
+       the same bare JID contained in the &lt;new-jid/&gt; element in the moved
+       statement. If the JIDs do not match, or if there was an error fetching
+       the moved statement (except for "gone" - see note below), the
+       &lt;moved/&gt; element in the incoming subscription request MUST be
+       ignored entirely.</p>
+
+    <p class="box" style="">
+      <strong>Note:</strong> As a special case, if the attempt to retrieve the
+      moved statement results in an error with the &lt;gone/&gt; condition as
+      defined in RFC 6120, and that &lt;gone/&gt; element contains a valid
+      XMPP URI (e.g. <code>xmpp:user@example.com</code>), then the error response
+      MUST be handled equivalent to a &lt;moved/&gt; statement containing a
+      &lt;new-jid/&gt; element with the JID provided in the URI (e.g.
+      <code>user@example.com</code>).
+    </p>
+
+
+    <p class="" style="">Upon successful verification, Romeo's client may present an appropriate
+       user interface, informing about Juliet's change of address, and a prompt
+       to accept the subscription request from the new address. On the user's
+       approval of such a subscription request, the client will typically want
+       to also send a subscription request to the contact's new JID to establish
+       a mutual subscription.</p>
+
+    <p class="" style="">Due to the potential for races between multiple clients connected to
+       the same account, it is NOT RECOMMENDED for a client to automatically
+       act upon migration notifications, but instead await manual interaction
+       from the user. As with any inbound subscription request it SHOULD pay
+       attention to roster pushes related to the contact, and update the UI
+       appropriately if the new contact address is authorized from another
+       device.</p>
+  </div>
+
+  <div class="indent"><h3 id="receive-notification-server">4.4 Server-side processing of inbound moved notification<a class="anchor-link" href="#receive-notification-server"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">It is not required for Romeo's server to support this specification.
+       However if Romeo's server does understand this extension, it SHOULD
+       handle the inbound subscription request on behalf of Romeo's clients.
+       This improves the user experience for Romeo, especially when he has
+       multiple devices.</p>
+
+    <p class="" style="">Broadly the server should follow exactly the same process as a client
+       would. Specifically:
+    </p>
+    <ol start="" class="" style="">
+       <li class="" style="">Receive subscription request with 'moved' payload.</li>
+       <li class="" style="">Verify that the old JID has an approved subscription to the user (i.e. a subscription of 'both' or 'from').</li>
+       <li class="" style="">Request moved statement from the old account JID.</li>
+       <li class="" style="">Verify that the new JID in the moved statement matches the 'from' of the subscription request.</li>
+    </ol>
+
+    <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> Romeo's server requests a moved statement from Juliet's old account<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get'
+    from='romeo@capulet.example'
+    to='juliet@im.example.net'
+    id='83hKgF'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;items node='urn:xmpp:moved:1'&gt;
+      &lt;item id='current'/&gt;
+    &lt;/items&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+    <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> Juliet's old server returns the published moved statement to Romeo's server<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result'
+    from='juliet@im.example.net'
+    to='romeo@capulet.example/laptop'
+    id='83hKgF'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;items node='urn:xmpp:moved:1'&gt;
+      &lt;item id='current'&gt;
+        &lt;moved xmlns='urn:xmpp:moved:1'&gt;
+          &lt;new-jid&gt;juliet@capulet.example&lt;/new-jid&gt;
+        &lt;/moved&gt;
+      &lt;/item&gt;
+    &lt;/items&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+    <p class="" style="">If verification fails (e.g. due to a missing or incorrect moved
+       statement), the server MUST ignore the &lt;moved/&gt; element in the
+       subscription request, and process the stanza as a normal subscription
+       request. It MUST NOT strip the &lt;moved/&gt; element before forwarding,
+       even if verification fails.</p>
+
+    <p class="" style="">Upon successful verification, the server MUST NOT forward the stanza to
+       Romeo's clients, but instead MUST create a roster entry for the new JID
+       with a subscription of 'from' (sending out the appropriate roster push),
+       and then auto-reply to the subscription request with a presence of type
+       'subscribed'.</p>
+
+    <figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> Romeo's server notifies Romeo about the new roster entry<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq id='a78b4q6ha463'
+    to='romeo@montague.example/orchard'
+    type='set'&gt;
+  &lt;query xmlns='jabber:iq:roster'&gt;
+    &lt;item jid='juliet@capulet.example'
+          subscription='from'/&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+    <p class="" style="">After authorizing the new JID, the server should revoke the presence
+       subscription of the old account.</p>
+
+    <figure class="code-example" id="example-8"><figcaption><strong>Example 8.</strong> Romeo's server notifies Juliet's old account about unsubscription<a class="anchor-link" href="#example-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;presence to='juliet@im.example.net' type='unsubscribed'/&gt;
+</pre></figure>
+
+    <figure class="code-example" id="example-9"><figcaption><strong>Example 9.</strong> Romeo's server notifies Romeo's clients about the old roster entry<a class="anchor-link" href="#example-9"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq id='a78b4q6ha463'
+    to='romeo@montague.example/orchard'
+    type='set'&gt;
+  &lt;query xmlns='jabber:iq:roster'&gt;
+    &lt;item jid='juliet@im.example.net'
+          subscription='to'/&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+    <p class="" style="">Finally, if the old JID was in the user's roster with a subscription of 'both', the
+       server MUST also send a presence of type 'subscribe' to the new JID in
+       order to seek establishment of a mutual subscription.</p>
+
+    <figure class="code-example" id="example-10"><figcaption><strong>Example 10.</strong> Romeo's server sends subscription request to Juliet's new JID<a class="anchor-link" href="#example-10"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;presence type='subscribe' id='uc51xs63' from='romeo@montague.example' to='juliet@capulet.example'/&gt;
+</pre></figure>
+
+  </div>
+
+<h2 id="impl">5.
+       Implementation Notes<a class="anchor-link" href="#impl"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="impl-lifetime">5.1 Lifetime of moved statement<a class="anchor-link" href="#impl-lifetime"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The moved statement is required for contacts to automatically verify
+       the authenticity of moved notifications. After publishing a moved
+       statement, the user should keep the statement published and the account
+       active for long enough for contacts to switch to the user's new account.</p>
+    <p class="" style="">It is not necessary to remain connected to the old account during the
+       transition period. However the account must not be deleted, and the
+       server must be available.</p>
+    <p class="" style="">In the event that the move statement is unpublished, the account is deleted,
+       or the server becomes unavailable, any contacts that have not yet transitioned
+       to the user's new JID will be unable to verify the migration. Those contacts
+       will have to manually approve the subscription from the user's new address.</p>
+    <p class="" style="">Migration progress of contacts is obervable through subscription revocations to
+       the old account, and subscription approvals to the new account.</p>
+  </div>
+  <div class="indent"><h3 id="impl-alt-verify">5.2 Alternative verification methods<a class="anchor-link" href="#impl-alt-verify"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Future revisions of this document, or alternative documents, may define
+       alternative verification methods. Such methods SHOULD be communicated via
+       child elements of &lt;moved/&gt; in an appropriate namespace. As is usual
+       throughout XMPP, entities MUST ignore unknown child elements of
+       &lt;moved/&gt; in unrecognised namespaces.</p>
+  </div>
+<h2 id="security">6.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="security-user">6.1 User considerations<a class="anchor-link" href="#security-user"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The following are considerations for the user (exemplified by Juliet in this document):</p>
+    <ul class="" style="">
+      <li class="" style="">A malicious client or other entity with access to the user's account
+          can perform a migration, potentially against the user's will and/or
+          without their knowledge. Although this is a concern, any malicious
+          actor with access to a user's account can abuse that access in many
+          ways. Servers that support granting restricted access to accounts
+          should consider blocking attempts to publish to the
+          'urn:xmpp:moved:1' PEP node from restricted entities.</li>
+      <li class="" style="">To avoid leaking the user's new JID to non-contacts, the PEP node
+          containing the moved statement SHOULD be configured to use the
+          "presence" access model (this is the default access model defined
+          by PEP).</li>
+    </ul>
+  </div>
+  <div class="indent"><h3 id="security-contact">6.2 Contact considerations<a class="anchor-link" href="#security-contact"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The following are considerations for the contact (exemplified by Romeo in this document), and the contact's server:</p>
+    <ul class="" style="">
+      <li class="" style="">A presence subscription with a &lt;moved/&gt; is trivial for a
+          malicious third-party to spoof. The verification methods discussed
+          in this document MUST be followed to prevent accepting rogue
+          subscription requests.</li>
+      <li class="" style="">It is important to verify that the original JID of the migrating
+          user was already authorized to view presence before processing a
+          migration.</li>
+      <li class="" style="">After successfully processing a migration, the original account
+          should have its presence subscription revoked. This ensures that
+          each JID may only be migrated once. Without this precaution the
+          migration mechanism can be abused to introduce unlimited arbitrary
+          JIDs to contacts' rosters. This precaution also ensures, if the
+          old account ends up owned by a new entity, that they will not
+          unexpectedly inherit a presence subscription.</li>
+    </ul>
+  </div>
+<h2 id="iana">7.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm46062928844880">2</a>].</p>
+<h2 id="registrar">8.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This specification defines the following XML namespace:</p>
+  <ul class="" style="">
+    <li class="" style="">urn:xmpp:moved:1</li>
+  </ul>
+<h2 id="design">9.
+       Design Considerations<a class="anchor-link" href="#design"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="design-verification">9.1 Verification methods<a class="anchor-link" href="#design-verification"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">There are two general approaches for verification - network-based
+       verification, or cryptographic verification. Network-based verification
+       (as described in this document) requests a verification statement from
+       the user's old account. Cryptographic verification would check a move
+       notification against a previously-established cryptographic identify of
+       the user.</p>
+    <p class="" style="">Network-based verification:</p>
+    <ul class="" style="">
+      <li class="" style="">Pro: Simple and easy to implement</li>
+      <li class="" style="">Con: depends on the original server being available and supporting PEP</li>
+    </ul>
+    <p class="" style="">Cryptographic verification:</p>
+    <ul class="" style="">
+      <li class="" style="">Pro: Can work even if the original server goes offline or begins blocking
+          migration attempts.</li>
+      <li class="" style="">Con: More complex implementation.</li>
+      <li class="" style="">Con: Requires user and contacts to manage/track cryptographic keys and
+          identies. It may be possible to piggyback on top of an existing cryptographic
+          layer, e.g. OMEMO. However this would eliminate the server-side assistance,
+          and OMEMO support is not universal among clients.</li>
+    </ul>
+
+    <p class="" style="">Ultimately this document defines a network-based verification method, but
+       leaves an obvious path to extend the protocol with alternative verification
+       methods (either in an update to this document, or defined by other
+       documents).</p>
+  </div>
+<h2 id="schema">10.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+        <p class="" style="">To be done upon advancement to Draft.</p>
+<h2 id="ack">11.
+       Acknowledgements<a class="anchor-link" href="#ack"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document was formerly driven by Tory Patnoe with the support and feedback provided by Doug Abbink, Mikhail Belov, Peter Saint-Andre, and Peter Sheu.</p>
+  <p class="" style="">It has since been taken over by the current author who thanks Kim Alvefur, Maxime Buquet and Jonas Schäfer for their input and feedback on this specification.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0283</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Experimental">Experimental</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.2.0</dd><dt>Last Updated</dt><dd>2021-07-20</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core</dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>moved</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0283.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0283.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0283.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Matthew Wild</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:mwild1@gmail.com">mwild1@gmail.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:me@matthewwild.co.uk">me@matthewwild.co.uk</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm46062928936544">1</a>. RFC 6121: Extensible Messaging and Presence Protocol (XMPP): Instant Messaging and Presence &lt;<a href="http://tools.ietf.org/html/rfc6121">http://tools.ietf.org/html/rfc6121</a>&gt;.</p><p><a name="nt-idm46062928844880">2</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.2.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0283-0.2.0.html">0.2.0</a> (2021-07-20)<a class="anchor-link" href="#revision-history-v0.2.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Re-write the flow with a more focused approach.</p><div class="revision-author">mw</div></li><li id="revision-history-v0.1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0283-0.1.1.html">0.1.1</a> (2018-08-06)<a class="anchor-link" href="#revision-history-v0.1.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Fix trivial typo</p><div class="revision-author">pep</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0283-0.1.html">0.1</a> (2010-06-16)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial published version.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.7"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0283-0.0.7.html">0.0.7</a> (2010-06-09)<a class="anchor-link" href="#revision-history-v0.0.7"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Modified syntax to use 'old' and 'new' attributes.</p>
+    <div class="revision-author">tp</div></li><li id="revision-history-v0.0.6"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0283-0.0.6.html">0.0.6</a> (2010-06-07)<a class="anchor-link" href="#revision-history-v0.0.6"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <ul class="" style="">
+        <li class="" style="">Update ordering so that it recommends sending the unsubscribe/unsubscribed, before, sending the subscribe</li>
+        <li class="" style="">Add section documenting what happens when a contact is offline when the unsubscribe/unsubscribed/subscribe stanzas are sent.</li>
+        <li class="" style="">Added an example about a hacker sending an unsolicited subscribe by guessing a roster entry.</li>
+      </ul>
+    <div class="revision-author">tp</div></li><li id="revision-history-v0.0.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0283-0.0.5.html">0.0.5</a> (2010-06-02)<a class="anchor-link" href="#revision-history-v0.0.5"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Added one-way subscription section</p>
+    <div class="revision-author">tp</div></li><li id="revision-history-v0.0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0283-0.0.4.html">0.0.4</a> (2010-05-30)<a class="anchor-link" href="#revision-history-v0.0.4"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Change MUST NOT to SHOULD NOT for clients auto-subscribing back; differentiate between inbound and outbound subscriptions.</p>
+    <div class="revision-author">tp</div></li><li id="revision-history-v0.0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0283-0.0.3.html">0.0.3</a> (2010-06-02)<a class="anchor-link" href="#revision-history-v0.0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Add one-way subscription comments.</p><div class="revision-author">tp</div></li><li id="revision-history-v0.0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0283-0.0.2.html">0.0.2</a> (2010-05-25)<a class="anchor-link" href="#revision-history-v0.0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Minor tweaks.</p><div class="revision-author">tp</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0283-0.0.1.html">0.0.1</a> (2010-05-22)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">tp</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{wild2010moved,
+  title = {Moved},
+  author = {Wild, Matthew},
+  type = {XEP},
+  number = {0283},
+  version = {0.2.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0283.html},
+  date = {2010-05-22/2021-07-20},
+}</pre><p>END</p></body></html>

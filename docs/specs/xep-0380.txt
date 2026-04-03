@@ -1,0 +1,278 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0380: Explicit Message Encryption</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0380";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Explicit Message Encryption"><meta name="DC.Creator" content="Emmanuel Gil Peyrot"><meta name="DC.Description" content="This specification provides a way to mark encrypted messages so the
+    recipient can discover how to decrypt it."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2021-11-18"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0380"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0380: Explicit Message Encryption</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification provides a way to mark encrypted messages so the
+    recipient can discover how to decrypt it.</dd><dt>Author</dt><dd>Emmanuel Gil Peyrot</dd><dt>Copyright</dt><dd>© 2016 – 2021 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Deferred</p><div id="status-notice" class="deferred standards track">WARNING: This document has been automatically Deferred after 12 months of inactivity in its previous Experimental state. Implementation of the protocol described herein is not recommended for production systems. However, exploratory implementations are encouraged to resume the standards process.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.4.0 (2021-11-18)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li class="current inserted">Deferred</li><li>Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#reqs">Requirements</a></li><li><a href="#usecases">Use Cases</a><ol><li><a href="#flow">Basic Flow</a></li><li><a href="#protocols">Protocols Supported</a></li><li><a href="#disco">Determining Support</a></li></ol></li><li><a href="#rules">Business Rules</a></li><li><a href="#i18n">Internationalization Considerations</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#registrar-ns">Protocol Namespaces</a></li></ol></li><li><a href="#schema">XML Schema</a></li><li><a href="#ack">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">In the past few years we have seen a strong interest in end to end
+    encryption, with multiple competing mechanisms being defined on top of
+    XMPP (e.g., <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0027.html">Current Jabber OpenPGP Usage (XEP-0027)</a></span>  [<a href="#nt-idm46732695501760">1</a>], <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0364.html">Current Off-the-Record Messaging Usage (XEP-0364)</a></span>  [<a href="#nt-idm46732695492960">2</a>] or <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0373.html">OpenPGP for XMPP (XEP-0373)</a></span>  [<a href="#nt-idm46732695495840">3</a>]).  This specification
+    addresses the lack of proper discoverability of most of these solutions by
+    adding a machine-readable explanation of how a specific message has been
+    encrypted.</p>
+  <p class="" style="">In a federated network where no central entity can mandate a particular
+    encryption mechanism, it becomes important to allow end users to know that
+    a message could not be decrypted (e.g., due to a missing plugin), and to
+    never fail to display that a message has been received due to that.</p>
+<h2 id="reqs">2.
+       Requirements<a class="anchor-link" href="#reqs"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document addresses the following requirements:</p>
+  <ol start="" class="" style="">
+    <li class="" style="">Enable a client to mark a message as encrypted.</li>
+    <li class="" style="">Enable a client to determine whether a message was encrypted, no matter
+      the encryption mechanism used.</li>
+    <li class="" style="">Enable a client to offer the user a possibility to decrypt a received
+      message (depending on the encryption method).</li>
+    <li class="" style="">Enable a client to offer the user a possibility to decrypt subsequently
+      received messages.</li>
+  </ol>
+  <p class="" style="">This document DOES NOT address the non-message usecases, encrypted
+    presence and iq have very different requirements than those defined
+    here.</p>
+<h2 id="usecases">3.
+       Use Cases<a class="anchor-link" href="#usecases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+<div class="indent"><h3 id="flow">3.1 Basic Flow<a class="anchor-link" href="#flow"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+  <p class="" style="">Romeo, wanting to get Juliet’s attention but not wanting to reveal his
+    intentions to the montague.lit nor to the capulet.lit servers, sends an
+    encrypted message tagged as OTR, as follows:</p>
+  <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Example of tagged message encrypted with OTR<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='juliet@capulet.lit/balcony'
+         from='romeo@montague.lit/orchard'
+         id='secret1'&gt;
+  &lt;body&gt;?OTR?v23?...&lt;/body&gt;
+  &lt;encryption xmlns='urn:xmpp:eme:0'
+              namespace='urn:xmpp:otr:0'/&gt;
+&lt;/message&gt;
+</pre></figure>
+
+  <p class="" style="">Juliet’s client, noticing it does not have any OTR capability, will
+    display that the message was encrypted but that it is not able to decrypt
+    it instead of displaying the body, for example:</p>
+  <figure class="example" style="">
+    <p class="" style="">This message was encrypted with OTR (urn:xmpp:otr:0) and could not be
+      decrypted.</p>
+  </figure>
+
+  <p class="" style="">Juliet may then communicate to Romeo that she was unable to receive his
+    message, through an error, or maybe out of band.</p>
+  <p class="" style="">Romeo, standing firm in his belief that they should not communicate
+    without encryption in their world where anyone could be a malicious
+    listener, then discovers that one of Juliet’s clients support <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0373.html">OpenPGP for XMPP (XEP-0373)</a></span>  [<a href="#nt-idm46732695495840">3</a>] and
+    subsequently starts an encrypted session using that protocol.</p>
+  <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Example of tagged message encrypted with OX<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='juliet@capulet.lit/balcony'
+         from='romeo@montague.lit/orchard'
+         id='secret2'&gt;
+  &lt;openpgp xmlns='urn:xmpp:openpgp:0'&gt;
+    ...
+  &lt;/openpgp&gt;
+  &lt;body&gt;This message is encrypted with OpenPGP for XMPP.&lt;/body&gt;
+  &lt;encryption xmlns='urn:xmpp:eme:0'
+              namespace='urn:xmpp:openpgp:0'/&gt;
+&lt;/message&gt;
+</pre></figure>
+
+  <p class="" style="">Upon receiving this message, Juliet’s current client prompts her to enable
+    a plugin, or even do it on its own, possible representations include:</p>
+  <figure class="example" style="">
+    <p class="" style="">This message was encrypted with OpenPGP for XMPP
+      (urn:xmpp:openpgp:0), <a href="#">click here</a> to enable this
+      plugin.</p>
+  </figure>
+</div>
+
+<div class="indent"><h3 id="protocols">3.2 Protocols Supported<a class="anchor-link" href="#protocols"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+  <p class="" style="">Any encryption mechanism using message as a transport is a candidate, and
+    MAY have a 'name' attribute to help the receiving client display it to the
+    user, in case this client doesn’t understand its namespace yet.  A 'name'
+    attribute SHOULD NOT be included for the protocols listed herein, and
+    SHOULD be ignored by a receiving client:</p>
+
+  <figure class="table"><figcaption id="table-1"><strong>Table 1:</strong> <a class="anchor-link" href="#table-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+    <tr class="body">
+      <th colspan="" rowspan="">Name</th>
+      <th colspan="" rowspan="">Namespace</th>
+      <th colspan="" rowspan="">Specification</th>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">OTR</td>
+      <td align="" colspan="" rowspan="">urn:xmpp:otr:0</td>
+      <td align="" colspan="" rowspan=""><span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0364.html">Current Off-the-Record Messaging Usage (XEP-0364)</a></span>  [<a href="#nt-idm46732695492960">2</a>]</td>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">Legacy OpenPGP</td>
+      <td align="" colspan="" rowspan="">jabber:x:encrypted</td>
+      <td align="" colspan="" rowspan=""><span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0027.html">Current Jabber OpenPGP Usage (XEP-0027)</a></span>  [<a href="#nt-idm46732695501760">1</a>]</td>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">OpenPGP for XMPP</td>
+      <td align="" colspan="" rowspan="">urn:xmpp:openpgp:0</td>
+      <td align="" colspan="" rowspan=""><span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0373.html">OpenPGP for XMPP (XEP-0373)</a></span>  [<a href="#nt-idm46732695495840">3</a>]</td>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">OMEMO</td>
+      <td align="" colspan="" rowspan="">eu.siacs.conversations.axolotl</td>
+      <td align="" colspan="" rowspan="">https://xmpp.org/extensions/attic/xep-0384-0.3.0.html</td>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">OMEMO 1</td>
+      <td align="" colspan="" rowspan="">urn:xmpp:omemo:1</td>
+      <td align="" colspan="" rowspan="">https://xmpp.org/extensions/attic/xep-0384-0.4.0.html</td>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">OMEMO 2</td>
+      <td align="" colspan="" rowspan="">urn:xmpp:omemo:2</td>
+      <td align="" colspan="" rowspan=""><span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0384.html">OMEMO Encryption (XEP-0384)</a></span>  [<a href="#nt-idm46732695427792">4</a>]</td>
+    </tr>
+  </table></figure>
+</div>
+
+<div class="indent"><h3 id="disco">3.3 Determining Support<a class="anchor-link" href="#disco"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+  <p class="" style="">If an entity supports the Encrypted Message Extension protocol, it MUST
+    report that by including a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm46732695421664">5</a>] feature of "urn:xmpp:eme:0" in
+    response to disco#info requests:</p>
+  <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Client queries for entity features<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get'
+    id='disco1'
+    to='juliet@capulet.lit/balcony'
+    from='romeo@montague.lit/orchard'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+  <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Entity responds with features<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result'
+    id='disco1'
+    to='romeo@montague.lit/orchard'
+    from='juliet@capulet.lit/balcony'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+    ...
+    &lt;feature var='urn:xmpp:eme:0'/&gt;
+    ...
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+  <p class="" style="">Support can also be determined via <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm46732695412608">6</a>], a.k.a. "caps".</p>
+</div>
+<h2 id="rules">4.
+       Business Rules<a class="anchor-link" href="#rules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Entities MUST report a failure to the user if they cannot decrypt an
+    incoming message for any reason, and MAY prompt the user to install or
+    enable a plugin to decrypt it.</p>
+  <p class="" style="">Entities SHOULD include a non-encrypted body as possible, since older
+    clients not supporting this protocol might otherwise ignore messages sent
+    with an unknown encryption, making both the sender frustrated that their
+    message did not get an answer, and the recipient frustrated that they never
+    saw any message.</p>
+  <p class="" style="">A sender entity MAY include the &lt;encryption/&gt; element even if the
+    recipient doesn’t advertise support for it in their disco, or isn’t
+    currently connected, since the recipient may be using multiple clients with
+    different capabilities.</p>
+  <p class="" style="">A sender entity MAY include a 'name' attribute for any encryption
+    mechanism not listed in this specification, to help the receiving entity
+    present it to the user, but SHOULD NOT include one for the ones listed
+    here.</p>
+  <p class="" style="">A receiving entity MUST NOT use the 'name' attribute if it is present and
+    they already have a name associated with it.</p>
+  <p class="" style="">A receiving entity MAY not display anything in case an encrypted message
+    has been received, if the user agreed to that behaviour.</p>
+<h2 id="i18n">5.
+       Internationalization Considerations<a class="anchor-link" href="#i18n"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">When a message is marked with an encryption tag and can not be decrypted,
+    the body can safely be ignored and a localized message displayed
+    instead.</p>
+  <p class="" style="">If an entity includes a 'name' attribute, it should attempt to localise it
+    to the best of its abilities for the receiving client.</p>
+<h2 id="security">6.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">A malicious entity could try to mimick the style of a client’s failure
+    message, maybe including a link to a compromised plugin, so a client should
+    not make those missing plugin messages look like normal messages.</p>
+<h2 id="iana">7.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the Internet Assigned Numbers
+    Authority (IANA).</p>
+<h2 id="registrar">8.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="registrar-ns">8.1 Protocol Namespaces<a class="anchor-link" href="#registrar-ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">This specification defines the following XML namespace:</p>
+    <ul class="" style="">
+      <li class="" style="">'urn:xmpp:eme:0'</li>
+    </ul>
+  </div>
+<h2 id="schema">9.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema attributeFormDefault="unqualified"
+  elementFormDefault="qualified"
+  targetNamespace="urn:xmpp:eme:0"
+  xmlns:xs="http://www.w3.org/2001/XMLSchema"&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+      The protocol documented by this schema is defined in
+      XEP-xxxx: http://xmpp.org/extensions/xep-xxxx.html
+    &lt;/xs:documentation&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:element name="encryption"&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:attribute type="xs:string" use="required" name="namespace"/&gt;
+      &lt;xs:attribute type="xs:string" use="optional" name="name"/&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+<h2 id="ack">10.
+       Acknowledgements<a class="anchor-link" href="#ack"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Thanks to Mathieu Pasquet for his feedback.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0380</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Deferred">Deferred</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.4.0</dd><dt>Last Updated</dt><dd>2021-11-18</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, XMPP IM, <a href="xep-0030.html">XEP-0030</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>EME</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0380.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0380.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0380.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Emmanuel Gil Peyrot</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:linkmauve@linkmauve.fr">linkmauve@linkmauve.fr</a></dd><dt>JabberID</dt><dd><a href="xmpp:linkmauve@linkmauve.fr">linkmauve@linkmauve.fr</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm46732695501760">1</a>. XEP-0027: Current Jabber OpenPGP Usage &lt;<a href="https://xmpp.org/extensions/xep-0027.html">https://xmpp.org/extensions/xep-0027.html</a>&gt;.</p><p><a name="nt-idm46732695492960">2</a>. XEP-0364: Current Off-the-Record Messaging Usage &lt;<a href="https://xmpp.org/extensions/xep-0364.html">https://xmpp.org/extensions/xep-0364.html</a>&gt;.</p><p><a name="nt-idm46732695495840">3</a>. XEP-0373: OpenPGP for XMPP &lt;<a href="https://xmpp.org/extensions/xep-0373.html">https://xmpp.org/extensions/xep-0373.html</a>&gt;.</p><p><a name="nt-idm46732695427792">4</a>. XEP-0384: OMEMO Encryption &lt;<a href="https://xmpp.org/extensions/xep-0384.html">https://xmpp.org/extensions/xep-0384.html</a>&gt;.</p><p><a name="nt-idm46732695421664">5</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm46732695412608">6</a>. XEP-0115: Entity Capabilities &lt;<a href="https://xmpp.org/extensions/xep-0115.html">https://xmpp.org/extensions/xep-0115.html</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.4.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0380-0.4.0.html">0.4.0</a> (2021-11-18)<a class="anchor-link" href="#revision-history-v0.4.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Add new OMEMO namespaces:</p>
+      <ul class="" style="">
+        <li class="" style="">Add 'urn:xmpp:omemo:1' for OMEMO versions since 0.4.0</li>
+        <li class="" style="">Add 'urn:xmpp:omemo:2' for OMEMO versions since 0.8.0</li>
+      </ul>
+    <div class="revision-author">melvo</div></li><li id="revision-history-v0.3.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0380-0.3.0.html">0.3.0</a> (2019-04-28)<a class="anchor-link" href="#revision-history-v0.3.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Added OMEMO encryption namespace.</p>
+      <p class="" style="">Made XEP experimental again.</p>
+    <div class="revision-author">lnj</div></li><li id="revision-history-v0.2.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0380-0.2.0.html">0.2.0</a> (2018-01-25)<a class="anchor-link" href="#revision-history-v0.2.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Defer due to lack of activity.<div class="revision-author">XEP Editor (jwi)</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0380-0.1.html">0.1</a> (2016-10-26)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+	  <p class="" style="">Initial published version approved by the XMPP Council.</p>
+	<div class="revision-author">fs</div></li><li id="revision-history-v0.0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0380-0.0.2.html">0.0.2</a> (2016-08-28)<a class="anchor-link" href="#revision-history-v0.0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><ul class="" style="">
+      <li class="" style="">Made the 'name' attribute optional for existing mechanisms.</li>
+      <li class="" style="">Added a remark about the possibility to hide encrypted messages
+        following user input.</li>
+      <li class="" style="">Made explicit that this protocol affects any encryption mechanism,
+        present or future, not only those listed here.</li>
+      <li class="" style="">Display the namespace of the encryption mechanism in the default
+        messages.</li>
+    </ul><div class="revision-author">egp</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0380-0.0.1.html">0.0.1</a> (2016-08-14)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">egp</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{peyrot2016eme,
+  title = {Explicit Message Encryption},
+  author = {Peyrot, Emmanuel Gil},
+  type = {XEP},
+  number = {0380},
+  version = {0.4.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0380.html},
+  date = {2016-08-14/2021-11-18},
+}</pre><p>END</p></body></html>

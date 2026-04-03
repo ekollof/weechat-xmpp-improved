@@ -1,0 +1,175 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0352: Client State Indication</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0352";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Client State Indication"><meta name="DC.Creator" content="Matthew Wild"><meta name="DC.Description" content="This document defines a way for the client to indicate its active/inactive state."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2020-10-14"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0352"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0352: Client State Indication</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This document defines a way for the client to indicate its active/inactive state.</dd><dt>Author</dt><dd>Matthew Wild</dd><dt>Copyright</dt><dd>© 2014 – 2020 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Stable</p><div id="status-notice" class="draft standards track">NOTICE: The protocol defined herein is a <strong>Stable Standard</strong> of the XMPP Standards Foundation. Implementations are encouraged and the protocol is appropriate for deployment in production systems, but some changes to the protocol are possible before it becomes a Final Standard.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>1.0.0 (2020-10-14)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li class="current">Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#reqs">Requirements</a></li><li><a href="#usecases">Use Cases</a><ol><li><a href="#behaviour-user">User and client behaviour</a></li><li><a href="#sect-idm46082919277072">Server behaviour</a></li></ol></li><li><a href="#protocol">Protocol</a><ol><li><a href="#discovery">Discovering support</a></li><li><a href="#indication">Indicating state</a></li></ol></li><li><a href="#rules">Business Rules</a><ol><li><a href="#in-order-processing">In-order processing</a></li><li><a href="#stream-resumption">Interaction with Stream Resumption</a></li></ol></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a></li><li><a href="#sect-idm46082919220512">XML Schema</a></li><li><a href="#acknowledgements">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">It is common for IM clients to be logged in and 'online' even while the user is not interacting with the application. This
+  protocol allows the client to indicate to the server when the user is not actively using the client, allowing the server to
+  optimise traffic to the client accordingly. This can save bandwidth and resources on both the client and server.</p>
+<h2 id="reqs">2.
+       Requirements<a class="anchor-link" href="#reqs"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The aim of this specification is to provide a simple and efficient protocol for the client to report its
+  state to the server. Exactly how the server uses this information is beyond the scope of this document, although
+  some examples are given.</p>
+  <p class="" style="">Other extensions exist, such as <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0273.html">Stanza Interception and Filtering Technology (XEP-0273)</a></span>  [<a href="#nt-idm46082919284416">1</a>], which also aim to optimise the traffic between the client and server.
+  A notable difference is that instead of being client-controlled, CSI shifts the responsibility to the server, and
+  aims to just provide the server with enough information to implement various optimisations itself.</p>
+<h2 id="usecases">3.
+       Use Cases<a class="anchor-link" href="#usecases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="behaviour-user">3.1 User and client behaviour<a class="anchor-link" href="#behaviour-user"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Juliet has an XMPP client on her phone, which is available to receive messages. However most of the time
+    Juliet has her phone screen turned off and is not interested in the status of her contacts unless they are
+    communicating with her.</p>
+
+    <p class="" style="">Juliet's client informs the server when Juliet is not interacting with it. The server uses this information to
+    suppress or reduce stanzas that are unimportant, such as status updates.</p>
+
+    <p class="" style="">When Juliet returns to her IM client, the client again informs the server, this time to report that it is active
+    again. The server then disables its traffic optimisations and restores the stream to its normal state.</p>
+  </div>
+  <div class="indent"><h3 id="sect-idm46082919277072">3.2 Server behaviour<a class="anchor-link" href="#sect-idm46082919277072"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">When the server knows that the user is not engaging with their client many optimisations become possible. For
+    example a server could:</p>
+    <ul class="" style="">
+    <li class="" style="">Suppress presence updates until the client becomes active again. On becoming active, push the latest
+    presence from each contact.</li>
+    <li class="" style="">Discard messages containing only <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0085.html">Chat State Notifications (XEP-0085)</a></span>  [<a href="#nt-idm46082919270080">2</a>] payloads.</li>
+    <li class="" style="">Defer or discard unimportant PEP notifications, possibly unsubscribe from certain PEP nodes
+    until the client becomes active again.</li>
+    </ul>
+
+    <p class="" style="">This list is for example only, a server is not required to implement all or any of these, nor is it prevented
+    from implementing other behaviour not listed here. Regardless of what optimisations a server implements, it SHOULD
+    provide a way for administrators to configure them, and MAY provide such configuration to users also (e.g., through an
+    ad-hoc command).</p>
+  </div>
+<h2 id="protocol">4.
+       Protocol<a class="anchor-link" href="#protocol"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="discovery">4.1 Discovering support<a class="anchor-link" href="#discovery"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">If the server supports CSI, it advertises it in the stream features after the client has authenticated:</p>
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Server indicates support for CSI<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+      &lt;stream:features&gt;
+        &lt;bind xmlns='urn:ietf:params:xml:ns:xmpp-bind'/&gt;
+        &lt;csi xmlns='urn:xmpp:csi:0'/&gt;
+      &lt;/stream:features&gt;
+</pre></figure>
+  </div>
+
+  <div class="indent"><h3 id="indication">4.2 Indicating state<a class="anchor-link" href="#indication"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">A stream always begins in 'active' state. If a client wishes to inform the server that it has become inactive,
+    it sends an &lt;inactive/&gt; element in the 'urn:xmpp:csi:0' namespace:</p>
+    <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Client indicates it is inactive<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+      &lt;inactive xmlns='urn:xmpp:csi:0'/&gt;
+</pre></figure>
+
+    <p class="" style="">As might be anticipated, when the client is active again it sends an &lt;active/&gt; element:</p>
+    <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Client indicates it is active<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+      &lt;active xmlns='urn:xmpp:csi:0'/&gt;
+</pre></figure>
+
+    <p class="" style="">There is no reply from the server to either of these elements (though they may indirectly cause the server to
+  send stanzas, e.g., to update presence information when the client becomes active after a period of inactivity).</p>
+  </div>
+<h2 id="rules">5.
+       Business Rules<a class="anchor-link" href="#rules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">As this protocol is for indication only, clients MUST NOT make assumptions about how the server
+  will use the active/inactive state information.</p>
+
+  <p class="" style="">The server MUST assume all clients to be in the 'active' state until the client indicates otherwise. Also the
+  CSI active/inactive state is unrelated to the user's presence, the server MUST treat the two independently.</p>
+
+  <p class="" style="">This protocol is intended primarily for clients with human interaction. Due to the open-ended nature of
+  the possible optimisations implemented by the server, it may not be suitable for non-IM purposes where the
+  fully standard behaviour of XMPP is required.</p>
+  <div class="indent"><h3 id="in-order-processing">5.1 In-order processing<a class="anchor-link" href="#in-order-processing"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+	<p class="" style="">
+	  XMPP requires stanzas to be processed in order as per <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6120">RFC 6120</a></span>  [<a href="#nt-idm46082919248288">3</a>] 10.1. Especially "If the server's processing of a particular request could have an effect on its processing of subsequent data it might receive over that input stream..., it MUST suspend processing of subsequent data until it has processed the request.". As a result, all actions triggered by a CSI nonza sent to the server must happen before processing further requests from the same client to the server.
+	</p>
+	<p class="" style="">
+	  For example: A client sends a CSI active nonza, followed by an XMPP Ping request to the server. The server first changes the CSI state to active and flushes all eventually queued stanzsa. After the state has been restored to 'active' and
+all resulting stanzas have been put on the wire, the
+server sends the pong.
+	</p>
+    <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> In-order processing<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;!-- Client sends 'active' and a ping to the server --&gt;
+&lt;active xmlns='urn:xmpp:csi:0'/&gt;
+&lt;iq to='capulaet.lit' from='juliet@capulet.lit/balcony' id='ping1' type='get'&gt;
+  &lt;ping xmlns='urn:xmpp:ping'/&gt;
+&lt;/iq&gt;
+
+&lt;!-- Server restores stream state to active,
+e.g. by flushing out queued stanzas to the client.
+and responds to the ping with a pong --&gt;
+&lt;iq to='juliet@capulet.lit/baclony' from='capulet.lit' id='ping1' type='result'/&gt;
+&lt;!-- Stream state is now 'active' --&gt;</pre></figure>
+  </div>
+  <div class="indent"><h3 id="stream-resumption">5.2 Interaction with Stream Resumption<a class="anchor-link" href="#stream-resumption"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">After a previous stream was resumed using mechanisms like
+    <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0198.html">Stream Management (XEP-0198)</a></span>  [<a href="#nt-idm46082919238736">4</a>], the CSI state is <em>not</em> restored. That is, stream
+    resumption does not affect the current CSI state, which always
+    defaults to 'active' for new and resumed streams. Clients wishing
+    to immediately go to the inactive state should do so after stream
+    resumption.</p>
+  </div>
+<h2 id="security">6.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">To protect the privacy of users, servers MUST NOT reveal the clients active/inactive state to other
+  entities on the network.</p>
+<h2 id="iana">7.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm46082919229520">5</a>].</p>
+<h2 id="registrar">8.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm46082919223376">6</a>].</p>
+<h2 id="sect-idm46082919220512">9.
+       XML Schema<a class="anchor-link" href="#sect-idm46082919220512"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='urn:xmpp:csi:0'
+    xmlns='urn:xmpp:csi:0'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:element name='csi' type='empty'/&gt;
+  &lt;xs:element name='active' type='empty'/&gt;
+  &lt;xs:element name='inactive' type='empty'/&gt;
+
+  &lt;xs:simpleType name='empty'&gt;
+    &lt;xs:restriction base='xs:string'&gt;
+      &lt;xs:enumeration value=''/&gt;
+    &lt;/xs:restriction&gt;
+  &lt;/xs:simpleType&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+<h2 id="acknowledgements">10.
+       Acknowledgements<a class="anchor-link" href="#acknowledgements"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Thanks to Florian Schmaus for his feedback.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0352</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Draft">Stable</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>1.0.0</dd><dt>Last Updated</dt><dd>2020-10-14</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core</dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>csi</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0352.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0352.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0352.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Matthew Wild</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:mwild1@gmail.com">mwild1@gmail.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:me@matthewwild.co.uk">me@matthewwild.co.uk</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm46082919284416">1</a>. XEP-0273: Stanza Interception and Filtering Technology &lt;<a href="https://xmpp.org/extensions/xep-0273.html">https://xmpp.org/extensions/xep-0273.html</a>&gt;.</p><p><a name="nt-idm46082919270080">2</a>. XEP-0085: Chat State Notifications &lt;<a href="https://xmpp.org/extensions/xep-0085.html">https://xmpp.org/extensions/xep-0085.html</a>&gt;.</p><p><a name="nt-idm46082919248288">3</a>. RFC 6120: Extensible Messaging and Presence Protocol (XMPP): Core &lt;<a href="http://tools.ietf.org/html/rfc6120">http://tools.ietf.org/html/rfc6120</a>&gt;.</p><p><a name="nt-idm46082919238736">4</a>. XEP-0198: Stream Management &lt;<a href="https://xmpp.org/extensions/xep-0198.html">https://xmpp.org/extensions/xep-0198.html</a>&gt;.</p><p><a name="nt-idm46082919229520">5</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm46082919223376">6</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v1.0.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0352-1.0.0.html">1.0.0</a> (2020-10-14)<a class="anchor-link" href="#revision-history-v1.0.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Accepted as Draft as per Council vote from 2020-08-26.<div class="revision-author">XEP Editor (jsc)</div></li><li id="revision-history-v0.3.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0352-0.3.0.html">0.3.0</a> (2018-11-08)<a class="anchor-link" href="#revision-history-v0.3.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Defer due to lack of activity.<div class="revision-author">XEP Editor (jsc)</div></li><li id="revision-history-v0.2.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0352-0.2.1.html">0.2.1</a> (2017-02-18)<a class="anchor-link" href="#revision-history-v0.2.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarify that the CSI state is not restored when the stream is resumed.</p><div class="revision-author">fs</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0352-0.2.html">0.2</a> (2015-10-02)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified how CSI is affected by in-order processing (Florian Schmaus).</p><div class="revision-author">XEP Editor (mam)</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0352-0.1.html">0.1</a> (2014-08-28)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial published version approved by the XMPP Council.</p><div class="revision-author">XEP Editor (asw)</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0352-0.0.1.html">0.0.1</a> (2014-08-14)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">mw</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{wild2014csi,
+  title = {Client State Indication},
+  author = {Wild, Matthew},
+  type = {XEP},
+  number = {0352},
+  version = {1.0.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0352.html},
+  date = {2014-08-14/2020-10-14},
+}</pre><p>END</p></body></html>

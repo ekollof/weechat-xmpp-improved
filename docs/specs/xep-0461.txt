@@ -1,0 +1,142 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0461: Message Replies</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0461";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Message Replies"><meta name="DC.Creator" content="Natalie Wirth"><meta name="DC.Creator" content="Marvin Wißfeld"><meta name="DC.Description" content="
+      This document defines a way to indicate that a message is a reply to a previous message.
+    "><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2026-02-25"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0461"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0461: Message Replies</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>
+      This document defines a way to indicate that a message is a reply to a previous message.
+    </dd><dt>Authors</dt><dd><ul class="authors"><li>Natalie Wirth</li><li>Marvin Wißfeld</li></ul></dd><dt>Copyright</dt><dd>© 2022 – 2026 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Experimental</p><div id="status-notice" class="experimental standards track">WARNING: This Standards-Track document is Experimental. Publication as an XMPP Extension Protocol does not imply approval of this proposal by the XMPP Standards Foundation. Implementation of the protocol described herein is encouraged in exploratory implementations, but production systems are advised to carefully consider whether it is appropriate to deploy implementations of this protocol before it advances to a status of Draft.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.2.1 (2026-02-25)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li class="current">Experimental</li><li>Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#disco">Discovering support</a></li><li><a href="#usecases">Use Cases</a><ol><li><a href="#compat">Compatibility Fallback</a></li></ol></li><li><a href="#rules">Business Rules</a><ol><li><a href="#business-id">Using the correct ID</a></li></ol></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">
+      When commenting on a previous message, it is sometimes desired to clarify which message the comment refers to.
+      Currently, <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0393.html">Message Styling (XEP-0393)</a></span>  [<a href="#nt-idm45735319095440">1</a>] quotes are commonly used for that purpose. However, this format does not allow receiving
+      clients to properly identify the referenced message or to adjust the user interface accordingly.
+    </p>
+    <p class="" style="">
+      This specification defines a way to indicate that a message is a reply to a previous message. It does not intend
+      to provide means to create sub-threads for a message.
+    </p>
+  <h2 id="disco">2.
+       Discovering support<a class="anchor-link" href="#disco"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">
+      If a client implements message replies, it MUST specify the 
+      'urn:xmpp:reply:0' feature in its service discovery information features
+      as specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45735318016416">2</a>] and the Entity Capabilities profile specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm45735318007440">3</a>].
+    </p>
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Client requests information about a chat partner's client<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+  &lt;iq type='get'
+      to='romeo@montague.lit/orchard'
+      from='juliet@capulet.lit/balcony'
+      id='info1'&gt;
+    &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+  &lt;/iq&gt;</pre></figure>
+    <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Partner's client advertises support for replies<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+  &lt;iq type='result'
+      to='juliet@capulet.lit/balcony'
+      from='romeo@montague.lit/orchard'
+      id='info1'&gt;
+    &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+  ...
+      &lt;feature var='urn:xmpp:reply:0'/&gt;
+  ...
+    &lt;/query&gt;
+  &lt;/iq&gt;</pre></figure>
+  <h2 id="usecases">3.
+       Use Cases<a class="anchor-link" href="#usecases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">
+      To indicate that a message is a reply, a &lt;reply&gt; element in the urn:xmpp:reply:0 namespace is placed in the
+      message stanza. The &lt;reply&gt; element SHOULD have a 'to' attribute containing the full jid of the author of the
+      referenced message and MUST have an 'id' attribute containing the id of the referenced message.
+      In a 1:1 chat context, a bare jid MAY be used instead of a full jid.
+    </p>
+    <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Max replies to Anna's message<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='max@example.com' from='anna@example.com/tablet' id='message-id1' type='chat'&gt;
+  &lt;body&gt;We should bake a cake&lt;/body&gt;
+&lt;/message&gt;
+
+&lt;message to='anna@example.com' id='message-id2' type='chat'&gt;
+  &lt;body&gt;Great idea!&lt;/body&gt;
+  &lt;reply to='anna@example.com/tablet' id='message-id1' xmlns='urn:xmpp:reply:0' /&gt;
+&lt;/message&gt;</pre></figure>
+
+    <div class="indent"><h3 id="compat">3.1 Compatibility Fallback<a class="anchor-link" href="#compat"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">
+        To provide a fallback for non-supporting clients, the sending client MAY include fallback text in the body and
+        indicate it via Compatibility Fallback.
+        Note that the following example is formatted for readability and that the indentation, leading and trailing new lines
+        of the example body element should not be taken into account.
+      </p>
+      <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Anna replies to a message and includes a fallback<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='anna@example.com' id='message-id3' type='chat'&gt;
+  &lt;body&gt;
+    &gt; Anna wrote:
+    &gt; We should bake a cake
+    Great idea!
+  &lt;/body&gt;
+  &lt;reply to='anna@example.com/laptop' id='message-id1' xmlns='urn:xmpp:reply:0' /&gt;
+  &lt;fallback xmlns='urn:xmpp:fallback:0' for='urn:xmpp:reply:0'&gt;
+    &lt;body start="0" end="38" /&gt;
+  &lt;/fallback&gt;
+&lt;/message&gt;</pre></figure>
+
+      <p class="" style="">
+        The receiving client SHOULD NOT display the compatibility fallback if it renders the referenced message
+        alongside the reply in some way. However, if the receiving client does not display the referenced message, for
+        example because it doesn't know the referenced id, it MAY display the compatibility fallback instead.
+      </p>
+    </div>
+  <h2 id="rules">4.
+       Business Rules<a class="anchor-link" href="#rules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">Answers MUST NOT be be assumed to relate to any other messages than the referenced one.</p>
+    <div class="indent"><h3 id="business-id">4.1 Using the correct ID<a class="anchor-link" href="#business-id"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">
+        For messages of type 'groupchat', the stanza's 'id' attribute MUST NOT be used for replies. Instead, in group
+        chat situations, the ID assigned to the stanza by the group chat itself must be used. This is discovered in a
+        &lt;stanza-id&gt; element with a 'by' attribute that matches the bare JID of the group chat, as defined
+        in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0359.html">Unique and Stable Stanza IDs (XEP-0359)</a></span>  [<a href="#nt-idm45735317992928">4</a>].
+      </p>
+      <p class="" style="">
+        This implies that group chat messages without a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0359.html">Unique and Stable Stanza IDs (XEP-0359)</a></span>  [<a href="#nt-idm45735317992928">4</a>] stanza-id cannot be replied to.
+      </p>
+      <p class="" style="">
+        For other message types the sender should use the 'id' from a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0359.html">Unique and Stable Stanza IDs (XEP-0359)</a></span>  [<a href="#nt-idm45735317992928">4</a>]
+        &lt;origin-id&gt; if present, or the value of the 'id' attribute on the
+        &lt;message&gt; otherwise.
+      </p>
+    </div>
+  <h2 id="iana">5.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm45735317978880">5</a>].</p>
+  <h2 id="registrar">6.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">This document requires no interaction with <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45735317972896">6</a>].</p>
+  <hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0461</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Experimental">Experimental</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.2.1</dd><dt>Last Updated</dt><dd>2026-02-25</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>
+                None
+              </dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>reply</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0461.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0461.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0461.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Natalie Wirth</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:nataliew@laposte.net">nataliew@laposte.net</a></dd></dl><h5>Marvin Wißfeld</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:xmpp@larma.de">xmpp@larma.de</a></dd><dt>JabberID</dt><dd><a href="xmpp:jabber@larma.de">jabber@larma.de</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45735319095440">1</a>. XEP-0393: Message Styling &lt;<a href="https://xmpp.org/extensions/xep-0393.html">https://xmpp.org/extensions/xep-0393.html</a>&gt;.</p><p><a name="nt-idm45735318016416">2</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm45735318007440">3</a>. XEP-0115: Entity Capabilities &lt;<a href="https://xmpp.org/extensions/xep-0115.html">https://xmpp.org/extensions/xep-0115.html</a>&gt;.</p><p><a name="nt-idm45735317992928">4</a>. XEP-0359: Unique and Stable Stanza IDs &lt;<a href="https://xmpp.org/extensions/xep-0359.html">https://xmpp.org/extensions/xep-0359.html</a>&gt;.</p><p><a name="nt-idm45735317978880">5</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm45735317972896">6</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.2.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0461-0.2.1.html">0.2.1</a> (2026-02-25)<a class="anchor-link" href="#revision-history-v0.2.1"><abbr title="Link to this point in the document">¶</abbr></a></div>Update the example to use the correct fallback namespace.<div class="revision-author">mye</div></li><li id="revision-history-v0.2.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0461-0.2.0.html">0.2.0</a> (2022-12-09)<a class="anchor-link" href="#revision-history-v0.2.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Fix example character counting. Add disco feature. Relax the 'to' attribute constraints.<div class="revision-author">nc</div></li><li id="revision-history-v0.1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0461-0.1.0.html">0.1.0</a> (2022-01-25)<a class="anchor-link" href="#revision-history-v0.1.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Accepted by vote of Council on 2022-01-05.<div class="revision-author">XEP Editor (jsc)</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0461-0.0.1.html">0.0.1</a> (2022-01-01)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+        <p class="" style="">First draft.</p>
+      <div class="revision-author">nw/mw</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{wirth2022reply,
+  title = {Message Replies},
+  author = {Wirth, Natalie and Wißfeld, Marvin},
+  type = {XEP},
+  number = {0461},
+  version = {0.2.1},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0461.html},
+  date = {2022-01-01/2026-02-25},
+}</pre><p>END</p></body></html>

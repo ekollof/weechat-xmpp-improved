@@ -1,0 +1,147 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0027: Current Jabber OpenPGP Usage</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0027";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Current Jabber OpenPGP Usage"><meta name="DC.Creator" content="Thomas Muldowney"><meta name="DC.Description" content="This document outlines the current usage of OpenPGP for messaging and presence."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2014-03-14"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0027"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0027: Current Jabber OpenPGP Usage</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This document outlines the current usage of OpenPGP for messaging and presence.</dd><dt>Author</dt><dd>Thomas Muldowney</dd><dt>Copyright</dt><dd>© 2002 – 2014 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Obsolete</p><div id="status-notice" class="obsolete historical">WARNING: This document has been obsoleted by the XMPP Standards Foundation. Implementation of the protocol described herein is not recommended. Developers desiring similar functionality are advised to implement the protocol that supersedes this one (if any).</div></dd><dt>Type</dt><dd>Historical</dd><dt>Version</dt><dd>1.4 (2014-03-14)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li>Active</li><li>Deprecated</li><li class="current">Obsolete</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#signing">Signing</a></li><li><a href="#encrypting">Encrypting</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#issues">Other Known Issues</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a></li><li><a href="#schemas">XML Schemas</a><ol><li><a href="#schemas-encrypted">jabber:x:encrypted</a></li><li><a href="#schemas-signed">jabber:x:signed</a></li></ol></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The Jabber community has long acknowledged the need for privacy and security features in a well-rounded instant messaging system.  Unfortunately, finding a consensus solution to the problem of end-to-end encryption during the community's younger days was not easy.  Eventually, early contributors created a quick solution using OpenPGP (<span class="ref" style=""><a href="http://tools.ietf.org/html/rfc4880">RFC 4880</a></span>  [<a href="#nt-idm46101443377104">1</a>]).  This specification documents the OpenPGP solution as it is used today, so that others may interoperate with clients that support it.  This document is not intended to present a standard, because more complete solutions are being investigated.</p>
+  <p class="" style="">All operations described here are done with standard OpenPGP software such as <a href="http://www.gnupg.org/">GnuPG</a>.  All program output is US-ASCII armored output with the headers removed.  This allows for easy transportation of the program output directly in the XML.  All keys are exchanged using OpenPGP key servers, and usually are retrieved when a signed &lt;presence/&gt; stanza is received (key retrieval does not happen in-band).</p>
+<h2 id="signing">2.
+       Signing<a class="anchor-link" href="#signing"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Signing enables a sender to verify that they sent a certain block of text.  In Jabber, signing uses the 'jabber:x:signed' namespace, and is primarily used with &lt;presence/&gt;, but may also be used with &lt;message/&gt;.  The text that is signed MAY be the empty string. When signing presence, the sender SHOULD sign the XML character data of the &lt;status&gt; element.  The sender SHOULD sign presence using the private key whose KeyID corresponds to the public key to be used in encrypting messages (see below).</p>
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> A signed presence stanza<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;presence from='pgmillard@jabber.org/wj_dev2' to='jer@jabber.org'&gt;
+  &lt;status&gt;Online&lt;/status&gt;
+  &lt;x xmlns='jabber:x:signed'&gt;
+    iQA/AwUBOjU5dnol3d88qZ77EQI2JACfRngLJ045brNnaCX78ykKNUZaTIoAoPHI
+    2uJxPMGR73EBIvEpcv0LRSy+
+    =45f8
+  &lt;/x&gt;
+&lt;/presence&gt;
+    </pre></figure>
+<h2 id="encrypting">3.
+       Encrypting<a class="anchor-link" href="#encrypting"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Encryption enables the sender to encrypt a message to a specific recipient.  This is accomplished using the 'jabber:x:encrypted' namespace in conjunction with &lt;message/&gt; stanzas.  Because a block of text is necessary in order to have something to encrypt, &lt;message/&gt; stanzas intended to be encrypted have the same restrictions as signing (see above).  The data encrypted MUST be the XML character data of the &lt;body&gt; element.  The sender SHOULD encrypt the message body using the public key whose KeyID corresponds to the private key used in signing presence (see above).</p>
+  <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> An encrypted message stanza<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='reatmon@jabber.org/jarl' from='pgmillard@jabber.org/wj_dev2'&gt;
+  &lt;body&gt;This message is encrypted.&lt;/body&gt;
+  &lt;x xmlns='jabber:x:encrypted'&gt;
+    qANQR1DBwU4DX7jmYZnncmUQB/9KuKBddzQH+tZ1ZywKK0yHKnq57kWq+RFtQdCJ
+    WpdWpR0uQsuJe7+vh3NWn59/gTc5MDlX8dS9p0ovStmNcyLhxVgmqS8ZKhsblVeu
+    IpQ0JgavABqibJolc3BKrVtVV1igKiX/N7Pi8RtY1K18toaMDhdEfhBRzO/XB0+P
+    AQhYlRjNacGcslkhXqNjK5Va4tuOAPy2n1Q8UUrHbUd0g+xJ9Bm0G0LZXyvCWyKH
+    kuNEHFQiLuCY6Iv0myq6iX6tjuHehZlFSh80b5BVV9tNLwNR5Eqz1klxMhoghJOA
+    w7R61cCPt8KSd8Vcl8K+StqOMZ5wkhosVjUqvEu8uJ9RupdpB/4m9E3gOQZCBsmq
+    OsX4/jJhn2wIsfYYWdqkbNKnuYoKCnwrlmn6I+wX72p0R8tTv8peNCwK9bEtL/XS
+    mhn4bCxoUkCITv3k8a+Jdvbov9ucduKSFuCBq4/l0fpHmPhHQjkFofxmaWJveFfF
+    619NXyYyCfoLTmWk2AaTHVCjtKdf1WmwcTa0vFfk8BuFHkdah6kJJiJ7w/yNwa/E
+    O6CMymuZTr/LpcKKWrWCt+SErxqmq8ekPI8h7oNwMxZBYAa7OJ1rXWKNgL9pDtNI
+    824Mf0mXj7q5N1eMHvX1QEoKLAda/Ae3TTEevOyeUK1DEgvxfM2KRZ11RzU+XtIE
+    My/bJk7EycAw8P/QKyeNlO1fxP58VEd6Gb8NCPqKOYn/LKh1O+c20ZNVEPFM4bNV
+    XA4hB4UtFF7Ao8kpdlrUqdKyw4lEtnmdemYQ6+iIIVPEarWl9PxOMY90KAnZrSAq
+    bt9uRY/1rPgelRaWblMKvxgpRO8++Y8VjdEyGgMOXxOiE851Ve72ftGzkSxDH8mW
+    TgY3pf2aATmBp3lagQ1COkGS/xupovT5AQPA3RzbCxDvc6s6eGYKmVVQVj5vmSj1
+    WULad5MB9KT1DzCm6FOSy063nWGBYYMWiejRvGLpo1j4eAnj0qOt7rTWmgv3RkYF
+    Oin0vDOhW7aC
+    =CvnG&lt;/x&gt;
+&lt;/message&gt;
+  </pre></figure>
+  <p class="" style="">It is considered polite to include an unencrypted message &lt;body/&gt; explaining that the actual message body is encrypted.  This helps if the client experiences an error while decrypting the message, or if the user's a client that does not support encryption (although generally this should not happen, since the signed presence can be used to indicate that a client accepts encrypted messages).</p>
+<h2 id="security">4.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The method defined herein has the following security issues:</p>
+  <ul class="" style="">
+    <li class="" style="">Key exchange relies on the web of trust model used on the OpenPGP keys network.</li>
+    <li class="" style="">There is no mechanism for checking a fingerprint or ownership of a key other than checking the user IDs on a key.</li>
+    <li class="" style="">When the recipient is not mentioned in the encrypted body, replay attacks are possible on messages.</li>
+    <li class="" style="">Replay of the signed &lt;presence/&gt; status is possible.</li>
+    <li class="" style="">It relies on signing or encryption of XML character data; therefore, it does not support signing or encryption of &lt;iq/&gt; stanzas, and it allows signing of the presence &lt;status/&gt; element and encryption of the message &lt;body/&gt; element only. Thus the method is not acceptable when signing or encryption of full stanzas is required.</li>
+    <li class="" style="">It does not enable both signing and encryption of a stanza, only signing of the presence status and encryption of the message body.</li>
+  </ul>
+<h2 id="issues">5.
+       Other Known Issues<a class="anchor-link" href="#issues"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">In addition to the security considerations listed above, there are several other known issues with this method:</p>
+  <ul class="" style="">
+    <li class="" style="">It is limited to PGP keys and does not support X.509 certificates, Kerberos, RSA keys, etc.</li>
+    <li class="" style="">It does not include feature negotiation; instead, signed &lt;presence/&gt; is used as an indicator of support.  Because of the lack of negotiation it is possible for encrypted &lt;message/&gt; elements to be stored offline and then read by a client that cannot support them.</li>
+    <li class="" style="">It is verbose (the example encrypted &lt;message/&gt; is "Hi").</li>
+  </ul>
+<h2 id="iana">6.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm46101443342224">2</a>].</p>
+<h2 id="registrar">7.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm46101443335664">3</a>] shall register the 'jabber:x:encrypted' and 'jabber:x:signed' namespaces as a result of this document.</p>
+<h2 id="schemas">8.
+       XML Schemas<a class="anchor-link" href="#schemas"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="schemas-encrypted">8.1 jabber:x:encrypted<a class="anchor-link" href="#schemas-encrypted"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='jabber:x:encrypted'
+    xmlns='jabber:x:encrypted'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+      The protocol documented by this schema is defined in
+      XEP-0027: http://www.xmpp.org/extensions/xep-0027.html
+    &lt;/xs:documentation&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:element name='x' type='xs:string'/&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="schemas-signed">8.2 jabber:x:signed<a class="anchor-link" href="#schemas-signed"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='jabber:x:signed'
+    xmlns='jabber:x:signed'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+      The protocol documented by this schema is defined in
+      XEP-0027: http://www.xmpp.org/extensions/xep-0027.html
+    &lt;/xs:documentation&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:element name='x' type='xs:string'/&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+  </div>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0027</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Obsolete">Obsolete</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Historical">Historical</a></dd><dt>Version</dt><dd>1.4</dd><dt>Last Updated</dt><dd>2014-03-14</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, <a href="https://datatracker.ietf.org/doc/html/rfc4880">RFC 4880</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>openpgp</dd><dt>Schema</dt><dd>
+        XML Schema for the 'jabber:x:encrypted' namespace: &lt;<a href="http://www.xmpp.org/schemas/x-encrypted.xsd">http://www.xmpp.org/schemas/x-encrypted.xsd</a>&gt;<br></dd><dd>
+        XML Schema for the 'jabber:x:signed' namespace: &lt;<a href="http://www.xmpp.org/schemas/x-signed.xsd">http://www.xmpp.org/schemas/x-signed.xsd</a>&gt;<br></dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0027.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0027.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0027.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Thomas Muldowney</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:temas@jabber.org">temas@jabber.org</a></dd><dt>JabberID</dt><dd><a href="xmpp:temas@jabber.org">temas@jabber.org</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Given that this XMPP Extension Protocol normatively references IETF technologies, discussion on the &lt;<a href="https://mail.jabber.org/mailman/listinfo/xsf-ietf">xsf-ietf@xmpp.org</a>&gt; list might also be appropriate.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm46101443377104">1</a>. RFC 4880: OpenPGP Message Format &lt;<a href="http://tools.ietf.org/html/rfc4880">http://tools.ietf.org/html/rfc4880</a>&gt;.</p><p><a name="nt-idm46101443342224">2</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm46101443335664">3</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v1.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0027-1.4.html">1.4</a> (2014-03-14)<a class="anchor-link" href="#revision-history-v1.4"><abbr title="Link to this point in the document">¶</abbr></a></div>Per a vote of the XMPP Council, changed status from Active to Deprecated to Obsolete.<div class="revision-author">editor (mam)</div></li><li id="revision-history-v1.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0027-1.3.html">1.3</a> (2006-11-29)<a class="anchor-link" href="#revision-history-v1.3"><abbr title="Link to this point in the document">¶</abbr></a></div>Removed the unnecessary requirement that the presence status or message body must contain XML character data, since an empty string can be signed.<div class="revision-author">psa</div></li><li id="revision-history-v1.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0027-1.2.html">1.2</a> (2004-03-08)<a class="anchor-link" href="#revision-history-v1.2"><abbr title="Link to this point in the document">¶</abbr></a></div>Clarified the text in several places; added several more security considerations and known issues.<div class="revision-author">psa</div></li><li id="revision-history-v1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0027-1.1.html">1.1</a> (2004-01-06)<a class="anchor-link" href="#revision-history-v1.1"><abbr title="Link to this point in the document">¶</abbr></a></div>Added XML schemas; added security, IANA, and XMPP Registrar considerations.<div class="revision-author">psa</div></li><li id="revision-history-v1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0027-1.0.html">1.0</a> (2002-04-23)<a class="anchor-link" href="#revision-history-v1.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Changed status to Active.<div class="revision-author">psa</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0027-0.2.html">0.2</a> (2002-04-11)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div>Merged DW's comments on key usage as well as more known issues.<div class="revision-author">tjm</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0027-0.1.html">0.1</a> (2002-03-12)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div>First draft.<div class="revision-author">tjm</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{muldowney2002openpgp,
+  title = {Current Jabber OpenPGP Usage},
+  author = {Muldowney, Thomas},
+  type = {XEP},
+  number = {0027},
+  version = {1.4},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0027.html},
+  date = {2002-03-12/2014-03-14},
+}</pre><p>END</p></body></html>

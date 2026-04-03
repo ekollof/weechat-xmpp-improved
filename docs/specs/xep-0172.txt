@@ -1,0 +1,230 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0172: User Nickname</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0172";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="User Nickname"><meta name="DC.Creator" content="Peter Saint-Andre"><meta name="DC.Creator" content="Valerie Mercier"><meta name="DC.Description" content="This specification defines a protocol for communicating user nicknames, either in XMPP presence subscription requests or in XMPP messages."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2012-03-21"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0172"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0172: User Nickname</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification defines a protocol for communicating user nicknames, either in XMPP presence subscription requests or in XMPP messages.</dd><dt>Authors</dt><dd><ul class="authors"><li>Peter Saint-Andre</li><li>Valerie Mercier</li></ul></dd><dt>Copyright</dt><dd>© 2005 – 2012 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Stable</p><div id="status-notice" class="draft standards track">NOTICE: The protocol defined herein is a <strong>Stable Standard</strong> of the XMPP Standards Foundation. Implementations are encouraged and the protocol is appropriate for deployment in production systems, but some changes to the protocol are possible before it becomes a Final Standard.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>1.1 (2012-03-21)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li class="current">Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#terms">Terminology</a></li><li><a href="#format">Format</a></li><li><a href="#usecases">Use Cases</a><ol><li><a href="#subscription">Presence Subscription Requests</a></li><li><a href="#message">Message Exchange</a></li><li><a href="#manage">Nickname Management</a></li></ol></li><li><a href="#impl">Implementation Notes</a></li><li><a href="#former">Former Usages</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#registrar-ns">Protocol Namespaces</a></li></ol></li><li><a href="#schema">XML Schema</a></li><li><a href="#ack">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">A nickname is a global, memorable (but not necessarily unique) friendly or informal name chosen by the owner of a bare JID &lt;localpart@domain.tld&gt; for the purpose of associating a distinctive mapping between the person's unique JID and non-unique nickname. While nicknames have been a common feature of instant messaging systems for many years, they have not always featured prominently in Jabber/XMPP IM systems (e.g., nicknames were not specified in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc3921">RFC 3921</a></span>  [<a href="#nt-idm46248465384672">1</a>] or <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6121">RFC 6121</a></span>  [<a href="#nt-idm46248465380256">2</a>]). However, there are several reasons why nicknames are important:</p>
+  <ul class="" style="">
+    <li class="" style="">Users like them.</li>
+    <li class="" style="">They are easier to remember than JIDs.</li>
+    <li class="" style="">They can be used to help prevent mimicking of JIDs (see <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0165.html">Best Practices to Prevent JID Mimicking (XEP-0165)</a></span>  [<a href="#nt-idm46248465372272">3</a>]).</li>
+  </ul>
+  <p class="" style="">This document defines best practices that enable IM users to advertise their preferred nicknames over Jabber/XMPP instant messaging networks.</p>
+<h2 id="terms">2.
+       Terminology<a class="anchor-link" href="#terms"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This proposal draws a distinction between the following kinds of names, where a JID is an innate feature of a user's identity on an XMPP system, a nickname is asserted by a user, and a handle is assigned by a contact to a user.</p>
+  <figure class="table"><figcaption id="table-1"><strong>Table 1:</strong> JIDs, Nicknames, and Handles<a class="anchor-link" href="#table-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+    <tr class="body">
+      <th colspan="" rowspan="">Name</th>
+      <th colspan="" rowspan="">Definition</th>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">Jabber ID (JID)</td>
+      <td align="" colspan="" rowspan="">A global and unique XMPP identifier registered to a particular user, of the form &lt;localpart@domain.tld&gt;; represented in the 'from' attribute of XML stanzas sent by that user, the 'jid' attribute of items associated with that user in a contact's roster, etc.</td>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">Nickname</td>
+      <td align="" colspan="" rowspan="">A global and memorable (but not necessarily unique) friendly name or informal name asserted by an IM user. Typically, a nickname is different from a familiar name, such as "Chuck" for "Charles", "Bill" for "William", "Pete" for "Peter", or "Dave" for "David"; instead, a nickname is even less formal, such as "stpeter" or "dizzyd". A nickname is thus typically different from a "display name" as that term is understood in SMTP (see <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc2821">RFC 2821</a></span>  [<a href="#nt-idm46248465355744">4</a>]) and SIP (see <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc3261">RFC 3261</a></span>  [<a href="#nt-idm46248465346704">5</a>]).</td>
+    </tr>
+    <tr class="body">
+      <td align="" colspan="" rowspan="">Handle</td>
+      <td align="" colspan="" rowspan="">A private, unique, and memorable "petname" or "alias" assigned by a contact to a user; represented in the 'name' attribute of the item associated with that user's JID in the contact's roster.  [<a href="#nt-idm46248465349680">6</a>]</td>
+    </tr>
+  </table></figure>
+<h2 id="format">3.
+       Format<a class="anchor-link" href="#format"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">A nickname MUST be encapsulated as the XML character data of a &lt;nick/&gt; element qualified by the 'http://jabber.org/protocol/nick' namespace. Here is an example:</p>
+  <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> A Nickname<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;nick xmlns='http://jabber.org/protocol/nick'&gt;Ishmael&lt;/nick&gt;
+</pre></figure>
+  <p class="" style="">A nickname of this form has the same semantic meaning as the following data fields:</p>
+  <ul class="" style="">
+    <li class="" style="">The "NICKNAME" field specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0054.html">vcard-temp (XEP-0054)</a></span>  [<a href="#nt-idm46248465337584">7</a>].</li>
+    <li class="" style="">The "nickname" field specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0154.html">User Profile (XEP-0154)</a></span>  [<a href="#nt-idm46248465327424">8</a>].</li>
+    <li class="" style="">The "nickname" field specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0077.html">In-Band Registration (XEP-0077)</a></span>  [<a href="#nt-idm46248465325520">9</a>].</li>
+    <li class="" style="">The "nick" field specified in <span class="ref" style=""><a href="http://xmlns.com/foaf/0.1/">Friend of a Friend (FOAF)</a></span>  [<a href="#nt-idm46248465320208">10</a>].</li>
+    <li class="" style="">The "Alias" field specified in the <span class="ref">Extensible Name and Address Language</span>  [<a href="#nt-idm46248465316800">11</a>] developed by <span class="ref" style=""><a href="http://www.oasis-open.org/">OASIS</a></span>  [<a href="#nt-idm46248465313776">12</a>].</li>
+  </ul>
+  <p class="" style="">The entity to which the &lt;nick/&gt; refers is the from address (no matter how encapsulated in XML) of the nearest ancestor element that specifies the sender (which might be a parent or grandparent element, e.g. the 'from' attribute of an &lt;iq/&gt; stanza).</p>
+<h2 id="usecases">4.
+       Use Cases<a class="anchor-link" href="#usecases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">In general, a user SHOULD include his or her nickname when establishing initial communication with a contact or group of contacts (i.e., the user has never been in communication with and does not have a prior relationship with the contact or group of contacts). Appropriate use cases therefore include:</p>
+  <ul class="" style="">
+    <li class="" style="">Presence subscription requests</li>
+    <li class="" style="">Message exchange</li>
+    <li class="" style="">Multi-user chat</li>
+    <li class="" style="">Waiting lists</li>
+  </ul>
+  <div class="indent"><h3 id="subscription">4.1 Presence Subscription Requests<a class="anchor-link" href="#subscription"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">As defined in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6121">RFC 6121</a></span>  [<a href="#nt-idm46248465380256">2</a>], a presence subscription request contains only the JID of the sender:</p>
+    <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> A Basic Subscription Request<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;presence from='narrator@moby-dick.lit' to='starbuck@moby-dick.lit' type='subscribe'/&gt;
+</pre></figure>
+    <p class="" style="">Naturally, based on the JID of the sender, it is possible for the client to pull information about the sender from a persistent data store such as an LDAP database, <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0054.html">vcard-temp (XEP-0054)</a></span>  [<a href="#nt-idm46248465337584">7</a>] node, or <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0154.html">User Profile (XEP-0154)</a></span>  [<a href="#nt-idm46248465327424">8</a>] store. However, to speed interactions, this document recommends that when a client sends a subscription request, it SHOULD include the preferred nickname of the sender:</p>
+    <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Including Nickname with Subscription Request<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;presence from='narrator@moby-dick.lit' to='starbuck@moby-dick.lit' type='subscribe'&gt;
+  &lt;nick xmlns='http://jabber.org/protocol/nick'&gt;Ishmael&lt;/nick&gt;
+&lt;/presence&gt;
+</pre></figure>
+    <p class="" style="">Note: This document recommends sending the nickname only in presence subscription requests; the nickname MUST NOT be included in presence broadcasts (i.e., &lt;presence/&gt; stanzas with no 'type' attribute or of type "unavailable").</p>
+  </div>
+  <div class="indent"><h3 id="message">4.2 Message Exchange<a class="anchor-link" href="#message"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">When a user begins to chat with a contact but the two parties have no pre-existing relationship or prior communications (e.g., no presence subscription or previous message exchange), the user SHOULD include the nickname with the first message sent to the contact:</p>
+    <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Including Nickname with First Message<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message from='narrator@moby-dick.lit/pda' to='starbuck@moby-dick.lit' type='chat'&gt;
+  &lt;body&gt;Call me Ishmael&lt;/body&gt;
+  &lt;nick xmlns='http://jabber.org/protocol/nick'&gt;Ishmael&lt;/nick&gt;
+&lt;/message&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="manage">4.3 Nickname Management<a class="anchor-link" href="#manage"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">In order for a user to modify his or her nickname and notify contacts of that change, it is RECOMMENDED for clients to use <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0163.html">Personal Eventing Protocol (XEP-0163)</a></span>  [<a href="#nt-idm46248465277520">13</a>] (a.k.a. PEP).</p>
+    <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> User Publishes Updated Nickname to PEP Node<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='narrator@moby-dick.lit/pda'
+    type='set'
+    id='pub1'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='http://jabber.org/protocol/nick'&gt;
+      &lt;item&gt;
+        &lt;nick xmlns='http://jabber.org/protocol/nick'&gt;CallMeIshmael&lt;/nick&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> PEP Node Generates Notifications<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message from='narrator@moby-dick.lit'
+         to='starbuck@moby-dick.lit'
+         type='headline'
+         id='foo'&gt;
+  &lt;event xmlns='http://jabber.org/protocol/pubsub#event'&gt;
+    &lt;items node='http://jabber.org/protocol/nick'&gt;
+      &lt;item&gt;
+        &lt;nick xmlns='http://jabber.org/protocol/nick'&gt;CallMeIshmael&lt;/nick&gt;
+      &lt;/item&gt;
+    &lt;/items&gt;
+  &lt;/event&gt;
+  &lt;addresses xmlns='http://jabber.org/protocol/address'&gt;
+    &lt;address type='replyto' jid='narrator@moby-dick.lit/pda'/&gt;
+  &lt;/addresses&gt;
+&lt;/message&gt;
+.
+.
+.
+</pre></figure>
+    <p class="" style="">If a XEP-0163-compliant personal eventing service is not available, a client SHOULD use a standalone <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm46248465273504">14</a>] service.</p>
+    <figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> User Publishes Updated Nickname to PubSub Node<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='narrator@moby-dick.lit/pda'
+    to='pubsub.mody-dick.lit'
+    type='set'
+    id='pub2'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='841f3c8955c4c41a0cf99620d78a33b996659ded'&gt;
+      &lt;item&gt;
+        &lt;nick xmlns='http://jabber.org/protocol/nick'&gt;CallMeIshmael&lt;/nick&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <figure class="code-example" id="example-8"><figcaption><strong>Example 8.</strong> PubSub Node Generates Notifications<a class="anchor-link" href="#example-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message from='pubsub.mody-dick.lit'
+         to='starbuck@moby-dick.lit'
+         type='headline'
+         id='foo'&gt;
+  &lt;event xmlns='http://jabber.org/protocol/pubsub#event'&gt;
+    &lt;items node='841f3c8955c4c41a0cf99620d78a33b996659ded'&gt;
+      &lt;item&gt;
+        &lt;nick xmlns='http://jabber.org/protocol/nick'&gt;CallMeIshmael&lt;/nick&gt;
+      &lt;/item&gt;
+    &lt;/items&gt;
+  &lt;/event&gt;
+  &lt;addresses xmlns='http://jabber.org/protocol/address'&gt;
+    &lt;address type='replyto' jid='narrator@moby-dick.lit/pda'/&gt;
+  &lt;/addresses&gt;
+&lt;/message&gt;
+.
+.
+.
+</pre></figure>
+    <p class="" style="">If a client does not support <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm46248465273504">14</a>] or the subset thereof specified in <span class="ref">XEP-0163</span>, it MAY send one &lt;message/&gt; stanza to each of its contacts, containing the updated nickname (note: the client SHOULD send the messages in a staggered fashion in order to avoid server-enforced rate limiting, commonly known as "karma").</p>
+    <figure class="code-example" id="example-9"><figcaption><strong>Example 9.</strong> Nickname Change Notification via Message<a class="anchor-link" href="#example-9"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message from='narrator@moby-dick.lit/pda' to='starbuck@moby-dick.lit'&gt;
+  &lt;nick xmlns='http://jabber.org/protocol/nick'&gt;CallMeIshmael&lt;/nick&gt;
+&lt;/message&gt;
+.
+.
+.
+</pre></figure>
+  </div>
+<h2 id="impl">5.
+       Implementation Notes<a class="anchor-link" href="#impl"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">An IM client MAY use the user's own nickname as all or part of the "display name" shown to the user of that client (e.g., as the sending name in one-to-one chats and groupchats). For example, if the user whose JID is narrator@moby-dick.lit asserts that his nickname is "Ishmael", that user's client may show "Ishmael" as all or part of the user's display name. How the client shall store the display name is out of scope for this document; possible mechanisms include the user's local vCard, an organizational LDAP directory, <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0049.html">Private XML Storage (XEP-0049)</a></span>  [<a href="#nt-idm46248465258592">15</a>], or <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0154.html">User Profile (XEP-0154)</a></span>  [<a href="#nt-idm46248465327424">8</a>].</p>
+<h2 id="former">6.
+       Former Usages<a class="anchor-link" href="#former"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Earlier versions of this document described how to include the User Nickname extension in presence stanzas and invitations sent in relation to <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm46248465249168">16</a>] rooms. Based on deployment experience, that usage is now discouraged, since it is confusing to display multiple nicknames to an end user and inclusion of user-generated nicknames can override or work around local service policies for "nick lockdown" in chatrooms.</p>
+  <p class="" style="">Earlier versions also described usage in relation to the <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0130.html">Waiting Lists (XEP-0130)</a></span>  [<a href="#nt-idm46248465243472">17</a>] protocol. Because that protocol is now obsolete, documentation of such usage has been removed from this specification.</p>
+<h2 id="security">7.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">A nickname is a memorable, friendly name asserted by a user. There is no guarantee that any given nickname will be unique even within a particular community (such as an enterprise or university), let alone across the Internet through federation of communities. Clients SHOULD warn users that nicknames asserted by contacts are not unique and that nickname collisions are possible. Clients also MUST NOT depend on nicknames to validate the identity of contacts; instead, nicknames SHOULD be used in conjunction with JIDs (which are globally unique) and user-assigned handles (which are private and unique) as described in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0165.html">Best Practices to Prevent JID Mimicking (XEP-0165)</a></span>  [<a href="#nt-idm46248465372272">3</a>] in order to provide a three-pronged approach to identity validation, preferably in combination with X.509 certificates.</p>
+<h2 id="iana">8.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm46248465230624">18</a>].</p>
+<h2 id="registrar">9.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="registrar-ns">9.1 Protocol Namespaces<a class="anchor-link" href="#registrar-ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm46248465223424">19</a>] includes 'http://jabber.org/protocol/nick' in its registry of protocol namespaces (see &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt;).</p>
+  </div>
+<h2 id="schema">10.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='http://jabber.org/protocol/nick'
+    xmlns='http://jabber.org/protocol/nick'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+      The protocol documented by this schema is defined in
+      XEP-0172: http://www.xmpp.org/extensions/xep-0172.html
+    &lt;/xs:documentation&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:element name='nick' type='xs:string'/&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+<h2 id="ack">11.
+       Acknowledgements<a class="anchor-link" href="#ack"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Thanks to Ian Paterson for his feedback.</p>
+  <p class="" style="">Unbeknownst to the authors of this document, work on user nicknames was previously done by Richard Dobson.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0172</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Draft">Stable</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>1.1</dd><dt>Last Updated</dt><dd>2012-03-21</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core</dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>nick</dd><dt>Schema</dt><dd>
+        &lt;<a href="http://www.xmpp.org/schemas/nick.xsd">http://www.xmpp.org/schemas/nick.xsd</a>&gt;<br></dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0172.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0172.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0172.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Peter Saint-Andre</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:stpeter@stpeter.im">stpeter@stpeter.im</a></dd><dt>JabberID</dt><dd><a href="xmpp:stpeter@jabber.org">stpeter@jabber.org</a></dd><dt>URI</dt><dd><a href="https://stpeter.im/">https://stpeter.im/</a></dd></dl><h5>Valerie Mercier</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:valerie.mercier@orange-ftgroup.com">valerie.mercier@orange-ftgroup.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:vmercier@jabber.com">vmercier@jabber.com</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm46248465384672">1</a>. RFC 3921: Extensible Messaging and Presence Protocol (XMPP): Instant Messaging and Presence &lt;<a href="http://tools.ietf.org/html/rfc3921">http://tools.ietf.org/html/rfc3921</a>&gt;.</p><p><a name="nt-idm46248465380256">2</a>. RFC 6121: Extensible Messaging and Presence Protocol (XMPP): Instant Messaging and Presence &lt;<a href="http://tools.ietf.org/html/rfc6121">http://tools.ietf.org/html/rfc6121</a>&gt;.</p><p><a name="nt-idm46248465372272">3</a>. XEP-0165: Best Practices to Prevent JID Mimicking &lt;<a href="https://xmpp.org/extensions/xep-0165.html">https://xmpp.org/extensions/xep-0165.html</a>&gt;.</p><p><a name="nt-idm46248465355744">4</a>. RFC 2821: Simple Mail Transfer Protocol &lt;<a href="http://tools.ietf.org/html/rfc2821">http://tools.ietf.org/html/rfc2821</a>&gt;.</p><p><a name="nt-idm46248465346704">5</a>. RFC 3261: Session Initiation Protocol (SIP) &lt;<a href="http://tools.ietf.org/html/rfc3261">http://tools.ietf.org/html/rfc3261</a>&gt;.</p><p><a name="nt-idm46248465349680">6</a>. In RFC 3921, the name here called a "handle" was described as an "alias"; RFC 6121; was modified to use the term "handle" instead.</p><p><a name="nt-idm46248465337584">7</a>. XEP-0054: vcard-temp &lt;<a href="https://xmpp.org/extensions/xep-0054.html">https://xmpp.org/extensions/xep-0054.html</a>&gt;.</p><p><a name="nt-idm46248465327424">8</a>. XEP-0154: User Profile &lt;<a href="https://xmpp.org/extensions/xep-0154.html">https://xmpp.org/extensions/xep-0154.html</a>&gt;.</p><p><a name="nt-idm46248465325520">9</a>. XEP-0077: In-Band Registration &lt;<a href="https://xmpp.org/extensions/xep-0077.html">https://xmpp.org/extensions/xep-0077.html</a>&gt;.</p><p><a name="nt-idm46248465320208">10</a>. Friend of a Friend (FOAF) &lt;<a href="http://xmlns.com/foaf/0.1/">http://xmlns.com/foaf/0.1/</a>&gt;.</p><p><a name="nt-idm46248465316800">11</a>. See &lt;<a href="http://xml.coverpages.org/xnal.html">http://xml.coverpages.org/xnal.html</a>&gt;.</p><p><a name="nt-idm46248465313776">12</a>. OASIS is a not-for-profit, international consortium that drives the development, convergence and adoption of e-business standards. For further information, see &lt;<a href="http://www.oasis-open.org/">http://www.oasis-open.org/</a>&gt;.</p><p><a name="nt-idm46248465277520">13</a>. XEP-0163: Personal Eventing Protocol &lt;<a href="https://xmpp.org/extensions/xep-0163.html">https://xmpp.org/extensions/xep-0163.html</a>&gt;.</p><p><a name="nt-idm46248465273504">14</a>. XEP-0060: Publish-Subscribe &lt;<a href="https://xmpp.org/extensions/xep-0060.html">https://xmpp.org/extensions/xep-0060.html</a>&gt;.</p><p><a name="nt-idm46248465258592">15</a>. XEP-0049: Private XML Storage &lt;<a href="https://xmpp.org/extensions/xep-0049.html">https://xmpp.org/extensions/xep-0049.html</a>&gt;.</p><p><a name="nt-idm46248465249168">16</a>. XEP-0045: Multi-User Chat &lt;<a href="https://xmpp.org/extensions/xep-0045.html">https://xmpp.org/extensions/xep-0045.html</a>&gt;.</p><p><a name="nt-idm46248465243472">17</a>. XEP-0130: Waiting Lists &lt;<a href="https://xmpp.org/extensions/xep-0130.html">https://xmpp.org/extensions/xep-0130.html</a>&gt;.</p><p><a name="nt-idm46248465230624">18</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm46248465223424">19</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0172-1.1.html">1.1</a> (2012-03-21)<a class="anchor-link" href="#revision-history-v1.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Based on implementation and deployment experience, discouraged use in Multi-User Chat; also removed text about Waiting Lists because of lack of deployment.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0172-1.0.html">1.0</a> (2006-06-05)<a class="anchor-link" href="#revision-history-v1.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the Jabber Council, advanced status to Draft.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.9"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0172-0.9.html">0.9</a> (2006-05-10)<a class="anchor-link" href="#revision-history-v0.9"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added pubsub examples.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.8"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0172-0.8.html">0.8</a> (2006-04-28)<a class="anchor-link" href="#revision-history-v0.8"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified terminology; explicitly mentioned that nicknames must not be included in presence broadcasts (only subscription requests); added implementation note about display names.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.7"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0172-0.7.html">0.7</a> (2006-04-21)<a class="anchor-link" href="#revision-history-v0.7"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added further detail to waitlist example; added schema.</p><div class="revision-author">psa/vm</div></li><li id="revision-history-v0.6"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0172-0.6.html">0.6</a> (2006-03-27)<a class="anchor-link" href="#revision-history-v0.6"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Specified security considerations.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0172-0.5.html">0.5</a> (2006-03-22)<a class="anchor-link" href="#revision-history-v0.5"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Fixed MUC invite example; clarified that nick refers to entity associated with nearest ancestor element that specifies a sender; added waitlist example.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0172-0.4.html">0.4</a> (2006-03-20)<a class="anchor-link" href="#revision-history-v0.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">To reflect use of dedicated namespace, (1) changed document type from Informational to Standards Track and (2) updated XMPP Registrar Considerations.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0172-0.3.html">0.3</a> (2006-03-16)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Modified to use dedicated namespace; added example for multi-user chat invitations.</p><div class="revision-author">psa/vm</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0172-0.2.html">0.2</a> (2006-03-08)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added wrapper element from XEP-0154.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0172-0.1.html">0.1</a> (2006-01-24)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial version.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0172-0.0.3.html">0.0.3</a> (2006-01-22)<a class="anchor-link" href="#revision-history-v0.0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added message exchange use case.</p><div class="revision-author">psa/vm</div></li><li id="revision-history-v0.0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0172-0.0.2.html">0.0.2</a> (2006-01-18)<a class="anchor-link" href="#revision-history-v0.0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added MUC and nickname management use cases; specified profile data syntax.</p><div class="revision-author">psa/vm</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0172-0.0.1.html">0.0.1</a> (2005-09-12)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial version.</p><div class="revision-author">psa</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{saint-andre2005nick,
+  title = {User Nickname},
+  author = {Saint-Andre, Peter and Mercier, Valerie},
+  type = {XEP},
+  number = {0172},
+  version = {1.1},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0172.html},
+  date = {2005-09-12/2012-03-21},
+}</pre><p>END</p></body></html>

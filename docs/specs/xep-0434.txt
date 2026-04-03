@@ -1,0 +1,451 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0434: Trust Messages (TM)</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0434";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Trust Messages (TM)"><meta name="DC.Creator" content="Melvin Keskin"><meta name="DC.Description" content="
+		This document specifies a way to communicate the trust in public long-term keys used by end-to-end encryption protocols from one endpoint to another.
+	"><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2021-10-04"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0434"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0434: Trust Messages (TM)</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>
+		This document specifies a way to communicate the trust in public long-term keys used by end-to-end encryption protocols from one endpoint to another.
+	</dd><dt>Author</dt><dd>Melvin Keskin</dd><dt>Copyright</dt><dd>© 2020 – 2021 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Experimental</p><div id="status-notice" class="experimental standards track">WARNING: This Standards-Track document is Experimental. Publication as an XMPP Extension Protocol does not imply approval of this proposal by the XMPP Standards Foundation. Implementation of the protocol described herein is encouraged in exploratory implementations, but production systems are advised to carefully consider whether it is appropriate to deploy implementations of this protocol before it advances to a status of Draft.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.6.0 (2021-10-04)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li class="current">Experimental</li><li>Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#introduction">Introduction</a></li><li><a href="#glossary">Glossary</a></li><li><a href="#why-trust-messages">Why Trust Messages?</a><ol><li><a href="#why-trust-messages-general-advantages">General Advantages</a><ol><li><a href="#why-trust-messages-general-advantages-no-permanent-storage">No Permanent Storage</a></li><li><a href="#why-trust-messages-general-advantages-no-additional-infrastructure">No Additional Infrastructure</a></li></ol></li><li><a href="#why-trust-messages-advantages-with-encryption">Advantages with Encryption</a><ol><li><a href="#why-trust-messages-advantages-with-encryption-same-cryptographic-properties">Same Cryptographic Properties</a></li><li><a href="#why-trust-messages-advantages-with-encryption-confidential-communication-of-trust">Confidential Communication of Trust</a></li><li><a href="#why-trust-messages-advantages-with-encryption-no-selective-blocking">No Selective Blocking</a></li></ol></li></ol></li><li><a href="#trust-message-structure">Trust Message Structure</a></li><li><a href="#use-cases">Use Cases</a><ol><li><a href="#use-cases-unencrypted-trust-message">Unencrypted Trust Message</a></li><li><a href="#use-cases-encrypted-trust-message">Encrypted Trust Message</a><ol><li><a href="#use-cases-encrypted-trust-message-sce-profile">SCE Profile</a></li></ol></li></ol></li><li><a href="#implementation-notes">Implementation Notes</a></li><li><a href="#security-considerations">Security Considerations</a></li><li><a href="#iana-considerations">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#xmpp-registrar-considerations-uri-query-types">URI Query Types</a><ol><li><a href="#xmpp-registrar-considerations-uri-query-types-trust-message">trust-message</a></li></ol></li><li><a href="#xmpp-registrar-considerations-protocol-namespaces">Protocol Namespaces</a></li><li><a href="#xmpp-registrar-considerations-protocol-versioning">Protocol Versioning</a></li></ol></li><li><a href="#xml-schema">XML Schema</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="introduction">1.
+       Introduction<a class="anchor-link" href="#introduction"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<p class="" style="">
+		End-to-end encryption without verifying the authenticity of the exchanged public long-term keys only enables the endpoints to protect their communication against passive attacks.
+		This means an attacker cannot read encrypted messages in transit without actively intervening in the key exchange.
+		However, without any other precautions, active attacks are still possible.
+		If an attacker replaces the exchanged keys with malicious ones or introduces an additional malicious endpoint, the end-to-end encrypted messages can be read and manipulated by the attacker.
+	</p>
+	<p class="" style="">
+		When using end-to-end encryption where public long-term keys are transmitted over a channel that is not protected against active attacks, the authenticity of those keys is not guaranteed.
+		Such a key has to be authenticated by the receiving endpoint over another channel that is already protected against active attacks to maintain the confidentiality of sent messages and ensure the authenticity and integrity of received messages.
+		Trust messages can be used to transfer the needed data via XMPP for performing such an authentication.
+		Furthermore, they can transmit the data used for distrusting a key.
+	</p>
+<h2 id="glossary">2.
+       Glossary<a class="anchor-link" href="#glossary"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<div class="indent"><dl>
+		
+			<dt><strong>Endpoint</strong></dt>
+			<dd>
+				Communication endpoint owning exactly one public long-term key.
+				In most cases that is an XMPP client instance.
+				In the terminology of <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0384.html">OMEMO Encryption (XEP-0384)</a></span>  [<a href="#nt-idm45075817088640">3</a>], that is a <em>device</em>.
+				To cover also the possibility for using multiple endpoints on the same physical device and via the same client instance, the general term <em>endpoint</em> is used.
+			</dd>
+		
+		
+			<dt><strong>Key authentication</strong></dt>
+			<dd>
+				Verification that a key received over an insecure channel is actually the one of the assumed endpoint
+			</dd>
+		
+		
+			<dt><strong>Key identifier</strong></dt>
+			<dd>
+				Identifier of a key (e.g., a hash value / fingerprint or the key itself)
+			</dd>
+		
+		
+			<dt><strong>Public key certificate</strong></dt>
+			<dd>
+				Electronic document used to prove the authenticity of a public key
+			</dd>
+		
+		
+			<dt><strong>Trust message</strong></dt>
+			<dd>
+				XMPP message that indicates whether specific keys are trusted or untrusted by the sending endpoint.
+				A trust message for an endpoint's key contains the key identifier of the given key.
+			</dd>
+		
+	</dl></div>
+<h2 id="why-trust-messages">3.
+       Why Trust Messages?<a class="anchor-link" href="#why-trust-messages"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<p class="" style="">
+		Trust messages can be used in conjunction with an end-to-end encryption protocol such as <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0373.html">OpenPGP for XMPP (XEP-0373)</a></span>  [<a href="#nt-idm45075817075184">4</a>] or <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0384.html">OMEMO Encryption (XEP-0384)</a></span>  [<a href="#nt-idm45075817088640">3</a>] to automatically or semi-automatically establish secure channels protected against active attacks.
+		This protocol specifies how trust messages are transmitted and protocols such as <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0450.html">Automatic Trust Management (ATM) (XEP-0450)</a></span>  [<a href="#nt-idm45075817125616">1</a>] specify how and for which purpose they are processed.
+	</p>
+	<div class="indent"><h3 id="why-trust-messages-general-advantages">3.1 General Advantages<a class="anchor-link" href="#why-trust-messages-general-advantages"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<p class="" style="">
+			Trust messages have the following advantages:
+		</p>
+		<div class="indent"><h4 id="why-trust-messages-general-advantages-no-permanent-storage">3.1.1 No Permanent Storage<a class="anchor-link" href="#why-trust-messages-general-advantages-no-permanent-storage"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+			<p class="" style="">
+				A permanent storage is not needed.
+				Cached data can be be removed as soon as the recipient made use of them.
+				E.g., a server-side storage holding available data because it does not know when a client needs to access them, as for certificate-based approaches, is unnecessary.
+			</p>
+		</div>
+		<div class="indent"><h4 id="why-trust-messages-general-advantages-no-additional-infrastructure">3.1.2 No Additional Infrastructure<a class="anchor-link" href="#why-trust-messages-general-advantages-no-additional-infrastructure"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+			<p class="" style="">
+				An infrastructure in additional to the one used for messages is not needed because trust messages are ordinary messages.
+				E.g., a server-side storage and a mechanism for accessing it other than those used for messages is unnecessary.
+			</p>
+		</div>
+	</div>
+	<div class="indent"><h3 id="why-trust-messages-advantages-with-encryption">3.2 Advantages with Encryption<a class="anchor-link" href="#why-trust-messages-advantages-with-encryption"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<p class="" style="">
+			The authenticity and integrity of trust messages are ensured by a signing mechanism.
+			If trust messages are additionally encrypted, they have the following advantages:
+		</p>
+		<div class="indent"><h4 id="why-trust-messages-advantages-with-encryption-same-cryptographic-properties">3.2.1 Same Cryptographic Properties<a class="anchor-link" href="#why-trust-messages-advantages-with-encryption-same-cryptographic-properties"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+			<p class="" style="">
+				The cryptographic properties of the encryption protocol are applied to the trust messages.
+				Properties such as confidentiality, forward secrecy and deniability can have a positive impact on the authentication of keys.
+				Hence, trust messages, in contrast to certificates, can e.g. be deniable toward a third party if the encryption protocol provides that kind of deniability.
+			</p>
+		</div>
+		<div class="indent"><h4 id="why-trust-messages-advantages-with-encryption-confidential-communication-of-trust">3.2.2 Confidential Communication of Trust<a class="anchor-link" href="#why-trust-messages-advantages-with-encryption-confidential-communication-of-trust"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+			<p class="" style="">
+				The fact that an endpoint trusts a key or not can be kept confidential toward an attacker by encrypting those messages and sending them only to endpoints with authenticated keys.
+				This means that an attacker cannot detect by the content of a trust message whether a specific key is trusted by the sender.
+				If the trust message is sent for an authentication of a key, the involved parties of that authentication will therefore stay anonymous toward an attacker.
+			</p>
+			<p class="" style="">
+				The encryption protects against passive attacks on the transmission of the trust messages.
+				That way, an attacker cannot read the content of the trust messages.
+			</p>
+			<p class="" style="">
+				The restriction to send trust messages only to endpoints with authenticated keys in addition to the encryption protects against active attacks on the transmission of the trust messages.
+				An attacker will even after introducing a malicious key not receive a trust message encrypted with that key.
+			</p>
+		</div>
+		<div class="indent"><h4 id="why-trust-messages-advantages-with-encryption-no-selective-blocking">3.2.3 No Selective Blocking<a class="anchor-link" href="#why-trust-messages-advantages-with-encryption-no-selective-blocking"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+			<p class="" style="">
+				Blocking data used to trust or distrust keys in transit is made more difficult.
+				In particular, an attacker is not able to selectively block transmitted data used to distrust the attacker's key.
+			</p>
+			<p class="" style="">
+				If an attacker cannot distinguish whether the data sent from a client is used for trusting or distrusting a key, the attacker can only randomly block some messages or the whole communication.
+				If the communication is already compromised by an active attack, the attacker does not want to stop the whole communication.
+				During that state, the attacker has the possibility to keep on e.g. eavesdropping or altering messages.
+				Therefore, the attacker wants to block data that can lead to excluding the attacker.
+				But the attacker does not want to block the communication itself.
+			</p>
+			<p class="" style="">
+				Data that is used by the recipient to distrust the attacker's key would make it impossible for the attacker to continue to encroach on the communication.
+				Thus, it is important to prevent an attacker from blocking data used for making trust decisions.
+				E.g., an approach using certificates permanently stored on a server cannot prevent an attacker from specifically blocking such data because certificates have to be discoverable and identifiable as such.
+			</p>
+			<p class="" style="">
+				It might be possible to distinguish an encrypted trust message from other encrypted messages by analyzing the network traffic over a period of time.
+				However, the mitigation of that issue is out of scope.
+			</p>
+		</div>
+	</div>
+<h2 id="trust-message-structure">4.
+       Trust Message Structure<a class="anchor-link" href="#trust-message-structure"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<p class="" style="">
+		A trust message (i.e., the root &lt;message/&gt; element)
+	</p>
+	<ul class="" style="">
+		<li class="" style="">
+			MUST contain exactly one &lt;trust-message/&gt; direct child element that
+			<ul class="" style="">
+				<li class="" style="">
+					MUST be signed in a way to ensure its authenticity and integrity.
+				</li>
+				<li class="" style="">
+					SHOULD be encrypted to ensure its confidentiality.
+				</li>
+				<li class="" style="">
+					MUST have an <em>xmlns</em> attribute specifying its namespace <em>urn:xmpp:tm:1</em>.
+				</li>
+				<li class="" style="">
+					MUST have a <em>usage</em> attribute specifying the namespace of the protocol that uses the trust message for a specific purpose.
+				</li>
+				<li class="" style="">
+					MUST have an <em>encryption</em> attribute specifying the namespace of the encryption protocol that uses the keys.
+				</li>
+				<li class="" style="">
+					MUST contain at least one &lt;key-owner/&gt; direct child element that
+					<ul class="" style="">
+						<li class="" style="">
+							MUST have a <em>JID</em> attribute specifying the bare JID of the key owner.
+						</li>
+						<li class="" style="">
+							MUST contain at least one &lt;trust/&gt; or &lt;distrust/&gt; direct child element indicating the trust respectively distrust in a key.
+							Each &lt;trust/&gt; and &lt;distrust/&gt; element MUST contain exactly one Base64-encoded (see <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc4648">RFC 4648</a></span>  [<a href="#nt-idm45075817022432">5</a>]) key identifier.
+							The kind of identifier that the key's encryption protocol specifies MUST be used.
+						</li>
+					</ul>
+				</li>
+			</ul>
+		</li>
+		<li class="" style="">
+			SHOULD have a type='chat' attribute which is needed to deliver the trust message to all endpoints (see <a href="https://xmpp.org/extensions/xep-0280.html#recommended-rules">XEP-0280: Message Carbons</a>).
+		</li>
+		<li class="" style="">
+			SHOULD contain a &lt;store xmlns='urn:xmpp:hints'/&gt; direct child element which is needed to deliver the trust message to each offline endpoint after it went online (see <a href="https://xmpp.org/extensions/xep-0313.html#business-storeret-user-archives">XEP-0313: Message Archive Management</a> and <a href="https://xmpp.org/extensions/xep-0334.html#sect-idm45856619663120">XEP-0334: Message Processing Hints</a>).
+		</li>
+	</ul>
+	<p class="" style="">
+		The last two points are needed to achieve their mentioned goals because a trust message does not contain a &lt;body&gt; element which would automatically lead to the desired result.
+	</p>
+	<p class="" style="">
+		In the following example, two <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0384.html">OMEMO Encryption (XEP-0384)</a></span>  [<a href="#nt-idm45075817088640">3</a>] keys of Alice are indicated as trusted, one key of Bob is indicated as trusted and two other ones of Bob are indicated as untrusted.
+	</p>
+	<figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Trust Message Element for Alice's and Bob's OMEMO Keys used by ATM<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;trust-message xmlns='urn:xmpp:tm:1' usage='urn:xmpp:atm:1' encryption='urn:xmpp:omemo:2'&gt;
+  &lt;key-owner jid='alice@example.org'&gt;
+    &lt;trust&gt;aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=&lt;/trust&gt;
+    &lt;trust&gt;IhpPjiKLchgrAG5cpSfTvdzPjZ5v6vTOluHEUehkgCA=&lt;/trust&gt;
+  &lt;/key-owner&gt;
+  &lt;key-owner jid='bob@example.com'&gt;
+    &lt;trust&gt;YjVI04NcbTPvXLaA95RO84HPcSvyOgEZ2r5cTyUs0C8=&lt;/trust&gt;
+    &lt;distrust&gt;tCP1CI3pqSTVGzFYFyPYUMfMZ9Ck/msmfD0wH/VtJBM=&lt;/distrust&gt;
+    &lt;distrust&gt;2fhJtrgoMJxfLI3084/YkYh9paqiSiLFDVL2m0qAgX4=&lt;/distrust&gt;
+  &lt;/key-owner&gt;
+&lt;/trust-message&gt;
+</pre></figure>
+<h2 id="use-cases">5.
+       Use Cases<a class="anchor-link" href="#use-cases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<p class="" style="">
+		Trust messages MAY be sent unencrypted to solely communicate the trust in specific keys without any other protection.
+		But as described before, the strength of trust messages is the possibility to encrypt their content and choose to which endpoints they are sent according to the trust in the endpoints' keys.
+	</p>
+	<div class="indent"><h3 id="use-cases-unencrypted-trust-message">5.1 Unencrypted Trust Message<a class="anchor-link" href="#use-cases-unencrypted-trust-message"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<p class="" style="">
+			The &lt;trust-message/&gt; element MUST be signed before sending for ensuring the authenticity and integrity.
+		</p>
+	</div>
+	<div class="indent"><h3 id="use-cases-encrypted-trust-message">5.2 Encrypted Trust Message<a class="anchor-link" href="#use-cases-encrypted-trust-message"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<p class="" style="">
+			The &lt;trust-message/&gt; element SHOULD be signed and encrypted before sending for applying all advantages the encryption provides.
+			That protects against passive attacks on the transmission of the trust message.
+			The trust message SHOULD only be sent to endpoints whose keys have already been authenticated for also preventing active attacks on the transmission of the trust message.
+		</p>
+		<p class="" style="">
+			Describing how the &lt;trust-message/&gt; element has to be used by each existing encryption protocol is out of scope.
+			<span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0420.html">Stanza Content Encryption (XEP-0420)</a></span>  [<a href="#nt-idm45075817104848">2</a>] specifies a common method for encrypting arbitrary elements which can be used by different encryption protocols.
+			When using an encryption protocol such as <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0384.html">OMEMO Encryption (XEP-0384)</a></span>  [<a href="#nt-idm45075817088640">3</a>] that uses <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0420.html">Stanza Content Encryption (XEP-0420)</a></span>  [<a href="#nt-idm45075817104848">2</a>] (SCE), the SCE &lt;content/&gt; element MUST contain the &lt;trust-message/&gt; element as a direct child.
+		</p>
+		<div class="indent"><h4 id="use-cases-encrypted-trust-message-sce-profile">5.2.1 SCE Profile<a class="anchor-link" href="#use-cases-encrypted-trust-message-sce-profile"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+			<p class="" style="">
+				A trust message SCE &lt;envelope/&gt; element
+			</p>
+			<ul class="" style="">
+				<li class="" style="">
+					MUST contain an &lt;rpad/&gt; affix element.
+					This prevents an attacker from finding out the trust message's content by its length and distinguishing a trust message from another kind of SCE message.
+				</li>
+				<li class="" style="">
+					MUST contain a &lt;time/&gt; affix element.
+					This prevents an attacker from delivering trust messages in the wrong order or delivering a former trust message again.
+					If the trust messages are used by the recipient for making trust decisions, it protects the recipient from setting the opposite of the intended trust state by applying trust changes in the wrong order or reapplying a former change.
+				</li>
+				<li class="" style="">
+					SHOULD contain a &lt;from/&gt; affix element.
+					This prevents an attacker from spoofing the sender.
+				</li>
+				<li class="" style="">
+					SHOULD contain a &lt;to/&gt; affix element.
+					This prevents an attacker from spoofing the recipient.
+				</li>
+			</ul>
+		</div>
+		<figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> SCE Envelope Element Used for a Trust Message from Alice's Endpoint to Carol<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;envelope xmlns='urn:xmpp:sce:1'&gt;
+  &lt;rpad&gt;QHqW2arWFewoERL1a43wonBKpTmsrBWnc1d66HSDq85NgMLmjrDJV9lV&lt;/rpad&gt;
+  &lt;time stamp='2020-01-01T00:00:00'/&gt;
+  &lt;from jid='alice@example.org/notebook'/&gt;
+  &lt;to jid='carol@example.com'/&gt;
+  &lt;content&gt;
+    &lt;trust-message xmlns='urn:xmpp:tm:1' usage='urn:xmpp:atm:1' encryption='urn:xmpp:omemo:2'&gt;
+      &lt;key-owner jid='alice@example.org'&gt;
+        &lt;trust&gt;aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=&lt;/trust&gt;
+        &lt;trust&gt;IhpPjiKLchgrAG5cpSfTvdzPjZ5v6vTOluHEUehkgCA=&lt;/trust&gt;
+      &lt;/key-owner&gt;
+      &lt;key-owner jid='bob@example.com'&gt;
+        &lt;trust&gt;YjVI04NcbTPvXLaA95RO84HPcSvyOgEZ2r5cTyUs0C8=&lt;/trust&gt;
+        &lt;distrust&gt;tCP1CI3pqSTVGzFYFyPYUMfMZ9Ck/msmfD0wH/VtJBM=&lt;/distrust&gt;
+        &lt;distrust&gt;2fhJtrgoMJxfLI3084/YkYh9paqiSiLFDVL2m0qAgX4=&lt;/distrust&gt;
+      &lt;/key-owner&gt;
+    &lt;/trust-message&gt;
+  &lt;/content&gt;
+&lt;/envelope&gt;
+</pre></figure>
+	</div>
+<h2 id="implementation-notes">6.
+       Implementation Notes<a class="anchor-link" href="#implementation-notes"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<p class="" style="">
+		<span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0280.html">Message Carbons (XEP-0280)</a></span>  [<a href="#nt-idm45075816976672">6</a>] minimizes the number of trust messages to be sent while having the same payload because trust messages with the same payload do not have to be sent for each endpoint.
+		In combination with the usage of <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0313.html">Message Archive Management (XEP-0313)</a></span>  [<a href="#nt-idm45075816972224">7</a>], the delivery of trust messages to temporarily offline endpoints is ensured even if they are available under a different resource after going online than the last known one before going offline.
+	</p>
+	<p class="" style="">
+		This specification uses <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0280.html">Message Carbons (XEP-0280)</a></span>  [<a href="#nt-idm45075816976672">6</a>] for sending a trust message to all endpoints of a contact or to all own endpoints at once.
+		By sending a trust message to the contact, each endpoint of the contact and each own endpoint receives the same trust message by the server.
+		Thus, a client needs to send the same trust message only once.
+	</p>
+	<p class="" style="">
+		If not all endpoints of the contact should receive the trust message, the trust message MAY be sent to specific endpoints of the contact but for all own endpoints <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0280.html">Message Carbons (XEP-0280)</a></span>  [<a href="#nt-idm45075816976672">6</a>] MAY be used and vice versa.
+		Even when a client does not yet have a contact, the client MAY use <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0280.html">Message Carbons (XEP-0280)</a></span>  [<a href="#nt-idm45075816976672">6</a>] for delivering a trust message to all own endpoints by sending it to the own bare JID.
+		If then a client receives a trust message with its own full JID as the sender, it MAY discard that message directly without parsing the content.
+	</p>
+	<p class="" style="">
+		Example:
+		Alice's endpoint A1 authenticates the key of her endpoint A2.
+		A1 sends the trust message for A2's key only once to all of Alice's and Bob's endpoints by using <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0280.html">Message Carbons (XEP-0280)</a></span>  [<a href="#nt-idm45075816976672">6</a>].
+	</p>
+	<p class="" style="">
+		Attention:
+		In that context, sending an encrypted trust message to all endpoints of a contact or to all own endpoints does not mean to encrypt it with the keys of all those endpoints.
+		Instead, it only means that all of those endpoints should receive the trust message even if it is not encrypted for some of them and thereby not decryptable by those endpoints.
+		Keep in mind that a trust message SHOULD only be encrypted for endpoints with authenticated keys.
+	</p>
+<h2 id="security-considerations">7.
+       Security Considerations<a class="anchor-link" href="#security-considerations"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<p class="" style="">
+		Protocols using trust messages SHOULD specify rules for processing them in order to create or sustain a secure communication.
+		Therefore, those protocols SHOULD state in which cases from which senders trust messages are used for making trust decisions and for which keys they are sent to whom.
+	</p>
+<h2 id="iana-considerations">8.
+       IANA Considerations<a class="anchor-link" href="#iana-considerations"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<p class="" style="">
+		This document requires no interaction with the Internet Assigned Numbers Authority (IANA).
+	</p>
+<h2 id="registrar">9.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<div class="indent"><h3 id="xmpp-registrar-considerations-uri-query-types">9.1 URI Query Types<a class="anchor-link" href="#xmpp-registrar-considerations-uri-query-types"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<p class="" style="">
+			As authorized by <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0147.html">XMPP URI Query Components (XEP-0147)</a></span>  [<a href="#nt-idm45075816945104">8</a>], the XMPP Registrar maintains a registry of queries and key-value pairs for use in XMPP URIs (see &lt;<a href="https://xmpp.org/registrar/querytypes.html">https://xmpp.org/registrar/querytypes.html</a>&gt;).
+		</p>
+		<div class="indent"><h4 id="xmpp-registrar-considerations-uri-query-types-trust-message">9.1.1 trust-message<a class="anchor-link" href="#xmpp-registrar-considerations-uri-query-types-trust-message"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+			<p class="" style="">
+				An XMPP URI with the <em>trust-message</em> query type (defined as <em>Trust Message URI</em>) MAY be used to provide a trust message for various purposes and a single key owner out-of-band.
+				Such a URI MAY be encoded as a QR code and used if only a QR code scan is available as a trusted channel.
+				E.g., the <em>initial authentication</em> needed by <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0450.html">Automatic Trust Management (ATM) (XEP-0450)</a></span>  [<a href="#nt-idm45075817125616">1</a>] can be performed by scanning a QR code that encodes a Trust Message URI.
+			</p>
+			<p class="" style="">
+				Only a Trust Message URI from a trusted source SHOULD be processed because of its impact on the communication's security.
+				Therefore, users SHOULD be asked for confirmation if a Trust Message URI is used to make a trust decision.
+			</p>
+			<p class="" style="">
+				The <em>JID</em> attribute of the &lt;key-owner/&gt; element MUST be used as the Trust Message URI's path.
+				The first key-value pair of the URI's query MUST represent the <em>encryption</em> attribute of the &lt;trust-message/&gt; element.
+				All remaining key-value pairs of the URI's query MUST represent the &lt;trust/&gt; respectively &lt;distrust/&gt; elements of the &lt;key-owner/&gt; element.
+				Each key identifier MUST be Base16-encoded (see <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc4648">RFC 4648</a></span>  [<a href="#nt-idm45075817022432">5</a>]).
+				The key of a key-value pair MUST be the element's respectively attribute's name and the value their content.
+			</p>
+      <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Trust Message URI for Bob's OMEMO keys<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+xmpp:bob@example.com?trust-message;encryption=urn:xmpp:omemo:2;trust=623548d3835c6d33ef5cb680f7944ef381cf712bf23a0119dabe5c4f252cd02f;distrust=b423f5088de9a924d51b31581723d850c7cc67d0a4fe6b267c3d301ff56d2413;distrust=d9f849b6b828309c5f2c8df4f38fd891887da5aaa24a22c50d52f69b4a80817e
+</pre></figure>
+		</div>
+	</div>
+	<div class="indent"><h3 id="xmpp-registrar-considerations-protocol-namespaces">9.2 Protocol Namespaces<a class="anchor-link" href="#xmpp-registrar-considerations-protocol-namespaces"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<p class="" style="">
+			This specification defines the following XMPP namespaces:
+		</p>
+		<ul class="" style="">
+			<li class="" style="">urn:xmpp:tm:1</li>
+		</ul>
+	</div>
+	<div class="indent"><h3 id="xmpp-registrar-considerations-protocol-versioning">9.3 Protocol Versioning<a class="anchor-link" href="#xmpp-registrar-considerations-protocol-versioning"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+		<p class="" style="">If the protocol defined in this specification undergoes a revision that is not fully backwards-compatible with an older version, the XMPP Registrar shall increment the protocol version number found at the end of the XML namespaces defined herein, as described in Section 4 of <span class="ref">XEP-0053</span>.</p>
+	</div>
+<h2 id="xml-schema">10.
+       XML Schema<a class="anchor-link" href="#xml-schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+	<figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+&lt;xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'
+           targetNamespace='urn:xmpp:tm:1'
+           xmlns='urn:xmpp:tm:1'
+           elementFormDefault='qualified'&gt;
+
+  &lt;xs:element name='trust-message'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:attribute name='usage' type='xs:string' use='required'/&gt;
+      &lt;xs:attribute name='encryption' type='xs:string' use='required'/&gt;
+      &lt;xs:sequence&gt;
+        &lt;xs:element ref='key-owner' minOccurs='1' maxOccurs='unbounded'/&gt;
+      &lt;/xs:sequence&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+  &lt;xs:element name='key-owner'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:attribute name='jid' type='xs:string' use='required'/&gt;
+      &lt;xs:sequence&gt;
+        &lt;xs:element name='trust' type='xs:base64Binary' minOccurs='0' maxOccurs='unbounded'/&gt;
+        &lt;xs:element name='distrust' type='xs:base64Binary' minOccurs='0' maxOccurs='unbounded'/&gt;
+      &lt;/xs:sequence&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+&lt;/xs:schema&gt;
+</pre></figure>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0434</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Experimental">Experimental</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.6.0</dd><dt>Last Updated</dt><dd>2021-10-04</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, <a href="xep-0001.html">XEP-0001</a>, <a href="xep-0280.html">XEP-0280</a>, <a href="xep-0334.html">XEP-0334</a>, <a href="xep-0420.html">XEP-0420</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>TM</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0434.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0434.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0434.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Melvin Keskin</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:melvo@olomono.de">melvo@olomono.de</a></dd><dt>JabberID</dt><dd><a href="xmpp:melvo@olomono.de">melvo@olomono.de</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45075817125616">1</a>. XEP-0450: Automatic Trust Management (ATM) &lt;<a href="https://xmpp.org/extensions/xep-0450.html">https://xmpp.org/extensions/xep-0450.html</a>&gt;.</p><p><a name="nt-idm45075817104848">2</a>. XEP-0420: Stanza Content Encryption &lt;<a href="https://xmpp.org/extensions/xep-0420.html">https://xmpp.org/extensions/xep-0420.html</a>&gt;.</p><p><a name="nt-idm45075817088640">3</a>. XEP-0384: OMEMO Encryption &lt;<a href="https://xmpp.org/extensions/xep-0384.html">https://xmpp.org/extensions/xep-0384.html</a>&gt;.</p><p><a name="nt-idm45075817075184">4</a>. XEP-0373: OpenPGP for XMPP &lt;<a href="https://xmpp.org/extensions/xep-0373.html">https://xmpp.org/extensions/xep-0373.html</a>&gt;.</p><p><a name="nt-idm45075817022432">5</a>. RFC 4648: The Base16, Base32, and Base64 Data Encodings &lt;<a href="http://tools.ietf.org/html/rfc4648">http://tools.ietf.org/html/rfc4648</a>&gt;.</p><p><a name="nt-idm45075816976672">6</a>. XEP-0280: Message Carbons &lt;<a href="https://xmpp.org/extensions/xep-0280.html">https://xmpp.org/extensions/xep-0280.html</a>&gt;.</p><p><a name="nt-idm45075816972224">7</a>. XEP-0313: Message Archive Management &lt;<a href="https://xmpp.org/extensions/xep-0313.html">https://xmpp.org/extensions/xep-0313.html</a>&gt;.</p><p><a name="nt-idm45075816945104">8</a>. XEP-0147: XMPP URI Query Components &lt;<a href="https://xmpp.org/extensions/xep-0147.html">https://xmpp.org/extensions/xep-0147.html</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.6.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0434-0.6.0.html">0.6.0</a> (2021-10-04)<a class="anchor-link" href="#revision-history-v0.6.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+			<p class="" style="">Specify key identifier encoding, improve glossary and update to XEP-0384 version 0.8.0:</p>
+			<ul class="" style="">
+				<li class="" style="">Specify usage of Base64 encoding for key identifiers within trust messages</li>
+				<li class="" style="">Specify usage of Base16 encoding for key identifiers within Trust Message URIs</li>
+				<li class="" style="">Use Base64-encoded key identifiers in examples</li>
+				<li class="" style="">Add 'hash value' as example of key identifier</li>
+				<li class="" style="">Update OMEMO's namespace to 'urn:xmpp:omemo:2'</li>
+				<li class="" style="">Update namespace to 'urn:xmpp:tm:1'</li>
+			</ul>
+		<div class="revision-author">melvo</div></li><li id="revision-history-v0.5.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0434-0.5.1.html">0.5.1</a> (2021-05-14)<a class="anchor-link" href="#revision-history-v0.5.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+			<p class="" style="">Update to XEP-0450 version 0.3.0 and apply consistent formatting:</p>
+			<ul class="" style="">
+				<li class="" style="">Update ATM's namespace to 'urn:xmpp:atm:1'</li>
+				<li class="" style="">Apply consistent formatting for revision history</li>
+			</ul>
+		<div class="revision-author">melvo</div></li><li id="revision-history-v0.5.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0434-0.5.0.html">0.5.0</a> (2021-04-16)<a class="anchor-link" href="#revision-history-v0.5.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+			<p class="" style="">Update to XEP-0420 version 0.4.0 and adapt namespace to shortname:</p>
+			<ul class="" style="">
+				<li class="" style="">Replace SCE's old 'content' element by its new 'envelope' element</li>
+				<li class="" style="">Replace SCE's old 'payload' element by its new 'content' element</li>
+				<li class="" style="">Update SCE's namespace to 'urn:xmpp:sce:1'</li>
+				<li class="" style="">Change namespace to 'urn:xmpp:tm:0'</li>
+			</ul>
+		<div class="revision-author">melvo</div></li><li id="revision-history-v0.4.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0434-0.4.0.html">0.4.0</a> (2021-04-13)<a class="anchor-link" href="#revision-history-v0.4.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+			<p class="" style="">Add new section, use more precise sentences, apply consistent formatting:</p>
+			<ul class="" style="">
+				<li class="" style="">Add new section for Trust Message URIs</li>
+				<li class="" style="">Use 'that' instead of 'which' for restrictive clauses</li>
+				<li class="" style="">Apply consistent formatting for paragraphs and revision history</li>
+			</ul>
+		<div class="revision-author">melvo</div></li><li id="revision-history-v0.3.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0434-0.3.0.html">0.3.0</a> (2020-12-19)<a class="anchor-link" href="#revision-history-v0.3.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+			<p class="" style="">Clarify usage, use real namespace for examples and add missing section:</p>
+			<ul class="" style="">
+				<li class="" style="">Clarify usage of trust messages by protocols such as <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0450.html">Automatic Trust Management (ATM) (XEP-0450)</a></span>  [<a href="#nt-idm45075817125616">1</a>]</li>
+				<li class="" style="">Use namespace 'urn:xmpp:atm:0' of <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0450.html">Automatic Trust Management (ATM) (XEP-0450)</a></span>  [<a href="#nt-idm45075817125616">1</a>] as example for 'usage' attribute</li>
+				<li class="" style="">Add section 'Security Considerations'</li>
+			</ul>
+		<div class="revision-author">melvo</div></li><li id="revision-history-v0.2.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0434-0.2.0.html">0.2.0</a> (2020-11-05)<a class="anchor-link" href="#revision-history-v0.2.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+			<p class="" style="">Improve explanations, descriptions and examples, introduce new attribute and complete all sections:</p>
+			<ul class="" style="">
+				<li class="" style="">Remove link to encryption protocol namespaces</li>
+				<li class="" style="">Add short name</li>
+				<li class="" style="">Shorten and improve introduction</li>
+				<li class="" style="">Use emphasizing text formatting instead of quotation marks</li>
+				<li class="" style="">Add new section for explaining the core properties of trust messages</li>
+				<li class="" style="">Add examples comparing trust messages to public key certificates</li>
+				<li class="" style="">Improve description of trust message structure</li>
+				<li class="" style="">Introduce 'usage' attribute for 'trust-message' element</li>
+				<li class="" style="">Focus on <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0420.html">Stanza Content Encryption (XEP-0420)</a></span>  [<a href="#nt-idm45075817104848">2</a>] and adjust examples accordingly</li>
+				<li class="" style="">Complete sections 'IANA Considerations', 'XMPP Registrar Considerations' and 'XML Schema'</li>
+			</ul>
+		<div class="revision-author">melvo</div></li><li id="revision-history-v0.1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0434-0.1.0.html">0.1.0</a> (2020-02-27)<a class="anchor-link" href="#revision-history-v0.1.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Accepted by vote of Council on 2020-02-19<div class="revision-author">XEP Editor (jsc)</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0434-0.0.1.html">0.0.1</a> (2020-02-15)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div>First draft<div class="revision-author">melvo</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{keskin2020tm,
+  title = {Trust Messages (TM)},
+  author = {Keskin, Melvin},
+  type = {XEP},
+  number = {0434},
+  version = {0.6.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0434.html},
+  date = {2020-02-15/2021-10-04},
+}</pre><p>END</p></body></html>

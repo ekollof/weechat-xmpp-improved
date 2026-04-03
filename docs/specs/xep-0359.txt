@@ -1,0 +1,198 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0359: Unique and Stable Stanza IDs</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0359";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Unique and Stable Stanza IDs"><meta name="DC.Creator" content="Florian Schmaus"><meta name="DC.Description" content="This specification describes unique and stable IDs for messages."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2023-02-20"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0359"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0359: Unique and Stable Stanza IDs</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification describes unique and stable IDs for messages.</dd><dt>Author</dt><dd>Florian Schmaus</dd><dt>Copyright</dt><dd>© 2015 – 2023 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Experimental</p><div id="status-notice" class="experimental standards track">WARNING: This Standards-Track document is Experimental. Publication as an XMPP Extension Protocol does not imply approval of this proposal by the XMPP Standards Foundation. Implementation of the protocol described herein is encouraged in exploratory implementations, but production systems are advised to carefully consider whether it is appropriate to deploy implementations of this protocol before it advances to a status of Draft.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.7.0 (2023-02-20)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li class="current">Experimental</li><li>Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#usecases">Use Cases</a><ol><li><a href="#stanza-id">Unique stanza IDs</a></li><li><a href="#origin-id">Origin generated stanza IDs</a></li></ol></li><li><a href="#rules">Business Rules</a></li><li><a href="#referencing">Referencing Other Stanzas</a></li><li><a href="#disco">Discovering Support</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#ns">Protocol Namespaces</a></li></ol></li><li><a href="#schema">XML Schema</a></li><li><a href="#ack">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This XEP introduces unique and stable IDs for messages, which are beneficial in various ways. For example, they can be used together with <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0313.html">Message Archive Management (XEP-0313)</a></span>  [<a href="#nt-idm45433235121872">1</a>] to uniquely identify a message within an archive. They are also useful in the context of <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45433235112832">2</a>] conferences, as they allow to identify a message reflected by a MUC service back to the originating entity.</p>
+<h2 id="usecases">2.
+       Use Cases<a class="anchor-link" href="#usecases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="stanza-id">2.1 Unique stanza IDs<a class="anchor-link" href="#stanza-id"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+  <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> The stanza ID extension.<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;stanza-id xmlns='urn:xmpp:sid:0'
+           id='de305d54-75b4-431b-adb2-eb6b9e546013'
+           by='room@muc.example.com'/&gt;
+</pre></figure>
+  <p class="" style="">In order to create a &lt;stanza-id/&gt; extension element, the creating XMPP entity generates and sets the value of the 'id' attribute, and puts its own XMPP address as value of the 'by' attribute. The value of the 'id' attribute must be unique and stable, i.e. it MUST NOT change later for some reason within the scope of the 'by' value. Thus the IDs defined in this extension MUST be unique and stable within the scope of the generating XMPP entity. It is RECOMMENDED that the ID generating service uses UUID and the algorithm defined in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc4122">RFC 4122</a></span>  [<a href="#nt-idm45433235108240">3</a>] to generate the IDs.</p>
+  </div>
+  <div class="indent"><h3 id="origin-id">2.2 Origin generated stanza IDs<a class="anchor-link" href="#origin-id"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+	<p class="" style="">
+	  Some use cases require the originating entity, e.g. a client, to generate the stanza ID. In this case, the client MUST use the &lt;origin-id/&gt; element extension element qualified by the 'urn:xmpp:sid:0' namespace. Note that originating entities often want to conceal their XMPP address and therefore the &lt;origin-id/&gt; element has no 'by' attribute.
+	</p>
+	<figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> A message stanza with the origin ID extension.<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message xmlns='jabber:client'
+         to='room@muc.example.com'
+         type='groupchat'&gt;
+  &lt;body&gt;Typical body text&lt;/body&gt;
+  &lt;origin-id xmlns='urn:xmpp:sid:0' id='de305d54-75b4-431b-adb2-eb6b9e546013'/&gt;
+&lt;/message&gt;</pre></figure>
+	<p class="" style="">
+	  The server or component MAY add a &lt;stanza-id/&gt; element. In that case, it MUST preserve the content of the &lt;origin-id/&gt; element.
+	</p>
+	<figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> A message stanza with the stanza ID extension.<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message xmlns='jabber:client'
+         to='room@muc.example.com'
+         type='groupchat'&gt;
+  &lt;body&gt;Typical body text&lt;/body&gt;
+  &lt;stanza-id xmlns='urn:xmpp:sid:0'
+             id='5f3dbc5e-e1d3-4077-a492-693f3769c7ad'
+             by='room@muc.example.com'/&gt;
+  &lt;origin-id xmlns='urn:xmpp:sid:0' id='de305d54-75b4-431b-adb2-eb6b9e546013'/&gt;
+&lt;/message&gt;</pre></figure>
+  </div>
+<h2 id="rules">3.
+       Business Rules<a class="anchor-link" href="#rules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <ol start="" class="" style="">
+	<li class="" style="">The values of the 'id' attribute SHOULD be unpredictable.</li>
+	<li class="" style="">Stanza ID generating entities, which encounter a &lt;stanza-id/&gt; element where the 'by' attribute matches the 'by' attribute they would otherwise set, MUST delete that element even if they are not adding their own stanza ID.</li>
+	<li class="" style="">Entities, which are routing stanzas, SHOULD NOT strip any elements qualified by the 'urn:xmpp:sid:0' namespace from message stanzas unless the preceding rule applied to those elements.</li>
+	<li class="" style="">Stanzas MUST possess, in the direct child level of the stanza, at most one &lt;stanza-id/&gt; extension element with the same XMPP address as value of the 'by' attribute.</li>
+	<li class="" style="">Every &lt;stanza-id/&gt; extension element MUST have the 'id' attribute and the 'by' attribute set.</li>
+	<li class="" style="">Every &lt;stanza-id/&gt; and &lt;origin-id/&gt; extension element MUST always possess an 'id' attribute and MUST NOT have any child elements or text content.</li>
+	<li class="" style="">The value of the 'by' attribute MUST be the XMPP address of the entity assigning the unique and stable stanza ID. For one-on-one messages the assigning entity is the account. In groupchats the assigning entity is the room. Note that XMPP addresses are normalized as defined in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6122">RFC 6122</a></span>  [<a href="#nt-idm45433235088656">4</a>].</li>
+  </ol>
+<h2 id="referencing">4.
+       Referencing Other Stanzas<a class="anchor-link" href="#referencing"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The &lt;referenced-stanza/&gt; element can be used to reference another stanza. The &lt;referenced-stanza/&gt; element MUST be qualified by the 'urn:xmpp:sid:0' namespace and MUST have an 'id' attribute and SHOULD have a 'by' attribute. The values of the attributes are the values of the referenced stanza's &lt;stanza-id/&gt; element.</p>
+  <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Example &lt;referenced-stanza/&gt; element<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;referenced-stanza xmlns='urn:xmpp:sid:0' id='xep359-stanza-id' by='muc.example.org'/&gt;
+</pre></figure>
+<h2 id="disco">5.
+       Discovering Support<a class="anchor-link" href="#disco"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">An entity that follows the business rules, especially the rule on overriding the ID in elements where the by atttribute matches the 'by' attribute they would otherwise set, SHOULD announce the 'urn:xmpp:sid:0' namespace in its disco features allowing other entities to verify that those business rules are properly enforced.</p>
+  <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> Client sends service discovery request to the room<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='romeo@montague.tld/garden'
+    id='somethingrandom'
+    to='room@muc.example.com'
+    type='get'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info' /&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> Servers includes the stanza ID namespace in its features<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='room@muc.example.com'
+    to='romeo@montague.tld/garden'
+    id='somethingrandom'
+    type='result'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+    …
+    &lt;feature var='urn:xmpp:sid:0'/&gt;
+    …
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+<h2 id="security">6.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The value of origin-id is spoofable and hence SHOULD not be used when referencing other stanzas. The value tuple of 'id' and 'by' of the stanza-id element is unspoofable iff all involved implementations follow the requirements of this specification.</p>
+  <p class="" style="">The value of the 'id' attribute should not provide any further information besides the opaque ID itself. Entities observing the value MUST NOT be able to infer any information from it, e.g. the size of the message archive. The value of 'id' MUST be considered a non-secret value.</p>
+  <p class="" style="">Before processing the stanza ID of a message and using it for deduplication purposes or for MAM catchup, the receiving entity SHOULD ensure that the stanza ID could not have been faked, by verifying that the entity referenced in the by attribute does annouce the 'urn:xmpp:sid:0' namespace in its disco features.</p>
+<h2 id="iana">7.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm45433235070704">5</a>].</p>
+<h2 id="registrar">8.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="ns">8.1 Protocol Namespaces<a class="anchor-link" href="#ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">This specification defines the following XML namespaces:</p>
+    <ul class="" style="">
+      <li class="" style="">urn:xmpp:sid:0</li>
+    </ul>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45433235059872">6</a>] shall include the foregoing namespaces in its registry of protocol namespaces (see &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt;) and in its disco features registry (&lt;<a href="https://xmpp.org/registrar/disco-features.html">https://xmpp.org/registrar/disco-features.html</a>&gt;) as defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45433235053424">7</a>].</p>
+<figure class="code"><figcaption>Registration</figcaption><pre class="prettyprint">
+&lt;var&gt;
+  &lt;name&gt;urn:xmpp:sid:0&lt;/name&gt;
+  &lt;desc&gt;Indicates that an entity adds stanza-ids and follows the business rules described in the XEP&lt;/desc&gt;
+  &lt;doc&gt;XEP-0359&lt;/doc&gt;
+&lt;/var&gt;
+</pre></figure>
+  </div>
+<h2 id="schema">9.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='urn:xmpp:sid:0'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+      The protocol documented by this schema is defined in
+      XEP-0359: https://www.xmpp.org/extensions/xep-0359.html
+    &lt;/xs:documentation&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:element name='stanza-id'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:attribute name='id' type='xs:string' use='required'/&gt;
+      &lt;xs:attribute name='by' type='xs:string' use='required'/&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+  &lt;xs:element name='origin-id'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:attribute name='id' type='xs:string' use='required'/&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+  &lt;xs:element name='referenced-stanza'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:attribute name='id' type='xs:string' use='required'/&gt;
+      &lt;xs:attribute name='by' type='xs:string' use='optional'/&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+&lt;/xs:schema&gt;</pre></figure>
+<h2 id="ack">10.
+       Acknowledgements<a class="anchor-link" href="#ack"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Thanks to Thijs Alkemade, Georg Lukas, and Maxime Buquet for providing feedback.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0359</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Experimental">Experimental</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.7.0</dd><dt>Last Updated</dt><dd>2023-02-20</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core</dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>stanza-id</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0359.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0359.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0359.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Florian Schmaus</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:flo@geekplace.eu">flo@geekplace.eu</a></dd><dt>JabberID</dt><dd><a href="xmpp:flo@geekplace.eu">flo@geekplace.eu</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45433235121872">1</a>. XEP-0313: Message Archive Management &lt;<a href="https://xmpp.org/extensions/xep-0313.html">https://xmpp.org/extensions/xep-0313.html</a>&gt;.</p><p><a name="nt-idm45433235112832">2</a>. XEP-0045: Multi-User Chat &lt;<a href="https://xmpp.org/extensions/xep-0045.html">https://xmpp.org/extensions/xep-0045.html</a>&gt;.</p><p><a name="nt-idm45433235108240">3</a>. RFC 4122: A Universally Unique IDentifier (UUID) URN Namespace &lt;<a href="http://tools.ietf.org/html/rfc4122">http://tools.ietf.org/html/rfc4122</a>&gt;.</p><p><a name="nt-idm45433235088656">4</a>. RFC 6122: Extensible Messaging and Presence Protocol (XMPP): Address Format &lt;<a href="http://tools.ietf.org/html/rfc6122">http://tools.ietf.org/html/rfc6122</a>&gt;.</p><p><a name="nt-idm45433235070704">5</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm45433235059872">6</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p><p><a name="nt-idm45433235053424">7</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.7.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0359-0.7.0.html">0.7.0</a> (2023-02-20)<a class="anchor-link" href="#revision-history-v0.7.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Add security consideration regarding spoofability and reference example</p><div class="revision-author">fs</div></li><li id="revision-history-v0.6.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0359-0.6.1.html">0.6.1</a> (2020-11-03)<a class="anchor-link" href="#revision-history-v0.6.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Correct example caption</p><div class="revision-author">gh/@melvo</div></li><li id="revision-history-v0.6.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0359-0.6.0.html">0.6.0</a> (2018-10-01)<a class="anchor-link" href="#revision-history-v0.6.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Defer due to lack of activity.<div class="revision-author">XEP Editor (jsc)</div></li><li id="revision-history-v0.5.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0359-0.5.0.html">0.5.0</a> (2017-08-23)<a class="anchor-link" href="#revision-history-v0.5.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+		  <ul class="" style="">
+			  <li class="" style="">Business rules clarifications</li>
+			  <li class="" style="">Define stanza-ids for messages only</li>
+		  </ul>
+	  <div class="revision-author">dg</div></li><li id="revision-history-v0.4.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0359-0.4.1.html">0.4.1</a> (2017-05-20)<a class="anchor-link" href="#revision-history-v0.4.1"><abbr title="Link to this point in the document">¶</abbr></a></div><ul class="" style="">
+      <li class="" style="">Added an XML schema.</li>
+      <li class="" style="">Fixed a typo.</li>
+    </ul><div class="revision-author">egp</div></li><li id="revision-history-v0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0359-0.4.html">0.4</a> (2016-10-30)<a class="anchor-link" href="#revision-history-v0.4"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Add ability to discover support</p>
+    <div class="revision-author">dg</div></li><li id="revision-history-v0.3.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0359-0.3.0.html">0.3.0</a> (2016-10-29)<a class="anchor-link" href="#revision-history-v0.3.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Rename client-id element to origin-id.</p>
+	  <p class="" style="">Minor improvements.</p>
+    <div class="revision-author">fs</div></li><li id="revision-history-v0.2.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0359-0.2.1.html">0.2.1</a> (2015-09-22)<a class="anchor-link" href="#revision-history-v0.2.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Minor fixes (typos, s/JID/XMPP Address, etc.)</p>
+    <div class="revision-author">fs</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0359-0.2.html">0.2</a> (2015-09-18)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div>
+	  <ul class="" style="">
+		<li class="" style="">Refactored client-id from attribute to element.</li>
+		<li class="" style="">Set short name to 'stanza-id'.</li>
+		<li class="" style="">Clarified that SID elements must not have additional content.</li>
+	  </ul>
+    <div class="revision-author">fs</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0359-0.1.html">0.1</a> (2015-07-14)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial published version approved by the XMPP Council.</p><div class="revision-author">XEP Editor (mam)</div></li><li id="revision-history-v0.0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0359-0.0.2.html">0.0.2</a> (2015-06-22)<a class="anchor-link" href="#revision-history-v0.0.2"><abbr title="Link to this point in the document">¶</abbr></a></div>
+	  <ul class="" style="">
+		<li class="" style="">Rename the XEP from "Message IDs" to "Stanza IDs"</li>
+		<li class="" style="">Add 'by' attribute</li>
+	  </ul>
+	<div class="revision-author">fs</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0359-0.0.1.html">0.0.1</a> (2015-06-01)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">fs</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{schmaus2015stanza-id,
+  title = {Unique and Stable Stanza IDs},
+  author = {Schmaus, Florian},
+  type = {XEP},
+  number = {0359},
+  version = {0.7.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0359.html},
+  date = {2015-06-01/2023-02-20},
+}</pre><p>END</p></body></html>

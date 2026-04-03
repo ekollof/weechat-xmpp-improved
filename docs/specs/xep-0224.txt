@@ -1,0 +1,158 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0224: Attention</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0224";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Attention"><meta name="DC.Creator" content="Andreas Monitzer"><meta name="DC.Description" content="This document defines an XMPP protocol extension for getting the attention of another user."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2008-11-13"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0224"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0224: Attention</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This document defines an XMPP protocol extension for getting the attention of another user.</dd><dt>Author</dt><dd>Andreas Monitzer</dd><dt>Copyright</dt><dd>© 2007 – 2008 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Stable</p><div id="status-notice" class="draft standards track">NOTICE: The protocol defined herein is a <strong>Stable Standard</strong> of the XMPP Standards Foundation. Implementations are encouraged and the protocol is appropriate for deployment in production systems, but some changes to the protocol are possible before it becomes a Final Standard.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>1.0 (2008-11-13)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li class="current">Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#reqs">Requirements</a></li><li><a href="#protocol">Protocol</a></li><li><a href="#rules">Business Rules</a></li><li><a href="#disco">Determining Support</a></li><li><a href="#impl">Implementation Notes</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#registrar-ns">Protocol Namespaces</a></li><li><a href="#registrar-versioning">Protocol Versioning</a></li></ol></li><li><a href="#schema">XML Schema</a></li><li><a href="#ack">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Even though a client might be available (as stated in the most recent presence stanza), the user this client belongs to might not be focused on the client currently. <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0132.html">Presence Obtained via Kinesthetic Excitation (POKE) (XEP-0132)</a></span>  [<a href="#nt-idm45481168951712">1</a>] defines a method for a physical test of user presence. Since this requires special hardware that cannot be assumed to be available, this XEP defines a software-only implementation where no direct feedback is expected. This feature is known as 'nudge' or 'buzz' in some non-XMPP IM protocols.</p>
+  <p class="" style="">It was discussed whether this feature belongs in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0085.html">Chat State Notifications (XEP-0085)</a></span>  [<a href="#nt-idm45481167763760">2</a>]. However, the semantics are inherently different, since Chat State Notifications describe the sender's state, not a request to change the receiver's. Thus, a separate extension is desirable.</p>
+<h2 id="reqs">2.
+       Requirements<a class="anchor-link" href="#reqs"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The specification addresses remotely getting the user's attention in a more assertive way than simple text messages.</p>
+<h2 id="protocol">3.
+       Protocol<a class="anchor-link" href="#protocol"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">In the following conversation, a user talks to somebody, but this user doesn't respond. The second inquiry includes an attention extension.</p>
+  <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> User sends a regular message<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message from='calvin@usrobots.lit/lab'
+         to='herbie@usrobots.lit/home'
+         type='chat'&gt;
+  &lt;body&gt;All right, then, Herbie, give! We're waiting.&lt;/body&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">When no reply is received, the sending user might want to grab the other's attention. This is done by sending a message that includes an &lt;attention/&gt; element qualified by the 'urn:xmpp:attention:0' namespace (see <a href="#registrar-versioning">Namespace Versioning</a> regarding the possibility of incrementing the version number). Note: The message MAY include a &lt;body/&gt; element.</p>
+  <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> User tries to capture the other's attention<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message from='calvin@usrobots.lit/lab'
+         to='herbie@usrobots.lit/home'
+         type='headline'&gt;
+  &lt;attention xmlns='urn:xmpp:attention:0'/&gt;
+  &lt;body&gt;Why don't you answer, Herbie?&lt;/body&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">Finally, the receiving user notices the urgency of the message and responds.</p>
+  <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> The user whose attention has been captured responds.<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message from='herbie@usrobots.lit/home'
+         to='calvin@usrobots.lit/lab'
+         type='chat'&gt;
+  &lt;body&gt;I cannot. You know I cannot! Dr. Bogert and Dr. Lanning don't want me to.&lt;/body&gt;
+&lt;/message&gt;
+</pre></figure>
+<h2 id="rules">4.
+       Business Rules<a class="anchor-link" href="#rules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The following rules apply to generating and processing of the attention extension.</p>
+  <ol start="" class="" style="">
+    <li class="" style="">Before sending an attention message stanza, the client SHOULD confirm support for it in the other client as described under <a href="#disco">Determining Support</a>.</li>
+    <li class="" style="">The message stanza containing the attention extension MAY contain a body and/or other extensions, which is to be displayed along with executing the attention event.</li>
+    <li class="" style="">In message stanzas containing either <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0203.html">Delayed Delivery (XEP-0203)</a></span>  [<a href="#nt-idm45481167742592">3</a>] data, attention extensions MUST be ignored, since the attention request is an instant event which SHOULD NOT be replayed after a delay.</li>
+    <li class="" style="">Messages containing an attention extension SHOULD use the headline message type to avoid offline storage.</li>
+    <li class="" style="">The attention extension MUST NOT be sent in &lt;iq/&gt; stanzas, since use of this feature is part of a messaging conversation.</li>
+  </ol>
+<h2 id="disco">5.
+       Determining Support<a class="anchor-link" href="#disco"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">If an entity wishes to receive the attention extension, it MUST advertise that fact in its responses to <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45481167734464">4</a>] information ("disco#info") requests by returning a feature of "urn:xmpp:attention:0":</p>
+  <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> A disco#info query<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get'
+    from='calvin@usrobots.lit/lab'
+    to='herbie@usrobots.lit/home'
+    id='disco1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> A disco#info response<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result'
+    from='herbie@usrobots.lit/home'
+    to='calvin@usrobots.lit/lab'
+    id='disco1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+    &lt;feature var='urn:xmpp:attention:0'/&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <p class="" style="">In order for an application to determine whether an entity supports this protocol, where possible it SHOULD use the dynamic, presence-based profile of service discovery defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm45481167725760">5</a>]. However, if an application has not received entity capabilities information from an entity, it SHOULD use explicit service discovery instead.</p>
+<h2 id="impl">6.
+       Implementation Notes<a class="anchor-link" href="#impl"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The implementation of the alert is up to the developer. Possible behavior includes:</p>
+  <ul class="" style="">
+    <li class="" style="">Shaking the window.</li>
+    <li class="" style="">Playing a specific sound not used for any other event.</li>
+    <li class="" style="">Flashing the screen.</li>
+    <li class="" style="">Enabling external hardware such as flashing lights.</li>
+    <li class="" style="">Let it be user customizable.</li>
+  </ul>
+  <p class="" style="">Because some users might not want this feature to disturb them, a client MUST either (1) allow the user to disable support or (2) disable the feature by default and process attention requests only if the user has explicitly enabled support. When the feature is disabled, it MUST NOT be advertised in disco#info.</p>
+  <p class="" style="">Rate-limiting might be desirable in some implementations.</p>
+  <p class="" style="">Formal feedback in response to the attention request to the requesting user is not specified, and so the request might be silently dropped.</p>
+<h2 id="security">7.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">It is RECOMMENDED that a client accept message stanzas containing the attention extension only contacts that are in the user's roster or with whom the user's client is currently sharing directed presence, mainly to prevent the user from being annoyed by attention requests from random entities on the network. A client could implement finer-grained control if desired (e.g., allow attention requests only from entities in a particular roster group).</p>
+<h2 id="iana">8.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm45481167706480">6</a>].</p>
+<h2 id="registrar">9.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="registrar-ns">9.1 Protocol Namespaces<a class="anchor-link" href="#registrar-ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">This specification defines the following XML namespace:</p>
+    <ul class="" style="">
+      <li class="" style="">urn:xmpp:attention:0</li>
+    </ul>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45481167695584">7</a>] includes this namespace in the registry located at &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt;, as described in Section 4 of <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0053.html">XMPP Registrar Function (XEP-0053)</a></span>  [<a href="#nt-idm45481167689008">8</a>].</p>
+  </div>
+  <div class="indent"><h3 id="registrar-versioning">9.2 Protocol Versioning<a class="anchor-link" href="#registrar-versioning"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">If the protocol defined in this specification undergoes a revision that is not fully backwards-compatible with an older version, the XMPP Registrar shall increment the protocol version number found at the end of the XML namespaces defined herein, as described in Section 4 of <span class="ref">XEP-0053</span>.</p>
+  </div>
+<h2 id="schema">10.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='urn:xmpp:attention:0'
+    xmlns='urn:xmpp:attention:0'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+      The protocol documented by this schema is defined in
+      XEP-0224: http://www.xmpp.org/extensions/xep-0224.html
+    &lt;/xs:documentation&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:element name='attention' type='empty'/&gt;
+
+  &lt;xs:simpleType name='empty'&gt;
+    &lt;xs:restriction base='xs:string'&gt;
+      &lt;xs:enumeration value=''/&gt;
+    &lt;/xs:restriction&gt;
+  &lt;/xs:simpleType&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+<h2 id="ack">11.
+       Acknowledgements<a class="anchor-link" href="#ack"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The quotes have been taken from Isaac Asimov's short story "Liar!" as published in the book <span class="ref">The Complete Robot</span>.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0224</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Draft">Stable</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>1.0</dd><dt>Last Updated</dt><dd>2008-11-13</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, XMPP IM, <a href="xep-0030.html">XEP-0030</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>attention</dd><dt>Schema</dt><dd>
+        &lt;<a href="http://xmpp.org/schemas/attention.xsd">http://xmpp.org/schemas/attention.xsd</a>&gt;<br></dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0224.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0224.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0224.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Andreas Monitzer</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:andy@monitzer.com">andy@monitzer.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:andy@monitzer.com">andy@monitzer.com</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45481168951712">1</a>. XEP-0132: Presence Obtained via Kinesthetic Excitation (POKE) &lt;<a href="https://xmpp.org/extensions/xep-0132.html">https://xmpp.org/extensions/xep-0132.html</a>&gt;.</p><p><a name="nt-idm45481167763760">2</a>. XEP-0085: Chat State Notifications &lt;<a href="https://xmpp.org/extensions/xep-0085.html">https://xmpp.org/extensions/xep-0085.html</a>&gt;.</p><p><a name="nt-idm45481167742592">3</a>. XEP-0203: Delayed Delivery &lt;<a href="https://xmpp.org/extensions/xep-0203.html">https://xmpp.org/extensions/xep-0203.html</a>&gt;.</p><p><a name="nt-idm45481167734464">4</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm45481167725760">5</a>. XEP-0115: Entity Capabilities &lt;<a href="https://xmpp.org/extensions/xep-0115.html">https://xmpp.org/extensions/xep-0115.html</a>&gt;.</p><p><a name="nt-idm45481167706480">6</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm45481167695584">7</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p><p><a name="nt-idm45481167689008">8</a>. XEP-0053: XMPP Registrar Function &lt;<a href="https://xmpp.org/extensions/xep-0053.html">https://xmpp.org/extensions/xep-0053.html</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0224-1.0.html">1.0</a> (2008-11-13)<a class="anchor-link" href="#revision-history-v1.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the XMPP Council, advanced specification to Draft.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0224-0.2.html">0.2</a> (2008-10-01)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Modified namespace to incorporate namespace versioning.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0224-0.1.html">0.1</a> (2007-08-08)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial published version.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0224-0.0.1.html">0.0.1</a> (2007-07-03)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial version.</p><div class="revision-author">am</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{monitzer2007attention,
+  title = {Attention},
+  author = {Monitzer, Andreas},
+  type = {XEP},
+  number = {0224},
+  version = {1.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0224.html},
+  date = {2007-07-03/2008-11-13},
+}</pre><p>END</p></body></html>

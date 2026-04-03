@@ -1,0 +1,206 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0466: Ephemeral Messages</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0466";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Ephemeral Messages"><meta name="DC.Creator" content="Maxime Buquet"><meta name="DC.Description" content="This specification encourages a shift in privacy settings wrt. logging policies."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2022-05-17"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0466"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0466: Ephemeral Messages</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification encourages a shift in privacy settings wrt. logging policies.</dd><dt>Author</dt><dd>Maxime Buquet</dd><dt>Copyright</dt><dd>© 2018 – 2022 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Experimental</p><div id="status-notice" class="experimental standards track">WARNING: This Standards-Track document is Experimental. Publication as an XMPP Extension Protocol does not imply approval of this proposal by the XMPP Standards Foundation. Implementation of the protocol described herein is encouraged in exploratory implementations, but production systems are advised to carefully consider whether it is appropriate to deploy implementations of this protocol before it advances to a status of Draft.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.1.0 (2022-05-17)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li class="current">Experimental</li><li>Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#reqs">Requirements</a></li><li><a href="#usecases">Use Cases</a><ol><li><a href="#disco">Advertising support</a></li><li><a href="#sending">Sending an ephemeral message</a></li><li><a href="#negotiation">Negotiating a delay</a></li><li><a href="#implicit-negotiation">Implicit timer negociation</a></li><li><a href="#opt-out">Opting-out of ephemeral messages</a></li></ol></li><li><a href="#examples">Example scenarios</a><ol><li><a href="#example-chat">Initiating chat</a></li></ol></li><li><a href="#rules">Business Rules</a></li><li><a href="#impl">Implementation Notes</a></li><li><a href="#access">Accessibility Considerations</a></li><li><a href="#i18n">Internationalization Considerations</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#registrar-ns">Protocol Namespaces</a></li></ol></li><li><a href="#design">Design Considerations</a></li><li><a href="#schema">XML Schema</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+
+<p class="" style="">Existing protocols deployed in XMPP networks offer forward secrecy both on the transport (TLS) and message (<span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0384.html">OMEMO Encryption (XEP-0384)</a></span>  [<a href="#nt-idm45683851402960">1</a>]) levels. Forward secrecy prevents recorded communications from being decrypted even if long term encryption keys are compromised by generating ephemeral keys and securely deleting them when they are no longer needed.</p>
+
+<p class="" style="">However, even though keys are deleted, message contents is retained client archives. While servers generally impose time limits on archives (messages, stored files, etc.), due to privacy laws (e.g., GDPR) and/or disk-space concerns, most XMPP clients still retain message content almost indefinitely even though it may not benefit a majority of their userbase. A device with an installed XMPP client that can be lost or stolen becomes the weakest link.</p>
+
+<p class="" style="">Unlike ephemeral keys, which have specified lifetimes, message contents cannot be removed immediately after being read. Users have to decide for how long they want to retain conversation contents. Verbally agreeing on the time interval and manually removing messages from all devices is cumbersome and error-prone.</p>
+
+<p class="" style="">This XEP defines a way to attach a timer value to messages which in order to specify for how long XMPP clients should store message contents. Besides that, it defines a way to synchronize common timer setting across all users of the conversation.</p>
+
+<p class="" style="">The specification does not depend on any encryption scheme and does not require encryption at all. Plaintext messages will still be readable by servers in between and will depend on trust placed on these server to apply their privacy policy or to respect a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0334.html">Message Processing Hints (XEP-0334)</a></span>  [<a href="#nt-idm45683850331504">2</a>] store hint.</p>
+
+<p class="" style="">Other IM systems, such as <a href="https://signal.org/">Signal</a>, <a href="https://wickr.com/">Wickr</a>, <a href="https://wire.com/">Wire</a> and <a href="https://telegram.org/">Telegram</a>, already offer ephemeral messages. Signal offers timer synchronization feature for user groups and Telegram offers it for secret chats, which are limited to two users.</p>
+
+<h2 id="reqs">2.
+       Requirements<a class="anchor-link" href="#reqs"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+
+<p class="" style="">What this specification tries to do:</p>
+<ul class="" style="">
+  <li class="" style="">Provide a way to specify a timer value after which message contents must be deleted from user devices.</li>
+  <li class="" style="">Clearly define semantics of timer value for XMPP clients.</li>
+  <li class="" style="">Provide a way for a group of users to choose common value for ephemeral message timers and synchronize it across all devices.</li>
+  <li class="" style="">Allow users to vacate to other activities while still being able to keep track of chats, as before.</li>
+</ul>
+
+<p class="" style="">What this XEP doesn’t try to be:</p>
+<ul class="" style=""><li class="" style="">A way to securely ensure that logs won’t be kept by parties included in chats.</li></ul>
+
+<h2 id="usecases">3.
+       Use Cases<a class="anchor-link" href="#usecases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+<div class="indent"><h3 id="disco">3.1 Advertising support<a class="anchor-link" href="#disco"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+
+<p class="" style="">A client implementing this specification MUST advertise the <code>&lt;ephemeral/&gt;</code> disco feature (as per <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45683850310960">3</a>]). When advertising the feature, a client will honor requests to discard messages after the agreed upon delay.</p>
+
+</div>
+
+<div class="indent"><h3 id="sending">3.2 Sending an ephemeral message<a class="anchor-link" href="#sending"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+
+<p class="" style="">An ephemeral message is a <code>&lt;message/&gt;</code> including an <code>&lt;ephemeral/&gt;</code> tag in the <code>urn:xmpp:ephemeral:0</code> namespace, with an attribute <code>timer</code> (xs:unsignedInt) indicating the delay in seconds, after which a message MUST be discarded.</p>
+
+<p class="" style="">Ephemeral messages SHOULD be sent as usual on the bare JID of the contact, or as is specified for groupchats (e.g., MUC, MIX). If this includes sending to non-supporting clients, and they can be detected, sending clients SHOULD warn the user in some way. Clients MAY warn users anyway if non-supporting clients cannot be detected (e.g., when they don’t get a directed presence).</p>
+
+<p class="" style="">Sending clients MAY include a <code>&lt;no-permanent-store/&gt;</code> <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0334.html">Message Processing Hints (XEP-0334)</a></span>  [<a href="#nt-idm45683850331504">2</a>] when not doing end-to-end encryption, even though this may break receiver clients' expectations regarding archive management, and cause even supporting devices not to see ephemeral information.</p>
+
+</div>
+<div class="indent"><h3 id="negotiation">3.3 Negotiating a delay<a class="anchor-link" href="#negotiation"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+
+<p class="" style="">Sending a message with an ephemeral tag is how a delay is negotiated in a chat. A client receiving a message with an ephemeral tag MUST honor the timer for the received messages, and SHOULD include it in turn in following messages.</p>
+
+<p class="" style="">To change the timer for the following messages, change the value when sending a new message.</p>
+
+</div>
+
+<div class="indent"><h3 id="implicit-negotiation">3.4 Implicit timer negociation<a class="anchor-link" href="#implicit-negotiation"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+
+<p class="" style="">A implicit negociation can be done by sending a message with no <code>&lt;body/&gt;</code>, that contains an <code>&lt;ephemeral/&gt;</code> tag and a timer attribute, specified in <a href="#sending">Sending an ephemeral message</a>. The message MUST also contain a <code>&lt;store&gt;</code> hint as described in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0334.html">Message Processing Hints (XEP-0334)</a></span>  [<a href="#nt-idm45683850331504">2</a>] so that offline clients see it.</p>
+
+</div>
+<div class="indent"><h3 id="opt-out">3.5 Opting-out of ephemeral messages<a class="anchor-link" href="#opt-out"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+
+<p class="" style=""><strong>XXX</strong>: Help. How do I ensure the receiving client sees what I am going to send, if it’s just a single message. Same issue as with negotiating the delay. (That is, if a client doesn’t fetch all MAM, it may miss the message). Do I need to send &lt;i-want-out/&gt; forever?</p>
+
+<p class="" style="">A client that has previously been sending ephemeral messages can choose to stop sending them, and send regular messages instead, in which case it should tell the recipient:</p>
+
+<figure class="code"><figcaption></figcaption><pre class="prettyprint">&lt;message from='vladimir@example.com/mobile' to='管野@example.com' type='chat'&gt;
+    &lt;body&gt;おは&lt;/body&gt;
+    &lt;i-want-out/&gt;
+&lt;/message&gt;</pre></figure>
+
+<p class="" style="">When the recipients sees the (TODO) <code>&lt;i-want-out/&gt;</code> element, it will stop including <code>&lt;ephemeral/&gt;</code>. The original client seeing no ephemeral tag is being included SHOULD stop sending the opt-out element.</p>
+
+<p class="" style=""><strong>TODO</strong>: Negociation within messages is wonky. If a client comes back online and this flag isn't in server archives anymore, it will send ephemeral messages again causing all devices to send them again. This might go on forever.</p>
+
+</div>
+<h2 id="examples">4.
+       Example scenarios<a class="anchor-link" href="#examples"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+<div class="indent"><h3 id="example-chat">4.1 Initiating chat<a class="anchor-link" href="#example-chat"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+
+<p class="" style="">Rosa sends a regular chat message to Peter:</p>
+
+<figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> <a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">&lt;message from='rosa@example.com/mobile' to='peter@example.com' type='chat'&gt;
+    &lt;body&gt;I have read the book you sent me, it was very insightful.&lt;/body&gt;
+&lt;/message&gt;</pre></figure>
+
+<p class="" style="">Peter had his client previously configured to send ephemeral messages, before a chat with Rosa was opened. He replies:</p>
+
+<figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> <a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">&lt;message from='peter@example.com/desktop' to='rosa@example.com' type='chat'&gt;
+    &lt;body&gt;Something&lt;/body&gt;
+    &lt;ephemeral xmlns='urn:xmpp:ephemeral:0' timer='604800' /&gt;
+&lt;/message&gt;</pre></figure>
+
+<p class="" style="">Rosa’s client tells her from now own, messages will disappear in a week (60 * 60 * 24 * 7). Before replying she decides a week is too long and changes her settings so that they now disappear in 5 days. Her client immediately sends an implicit timer negotiation. The message she just received from Peter however will still disappear in 7 days.</p>
+
+<figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> <a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">&lt;message from='rosa@example.com/mobile' to='peter@example.com' type='chat'&gt;
+    &lt;ephemeral xmlns='urn:xmpp:ephemeral:0' timer='432000' /&gt;
+    &lt;store xmlns="urn:xmpp:hints" /&gt;
+&lt;/message&gt;</pre></figure>
+
+<p class="" style="">Peter’s client tells him messages will disappear in 5 days. Peter is fine with this and doesn’t change his client settings. His client will continue including the ephemeral tag with the same timer value of 5 days.</p>
+
+<figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> <a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">&lt;message from='peter@example.com/desktop' to='rosa@example.com' type='chat'&gt;
+    &lt;body&gt;I see you changed the settings slightly. It's just as good to me!&lt;/body&gt;
+    &lt;ephemeral xmlns='urn:xmpp:ephemeral:0' timer='432000' /&gt;
+&lt;/message&gt;</pre></figure>
+
+</div>
+
+<h2 id="rules">5.
+       Business Rules<a class="anchor-link" href="#rules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+
+<p class="" style="">Timers SHOULD be started once a user has seen/read a message, to give them the possibility to read it – in case the timer was too low, and/or they were taking a holiday from messaging. <strong>XXX</strong>: Is "read" and/or "seen" defined anywhere? Should we settle on some definition?</p>
+
+<p class="" style="">Once it has been sent, the timer on a message cannot be changed.</p>
+
+<p class="" style="">Discarded messages SHOULD be noted as such in the client (e.g., "This message has disappeared"). Not just removed with no indication of the reason.</p>
+
+<p class="" style="">When using with encryption mechanisms that include an encrypted wrapper such as <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0373.html">OpenPGP for XMPP (XEP-0373)</a></span>  [<a href="#nt-idm45683850264800">4</a>] or <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0420.html">Stanza Content Encryption (XEP-0420)</a></span>  [<a href="#nt-idm45683850255376">5</a>], this element SHOULD be placed in the wrapper.</p>
+
+<h2 id="impl">6.
+       Implementation Notes<a class="anchor-link" href="#impl"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+
+<p class="" style="">Discarded messages shall be removed from memory and disk on a best effort basis.</p>
+
+<p class="" style="">Timers do not have to be exactly exact, the definition of "seen" or "read" not being consistent, and clock issues might also be a thing (use NTP?). This is also a best effort basis.</p>
+
+<p class="" style="">Ephemeral messages can be used with end-to-end encryption mechanisms. Both mechanisms are orthogonal. Messages are decrypted on the client and stored as plaintext in most cases when using end-to-end encryption.</p>
+
+<h2 id="access">7.
+       Accessibility Considerations<a class="anchor-link" href="#access"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+
+<p class="" style="">OPTIONAL.</p>
+
+<h2 id="i18n">8.
+       Internationalization Considerations<a class="anchor-link" href="#i18n"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+
+<p class="" style="">The message that appears once a message is discarded is a suggestion and should be adapted to the environment locale of the user.</p>
+
+<h2 id="security">9.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+
+<p class="" style="">Ephemeral messages are not to be considered "secure" in any way.</p>
+
+<p class="" style="">Even within well-meaning entities, requiring that messages be discarded and made impossible to retrieve, requires a lot more scrutiny in the specification and in implementations, and even then, is a really technically challenging task, to say the least.</p>
+
+<p class="" style="">In an adversarial context, requiring that sent messages be deleted from every devices receiving it (thus including to an attacker), requires a lot more control over the infrastructure in place and is not in scope for this specification. The author of this specification has no intention to specify DRM.</p>
+
+<p class="" style="">This specification doesn't prevent an attacker to read messages sent to you after they get control of your device (e.g., stolen, confiscated). In this specific case, the situation is improved nonetheless as the spec helps reduce the overall amount of messages that stay on a given device, compared to the current community standards.</p>
+
+<p class="" style="">Note that if a message hasn't been fetched by the client yet, using a timestamp instead of a timer doesn't necessarily protect the user entirely. An attacker obtaining access to a device after a long time would have taken an image of the original device, gain access again at time of obtention of the device, replace the client to handle these particular messages differently. To counter this, a user would have to have go through the gymnastics of getting their server not to send any archive to this device, during the interval necessary to open the device.</p>
+
+<h2 id="iana">10.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+
+<p class="" style="">This document requires no interaction with the the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm45683850238624">6</a>]</p>
+
+<h2 id="registrar">11.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="registrar-ns">11.1 Protocol Namespaces<a class="anchor-link" href="#registrar-ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45683850231168">7</a>] includes <code>urn:xmpp:ephemeral:0</code> in its registery of protocol namespaces (see &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt;).</p>
+  </div>
+<h2 id="design">12.
+       Design Considerations<a class="anchor-link" href="#design"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+
+<p class="" style="">From the previous ephemeral-messages protoXEP, the requirement that made it incompatible with non-implementing clients has been removed, as well as the one that made clients using e2ee only send only to supporting clients. This is explained by the fact that the goal of this specification is to change privacy defaults in the ecosystem and not to prevent users from getting their messages and break user-experience substantially.</p>
+
+<p class="" style="">Another use-case mentioned (and alluded to in security considerations) was being able to send time-sensitive messages, or rather, messages that have no purpose after a given time and thus should disappear. This specification doesn’t exactly answer it as it might have been necessary to start the timer at the exact same time on both sender and receiver, and as such, a timestamp would have been better. This behaviour can still be observed more or less if sender and receiver are active at the same time, but of course it will differ when the receiver comes back at a later time.</p>
+
+<p class="" style="">A minimal timer value was originally negociable, but was removed as it complicates the protocol substancially, and can directly be solved between users.</p>
+
+<p class="" style=""><strong>XXX</strong>: Do we want to use a per-“contact” model? How? With PEP? How would a client know which node to pick (of the two in a 1:1 chat, easier in MUC). What to do about the access model? This should also not be limited to contacts but whitelist may be annoying to manage. IQ negociation? This requires simultanous online-ness and also not likely with non-contacts as it would require directed presence.</p>
+
+<h2 id="schema">13.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+
+<p class="" style="">REQUIRED for protocol specifications.</p>
+
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0466</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Experimental">Experimental</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.1.0</dd><dt>Last Updated</dt><dd>2022-05-17</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd><a href="xep-0004.html">XEP-0004</a>, <a href="xep-0030.html">XEP-0030</a>, <a href="xep-0313.html">XEP-0313</a>, <a href="xep-0334.html">XEP-0334</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>NOT_YET_ASSIGNED</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0466.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0466.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0466.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Maxime Buquet</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:pep@bouah.net">pep@bouah.net</a></dd><dt>JabberID</dt><dd><a href="xmpp:pep@bouah.net">pep@bouah.net</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45683851402960">1</a>. XEP-0384: OMEMO Encryption &lt;<a href="https://xmpp.org/extensions/xep-0384.html">https://xmpp.org/extensions/xep-0384.html</a>&gt;.</p><p><a name="nt-idm45683850331504">2</a>. XEP-0334: Message Processing Hints &lt;<a href="https://xmpp.org/extensions/xep-0334.html">https://xmpp.org/extensions/xep-0334.html</a>&gt;.</p><p><a name="nt-idm45683850310960">3</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm45683850264800">4</a>. XEP-0373: OpenPGP for XMPP &lt;<a href="https://xmpp.org/extensions/xep-0373.html">https://xmpp.org/extensions/xep-0373.html</a>&gt;.</p><p><a name="nt-idm45683850255376">5</a>. XEP-0420: Stanza Content Encryption &lt;<a href="https://xmpp.org/extensions/xep-0420.html">https://xmpp.org/extensions/xep-0420.html</a>&gt;.</p><p><a name="nt-idm45683850238624">6</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm45683850231168">7</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0466-0.1.0.html">0.1.0</a> (2022-05-17)<a class="anchor-link" href="#revision-history-v0.1.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Accepted by vote of Council on 2022-05-03.<div class="revision-author">XEP Editor (jsc)</div></li><li id="revision-history-v0.0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0466-0.0.2.html">0.0.2</a> (2022-04-16)<a class="anchor-link" href="#revision-history-v0.0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Resubmit with some changes.</p><div class="revision-author">pep</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0466-0.0.1.html">0.0.1</a> (2018-04-10)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">ak</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{buquet2018xep0466,
+  title = {Ephemeral Messages},
+  author = {Buquet, Maxime},
+  type = {XEP},
+  number = {0466},
+  version = {0.1.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0466.html},
+  date = {2018-04-10/2022-05-17},
+}</pre><p>END</p></body></html>

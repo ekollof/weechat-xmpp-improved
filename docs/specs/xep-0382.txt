@@ -1,0 +1,182 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0382: Spoiler messages</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0382";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Spoiler messages"><meta name="DC.Creator" content="Severino Ferrer de la Peñita"><meta name="DC.Creator" content="Xavier Ferrer de la Peñita"><meta name="DC.Description" content="
+      This specification defines an XMPP protocol extension that provides a
+      method for indicating a message is a spoiler and should be displayed as
+      such.
+    "><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2018-01-25"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0382"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0382: Spoiler messages</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>
+      This specification defines an XMPP protocol extension that provides a
+      method for indicating a message is a spoiler and should be displayed as
+      such.
+    </dd><dt>Authors</dt><dd><ul class="authors"><li>Severino Ferrer de la Peñita</li><li>Xavier Ferrer de la Peñita</li></ul></dd><dt>Copyright</dt><dd>© 2016 – 2018 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Deferred</p><div id="status-notice" class="deferred standards track">WARNING: This document has been automatically Deferred after 12 months of inactivity in its previous Experimental state. Implementation of the protocol described herein is not recommended for production systems. However, exploratory implementations are encouraged to resume the standards process.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.2.0 (2018-01-25)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li class="current inserted">Deferred</li><li>Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#disco">Discovering support</a></li><li><a href="#usecases">Use Cases</a></li><li><a href="#rules">Business Rules</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#registrar-ns">Protocol Namespaces</a></li></ol></li><li><a href="#schema">XML Schema</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">
+      Sometimes, people have the need to send large texts related to the current
+      topic but because of their length, make it hard to follow the conversation
+      (specially on mobile devices). On other occasions, people may want to
+      discuss or just make a little quick comment related to a film or a book in
+      a conversation with multiple people that may or may not know the plot.
+      Also, every now and then, people may want to send a private message (in
+      the sense that people near the receiver must not be able to read) or
+      inline images to someone is known is in a public enviroment like
+      libraries, coffehouses, bars, etc.
+    </p>
+
+    <p class="" style="">
+      This specification defines a way to indicate message's content does not
+      have to be displayed until receiver requests to do so.
+    </p>
+  <h2 id="disco">2.
+       Discovering support<a class="anchor-link" href="#disco"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">
+      If a client implements spoiler messages, it MUST specify the
+      'urn:xmpp:spoiler:0' feature in its service discovery information
+      features as specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm46254613834224">1</a>] and the Entity Capabilities profile
+      specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm46254612649168">2</a>].
+    </p>
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Client requests information about a chat partner's client<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='romeo@montague.net/orchard'
+    id='disco1'
+    to='juliet@capulet.lit/balcony'
+    type='get'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;</pre></figure>
+    <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Partner's client advertises support for spoiler messages<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq to='romeo@montague.net/orchard'
+    id='disco1'
+    from='juliet@capulet.lit/balcony'
+    type='result'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+…
+    &lt;feature var='urn:xmpp:spoiler:0'/&gt;
+…
+  &lt;/query&gt;
+&lt;/iq&gt;</pre></figure>
+  <h2 id="usecases">3.
+       Use Cases<a class="anchor-link" href="#usecases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">
+      Messages user wants to be sent as spoilers, MUST contain a &lt;spoiler&gt; element qualified by the
+      'urn:xmpp:spoiler:0' namespace and optionally, &lt;spoiler&gt; elements may contain character data as
+      a hint that warns about the topic of the spoiler message. They may also possess the 'xml:lang'
+      attribute.
+    </p>
+    <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> User sends a spoiler message without the hint<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='romeo@montague.net/orchard' from='juliet@capulet.net/balcony' id='spoiler1'&gt;
+  &lt;body&gt;This is a very long message so I'm going to hide inside a spoiler [...] &lt;/body&gt;
+  &lt;spoiler xmlns='urn:xmpp:spoiler:0'/&gt;
+&lt;/message&gt;
+</pre></figure>
+    <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> User sends a spoiler message with the hint<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='romeo@montague.net/orchard' from='juliet@capulet.net/balcony' id='spoiler2'&gt;
+  &lt;body&gt;And at the end of the story, both of them die! It is so tragic!&lt;/body&gt;
+  &lt;spoiler xmlns='urn:xmpp:spoiler:0'&gt;Love story end&lt;/spoiler&gt;
+&lt;/message&gt;
+</pre></figure>
+    <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> User sends a spoiler message with the hint in two languages<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='romeo@montague.net/orchard' from='juliet@capulet.net/balcony' id='spoiler3'&gt;
+  &lt;body&gt;holidays.png&lt;/body&gt;
+  &lt;spoiler xml:lang='en' xmlns='urn:xmpp:spoiler:0'&gt;Trip to the beach&lt;/spoiler&gt;
+  &lt;spoiler xml:lang='ca' xmlns='urn:xmpp:spoiler:0'&gt;Viatge a la platja&lt;/spoiler&gt;
+&lt;/message&gt;
+</pre></figure>
+    <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> User sends a spoiler message with the hint and body in two languages<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='romeo@montague.net/orchard' from='juliet@capulet.net/balcony' id='spoiler4'&gt;
+  &lt;body xml:lang='en'&gt;And at the end of the story, both of them die! It is so tragic!&lt;/body&gt;
+  &lt;body xml:lang='ca'&gt;I al final de la història, els dos moren! És tan tràgic!&lt;/body&gt;
+  &lt;spoiler xml:lang='en' xmlns='urn:xmpp:spoiler:0'&gt;Love story end&lt;/spoiler&gt;
+  &lt;spoiler xml:lang='ca' xmlns='urn:xmpp:spoiler:0'&gt;Fi de la història d'amor&lt;/spoiler&gt;
+&lt;/message&gt;
+</pre></figure>
+    <h2 id="rules">4.
+       Business Rules<a class="anchor-link" href="#rules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <ol start="" class="" style="">
+      <li class="" style="">It MUST be clear that a message is in fact a spoiler and its content MUST only be displayed upon
+        user's request.</li>
+      <li class="" style="">Clients MAY provide a way to display spoilers always uncovered, without the need of interaction
+        by the user (e.g. in the client's settings).</li>
+      <li class="" style="">Clients SHOULD display spoiler's hint, if any, before showing message's content.</li>
+      <li class="" style="">Clients MAY display spoiler's hint even after showing message's content (e.g. as a header or
+        title of the message).</li>
+      <li class="" style="">Users SHOULD uncover or hide a spoiler message at will, anytime.</li>
+    </ol>
+  <h2 id="security">5.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">
+      This document introduces no additional security considerations above and
+      beyond those defined in the documents on which it depends.
+    </p>
+  <h2 id="iana">6.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm46254612625504">3</a>].</p>
+  <h2 id="registrar">7.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <div class="indent"><h3 id="registrar-ns">7.1 Protocol Namespaces<a class="anchor-link" href="#registrar-ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">This specification defines the following XML namespace:</p>
+      <ul class="" style="">
+        <li class="" style="">'urn:xmpp:spoiler:0'</li>
+      </ul>
+      <p class="" style="">
+        Upon advancement of this specification to draft status, the <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm46254612614480">4</a>]
+        shall include the foregoing namespaces in its registry of protocol
+        namespaces &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt; and in its disco features registry
+        &lt;<a href="https://xmpp.org/registrar/disco-features.html">https://xmpp.org/registrar/disco-features.html</a>&gt; as defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm46254613834224">1</a>].
+      </p>
+      <figure class="code"><figcaption>Registration</figcaption><pre class="prettyprint">
+&lt;var&gt;
+  &lt;name&gt;urn:xmpp:spoiler:0&lt;/name&gt;
+  &lt;desc&gt;Indicates that a message's content should not be displayed by default.&lt;/desc&gt;
+  &lt;doc&gt;0382&lt;/doc&gt;
+&lt;/var&gt;
+</pre></figure>
+    </div>
+  <h2 id="schema">8.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='urn:xmpp:spoiler:0'
+    xmlns='urn:xmpp:spoiler:0'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:element name='spoiler'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:simpleContent&gt;
+        &lt;xs:extension base='xs:string'&gt;
+          &lt;xs:attribute ref='xml:lang' use='optional'/&gt;
+        &lt;/xs:extension&gt;
+      &lt;/xs:simpleContent&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+
+&lt;/xs:schema&gt;
+</pre></figure>
+  <hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0382</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Deferred">Deferred</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.2.0</dd><dt>Last Updated</dt><dd>2018-01-25</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core</dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>spoilers</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0382.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0382.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0382.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Severino Ferrer de la Peñita</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:soul@blastersklan.com">soul@blastersklan.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:soul@blastersklan.com">soul@blastersklan.com</a></dd></dl><h5>Xavier Ferrer de la Peñita</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:vaulor@openmailbox.org">vaulor@openmailbox.org</a></dd><dt>JabberID</dt><dd><a href="xmpp:vaulor@blastersklan.com">vaulor@blastersklan.com</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm46254613834224">1</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm46254612649168">2</a>. XEP-0115: Entity Capabilities &lt;<a href="https://xmpp.org/extensions/xep-0115.html">https://xmpp.org/extensions/xep-0115.html</a>&gt;.</p><p><a name="nt-idm46254612625504">3</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm46254612614480">4</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.2.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0382-0.2.0.html">0.2.0</a> (2018-01-25)<a class="anchor-link" href="#revision-history-v0.2.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Defer due to lack of activity.<div class="revision-author">XEP Editor (jwi)</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0382-0.1.html">0.1</a> (2016-12-07)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial version approved by the council.</p><div class="revision-author">XEP Editor: ssw</div></li><li id="revision-history-v0.0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0382-0.0.2.html">0.0.2</a> (2016-10-31)<a class="anchor-link" href="#revision-history-v0.0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">sfp, xfp</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{ferrer de la peñita2016spoilers,
+  title = {Spoiler messages},
+  author = {Ferrer de la Peñita, Severino and Ferrer de la Peñita, Xavier},
+  type = {XEP},
+  number = {0382},
+  version = {0.2.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0382.html},
+  date = {2016-10-31/2018-01-25},
+}</pre><p>END</p></body></html>

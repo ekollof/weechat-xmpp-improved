@@ -1,0 +1,180 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0441: Message Archive Management Preferences</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0441";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Message Archive Management Preferences"><meta name="DC.Creator" content="Matthew Wild"><meta name="DC.Creator" content="Kevin Smith"><meta name="DC.Description" content="This document defines a protocol to control a user's archiving preferences."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2020-08-25"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0441"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0441: Message Archive Management Preferences</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This document defines a protocol to control a user's archiving preferences.</dd><dt>Authors</dt><dd><ul class="authors"><li>Matthew Wild</li><li>Kevin Smith</li></ul></dd><dt>Copyright</dt><dd>© 2020 – 2020 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Experimental</p><div id="status-notice" class="experimental standards track">WARNING: This Standards-Track document is Experimental. Publication as an XMPP Extension Protocol does not imply approval of this proposal by the XMPP Standards Foundation. Implementation of the protocol described herein is encouraged in exploratory implementations, but production systems are advised to carefully consider whether it is appropriate to deploy implementations of this protocol before it advances to a status of Draft.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.2.0 (2020-08-25)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li class="current">Experimental</li><li>Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#prefs">Archiving Preferences</a><ol><li><a href="#config">Simple configuration</a><ol><li><a href="#config-default">Default behaviour</a></li><li><a href="#config-always">Always archive</a></li><li><a href="#config-never">Never archive</a></li></ol></li><li><a href="#advanced-config">Advanced configuration</a></li><li><a href="#match">JID matching</a><ol><li><a href="#match-rules">General rules</a></li><li><a href="#match-out">Outgoing messages</a></li><li><a href="#match-in">Incoming messages</a></li></ol></li></ol></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This specification describes a protocol for a server to allow a client to configure a user's
+  message archiving preferences. It is intended to be used in conjunction with <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0313.html">Message Archive Management (XEP-0313)</a></span>  [<a href="#nt-idm46391635265136">1</a>].</p>
+
+  <p class="" style="">After observing XEP-0313 usage in the wild, it became apparent that preferences were not often
+  used, and can interfere with clients that use the archive for synchronization of messages received
+  by the user while disconnected. Therefore it is not actively encouraged for an implementation/deployment
+  to offer this functionality.</p>
+<h2 id="prefs">2.
+       Archiving Preferences<a class="anchor-link" href="#prefs"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Depending on implementation and deployment policies, a server MAY allow the user to have control
+  over the server's archiving behaviour. This specification defines a basic protocol for this, and
+  also allows a server to offer more advanced configuration to a user.</p>
+  <div class="indent"><h3 id="config">2.1 Simple configuration<a class="anchor-link" href="#config"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">If the server supports and allows configuration of the preferences described below then it SHOULD implement the protocol defined
+    in this section. This allows the user to retrieve and configure the following preferences:</p>
+    <ul class="" style="">
+      <li class="" style="">A list of JIDs that should always have messages to/from archived in the user's store.</li>
+      <li class="" style="">A list of JIDs that should never have messages to/from archived in the user's store.</li>
+      <li class="" style="">The default archiving behaviour (for JIDs in neither of the above lists).</li>
+    </ul>
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Retrieving archiving preferences<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get' id='juliet2'&gt;
+  &lt;prefs xmlns='urn:xmpp:mam:2'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+    <p class="" style="">The server replies with the user's current archiving preferences. The &lt;prefs&gt; element
+    MUST be present and contain the current default archiving policy. The &lt;always&gt; and &lt;never&gt;
+    MUST also be present (even if empty), and contain a list of JIDs enclosed in &lt;jid&gt; elements.</p>
+
+    <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Server responds with current preferences<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result' id='juliet2'&gt;
+  &lt;prefs xmlns='urn:xmpp:mam:2' default='roster'&gt;
+    &lt;always/&gt;
+    &lt;never/&gt;
+  &lt;/prefs&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+    <p class="" style="">It is also possible that the server may respond with a stanza error, for example the standard
+    'feature-not-implemented' (server does not support MAM configuration) defined in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6120">RFC 6120</a></span>  [<a href="#nt-idm46391634175024">2</a>].</p>
+
+    <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Server does not support archive configuration<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='error' id='juliet2'&gt;
+  &lt;error type='cancel'&gt;
+    &lt;feature-not-implemented xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+  &lt;/error&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+    <p class="" style="">To update the preferences, the client can simply send an iq stanza with a type of 'set':</p>
+
+    <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Updating archiving preferences<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' id='juliet3'&gt;
+  &lt;prefs xmlns='urn:xmpp:mam:2' default='roster'&gt;
+    &lt;always&gt;
+      &lt;jid&gt;romeo@montague.lit&lt;/jid&gt;
+    &lt;/always&gt;
+    &lt;never&gt;
+      &lt;jid&gt;montague@montague.lit&lt;/jid&gt;
+    &lt;/never&gt;
+  &lt;/prefs&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <p class="" style="">The server then replies with the applied preferences (note that due to server policies these
+  MAY be different to the preferences sent by the client):</p>
+<figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> Server responds with updated preferences<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result' id='juliet3'&gt;
+  &lt;prefs xmlns='urn:xmpp:mam:2' default='roster'&gt;
+    &lt;always&gt;
+      &lt;jid&gt;romeo@montague.lit&lt;/jid&gt;
+    &lt;/always&gt;
+    &lt;never&gt;
+      &lt;jid&gt;montague@montague.lit&lt;/jid&gt;
+    &lt;/never&gt;
+  &lt;/prefs&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+  <p class="" style="">It is also possible for the server to respond with an error, for example (but not limited to)
+  the standard 'feature-not-implemented' (the server does not support configuration of preferences),
+  'forbidden' (the user is not authorized to change their preferences) or 'not-allowed' (the server
+  generally does not allow changing of configuration preferences).</p>
+
+    <div class="indent"><h4 id="config-default">2.1.1 Default behaviour<a class="anchor-link" href="#config-default"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">If a JID is in neither the 'always archive' nor the 'never archive' list then whether it
+         is archived depends on this setting, the default.
+      </p>
+      <p class="" style="">The 'default' attribute of the 'prefs' element MUST be one of the following values:</p>
+      <ul class="" style="">
+        <li class="" style="">'always' - all messages are archived by default.</li>
+        <li class="" style="">'never' - messages are never archived by default.</li>
+        <li class="" style="">'roster' - messages are archived only if the contact's bare JID is in the user's roster.</li>
+      </ul>
+    </div>
+    <div class="indent"><h4 id="config-always">2.1.2 Always archive<a class="anchor-link" href="#config-always"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">The &lt;prefs/&gt; element MAY contain an &lt;always/&gt; child element. If present, it
+         contains a list of &lt;jid/&gt; elements, each containing a single JID. The server SHOULD
+         archive any messages to/from this JID (see 'JID matching').
+      </p>
+      <p class="" style="">If missing from the preferences, &lt;always/&gt; SHOULD be assumed by the server to be an
+         empty list.
+      </p>
+    </div>
+    <div class="indent"><h4 id="config-never">2.1.3 Never archive<a class="anchor-link" href="#config-never"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">The &lt;prefs/&gt; element MAY contain an &lt;never/&gt; child element. If present, it
+         contains a list of &lt;jid/&gt; elements, each containing a single JID. The server SHOULD
+         NOT archive any messages to/from this JID (see 'JID matching').
+      </p>
+      <p class="" style="">If missing from the preferences, &lt;never/&gt; SHOULD be assumed by the server to be an
+         empty list.
+      </p>
+    </div>
+  </div>
+  <div class="indent"><h3 id="advanced-config">2.2 Advanced configuration<a class="anchor-link" href="#advanced-config"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">In addition to this protocol, a server MAY offer more advanced configuration to the user
+       through <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0050.html">Ad-Hoc Commands (XEP-0050)</a></span>  [<a href="#nt-idm46391634149600">3</a>]. Such an interface might, for example, allow the user to configure what
+       types of messages to store, or set a limit on how long messages should remain in the
+       archive.</p>
+    <p class="" style="">If supported, such a configuration command SHOULD be presented on the well-defined
+       command node of "urn:xmpp:mam#configure".</p>
+  </div>
+  <div class="indent"><h3 id="match">2.3 JID matching<a class="anchor-link" href="#match"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <div class="indent"><h4 id="match-rules">2.3.1 General rules<a class="anchor-link" href="#match-rules"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">When comparing the message target JID against the user's roster (ie. when the user has
+         set default='roster') the comparison MUST use the bare target JID (that is, stripped of
+         any resource).
+      </p>
+      <p class="" style="">For matching against entries in either the 'allow' or 'never' lists, for each listed
+         JID:
+      </p>
+      <ul class="" style="">
+        <li class="" style="">If the listed JID contains a resource, compare against the target JID as-is.</li>
+        <li class="" style="">If the listed JID has no resource (it is a bare JID) then first strip any resource
+            from the target JID prior to comparison.
+        </li>
+      </ul>
+    </div>
+    <div class="indent"><h4 id="match-out">2.3.2 Outgoing messages<a class="anchor-link" href="#match-out"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">For outgoing messages, the server MUST use the value of the 'to' attribute as the target JID.
+      </p>
+    </div>
+    <div class="indent"><h4 id="match-in">2.3.3 Incoming messages<a class="anchor-link" href="#match-in"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">For incoming messages, the server MUST use the value of the 'from' attribute as the target JID.
+      </p>
+    </div>
+  </div>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0441</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Experimental">Experimental</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.2.0</dd><dt>Last Updated</dt><dd>2020-08-25</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, <a href="xep-0030.html">XEP-0030</a>, <a href="xep-0313.html">XEP-0313</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>mamprefs</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0441.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0441.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0441.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Matthew Wild</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:mwild1@gmail.com">mwild1@gmail.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:me@matthewwild.co.uk">me@matthewwild.co.uk</a></dd></dl><h5>Kevin Smith</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:kevin@kismith.co.uk">kevin@kismith.co.uk</a></dd><dt>JabberID</dt><dd><a href="xmpp:kevin@doomsong.co.uk">kevin@doomsong.co.uk</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm46391635265136">1</a>. XEP-0313: Message Archive Management &lt;<a href="https://xmpp.org/extensions/xep-0313.html">https://xmpp.org/extensions/xep-0313.html</a>&gt;.</p><p><a name="nt-idm46391634175024">2</a>. RFC 6120: Extensible Messaging and Presence Protocol (XMPP): Core &lt;<a href="http://tools.ietf.org/html/rfc6120">http://tools.ietf.org/html/rfc6120</a>&gt;.</p><p><a name="nt-idm46391634149600">3</a>. XEP-0050: Ad-Hoc Commands &lt;<a href="https://xmpp.org/extensions/xep-0050.html">https://xmpp.org/extensions/xep-0050.html</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.2.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0441-0.2.0.html">0.2.0</a> (2020-08-25)<a class="anchor-link" href="#revision-history-v0.2.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Accepted by vote of Council on 2020-08-19.<div class="revision-author">XEP Editor (jsc)</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0441-0.1.html">0.1</a> (2020-04-03)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Split from XEP-0313, no protocol changes</p>
+    <div class="revision-author">mw</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{wild2020mamprefs,
+  title = {Message Archive Management Preferences},
+  author = {Wild, Matthew and Smith, Kevin},
+  type = {XEP},
+  number = {0441},
+  version = {0.2.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0441.html},
+  date = {2020-04-03/2020-08-25},
+}</pre><p>END</p></body></html>

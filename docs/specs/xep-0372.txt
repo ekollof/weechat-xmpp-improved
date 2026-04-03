@@ -1,0 +1,127 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0372: References</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0372";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="References"><meta name="DC.Creator" content="Kevin Smith"><meta name="DC.Description" content="This document defines a method for one XMPP stanza to provide references to another entity, such as mentioning users, HTTP resources, or other XMPP resources."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2020-12-09"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0372"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0372: References</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This document defines a method for one XMPP stanza to provide references to another entity, such as mentioning users, HTTP resources, or other XMPP resources.</dd><dt>Author</dt><dd>Kevin Smith</dd><dt>Copyright</dt><dd>© 2016 – 2020 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Experimental</p><div id="status-notice" class="experimental standards track">WARNING: This Standards-Track document is Experimental. Publication as an XMPP Extension Protocol does not imply approval of this proposal by the XMPP Standards Foundation. Implementation of the protocol described herein is encouraged in exploratory implementations, but production systems are advised to carefully consider whether it is appropriate to deploy implementations of this protocol before it advances to a status of Draft.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.5.0 (2020-12-09)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li class="current">Experimental</li><li>Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#discovery">Discovery</a></li><li><a href="#usecases">Use Cases</a><ol><li><a href="#usecase_generics">Generics</a></li><li><a href="#usecase_mention">Mentions</a></li><li><a href="#usecase_data">Data</a></li><li><a href="#usecase_previous">Previous messages</a></li></ol></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a></li><li><a href="#schema">XML Schema</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">
+    It's often desirable to encode a reference to another entity within a chat message and to mark up the reference. Examples of this include HTTP URLs, 'mentions' (referring to another user), references to previous messages and references to <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0346.html">Form Discovery and Publishing (XEP-0346)</a></span>  [<a href="#nt-idm45306682290576">1</a>] (FDP) forms. This document provides a mechanism for marking up a section of a message body with information about the target of the reference.
+  </p>
+<h2 id="discovery">2.
+       Discovery<a class="anchor-link" href="#discovery"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">If a client implements references, it MUST specify the 'urn:xmpp:reference:0' feature in its service discovery information features as specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45306682284192">2</a>] and the Entity Capabilities profile specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm45306682279728">3</a>].</p>
+  <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Client queries for contact's features<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get'
+    id='disco1'
+    from='romeo@montegue.lit/30d3d8'
+    to='juliet@capulet.lit/sabo239'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+<figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Contact's client responds with features<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result'
+    id='disco1'
+    from='juliet@capulet.lit/sabo239'
+    to='romeo@montegue.lit/30d3d8'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+    ...
+    &lt;feature var='urn:xmpp:reference:0'/&gt;
+    ...
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+<p class="" style="">TODO: Individual discovery of reference types - FDP, Mentions, ...</p>
+<h2 id="usecases">3.
+       Use Cases<a class="anchor-link" href="#usecases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="usecase_generics">3.1 Generics<a class="anchor-link" href="#usecase_generics"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">References are provided in a 'reference' element of a message, with a namespace of 'urn:xmpp:reference:0'. The element MUST contain a 'type' attribute denoting the type of the reference and a 'uri' attribute of the thing that is referenced. It MAY contain 'begin', 'end' and 'anchor' elements.</p>
+    <p class="" style="">The 'begin' and 'end' attributes are indexes denoting the beginning and end of the referenced substring in the message body. The Dijkstra convention of ranges [<a href="#nt-idm45306682271232">4</a>] is used, which means that 'begin' is inclusive and 'end' is exclusive. In other words, the 'begin' attribute is the index of the first unicode code point in the referenced substring, with 0 being the index of the first code point in the body, and the 'end' attribute is one higher than the index of the last code point in the substring.
+       This convention has three main advantages. It matches subsequence indexing in various programming languages, 'end' minus 'begin' equals the length of the substring, and when two substrings are adjacent, the 'end' attribute of the first one matches the 'begin' attribute of the second one.
+       Where the reference is not a substring of the message body in the referring stanza, 'begin' and 'end' are not used.</p>
+    <p class="" style="">An 'anchor' attribute is used when the referring message is not the one containing the reference element, and points to the previous message containing the reference (the referring message).</p>
+    <p class="" style="">Note that the URIs of the reference and anchor do not need to refer to the same mechanism as that in which the reference was received. E.g., a service could listen for mentions in a MIX channels of users outside that channel, and send them messages containing a reference to let them know that they've been mentioned.</p>
+  </div>
+  <div class="indent"><h3 id="usecase_mention">3.2 Mentions<a class="anchor-link" href="#usecase_mention"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Mentions are a reference to a user's bare JID, and have a type of 'mention'.</p>
+    <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Romeo sends a message mentioning Juliet<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message type='groupchat'
+         id='sotehu-bthbtp32h3'
+         to='balcony@channels.shakespeare.lit'&gt;
+  &lt;body&gt;But, soft! what light through yonder window breaks? It is the east, and Juliet is the sun.&lt;/body&gt;
+  &lt;reference xmlns='urn:xmpp:reference:0'
+             begin='72'
+             end='78'
+             type='mention'
+             uri='xmpp:juliet@capulet.lit'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="usecase_data">3.3 Data<a class="anchor-link" href="#usecase_data"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Data references are a generic reference without additional information. The URI points to an 'item' that is able to be fetched. This is useful for, for example, fetching an item from pubsub, as in the example below. TODO: check URI syntax for refering to a pubsub item.</p>
+    <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> A MIX Channel sends a message that a new FDP form has been submitted elsewhere<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message type='groupchat'
+         id='sotehu-bthbtp32h4'
+         from='balcony@channels.shakespeare.lit'
+         to='romeo@montegue.lit/30d3d8'&gt;
+  &lt;body&gt;Form received&lt;/body&gt;
+  &lt;reference xmlns='urn:xmpp:reference:0'
+             type='data'
+             uri='xmpp:fdp.shakespeare.lit?;node=fdp/submitted/stan.isode.net/accidentreport;item=ndina872be'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="usecase_previous">3.4 Previous messages<a class="anchor-link" href="#usecase_previous"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Sometimes it's desirable to annotate a reference in a previous message. An example of this might be where a MIX channel asynchronously adds information about references made in previous messages by users. In this case the message MUST NOT contain a body. Here the anchor attribute is used to provide a URI to the previous message. TODO: URI scheme for messages.</p>
+    <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> A MIX Channel annotates a previous user message<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message type='groupchat'
+         id='sotehu-bthbtp32h5'
+         from='balcony@channels.shakespeare.lit'
+         to='romeo@montegue.lit/30d3d8'&gt;
+  &lt;reference xmlns='urn:xmpp:reference:0'
+             type='data'
+             anchor='xmpp:balcony@channels.shakespeare.lit?;node=messages;item=bnhob'
+             begin='72'
+             end='78'
+             uri='xmpp:fdp.shakespeare.lit?;node=fdp/submitted/stan.isode.net/accidentreport;item=ndina872be'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  </div>
+
+<h2 id="security">4.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">TODO.</p>
+<h2 id="iana">5.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">None.</p>
+<h2 id="registrar">6.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Needs a namespace.</p>
+<h2 id="schema">7.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">When advanced.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0372</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Experimental">Experimental</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.5.0</dd><dt>Last Updated</dt><dd>2020-12-09</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, XMPP IM, <a href="xep-0030.html">XEP-0030</a>, <a href="xep-0115.html">XEP-0115</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>Refs</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0372.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0372.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0372.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Kevin Smith</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:kevin.smith@isode.com">kevin.smith@isode.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:kevin.smith@isode.com">kevin.smith@isode.com</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45306682290576">1</a>. XEP-0346: Form Discovery and Publishing &lt;<a href="https://xmpp.org/extensions/xep-0346.html">https://xmpp.org/extensions/xep-0346.html</a>&gt;.</p><p><a name="nt-idm45306682284192">2</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm45306682279728">3</a>. XEP-0115: Entity Capabilities &lt;<a href="https://xmpp.org/extensions/xep-0115.html">https://xmpp.org/extensions/xep-0115.html</a>&gt;.</p><p><a name="nt-idm45306682271232">4</a>. Dijkstra convention of ranges &lt;<a href="https://www.cs.utexas.edu/users/EWD/transcriptions/EWD08xx/EWD831.html">https://www.cs.utexas.edu/users/EWD/transcriptions/EWD08xx/EWD831.html</a>&gt;</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.5.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0372-0.5.0.html">0.5.0</a> (2020-12-09)<a class="anchor-link" href="#revision-history-v0.5.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Specify counting should be of code points.<div class="revision-author">kis</div></li><li id="revision-history-v0.4.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0372-0.4.0.html">0.4.0</a> (2020-12-08)<a class="anchor-link" href="#revision-history-v0.4.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Specify that begin is inclusive, starts counting at zero, and that end is exclusive (Dijkstra-based convention).<div class="revision-author">gh/jcbrand</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0372-0.3.html">0.3</a> (2019-09-04)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div>Make Pubsub URIs in sections 3.3 and 3.4 conform to XEP-0147.<div class="revision-author">(mb)</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0372-0.2.html">0.2</a> (2017-09-11)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div>Defer due to lack of activity.<div class="revision-author">XEP Editor (jwi)</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0372-0.1.html">0.1</a> (2016-03-22)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial published version approved by the XMPP Council.</p><div class="revision-author">XEP Editor (asw)</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0372-0.0.1.html">0.0.1</a> (2016-01-29)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">kis</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{smith2016refs,
+  title = {References},
+  author = {Smith, Kevin},
+  type = {XEP},
+  number = {0372},
+  version = {0.5.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0372.html},
+  date = {2016-01-29/2020-12-09},
+}</pre><p>END</p></body></html>

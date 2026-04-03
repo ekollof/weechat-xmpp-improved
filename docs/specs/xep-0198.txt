@@ -1,0 +1,637 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0198: Stream Management</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0198";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Stream Management"><meta name="DC.Creator" content="Justin Karneges"><meta name="DC.Creator" content="Peter Saint-Andre"><meta name="DC.Creator" content="Joe Hildebrand"><meta name="DC.Creator" content="Fabio Forno"><meta name="DC.Creator" content="Dave Cridland"><meta name="DC.Creator" content="Matthew Wild"><meta name="DC.Creator" content="Thilo Molitor"><meta name="DC.Description" content="This specification defines an XMPP protocol extension for active management of an XML stream between two XMPP entities, including features for stanza acknowledgements and stream resumption."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2025-07-28"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0198"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0198: Stream Management</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification defines an XMPP protocol extension for active management of an XML stream between two XMPP entities, including features for stanza acknowledgements and stream resumption.</dd><dt>Authors</dt><dd><ul class="authors"><li>Justin Karneges</li><li>Peter Saint-Andre</li><li>Joe Hildebrand</li><li>Fabio Forno</li><li>Dave Cridland</li><li>Matthew Wild</li><li>Thilo Molitor</li></ul></dd><dt>Copyright</dt><dd>© 2004 – 2025 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Stable</p><div id="status-notice" class="draft standards track">NOTICE: The protocol defined herein is a <strong>Stable Standard</strong> of the XMPP Standards Foundation. Implementations are encouraged and the protocol is appropriate for deployment in production systems, but some changes to the protocol are possible before it becomes a Final Standard.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>1.6.3 (2025-07-28)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li class="current">Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#feature">Stream Feature</a></li><li><a href="#enable">Enabling Stream Management</a></li><li><a href="#acking">Acks</a></li><li><a href="#resumption">Resumption</a></li><li><a href="#errors">Error Handling</a></li><li><a href="#closure">Stream Closure</a></li><li><a href="#scenarios">Scenarios</a><ol><li><a href="#scenarios-basic">Basic Acking Scenario</a></li><li><a href="#scenarios-efficient">Efficient Acking Scenario</a></li></ol></li><li><a href="#inline">SASL2 And BIND2 Interaction</a><ol><li><a href="#inline-enable">Enable Stream Management Inline</a><ol><li><a href="#sect-idm46308528834592">Failed To Enable Stream Management</a></li></ol></li><li><a href="#inline-resume">Inline Stream Resumption</a><ol><li><a href="#sect-idm46308528821088">Failed Resumption</a></li></ol></li><li><a href="#inline-examples">Inlining Examples</a></li></ol></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#registrar-ns">Protocol Namespaces</a></li><li><a href="#registrar-versioning">Protocol Versioning</a></li><li><a href="#registrar-stream">Stream Features</a></li></ol></li><li><a href="#schemas">XML Schemas</a></li><li><a href="#ack">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style=""><span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6120">XMPP Core</a></span>  [<a href="#nt-idm46308529102144">1</a>] defines the fundamental streaming XML technology used by XMPP (i.e., stream establishment and termination including authentication and encryption). However, the core XMPP specification does not provide tools for actively managing a live XML stream.</p>
+  <p class="" style="">The basic concept behind stream management is that the initiating entity (either a client or a server) and the receiving entity (a server) can exchange "commands" for active management of the stream. The following stream management features are of particular interest because they are expected to improve network reliability and the end-user experience:</p>
+  <ul class="" style="">
+    <li class="" style="">Stanza Acknowledgements -- the ability to know if a stanza or series of stanzas has been received by one's peer.</li>
+    <li class="" style="">Stream Resumption -- the ability to quickly resume a stream that has been terminated.</li>
+  </ul>
+  <p class="" style="">Stream management implements these features using short XML elements at the root stream level. These elements are not "stanzas" in the XMPP sense (i.e., not &lt;iq/&gt;, &lt;message/&gt;, or &lt;presence/&gt; stanzas as defined in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6120">RFC 6120</a></span>  [<a href="#nt-idm46308529102144">1</a>]) and are not counted or acked in stream management, since they exist for the purpose of managing stanzas themselves.</p>
+  <p class="" style="">Stream management is used at the level of an XML stream. To check TCP connectivity underneath a given stream, it is RECOMMENDED to use whitespace keepalives (see <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6120">RFC 6120</a></span>  [<a href="#nt-idm46308529102144">1</a>]), <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0199.html">XMPP Ping (XEP-0199)</a></span>  [<a href="#nt-idm46308529082928">2</a>], or TCP keepalives. By contrast with stream management, <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0079.html">Advanced Message Processing (XEP-0079)</a></span>  [<a href="#nt-idm46308529073376">3</a>] and <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0184.html">Message Delivery Receipts  (XEP-0184)</a></span>  [<a href="#nt-idm46308529075920">4</a>] define acks that are sent end-to-end over multiple streams; these facilities are useful in special scenarios but are unnecessary for checking of a direct stream between two XMPP entities.</p>
+  <p class="" style="">Note: Stream Management can be used for server-to-server streams as well as for client-to-server streams. However, for convenience this specification discusses client-to-server streams only. The same principles apply to server-to-server streams.</p>
+<h2 id="feature">2.
+       Stream Feature<a class="anchor-link" href="#feature"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The server returns a stream header to the client along with stream features, where the features include an &lt;sm/&gt; element qualified by the 'urn:xmpp:sm:3' namespace (see <a href="#registrar-versioning">Namespace Versioning</a> regarding the possibility of incrementing the version number).</p>
+  <p class="" style="">Note: The client cannot negotiate stream management until it has authenticated with the server and has bound a resource; see below for specific restrictions.</p>
+  <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Server sends new stream header along with stream features<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;stream:stream
+    from='example.com'
+    xmlns='jabber:client'
+    xmlns:stream='http://etherx.jabber.org/streams'
+    version='1.0'&gt;
+
+&lt;stream:features&gt;
+  &lt;bind xmlns='urn:ietf:params:xml:ns:xmpp-bind'/&gt;
+  &lt;sm xmlns='urn:xmpp:sm:3'/&gt;
+&lt;/stream:features&gt;
+</pre></figure>
+<h2 id="enable">3.
+       Enabling Stream Management<a class="anchor-link" href="#enable"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">To enable use of stream management, the client sends an &lt;enable/&gt; command to the server.</p>
+  <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Client enables stream management<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;enable xmlns='urn:xmpp:sm:3'/&gt;
+</pre></figure>
+  <p class="" style="">If the client wants to be allowed to resume the stream, it includes a boolean 'resume' attribute, which defaults to false  [<a href="#nt-idm46308529054848">5</a>]. For information about resuming a previous session, see the <a href="#resumption">Resumption</a> section of this document.</p>
+  <p class="" style="">The &lt;enable/&gt; element MAY include a 'max' attribute to specify the client's preferred maximum resumption time in seconds.</p>
+  <p class="" style="">Upon receiving the enable request, the server MUST reply with an &lt;enabled/&gt; element or a &lt;failed/&gt; element qualified by the 'urn:xmpp:sm:3' namespace. The &lt;failed/&gt; element indicates that there was a problem establishing the stream management "session". The &lt;enabled/&gt; element indicates successful establishment of the stream management session.</p>
+  <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Server enables stream management<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;enabled xmlns='urn:xmpp:sm:3'/&gt;
+</pre></figure>
+  <p class="" style="">The parties can then the use stream management features defined below.</p>
+  <p class="" style="">If the server allows session resumption, it MUST include a 'resume' attribute set to a value of "true" or "1"  [<a href="#nt-idm46308529054848">5</a>].</p>
+  <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Server enables stream management with session resumption<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;enabled xmlns='urn:xmpp:sm:3' id='some-long-sm-id' resume='true'/&gt;
+</pre></figure>
+  <p class="" style="">The &lt;enabled/&gt; element MAY include a 'max' attribute to specify the server's preferred maximum resumption time.</p>
+  <p class="" style="">The &lt;enabled/&gt; element MAY include a 'location' attribute to specify the server's preferred IP address or hostname (optionally with a port) for reconnection, in the form specified in Section 4.9.3.19 of <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6120">RFC 6120</a></span>  [<a href="#nt-idm46308529102144">1</a>] (i.e., "domainpart:port", where IPv6 addresses are enclosed in square brackets "[...]" as described in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc5952">RFC 5952</a></span>  [<a href="#nt-idm46308529042832">6</a>]); if reconnection to that location fails, the standard XMPP connection algorithm specified in <span class="ref">RFC 6120</span> applies.</p>
+  <p class="" style="">The client MUST NOT attempt to negotiate stream management until it is authenticated; i.e., it MUST NOT send an &lt;enable/&gt; element until after authentication (such as SASL, <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0078.html">Non-SASL Authentication (XEP-0078)</a></span>  [<a href="#nt-idm46308529037840">7</a>] or <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0220.html">Server Dialback (XEP-0220)</a></span>  [<a href="#nt-idm46308529030544">8</a>]) has been completed successfully.</p>
+  <p class="" style="">For client-to-server connections, the client MUST NOT attempt to enable stream management until after it has completed Resource Binding <em>unless it is resuming a previous session</em> (see <a href="#resumption">Resumption</a>).</p>
+  <p class="" style="">The server SHALL enforce this order and return a &lt;failed/&gt; element in response if the order is violated (see <a href="#errors">Error Handling</a>).</p>
+  <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> Server returns error if client attempts to enable stream management before resource binding<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;failed xmlns='urn:xmpp:sm:3'&gt;
+  &lt;unexpected-request xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+&lt;/failed&gt;
+</pre></figure>
+  <p class="" style="">Note that a client SHALL only make at most one attempt to enable stream management. If a server receives a second &lt;enable/&gt; element it SHOULD respond with a stream error, thus terminating the client connection.</p>
+  <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> Server returns error if client attempts to enable stream management more than once<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;failed xmlns='urn:xmpp:sm:3'&gt;
+  &lt;unexpected-request xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+&lt;/failed&gt;
+</pre></figure>
+<h2 id="acking">4.
+       Acks<a class="anchor-link" href="#acking"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">After enabling stream management, the client or server can send ack elements at any time over the stream. An ack element is one of the following:</p>
+  <ul class="" style="">
+    <li class="" style="">The &lt;a/&gt; element is used to <strong>answer</strong> a request for acknowledgement or to send an unrequested ack.</li>
+    <li class="" style="">The &lt;r/&gt; element is used to <strong>request</strong> acknowledgement of received stanzas.</li>
+  </ul>
+  <p class="" style="">The following attribute is defined:</p>
+  <ul class="" style="">
+    <li class="" style="">The 'h' attribute identifies the last <strong>handled</strong> stanza (i.e., the last stanza that the server will acknowledge as having received).</li>
+  </ul>
+  <p class="" style="">An &lt;a/&gt; element MUST possess an 'h' attribute.</p>
+  <p class="" style="">The &lt;r/&gt; element has no defined attributes.</p>
+  <p class="def" style=""><strong>Definition:</strong> Acknowledging a previously-received ack element indicates that the stanza(s) sent since then have been "handled" by the server. By "handled" we mean that the server has accepted responsibility for a stanza or stanzas (e.g., to process the stanza(s) directly, deliver the stanza(s) to a local entity such as another connected client on the same server, or route the stanza(s) to a remote entity at a different server); until a stanza has been affirmed as handled by the server, that stanza is the responsibility of the sender (e.g., to resend it or generate an error if it is never affirmed as handled by the server).</p>
+  <p class="" style="">Receipt of an &lt;r/&gt; element does not imply that new stanzas have been transmitted by the peer; receipt of an &lt;a/&gt; element only indicates that new stanzas have been processed if the 'h' attribute has been incremented.</p>
+  <p class="" style="">The value of 'h' starts at zero at the point stream management is enabled or requested to be enabled (see note below). The value of 'h' is then incremented to one for the first stanza handled and incremented by one again with each subsequent stanza handled. In the unlikely case that the number of stanzas handled during a stream management session exceeds the number of digits that can be represented by the unsignedInt datatype as specified in <span class="ref" style=""><a href="http://www.w3.org/TR/xmlschema11-2/">XML Schema Part 2</a></span>  [<a href="#nt-idm46308529004720">9</a>] (i.e., 2<span class="super" style="">32</span>), the value of 'h' SHALL be reset from 2<span class="super" style="">32</span>-1 back to zero (rather than being incremented to 2<span class="super" style="">32</span>).</p>
+  <p class="box" style="">Note: Each entity maintains two counters for any given stream: a counter of stanzas it has sent, and a counter of stanzas it has received and handled ('h'). The counter for an entity's own sent stanzas is set to zero and started after sending either &lt;enable/&gt; or &lt;enabled/&gt;. The counter for the received stanzas ('h') is set to zero and started after receiving either &lt;enable/&gt; or &lt;enabled/&gt;.</p>
+  <p class="" style="">The following annotated example shows a message sent by the client, a request for acknowledgement, and an ack of the stanza.</p>
+   <figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> Simple stanza acking<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;!-- Client --&gt;
+&lt;enable xmlns='urn:xmpp:sm:3'/&gt;
+
+&lt;!-- Client sets outbound count to zero. --&gt;
+
+&lt;message from='laurence@example.net/churchyard'
+         to='juliet@example.com'
+         xml:lang='en'&gt;
+  &lt;body&gt;
+    I'll send a friar with speed, to Mantua,
+    with my letters to thy lord.
+  &lt;/body&gt;
+&lt;/message&gt;
+
+&lt;!-- Note that client need not wait for a response. --&gt;
+
+&lt;!-- Server --&gt;
+&lt;enabled xmlns='urn:xmpp:sm:3'/&gt;
+
+&lt;!--
+     Server receives enable, and responds,
+     setting both inbound and outbound counts
+     to zero.
+
+     In addition, client sets inbound count to zero.
+--&gt;
+
+&lt;!-- Client --&gt;
+&lt;r xmlns='urn:xmpp:sm:3'/&gt;
+
+&lt;!-- Server --&gt;
+&lt;a xmlns='urn:xmpp:sm:3' h='1'/&gt;
+</pre></figure>
+  <p class="" style="">When an &lt;r/&gt; element ("request") is received, the recipient MUST acknowledge it by sending an &lt;a/&gt; element to the sender containing a value of 'h' that is equal to the number of stanzas handled by the recipient of the &lt;r/&gt; element. The response SHOULD be sent as soon as possible after receiving the &lt;r/&gt; element, and MUST NOT be withheld for any condition other than a timeout. For example, a client with a slow connection might want to collect many stanzas over a period of time before acking, and a server might want to throttle incoming stanzas. The sender does not need to wait for an ack to continue sending stanzas.</p>
+  <p class="" style="">Either party MAY send an &lt;a/&gt; element at any time (e.g., after it has received a certain number of stanzas, or after a certain period of time), even if it has not received an &lt;r/&gt; element from the other party.
+  It is RECOMMENDED that initiating entities (usually clients) send an &lt;a/&gt; element right before they gracefully close the stream, in order to inform the peer about received stanzas. Otherwise it can happen that stanzas are re-sent (usually by the server) although they were actually received.
+  </p>
+  <p class="" style="">When a party receives an &lt;a/&gt; element, it SHOULD keep a record of the 'h' value returned as the sequence number of the last handled outbound stanza for the current stream (and discard the previous value).</p>
+  <p class="" style="">If a stream ends and it is not resumed within the time specified in the original &lt;enabled/&gt; element, the sequence number and any associated state MAY be discarded by both parties. Before the session state is discarded, implementations SHOULD take alternative action regarding any unhandled stanzas (i.e., stanzas sent after the most recent 'h' value received):</p>
+  <ul class="" style="">
+    <li class="" style="">A server SHOULD treat unacknowledged stanzas in the same way that it would treat a stanza sent to an unavailable resource, by either returning an error to the sender, delivery to an alternate resource, or committing the stanza to offline storage. (Note that servers SHOULD add a delay element with the original (failed) delivery timestamp, as per <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0203.html">Delayed Delivery (XEP-0203)</a></span>  [<a href="#nt-idm46308528984144">10</a>]).</li>
+    <li class="" style="">A user-oriented client SHOULD try to silently resend the stanzas upon reconnection or inform the user of the failure via appropriate user-interface elements. Clients SHOULD also add a delay element with the original (failed) send timestamp, so that the original send date is preserved. Otherwise receiving clients could only display the reconnection timestamp of the sending client, which may confuse users.</li>
+  </ul>
+  <p class="" style="">Because unacknowledged stanzas might have been received by the other party, resending them might result in duplicates; there is no way to prevent such a result in this protocol, although use of the XMPP 'id' attribute on all stanzas can at least assist the intended recipients in weeding out duplicate stanzas.</p>
+<h2 id="resumption">5.
+       Resumption<a class="anchor-link" href="#resumption"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">It can happen that an XML stream is terminated unexpectedly (e.g., because of network outages). In this case, it is desirable to quickly resume the former stream rather than complete the tedious process of stream establishment, roster retrieval, and presence broadcast.</p>
+  <p class="" style="">In addition, this protocol exchanges the sequence numbers of the last received stanzas on the previous connection, allowing entities to establish definitively which stanzas require retransmission and which do not, eliminating duplication through replay.</p>
+  <p class="" style="">To request that the stream will be resumable, when enabling stream management the client MUST add a 'resume' attribute to the &lt;enable/&gt; element with a value of "true" or "1"  [<a href="#nt-idm46308529054848">5</a>].</p>
+  <figure class="code-example" id="example-8"><figcaption><strong>Example 8.</strong> Client enables stream management<a class="anchor-link" href="#example-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;enable xmlns='urn:xmpp:sm:3' resume='true'/&gt;
+</pre></figure>
+  <p class="" style="">If the server will allow the stream to be resumed, it MUST include a 'resume' attribute set to "true" or "1" on the &lt;enabled/&gt; element and MUST include an 'id' attribute that specifies an identifier for the stream.</p>
+  <figure class="code-example" id="example-9"><figcaption><strong>Example 9.</strong> Server allows stream resumption<a class="anchor-link" href="#example-9"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;enabled xmlns='urn:xmpp:sm:3' id='some-long-sm-id' resume='true'/&gt;
+</pre></figure>
+  <figure class="code-example" id="example-10"><figcaption><strong>Example 10.</strong> Alternative response: Server enables stream management without session resumption<a class="anchor-link" href="#example-10"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;enabled xmlns='urn:xmpp:sm:3' id='some-long-sm-id'/&gt;
+</pre></figure>
+  <p class="def" style=""><strong>Definition:</strong> The 'id' attribute defines a unique identifier for purposes of stream management (an "SM-ID"). The SM-ID MUST be generated by the server. The client MUST consider the SM-ID to be opaque and therefore MUST NOT assign any semantic meaning to the SM-ID. The server MAY encode any information it deems useful into the SM-ID, such as the full JID &lt;localpart@domain.tld/resource&gt; of a connected client (e.g., the full JID plus a nonce value). Any characters allowed in an XML attribute are allowed. The SM-ID MUST NOT be reused for simultaneous or subsequent sessions (but the server need not ensure that SM-IDs are unique for all time, only for as long as the server is continuously running). The SM-ID SHOULD NOT be longer than 4000 bytes.</p>
+  <p class="" style="">As noted, the &lt;enabled/&gt; element MAY include a 'location' attribute that specifies the server's preferred location for reconnecting (e.g., a particular connection manager that hold session state for the connected client).</p>
+  <figure class="code-example" id="example-11"><figcaption><strong>Example 11.</strong> Server prefers reconnection at a particular location<a class="anchor-link" href="#example-11"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;enabled xmlns='urn:xmpp:sm:3'
+            id='some-long-sm-id'
+            location='[2001:41D0:1:A49b::1]:9222'
+            resume='true'/&gt;
+</pre></figure>
+  <p class="" style="">If the stream is terminated unexpectedly, the client would then open a TCP connection to the server. The order of events is as follows:</p>
+  <ol start="1" class="" style="">
+    <li class="" style="">After disconnection, the client opens a new TCP connection to the server, preferring the address specified in the 'location' attribute (if any).</li>
+    <li class="" style="">Client sends initial stream header.</li>
+    <li class="" style="">Server sends response stream header.</li>
+    <li class="" style="">Server sends stream features.</li>
+    <li class="" style="">Client sends STARTTLS request.</li>
+    <li class="" style="">Server informs client to proceed with the TLS negotiation.</li>
+    <li class="" style="">The parties complete a TLS handshake. (Note: When performing session resumption and also utilizing TLS, it is RECOMMENDED to take advantage of TLS session resumption <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc5077">RFC 5077</a></span>  [<a href="#nt-idm46308528954416">11</a>] to further optimize the resumption of the XML stream.)</li>
+    <li class="" style="">Client sends new initial stream header.</li>
+    <li class="" style="">Server sends response stream header.</li>
+    <li class="" style="">Server sends stream features, requiring SASL negotiation and offering appropriate SASL mechanisms. (Note: If the server considers the information provided during TLS session resumption to be sufficient authentication, it MAY offer the SASL EXTERNAL mechanism; for details, refer to <span class="ref" style=""><a href="http://tools.ietf.org/html/draft-cridland-sasl-tls-sessions">draft-cridland-sasl-tls-sessions</a></span>  [<a href="#nt-idm46308528946944">12</a>].)</li>
+    <li class="" style="">The parties complete SASL negotiation.</li>
+    <li class="" style="">Client sends new initial stream header.</li>
+    <li class="" style="">Server sends response stream header.</li>
+    <li class="" style="">Server sends stream features, offering the SM feature.</li>
+    <li class="" style="">Client requests resumption of the former stream.</li>
+  </ol>
+  <p class="" style="">Note: The order of events might differ from those shown above, depending on when the server offers the SM feature, whether the client chooses STARTTLS, etc. Furthermore, in practice server-to-server streams often do not complete SASL negotiation or even TLS negotiation. The foregoing text does not modify any rules about the stream negotiation process specified in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6120">RFC 6120</a></span>  [<a href="#nt-idm46308529102144">1</a>]. However, since stream management applies to the exchange of stanzas (not any other XML elements), it makes sense for the server to offer the SM feature when it will be possible for the other party to start sending stanzas, not before. See also <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0170.html">Recommended Order of Stream Feature Negotiation (XEP-0170)</a></span>  [<a href="#nt-idm46308528933040">13</a>].</p>
+  <p class="" style="">To request resumption of the former stream, the client sends a &lt;resume/&gt; element qualified by the 'urn:xmpp:sm:3' namespace. The &lt;resume/&gt; element MUST include a 'previd' attribute whose value is the SM-ID of the former stream and MUST include an 'h' attribute that identifies the sequence number of the last handled stanza sent over the former stream from the server to the client (in the unlikely case that the client never received any stanzas, it would set 'h' to zero).</p>
+  <figure class="code-example" id="example-12"><figcaption><strong>Example 12.</strong> Stream resumption request<a class="anchor-link" href="#example-12"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;resume xmlns='urn:xmpp:sm:3'
+        h='some-sequence-number'
+        previd='some-long-sm-id'/&gt;
+</pre></figure>
+  <p class="" style="">If the server can resume the former stream, it MUST return a &lt;resumed/&gt; element, which MUST include a 'previd' attribute set to the SM-ID of the former stream and MUST also include an 'h' attribute set to the sequence number of the last handled stanza sent over the former stream from the client to the server (in the unlikely case that the server never received any stanzas, it would set 'h' to zero).</p>
+  <figure class="code-example" id="example-13"><figcaption><strong>Example 13.</strong> Stream resumed<a class="anchor-link" href="#example-13"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;resumed xmlns='urn:xmpp:sm:3'
+         h='another-sequence-number'
+         previd='some-long-sm-id'/&gt;
+</pre></figure>
+  <p class="" style="">If the server does not support session resumption, it MUST return a &lt;failed/&gt; element, which SHOULD include an error condition of &lt;feature-not-implemented/&gt;. If the server does not recognize the 'previd' as an earlier session (e.g., because the former session has timed out), it MUST return a &lt;failed/&gt; element, which SHOULD include an error condition of &lt;item-not-found/&gt;. If the server recogizes the 'previd' as an earlier session that has timed out the server MAY also include a 'h' attribute indicating the number of stanzas received before the timeout. (Note: For this to work the server has to store the SM-ID/sequence number tuple past the time out of the actual session.)</p>
+  <figure class="code-example" id="example-14"><figcaption><strong>Example 14.</strong> Stream timed out<a class="anchor-link" href="#example-14"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;failed xmlns='urn:xmpp:sm:3'
+        h='another-sequence-number'&gt;
+  &lt;item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+&lt;/failed&gt;
+</pre></figure>
+  <p class="" style="">In both of these failure cases, the server SHOULD allow the client to bind a resource at this point rather than forcing the client to restart the stream negotiation process and re-authenticate.</p>
+  <p class="" style="">If the former stream is resumed and the server still has the stream for the previously-identified session open at this time, the server SHOULD send a 'conflict' stream error and close that stream.</p>
+<figure class="code-example" id="example-15"><figcaption><strong>Example 15.</strong> Server closes old stream that was replaced by new<a class="anchor-link" href="#example-15"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;stream:error&gt;
+  &lt;conflict xmlns='urn:ietf:params:xml:ns:xmpp-streams'/&gt;
+&lt;/stream:error&gt;
+&lt;/stream:stream&gt;
+</pre></figure>
+  <p class="" style="">When a session is resumed, the parties proceed as follows:</p>
+  <ul class="" style="">
+    <li class="" style="">The sequence values are carried over from the previous session and are not reset for the new stream.</li>
+    <li class="" style="">Upon receiving a &lt;resume/&gt; or &lt;resumed/&gt; element the client and server use the 'h' attribute to retransmit any stanzas lost by the disconnection. In effect, it should handle the element's 'h' attribute as it would handle it on an &lt;a/&gt; element (i.e., marking stanzas in its outgoing queue as handled), except that after processing it MUST re-send to the peer any stanzas that are still marked as unhandled.</li>
+    <li class="" style="">Both parties SHOULD retransmit any stanzas that were not handled during the previous session, based on the sequence number reported by the peer.</li>
+    <li class="" style="">A reconnecting client SHOULD NOT request the roster, because any roster changes that occurred while the client was disconnected will be sent to the client after the stream management session resumes.</li>
+    <li class="" style="">The client SHOULD NOT resend presence stanzas in an attempt to restore its former presence state, since this state will have been retained by the server.</li>
+    <li class="" style="">Both parties SHOULD NOT try to re-establish state information (e.g., <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm46308528908384">14</a>] information).</li>
+  </ul>
+<h2 id="errors">6.
+       Error Handling<a class="anchor-link" href="#errors"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">If an error occurs with regard to an &lt;enable/&gt; or &lt;resume/&gt; element, the server MUST return a &lt;failed/&gt; element. This element SHOULD contain an error condition, which MUST be one of the stanza error conditions defined in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6120">RFC 6120</a></span>  [<a href="#nt-idm46308529102144">1</a>].</p>
+  <p class="" style="">An example follows.</p>
+  <figure class="code-example" id="example-16"><figcaption><strong>Example 16.</strong> Server returns error<a class="anchor-link" href="#example-16"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;failed xmlns='urn:xmpp:sm:3'&gt;
+  &lt;unexpected-request xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+&lt;/failed&gt;
+</pre></figure>
+  <p class="" style="">Stream management errors SHOULD be considered recoverable; however, misuse of stream management MAY result in termination of the stream.</p>
+  <p class="" style="">When a remote entity acknowledges that it has handled a number of stanzas that is higher than the amount of stanzas that it was sent (by sending an 'h' value that is too high), the local entity SHOULD generate an undefined-condition stream error that includes a &lt;handled-count-too-high/&gt; element, and close the stream:</p>
+  <figure class="code-example" id="example-17"><figcaption><strong>Example 17.</strong> Entity closes stream because peer acknowledges more stanzas than it was sent<a class="anchor-link" href="#example-17"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;stream:error&gt;
+  &lt;undefined-condition xmlns='urn:ietf:params:xml:ns:xmpp-streams'/&gt;
+  &lt;handled-count-too-high xmlns='urn:xmpp:sm:3' h='10' send-count='8'/&gt;
+  &lt;text xml:lang='en' xmlns='urn:ietf:params:xml:ns:xmpp-streams'&gt;
+    You acknowledged 10 stanzas, but I only sent you 8 so far.
+  &lt;/text&gt;
+&lt;/stream:error&gt;
+&lt;/stream:stream&gt;
+</pre></figure>
+<h2 id="closure">7.
+       Stream Closure<a class="anchor-link" href="#closure"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">A cleanly closed stream differs from an unfinished stream. If a client wishes to cleanly close its stream and end its session, it MUST send a &lt;/stream:stream&gt; so that the server can send unavailable presence on the client's behalf.</p>
+  <p class="" style="">If the stream is not cleanly closed then the server SHOULD consider the stream to be unfinished (even if the client closes its TCP connection to the server) and SHOULD maintain the session on behalf of the client for a limited amount of time. The client can send whatever presence it wishes before leaving the stream in an unfinished state.</p>
+<h2 id="scenarios">8.
+       Scenarios<a class="anchor-link" href="#scenarios"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The following scenarios illustrate several different uses of stream management. The examples are that of a client and a server, but stream management can also be used for server-to-server streams.</p>
+
+  <div class="indent"><h3 id="scenarios-basic">8.1 Basic Acking Scenario<a class="anchor-link" href="#scenarios-basic"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The Stream Management protocol can be used to improve reliability using acks without the ability to resume a session. A basic implementation would do the following:</p>
+    <ul class="" style="">
+      <li class="" style="">As a client, send &lt;enable/&gt; with no attributes, and ignore the attributes on the &lt;enabled/&gt; response.</li>
+      <li class="" style="">As a server, ignore the attributes on the &lt;enable/&gt; element received, and respond via &lt;enabled/&gt; with no attributes.</li>
+      <li class="" style="">When receiving an &lt;r/&gt; element, immediately respond via an &lt;a/&gt; element where the value of 'h' returned is the sequence number of the last handled stanza.</li>
+      <li class="" style="">Keep an integer X for this stream session, initially set to zero. When about to send a stanza, first put the stanza (paired with the current value of X) in an "unacknowleged" queue. Then send the stanza over the wire with &lt;r/&gt; to request acknowledgement of that outbound stanza, and increment X by 1. When receiving an &lt;a/&gt; element with an 'h' attribute, all stanzas whose paired value (X at the time of queueing) is less than or equal to the value of 'h' can be removed from the unacknowledged queue.</li>
+    </ul>
+    <p class="" style="">This is enough of an implementation to minimally satisfy the peer, and allows basic tracking of each outbound stanza. If the stream connection is broken, the application has a queue of unacknowledged stanzas that it can choose to handle appropriately (e.g., warn a human user or silently send after reconnecting).</p>
+    <p class="" style="">The following examples illustrate basic acking (here the client automatically acks each stanza it has received from the server, without first being prompted via an &lt;r/&gt; element).</p>
+    <p class="" style="">First, after authentication and resource binding, the client enables stream management.</p>
+    <figure class="code-example" id="example-18"><figcaption><strong>Example 18.</strong> Client enables stream management<a class="anchor-link" href="#example-18"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;enable xmlns='urn:xmpp:sm:3'/&gt;
+</pre></figure>
+    <p class="" style="">The server then enables stream management.</p>
+  <figure class="code-example" id="example-19"><figcaption><strong>Example 19.</strong> Server enables stream management<a class="anchor-link" href="#example-19"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;enabled xmlns='urn:xmpp:sm:3'/&gt;
+</pre></figure>
+    <p class="" style="">The client then retrieves its roster and immediately sends an &lt;r/&gt; element to request acknowledgement.</p>
+    <figure class="code-example" id="example-20"><figcaption><strong>Example 20.</strong> Client sends a stanza and requests acknowledgement<a class="anchor-link" href="#example-20"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq id='ls72g593' type='get'&gt;
+  &lt;query xmlns='jabber:iq:roster'/&gt;
+&lt;/iq&gt;
+
+&lt;r xmlns='urn:xmpp:sm:3'/&gt;
+</pre></figure>
+    <p class="" style="">The server handles the client stanza (here returning the roster) and sends an &lt;a/&gt; element to acknowledge handling of the stanza.</p>
+    <figure class="code-example" id="example-21"><figcaption><strong>Example 21.</strong> Server handles client stanza and acknowledges handling of client stanza<a class="anchor-link" href="#example-21"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq id='ls72g593' type='result'&gt;
+  &lt;query xmlns='jabber:iq:roster'&gt;
+    &lt;item jid='juliet@capulet.lit'/&gt;
+    &lt;item jid='benvolio@montague.lit'/&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+
+&lt;a xmlns='urn:xmpp:sm:3' h='1'/&gt;
+</pre></figure>
+    <p class="" style="">The client then chooses to acknowledge receipt of the server's stanza (although here it is under no obligation to do so, since the server has not requested an ack), sends initial presence, and immediately sends an &lt;r/&gt; element to request acknowledgement, incrementing by one its internal representation of how many stanzas have been handled by the server.</p>
+    <figure class="code-example" id="example-22"><figcaption><strong>Example 22.</strong> Client acks handling of first server stanza, sends a stanza, and requests acknowledgement<a class="anchor-link" href="#example-22"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;a xmlns='urn:xmpp:sm:3' h='1'/&gt;
+
+&lt;presence/&gt;
+
+&lt;r xmlns='urn:xmpp:sm:3'/&gt;
+</pre></figure>
+    <p class="" style="">The server immediately sends an &lt;a/&gt; element to acknowledge handling of the stanza and then broadcasts the user's presence (including to the client itself as shown below).</p>
+    <figure class="code-example" id="example-23"><figcaption><strong>Example 23.</strong> Server acks handling of second client stanza and sends a stanza<a class="anchor-link" href="#example-23"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;a xmlns='urn:xmpp:sm:3' h='2'/&gt;
+
+&lt;presence from='romeo@montague.lit/orchard'
+          to='romeo@montague.lit/orchard'/&gt;
+</pre></figure>
+    <p class="" style="">The client then acks the server's second stanza and sends an outbound message followed by an &lt;r/&gt; element.</p>
+    <figure class="code-example" id="example-24"><figcaption><strong>Example 24.</strong> Client acks receipt of second server stanza, sends a stanza, and requests acknowledgement<a class="anchor-link" href="#example-24"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;a xmlns='urn:xmpp:sm:3' h='2'/&gt;
+
+&lt;message to='juliet@capulet.lit'&gt;
+  &lt;body&gt;ciao!&lt;/body&gt;
+&lt;/message&gt;
+
+&lt;r xmlns='urn:xmpp:sm:3'/&gt;
+</pre></figure>
+    <p class="" style="">The server immediately sends an &lt;a/&gt; element to acknowledge handling of the third client stanza and then routes the stanza to the remote contact (not shown here because the server does not send a stanza to the client).</p>
+    <figure class="code-example" id="example-25"><figcaption><strong>Example 25.</strong> Server acknowledges handling of third client stanza<a class="anchor-link" href="#example-25"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;a xmlns='urn:xmpp:sm:3' h='3'/&gt;
+</pre></figure>
+    <p class="" style="">And so on.</p>
+  </div>
+
+  <div class="indent"><h3 id="scenarios-efficient">8.2 Efficient Acking Scenario<a class="anchor-link" href="#scenarios-efficient"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The basic acking scenario is wasteful because the client requested an ack for each stanza. A more efficient approach is to periodically request acks (e.g., every 5 stanzas). This is shown schematically in the following pseudo-XML.</p>
+    <figure class="code-example" id="example-26"><figcaption><strong>Example 26.</strong> An efficient session<a class="anchor-link" href="#example-26"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;!-- Client --&gt;
+&lt;enable/&gt;
+&lt;!-- Server --&gt;
+&lt;enabled/&gt;
+&lt;!-- Client --&gt;
+&lt;message/&gt;
+&lt;message/&gt;
+&lt;message/&gt;
+&lt;message/&gt;
+&lt;message/&gt;
+&lt;r/&gt;
+&lt;!-- Server --&gt;
+&lt;a h='5'/&gt;
+&lt;!-- Client--&gt;
+&lt;message/&gt;
+&lt;message/&gt;
+&lt;message/&gt;
+&lt;message/&gt;
+&lt;message/&gt;
+&lt;r/&gt;
+&lt;!-- Server --&gt;
+&lt;a h='10'/&gt;
+</pre></figure>
+    <p class="" style="">In particular, on mobile networks, it is advisable to only request and/or send acknowledgements when an entity has other data to send, or in lieu of a whitespace keepalive or XMPP ping (XEP-0199).</p>
+  </div>
+<h2 id="inline">9.
+       SASL2 And BIND2 Interaction<a class="anchor-link" href="#inline"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="box" style="">This section is about <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0388.html">Extensible SASL Profile (XEP-0388)</a></span>  [<a href="#nt-idm46308528855712">15</a>] (SASL2) and <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0386.html">Bind 2.0 (XEP-0386)</a></span>  [<a href="#nt-idm46308528845616">16</a>] (BIND2) interaction. You don't have to implement this if you don't implement SASL2 and BIND2.</p>
+  <p class="" style=""><span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0388.html">Extensible SASL Profile (XEP-0388)</a></span>  [<a href="#nt-idm46308528855712">15</a>] (SASL2) describes a way of inlining the stream resumption into the authentication process to reduce the round-trips needed for authentication and subsequent stream resumption. Similarly <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0386.html">Bind 2.0 (XEP-0386)</a></span>  [<a href="#nt-idm46308528845616">16</a>] (BIND2) defines a way of inlining the stream management &lt;enable/&gt; into the resource binding process to reduce round-trips.</p>
+  <div class="indent"><h3 id="inline-enable">9.1 Enable Stream Management Inline<a class="anchor-link" href="#inline-enable"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">To indicate support for inlining the activation of Stream Management into the resource binding process, the server adds a &lt;feature/&gt; element with var attribute set to "urn:xmpp:sm:3" in the &lt;inline/&gt; element of BIND2 which is sent in the stream features.</p>
+    <p class="" style="">If the client wishes to begin a new session (i.e. it has no prior session to resume), it simply includes the &lt;enable/&gt; element defined by this specification in its <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0386.html">Bind 2.0 (XEP-0386)</a></span>  [<a href="#nt-idm46308528845616">16</a>] &lt;bind/&gt; request which itself is a child of the &lt;authenticate/&gt; element of SASL2.</p>
+    <div class="indent"><h4 id="sect-idm46308528834592">9.1.1 Failed To Enable Stream Management<a class="anchor-link" href="#sect-idm46308528834592"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">In the unexpected case where the server was able to bind a resource for the client, but unable to enable stream management, it will include a &lt;failed/&gt; element as defined by this specification within the &lt;bound/&gt; response defined by <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0386.html">Bind 2.0 (XEP-0386)</a></span>  [<a href="#nt-idm46308528845616">16</a>].</p>
+    </div>
+  </div>
+  <div class="indent"><h3 id="inline-resume">9.2 Inline Stream Resumption<a class="anchor-link" href="#inline-resume"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">To indicate support for inlining stream resumption into the authentication process, the server adds a &lt;sm/&gt; element in the namespace "urn:xmpp:sm:3" to the &lt;inline/&gt; element of SASL2.</p>
+    <p class="" style="">If the client wishes to resume an existing session it, it simply includes the &lt;resume/&gt; element defined by this specification in the SASL2 &lt;authenticate/&gt; element.</p>
+    <p class="box" style="">Note: If the client included a &lt;resume/&gt; element in its SASL2 &lt;authenticate/&gt; element, that MUST be processed first by the server. If that resumption is successful, the server MUST skip resource binding (a resumed session already has a resource bound) and MUST entirely ignore the &lt;bind/&gt; request that might also be inlined in the &lt;authenticate/&gt; element.</p>
+    <p class="" style=""><span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0388.html">Extensible SASL Profile (XEP-0388)</a></span>  [<a href="#nt-idm46308528855712">15</a>] mandates that the &lt;success&gt; element is immeditaly followed by stream features. If a former stream has been successfully resumed using this specification, the stream is considered re-established immediately after the &lt;success/&gt; element instead and stream features MUST NOT be sent in this case.</p>
+    <div class="indent"><h4 id="sect-idm46308528821088">9.2.1 Failed Resumption<a class="anchor-link" href="#sect-idm46308528821088"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">Sometimes resumption might fail - for example, because the session has been disconnected longer than the server’s resumption timeout. In this case, the server MUST include the &lt;failed/&gt; element defined by this specification in its SASL2 &lt;success/&gt; response, but also MUST continue to process the &lt;bind/&gt; in order to establish a new session for the client.</p>
+      <p class="" style="">The client can find details about its new session in the &lt;bound/&gt; response (defined by <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0386.html">Bind 2.0 (XEP-0386)</a></span>  [<a href="#nt-idm46308528845616">16</a>]).</p>
+    </div>
+  </div>
+  <div class="indent"><h3 id="inline-examples">9.3 Inlining Examples<a class="anchor-link" href="#inline-examples"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <figure class="code-example" id="example-27"><figcaption><strong>Example 27.</strong> Server announces support for inlining activation of stream management and stream resumption<a class="anchor-link" href="#example-27"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;stream:features&gt;
+  &lt;authentication xmlns="urn:xmpp:sasl:2"&gt;
+    &lt;mechanism&gt;SCRAM-SHA-1&lt;/mechanism&gt;
+    &lt;inline&gt;
+      &lt;sm xmlns="urn:xmpp:sm:3"/&gt;
+      &lt;bind xmlns="urn:xmpp:bind2:1"&gt;
+        &lt;feature var='urn:xmpp:sm:3'/&gt;
+      &lt;/bind&gt;
+    &lt;/inline&gt;
+  &lt;/authentication&gt;
+&lt;/stream:features&gt;
+</pre></figure>
+    <figure class="code-example" id="example-28"><figcaption><strong>Example 28.</strong> Client tries to resume stream and enables stream management inlined in its bind request<a class="anchor-link" href="#example-28"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;authenticate xmlns='urn:xmpp:sasl:2' mechanism='SCRAM-SHA-1'&gt;
+  &lt;initial-response&gt;[base64 encoded SASL data]&lt;/initial-response&gt;
+  &lt;resume xmlns="urn:xmpp:sm:3" h="some-sequence-number" previd="some-long-sm-id"/&gt;
+  &lt;bind xmlns="urn:xmpp:bind2:1"&gt;
+    &lt;tag&gt;AwesomeXMPP&lt;/tag&gt;
+    &lt;enable xmlns="urn:xmpp:sm:3"/&gt;
+  &lt;/bind&gt;
+&lt;/authenticate&gt;
+</pre></figure>
+    <figure class="code-example" id="example-29"><figcaption><strong>Example 29.</strong> Client failed to enable stream management<a class="anchor-link" href="#example-29"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;success xmlns='urn:xmpp:sasl:2'&gt;
+    &lt;additional-data&gt;[base64 encoded SASL data]&lt;/additional-data&gt;
+    &lt;authorization-identifier&gt;user@example.com/resource&lt;/authorization-identifier&gt;
+    &lt;bound xmlns='urn:xmpp:bind2:1'&gt;
+        &lt;failed xmlns='urn:xmpp:sm:3'&gt;
+            &lt;internal-server-error xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+        &lt;/failed&gt;
+        &lt;latest-id&gt;0312a1b8&lt;/latest-id&gt;
+    &lt;/bound&gt;
+&lt;/success&gt;
+</pre></figure>
+    <figure class="code-example" id="example-30"><figcaption><strong>Example 30.</strong> Client failed to resume stream<a class="anchor-link" href="#example-30"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;success xmlns='urn:xmpp:sasl:2'&gt;
+    &lt;additional-data&gt;[base64 encoded SASL data]&lt;/additional-data&gt;
+    &lt;authorization-identifier&gt;user@example.com/resource&lt;/authorization-identifier&gt;
+    &lt;failed xmlns='urn:xmpp:sm:3' h='another-sequence-number'&gt;
+        &lt;item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+    &lt;/failed&gt;
+    &lt;bound xmlns='urn:xmpp:bind2:1'&gt;
+        &lt;latest-id&gt;0312a1b8&lt;/latest-id&gt;
+    &lt;/bound&gt;
+&lt;/success&gt;
+</pre></figure>
+        <figure class="code-example" id="example-31"><figcaption><strong>Example 31.</strong> Client failed to resume stream and to enable management of newly bound stream<a class="anchor-link" href="#example-31"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;success xmlns='urn:xmpp:sasl:2'&gt;
+    &lt;additional-data&gt;[base64 encoded SASL data]&lt;/additional-data&gt;
+    &lt;authorization-identifier&gt;user@example.com/resource&lt;/authorization-identifier&gt;
+    &lt;failed xmlns='urn:xmpp:sm:3' h='another-sequence-number'&gt;
+        &lt;item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+    &lt;/failed&gt;
+    &lt;bound xmlns='urn:xmpp:bind2:1'&gt;
+        &lt;failed xmlns='urn:xmpp:sm:3'&gt;
+            &lt;internal-server-error xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+        &lt;/failed&gt;
+        &lt;latest-id&gt;0312a1b8&lt;/latest-id&gt;
+    &lt;/bound&gt;
+&lt;/success&gt;
+</pre></figure>
+  </div>
+<h2 id="security">10.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">As noted, a server MUST NOT allow a client to resume a stream management session until after the client has authenticated (for some value of "authentication"); this helps to prevent session hijacking.</p>
+  <p class="" style="">If SASL2 is used to inline stream resumption, implementations must adhere to the security considerations defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0388.html">Extensible SASL Profile (XEP-0388)</a></span>  [<a href="#nt-idm46308528855712">15</a>] regarding the inclusion of SASL2 requests and inline feature negotiation in TLS 0-RTT ("early data") extensions. That is, these elements MUST NOT be sent or processed if the stream would be resumed solely based on 0-RTT data, except when appropriate mitigations are in place (which are beyond the scope of this document, but may be defined by others).</p>
+<h2 id="iana">11.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This XEP requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm46308528789616">17</a>]. </p>
+<h2 id="registrar">12.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="registrar-ns">12.1 Protocol Namespaces<a class="anchor-link" href="#registrar-ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">This specification defines the following XML namespace:</p>
+    <ul class="" style="">
+      <li class="" style="">urn:xmpp:sm:3</li>
+    </ul>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm46308528777616">18</a>] includes the foregoing namespace in its registry at &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt;, as described in Section 4 of <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0053.html">XMPP Registrar Function (XEP-0053)</a></span>  [<a href="#nt-idm46308528770128">19</a>].</p>
+  </div>
+  <div class="indent"><h3 id="registrar-versioning">12.2 Protocol Versioning<a class="anchor-link" href="#registrar-versioning"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">If the protocol defined in this specification undergoes a revision that is not fully backwards-compatible with an older version, the XMPP Registrar shall increment the protocol version number found at the end of the XML namespaces defined herein, as described in Section 4 of <span class="ref">XEP-0053</span>.</p>
+  </div>
+  <div class="indent"><h3 id="registrar-stream">12.3 Stream Features<a class="anchor-link" href="#registrar-stream"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The XMPP Registrar includes 'urn:xmpp:sm:3' in its registry of stream features at &lt;<a href="https://xmpp.org/registrar/stream-features.html">https://xmpp.org/registrar/stream-features.html</a>&gt;.</p>
+  </div>
+<h2 id="schemas">13.
+       XML Schemas<a class="anchor-link" href="#schemas"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='urn:xmpp:sm:3'
+    xmlns='urn:xmpp:sm:3'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+      The protocol documented by this schema is defined in
+      XEP-0198: http://www.xmpp.org/extensions/xep-0198.html
+    &lt;/xs:documentation&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:import namespace='urn:ietf:params:xml:ns:xmpp-stanzas'
+             schemaLocation='http://xmpp.org/schemas/stanzaerror.xsd'/&gt;
+
+  &lt;xs:element name='a'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:simpleContent&gt;
+        &lt;xs:extension base='empty'&gt;
+          &lt;xs:attribute name='h'
+                        type='xs:unsignedInt'
+                        use='required'/&gt;
+        &lt;/xs:extension&gt;
+      &lt;/xs:simpleContent&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+  &lt;xs:element name='enable'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:simpleContent&gt;
+        &lt;xs:extension base='empty'&gt;
+          &lt;xs:attribute name='max'
+                        type='xs:positiveInteger'
+                        use='optional'/&gt;
+          &lt;xs:attribute name='resume'
+                        type='xs:boolean'
+                        use='optional'
+                        default='false'/&gt;
+        &lt;/xs:extension&gt;
+      &lt;/xs:simpleContent&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+  &lt;xs:element name='enabled'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:simpleContent&gt;
+        &lt;xs:extension base='empty'&gt;
+          &lt;xs:attribute name='id'
+                        type='xs:string'
+                        use='optional'/&gt;
+          &lt;xs:attribute name='location'
+                        type='xs:string'
+                        use='optional'/&gt;
+          &lt;xs:attribute name='max'
+                        type='xs:positiveInteger'
+                        use='optional'/&gt;
+          &lt;xs:attribute name='resume'
+                        type='xs:boolean'
+                        use='optional'
+                        default='false'/&gt;
+        &lt;/xs:extension&gt;
+      &lt;/xs:simpleContent&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+  &lt;xs:element name='failed'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:sequence xmlns:err='urn:ietf:params:xml:ns:xmpp-stanzas'
+                   minOccurs='0'
+                   maxOccurs='1'&gt;
+        &lt;xs:group ref='err:stanzaErrorGroup'/&gt;
+      &lt;/xs:sequence&gt;
+      &lt;xs:attribute name='h'
+                    type='xs:unsignedInt'
+                    use='optional'/&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+  &lt;xs:element name='r' type='empty'/&gt;
+
+  &lt;xs:element name='resume' type='resumptionElementType'/&gt;
+
+  &lt;xs:element name='resumed' type='resumptionElementType'/&gt;
+
+  &lt;xs:element name='sm' type='empty'/&gt;
+
+  &lt;xs:complexType name='resumptionElementType'&gt;
+    &lt;xs:simpleContent&gt;
+      &lt;xs:extension base='empty'&gt;
+        &lt;xs:attribute name='h'
+                      type='xs:unsignedInt'
+                      use='required'/&gt;
+        &lt;xs:attribute name='previd'
+                      type='xs:string'
+                      use='required'/&gt;
+      &lt;/xs:extension&gt;
+    &lt;/xs:simpleContent&gt;
+  &lt;/xs:complexType&gt;
+
+  &lt;xs:simpleType name='empty'&gt;
+    &lt;xs:restriction base='xs:string'&gt;
+      &lt;xs:enumeration value=''/&gt;
+    &lt;/xs:restriction&gt;
+  &lt;/xs:simpleType&gt;
+
+  &lt;xs:element name='handled-count-too-high'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:attribute name='send-count'
+                    type='xs:unsignedInt'
+                    use='optional'/&gt;
+      &lt;xs:attribute name='h'
+                    type='xs:unsignedInt'
+                    use='optional'/&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+<h2 id="ack">14.
+       Acknowledgements<a class="anchor-link" href="#ack"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Thanks to Bruce Campbell, Jack Erwin, Philipp Hancke, Curtis King, Tobias Markmann, Alexey Melnikov, Pedro Melo, Robin Redeker, Mickaël Rémond, Florian Schmaus, and Tomasz Sterna for their feedback.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0198</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Draft">Stable</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>1.6.3</dd><dt>Last Updated</dt><dd>2025-07-28</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core</dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>sm</dd><dt>Schema</dt><dd>
+        &lt;<a href="http://xmpp.org/schemas/sm.xsd">http://xmpp.org/schemas/sm.xsd</a>&gt;<br></dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0198.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0198.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0198.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Justin Karneges</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:justin@karneges.com">justin@karneges.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:justin@andbit.net">justin@andbit.net</a></dd></dl><h5>Peter Saint-Andre</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:stpeter@stpeter.im">stpeter@stpeter.im</a></dd><dt>JabberID</dt><dd><a href="xmpp:stpeter@jabber.org">stpeter@jabber.org</a></dd><dt>URI</dt><dd><a href="https://stpeter.im/">https://stpeter.im/</a></dd></dl><h5>Joe Hildebrand</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:jhildebr@cisco.com">jhildebr@cisco.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:hildjj@jabber.org">hildjj@jabber.org</a></dd></dl><h5>Fabio Forno</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:fabio.forno@gmail.com">fabio.forno@gmail.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:ff@jabber.bluendo.com">ff@jabber.bluendo.com</a></dd></dl><h5>Dave Cridland</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:dave@hellopando.com">dave@hellopando.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:dwd@dave.cridland.net">dwd@dave.cridland.net</a></dd></dl><h5>Matthew Wild</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:mwild1@gmail.com">mwild1@gmail.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:me@matthewwild.co.uk">me@matthewwild.co.uk</a></dd></dl><h5>Thilo Molitor</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:thilo+xmpp@eightysoft.de">thilo+xmpp@eightysoft.de</a></dd><dt>JabberID</dt><dd><a href="xmpp:thilo.molitor@juforum.de">thilo.molitor@juforum.de</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm46308529102144">1</a>. RFC 6120: Extensible Messaging and Presence Protocol (XMPP): Core &lt;<a href="http://tools.ietf.org/html/rfc6120">http://tools.ietf.org/html/rfc6120</a>&gt;.</p><p><a name="nt-idm46308529082928">2</a>. XEP-0199: XMPP Ping &lt;<a href="https://xmpp.org/extensions/xep-0199.html">https://xmpp.org/extensions/xep-0199.html</a>&gt;.</p><p><a name="nt-idm46308529073376">3</a>. XEP-0079: Advanced Message Processing &lt;<a href="https://xmpp.org/extensions/xep-0079.html">https://xmpp.org/extensions/xep-0079.html</a>&gt;.</p><p><a name="nt-idm46308529075920">4</a>. XEP-0184: Message Delivery Receipts &lt;<a href="https://xmpp.org/extensions/xep-0184.html">https://xmpp.org/extensions/xep-0184.html</a>&gt;.</p><p><a name="nt-idm46308529054848">5</a>. In accordance with Section 3.2.2.1 of <span class="ref">XML Schema Part 2: Datatypes</span>, the allowable lexical representations for the xs:boolean datatype are the strings "0" and "false" for the concept 'false' and the strings "1" and "true" for the concept 'true'; implementations MUST support both styles of lexical representation.</p><p><a name="nt-idm46308529042832">6</a>. RFC 5952: A Recommendation for IPv6 Address Text Representation &lt;<a href="http://tools.ietf.org/html/rfc5952">http://tools.ietf.org/html/rfc5952</a>&gt;.</p><p><a name="nt-idm46308529037840">7</a>. XEP-0078: Non-SASL Authentication &lt;<a href="https://xmpp.org/extensions/xep-0078.html">https://xmpp.org/extensions/xep-0078.html</a>&gt;.</p><p><a name="nt-idm46308529030544">8</a>. XEP-0220: Server Dialback &lt;<a href="https://xmpp.org/extensions/xep-0220.html">https://xmpp.org/extensions/xep-0220.html</a>&gt;.</p><p><a name="nt-idm46308529004720">9</a>. XML Schema Part 2: Datatypes &lt;<a href="http://www.w3.org/TR/xmlschema11-2/">http://www.w3.org/TR/xmlschema11-2/</a>&gt;.</p><p><a name="nt-idm46308528984144">10</a>. XEP-0203: Delayed Delivery &lt;<a href="https://xmpp.org/extensions/xep-0203.html">https://xmpp.org/extensions/xep-0203.html</a>&gt;.</p><p><a name="nt-idm46308528954416">11</a>. RFC 5077: Transport Layer Security (TLS) Session Resumption without Server-Side State &lt;<a href="http://tools.ietf.org/html/rfc5077">http://tools.ietf.org/html/rfc5077</a>&gt;.</p><p><a name="nt-idm46308528946944">12</a>. On the use of TLS Session resumption and SASL EXTERNAL &lt;<a href="http://tools.ietf.org/html/draft-cridland-sasl-tls-sessions">http://tools.ietf.org/html/draft-cridland-sasl-tls-sessions</a>&gt;. Work in progress.</p><p><a name="nt-idm46308528933040">13</a>. XEP-0170: Recommended Order of Stream Feature Negotiation &lt;<a href="https://xmpp.org/extensions/xep-0170.html">https://xmpp.org/extensions/xep-0170.html</a>&gt;.</p><p><a name="nt-idm46308528908384">14</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm46308528855712">15</a>. XEP-0388: Extensible SASL Profile &lt;<a href="https://xmpp.org/extensions/xep-0388.html">https://xmpp.org/extensions/xep-0388.html</a>&gt;.</p><p><a name="nt-idm46308528845616">16</a>. XEP-0386: Bind 2.0 &lt;<a href="https://xmpp.org/extensions/xep-0386.html">https://xmpp.org/extensions/xep-0386.html</a>&gt;.</p><p><a name="nt-idm46308528789616">17</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm46308528777616">18</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p><p><a name="nt-idm46308528770128">19</a>. XEP-0053: XMPP Registrar Function &lt;<a href="https://xmpp.org/extensions/xep-0053.html">https://xmpp.org/extensions/xep-0053.html</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v1.6.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-1.6.3.html">1.6.3</a> (2025-07-28)<a class="anchor-link" href="#revision-history-v1.6.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Remove leftover &lt;optional/&gt; and &lt;required/&gt; children in &lt;sm/&gt; element.</p><div class="revision-author">egp</div></li><li id="revision-history-v1.6.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-1.6.2.html">1.6.2</a> (2024-09-24)<a class="anchor-link" href="#revision-history-v1.6.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarify server enabling stream management without requested resume functionality.</p><div class="revision-author">gk</div></li><li id="revision-history-v1.6.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-1.6.1.html">1.6.1</a> (2022-10-05)<a class="anchor-link" href="#revision-history-v1.6.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarify SASL2 and BIND2 interaction.</p><div class="revision-author">tm</div></li><li id="revision-history-v1.6"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-1.6.html">1.6</a> (2018-07-25)<a class="anchor-link" href="#revision-history-v1.6"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Specify error conditions.</p><div class="revision-author">gdk</div></li><li id="revision-history-v1.5.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-1.5.4.html">1.5.4</a> (2018-07-19)<a class="anchor-link" href="#revision-history-v1.5.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Mark 'h' element as xs:unsignedInt in the schema too, it is already specified to be a 32-bit wrapping unsigned integer in the text.</p><div class="revision-author">egp</div></li><li id="revision-history-v1.5.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-1.5.3.html">1.5.3</a> (2018-06-29)<a class="anchor-link" href="#revision-history-v1.5.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Improve the note about stream management counters in section 4.</p><div class="revision-author">fs/mw</div></li><li id="revision-history-v1.5.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-1.5.2.html">1.5.2</a> (2016-12-08)<a class="anchor-link" href="#revision-history-v1.5.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Send 'a' element before stream closure.</p><div class="revision-author">cs (XEP Editor: ssw)</div></li><li id="revision-history-v1.5.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-1.5.1.html">1.5.1</a> (2016-09-30)<a class="anchor-link" href="#revision-history-v1.5.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Fix example syntax highlighting and formatting.</p><div class="revision-author">ssw</div></li><li id="revision-history-v1.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-1.5.html">1.5</a> (2015-09-13)<a class="anchor-link" href="#revision-history-v1.5"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <ul class="" style="">
+        <li class="" style="">Noted that the server MAY include a 'h' attribute when failing to resume a session because it has been timed out</li>
+      </ul>
+    <div class="revision-author">dg</div></li><li id="revision-history-v1.4rc1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-1.4rc1.html">1.4rc1</a> (2015-07-27)<a class="anchor-link" href="#revision-history-v1.4rc1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <ul class="" style="">
+        <li class="" style="">Expressed how to handle duplicate enable requests.</li>
+        <li class="" style="">Noted the use of delay stamping in redelivery/offline messaging by servers.</li>
+      </ul>
+    <div class="revision-author">dc</div></li><li id="revision-history-v1.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-1.3.html">1.3</a> (2011-06-29)<a class="anchor-link" href="#revision-history-v1.3"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <ul class="" style="">
+        <li class="" style="">Specified that 'h' is REQUIRED when sending &lt;resume/&gt; or &lt;resumed/&gt;, and clarified how to set its value</li>
+        <li class="" style="">Mentioned the possibility of duplicate stanzas</li>
+        <li class="" style="">Clarified terminology to use 'client' and 'server' instead of 'initiating entity' and 'receiving entity'</li>
+        <li class="" style="">Added note about the order of events in the stream negotiation process</li>
+        <li class="" style="">Corrected the value of 'h' in several examples</li>
+        <li class="" style="">Removed an extraneous 'stanzas' attribute from one example</li>
+        <li class="" style="">Corrected the schema</li>
+      </ul>
+    <div class="revision-author">psa/mw</div></li><li id="revision-history-v1.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-1.2.html">1.2</a> (2011-03-02)<a class="anchor-link" href="#revision-history-v1.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Simplification based on implementation experience: removed acking per number of stanzas exchanged because either entity can request an ack at any time; moved throttling feature to a separate specification; removed 'stanzas' attribute from &lt;enable/&gt; element; added 'location' attribute to &lt;enabled/&gt; element; clarified several implementation issues in the text; fixed several examples; versioned the XML namespace from urn:xmpp:sm:2 to urn:xmpp:sm:3.</p><div class="revision-author">psa/dc/mw</div></li><li id="revision-history-v1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-1.1.html">1.1</a> (2010-03-05)<a class="anchor-link" href="#revision-history-v1.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Corrected value of 'h' so that zero means no stanzas have yet been handled; clarified distinction between a cleanly closed stream and an unfinished stream.</p><div class="revision-author">psa/jk</div></li><li id="revision-history-v1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-1.0.html">1.0</a> (2009-06-17)<a class="anchor-link" href="#revision-history-v1.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the XMPP Council, advanced specification from Experimental to Draft.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.10"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-0.10.html">0.10</a> (2009-06-11)<a class="anchor-link" href="#revision-history-v0.10"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Editorial review.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.9"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-0.9.html">0.9</a> (2009-06-03)<a class="anchor-link" href="#revision-history-v0.9"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <ul class="" style="">
+        <li class="" style="">Specified that the value of the 'h' attribute starts at zero, not one.</li>
+        <li class="" style="">Specified that the 'h' attribute is an unsignedInt and that it loops back to zero when reaching 2^32.</li>
+        <li class="" style="">Added security consideration regarding session resumption and removed security consideration regarding proxies.</li>
+        <li class="" style="">Clarified the meaning of handled as defining which entity has responsibility for a stanza.</li>
+        <li class="" style="">Corrected schema and examples.</li>
+      </ul>
+    <div class="revision-author">psa</div></li><li id="revision-history-v0.8"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-0.8.html">0.8</a> (2009-04-09)<a class="anchor-link" href="#revision-history-v0.8"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <ul class="" style="">
+        <li class="" style="">Added &lt;t/&gt; element for throttling notifications, including 'stanzas' attribute for dynamic adjustment of the stanzas window.</li>
+        <li class="" style="">Simplified protocol by making the sequence number increment per stanza and removing the u attribute (which is now unnecessary).</li>
+        <li class="" style="">Removed 'h' attribute from &lt;r/&gt; element.</li>
+        <li class="" style="">Added 'max' and 'stanzas' attributes to both &lt;enable/&gt; and &lt;enabled/&gt; elements, and removed those attributes from the &lt;sm/&gt; element.</li>
+        <li class="" style="">Incremented the protocol version from 1 to 2.</li>
+        <li class="" style="">Added in-depth usage scenarios.</li>
+      </ul>
+    <div class="revision-author">ff/jk/jjh/psa</div></li><li id="revision-history-v0.7"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-0.7.html">0.7</a> (2009-03-30)<a class="anchor-link" href="#revision-history-v0.7"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Removed pings (use XEP-0199, whitespace pings, or TCP keepalives instead); removed section on throttling, since it is unworkable.</p><div class="revision-author">jjh/psa</div></li><li id="revision-history-v0.6"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-0.6.html">0.6</a> (2009-03-19)<a class="anchor-link" href="#revision-history-v0.6"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <ul class="" style="">
+        <li class="" style="">Incremented protocol version from 0 to 1.</li>
+        <li class="" style="">Changed attribute names from c (?) and b (?) to u (unacknowledged) and h (handled).</li>
+        <li class="" style="">Added stanzas attribute to specify maximum number of stanzas between acking requests.</li>
+        <li class="" style="">More clearly defined error handling using &lt;failed/&gt; element plus stanza error conditions.</li>
+        <li class="" style="">Defined error handling for &lt;ping/&gt; element by allowing stanza error conditions in &lt;pong/&gt; element.</li>
+        <li class="" style="">More clearly specified maximum reconnect time.</li>
+        <li class="" style="">Added detailed scenarios for basic acking and for outbound and inbound throttling.</li>
+      </ul>
+    <div class="revision-author">psa</div></li><li id="revision-history-v0.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-0.5.html">0.5</a> (2008-09-29)<a class="anchor-link" href="#revision-history-v0.5"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Removed recommendation to use namespace prefixes; modified namespace to incorporate namespace versioning.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-0.4.html">0.4</a> (2008-09-08)<a class="anchor-link" href="#revision-history-v0.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added support for session resumption; re-organized the document; changed name to stream management; changed provisional namespace.</p><div class="revision-author">jjh/jk/psa</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-0.3.html">0.3</a> (2007-10-03)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Updates per devcon discussion.</p><div class="revision-author">jk</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-0.2.html">0.2</a> (2007-04-05)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Require c attribute on &lt;r/&gt; element. Describe minimal implementation. Switch to standard temporary namespace.</p><div class="revision-author">jk</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-0.1.html">0.1</a> (2006-11-21)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial published version.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-0.0.3.html">0.0.3</a> (2006-11-08)<a class="anchor-link" href="#revision-history-v0.0.3"><abbr title="Link to this point in the document">¶</abbr></a></div>New version, using sequence numbers.<div class="revision-author">jk</div></li><li id="revision-history-v0.0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-0.0.2.html">0.0.2</a> (2004-12-11)<a class="anchor-link" href="#revision-history-v0.0.2"><abbr title="Link to this point in the document">¶</abbr></a></div>Further clarification, allow acking many stanzas at once.<div class="revision-author">jk</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0198-0.0.1.html">0.0.1</a> (2004-08-09)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div>First draft.<div class="revision-author">jk</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{karneges2004sm,
+  title = {Stream Management},
+  author = {Karneges, Justin and Saint-Andre, Peter and Hildebrand, Joe and Forno, Fabio and Cridland, Dave and Wild, Matthew and Molitor, Thilo},
+  type = {XEP},
+  number = {0198},
+  version = {1.6.3},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0198.html},
+  date = {2004-08-09/2025-07-28},
+}</pre><p>END</p></body></html>

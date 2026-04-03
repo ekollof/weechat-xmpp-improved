@@ -1,0 +1,430 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0277: Microblogging over XMPP</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0277";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Microblogging over XMPP"><meta name="DC.Creator" content="Peter Saint-Andre"><meta name="DC.Creator" content="Joe Hildebrand"><meta name="DC.Creator" content="Sergey Dobrov"><meta name="DC.Creator" content="Valerian Saliou"><meta name="DC.Description" content="This specification defines a method for microblogging over XMPP."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2022-02-15"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0277"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0277: Microblogging over XMPP</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification defines a method for microblogging over XMPP.</dd><dt>Authors</dt><dd><ul class="authors"><li>Peter Saint-Andre</li><li>Joe Hildebrand</li><li>Sergey Dobrov</li><li>Valerian Saliou</li></ul></dd><dt>Copyright</dt><dd>© 2008 – 2022 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Deferred</p><div id="status-notice" class="deferred standards track">WARNING: This document has been automatically Deferred after 12 months of inactivity in its previous Experimental state. Implementation of the protocol described herein is not recommended for production systems. However, exploratory implementations are encouraged to resume the standards process.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.6.5 (2022-02-15)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li class="current inserted">Deferred</li><li>Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#proto">Protocol</a><ol><li><a href="#location">Location</a></li><li><a href="#subscribe">Subscribing to a Microblog</a></li><li><a href="#publish">Publishing a Post</a><ol><li><a href="#rich_content">Publishing a Post with Rich Content</a></li></ol></li><li><a href="#receive">Receiving a Post</a></li><li><a href="#reply">Replying to a Post</a></li><li><a href="#repeat">Repeating a Post</a></li><li><a href="#categories">Post Categories</a></li></ol></li><li><a href="#comments">Comments</a><ol><li><a href="#post_comments">Post Comments</a></li><li><a href="#comment_add">Adding a Comment</a></li></ol></li><li><a href="#node_config">Pubsub Node Configuration</a><ol><li><a href="#microblog_node_config">Microblog node configuration</a></li><li><a href="#comments_node_config">Comments node configuration</a></li></ol></li><li><a href="#metadata">Microblog Metadata</a></li><li><a href="#geotagging">Geotagging</a></li><li><a href="#aggregators">Aggregators</a><ol><li><a href="#pubsub_id_vs_atom_id">Pubsub Item ID vs. Atom Entry id</a></li><li><a href="#aggregator_usecases">Aggregator Usecases</a><ol><li><a href="#aggregator_web">Representing Posts in the Web</a></li></ol></li></ol></li><li><a href="#body">Message Body</a></li><li><a href="#security">Security Considerations</a><ol><li><a href="#comment_author">Comment Author</a></li></ol></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a></li><li><a href="#schema">XML Schema</a></li><li><a href="#ack">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Microblogging is an increasingly popular technology for lightweight interaction over the Internet. It differs from traditional blogging in that:</p>
+  <ul class="" style="">
+    <li class="" style="">Posts are short (typically less than 140 characters, which is the limit in SMS).</li>
+    <li class="" style="">Posts are in plain text.</li>
+    <li class="" style="">People can reply to your posts, but not directly comment on them.</li>
+    <li class="" style="">People learn about your posts only if they have permission to view them.</li>
+    <li class="" style="">Your microblogging feed is discovered based on your identity at a domain or with a service.</li>
+  </ul>
+  <p class="" style="">These characteristics map well to instant messaging systems such as those built using Jabber/XMPP technologies (e.g., permissions can be based on existing presence subscriptions as reflected in the XMPP roster or "buddy list"). Furthermore, the push nature of XMPP (especially as formalized in the <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0163.html">Personal Eventing Protocol (XEP-0163)</a></span>  [<a href="#nt-idm45641322883968">1</a>] profile of <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm45641322874976">2</a>]) overcomes the problems of polling for updates via HTTP, which has caused scaling issues in existing microblogging services. Therefore this specification defines a method for microblogging over XMPP, building on the existing method for transporting Atom syndication data <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc4287">RFC 4287</a></span>  [<a href="#nt-idm45641322877968">3</a>] over XMPP as described in <span class="ref" style=""><a href="https://tools.ietf.org/html/draft-saintandre-atompub-notify-07">AtomSub</a></span>  [<a href="#nt-idm45641322869680">4</a>]. These XMPP-based methods are complementary to HTTP-based methods, and can provide an XMPP interface to existing microblogging services (which may also be accessible via HTTP, Short Message Service (SMS), and other messaging transports).</p>
+<h2 id="proto">2.
+       Protocol<a class="anchor-link" href="#proto"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="location">2.1 Location<a class="anchor-link" href="#location"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">A person's microblog SHOULD be located at a personal eventing (PEP) node named "urn:xmpp:microblog:0" but MAY be located at a generic publish-subscribe node that is not attached to a user's IM account. For instance, if the Shakespearean character Romeo has a JabberID of &lt;romeo@montague.lit&gt; then his microblog would be located at that JID with a node of "urn:xmpp:microblog:0". Outside of native XMPP systems, this node can be referred to as the following XMPP URI (see <span class="ref">XEP-0060 § 12.21</span>).</p>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+xmpp:romeo@montague.lit?;node=urn%3Axmpp%3Amicroblog%3A0
+</pre></figure>
+	<p class="" style="">Note that the ":" character from the namespace URN is percent-encoded in the query component (see <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc5122">RFC 5122</a></span>  [<a href="#nt-idm45641322859296">5</a>] and <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc3986">RFC 3986</a></span>  [<a href="#nt-idm45641322849472">6</a>]).</p>
+    <p class="" style="">Naturally, this node can be discovered by contacting romeo@montague.lit directly using <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45641322847648">7</a>].</p>
+  </div>
+  <div class="indent"><h3 id="subscribe">2.2 Subscribing to a Microblog<a class="anchor-link" href="#subscribe"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Let us imagine that Juliet wishes to receive the posts that Romeo publishes to his microblog. She has two options:</p>
+    <ol start="" class="" style="">
+      <li class="" style="">Implicitly subscribe by advertising support for "urn:xmpp:microblog:0+notify" in her <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm45641322839248">8</a>] data. Romeo's PEP service then automatically sends posts to her when it receives presence from her, until and unless she sends presence of type unavailable or stops advertising an interest in microblog updates.</li>
+      <li class="" style="">Explicitly subscribe by sending a formal subscription request to the "urn:xmpp:microblog:0" node at Romeo's JabberID. Romeo's PEP service may send her all posts even if she is offline at the time (depending on service policies regarding presence integration).</li>
+    </ol>
+  </div>
+  <div class="indent"><h3 id="publish">2.3 Publishing a Post<a class="anchor-link" href="#publish"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Romeo can publish a post via any interface provided by his service, such as a website, the Atom Publishing Protocol (see <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc5023">RFC 5023</a></span>  [<a href="#nt-idm45641322831152">9</a>]), SMS, an IM bot, or XMPP pubsub. Here we assume that the post is provided via XMPP pubsub.</p>
+    <p class="" style="">The post content itself can be either text (content element without "type" attribute or with "type" attribute with "text" value) or XHTML ("content" element "type" attribute with "xhtml" value). If Romeo publishes XHTML content, his client MUST publish two "content" elements: a text one, and a XHTML one. For XHTML publishing, see <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm45641322874976">2</a>].</p>
+    <p class="" style="">Note: Publishing via HTTP, AtomPub, SMS, or IM bot is simpler for the client (e.g., because the client does not need to generate an Item ID).</p>
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Publishing a post<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='romeo@montague.lit/pda'
+    id='pub1'
+    to='romeo@montague.lit'
+    type='set'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:microblog:0'&gt;
+      &lt;item id='1cb57d9c-1c46-11dd-838c-001143d5d5db'&gt;
+        &lt;entry xmlns='http://www.w3.org/2005/Atom'&gt;
+          &lt;title type='text'&gt;hanging out at the Caf&amp;#233; Napolitano&lt;/title&gt;
+          &lt;id&gt;tag:montague.lit,2008-05-08:posts-1cb57d9c-1c46-11dd-838c-001143d5d5db&lt;/id&gt;
+          &lt;published&gt;2008-05-08T18:30:02Z&lt;/published&gt;
+          &lt;updated&gt;2008-05-08T18:30:02Z&lt;/updated&gt;
+        &lt;/entry&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">Note: The "title" element is required to be included in an "atom:entry" element according to <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc4287">RFC 4287</a></span>  [<a href="#nt-idm45641322877968">3</a>]. An implementation MAY provide also "atom:summary" and/or "atom:content" elements too if it needs.</p>
+    <div class="indent"><h4 id="rich_content">2.3.1 Publishing a Post with Rich Content<a class="anchor-link" href="#rich_content"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+        <p class="" style="">It's possible to insert some rich content in the post or comment. It can be some text formatting, images, etc. Only "xhtml" content type is supported for the moment by this document but possibly it will be extended later. Also, it is RECOMMENDED for the client to restrict XHTML content to the XHTML-IM subset (<span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0071.html">XHTML-IM (XEP-0071)</a></span>  [<a href="#nt-idm45641322814448">10</a>]).</p>
+        <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Publishing a post with rich content<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='romeo@montague.lit/pda'
+    id='pub1'
+    to='romeo@montague.lit'
+    type='set'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:microblog:0'&gt;
+      &lt;item id='1cb57d9c-1c46-11dd-838c-001143d5d5db'&gt;
+        &lt;entry xmlns='http://www.w3.org/2005/Atom'&gt;
+          &lt;title type='xhtml'&gt;
+            &lt;div xmlns="http://www.w3.org/1999/xhtml"&gt;
+              &lt;p&gt;hanging out at the &lt;strong&gt;Caf&amp;#233; Napolitano&lt;/strong&gt;&lt;/p&gt;
+            &lt;/div&gt;
+          &lt;/title&gt;
+          &lt;id&gt;tag:montague.lit,2008-05-08:posts-1cb57d9c-1c46-11dd-838c-001143d5d5db&lt;/id&gt;
+          &lt;published&gt;2008-05-08T18:30:02Z&lt;/published&gt;
+          &lt;updated&gt;2008-05-08T18:30:02Z&lt;/updated&gt;
+          &lt;generator uri='https://capu.chat' version='42'&gt;CapuChat&lt;/generator&gt;
+        &lt;/entry&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    </div>
+  </div>
+  <div class="indent"><h3 id="receive">2.4 Receiving a Post<a class="anchor-link" href="#receive"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Because Juliet has sent presence to Romeo including Entity Capabilities data that encapsulates the "urn:xmpp:microblog:0+notify" feature, Romeo's XMPP server will send a PEP notification to Juliet. The notification can include an XMPP message body for backwards-compatibility with Jabber clients that are not pubsub-capable (see <a href="#body">Message Body</a>).</p>
+    <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Receiving a post<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message from='romeo@montague.lit'
+         to='juliet@capulet.lit'
+         type='headline'&gt;
+  &lt;body&gt;hanging out at the Caf&amp;#233; Napolitano&lt;/body&gt;
+  &lt;event xmlns='http://jabber.org/protocol/pubsub#event'&gt;
+    &lt;items node='urn:xmpp:microblog:0'&gt;
+      &lt;item id='1cb57d9c-1c46-11dd-838c-001143d5d5db' publisher='romeo@montague.lit'&gt;
+        &lt;entry xmlns='http://www.w3.org/2005/Atom'&gt;
+          &lt;title type='text'&gt;hanging out at the Caf&amp;#233; Napolitano&lt;/title&gt;
+          &lt;link rel='alternate'
+                type='text/html'
+                href='http://montague.lit/romeo/posts/1cb57d9c-1c46-11dd-838c-001143d5d5db'/&gt;
+          &lt;link rel='alternate'
+                href='xmpp:romeo@montague.lit?;node=urn%3Axmpp%3Amicroblog%3A0;item=1cb57d9c-1c46-11dd-838c-001143d5d5db'/&gt;
+          &lt;id&gt;tag:montague.lit,2008-05-08:posts-1cb57d9c-1c46-11dd-838c-001143d5d5db&lt;/id&gt;
+          &lt;published&gt;2008-05-08T18:30:02Z&lt;/published&gt;
+          &lt;updated&gt;2008-05-08T18:30:02Z&lt;/updated&gt;
+          &lt;generator uri='https://capu.chat' version='42'&gt;CapuChat&lt;/generator&gt;
+        &lt;/entry&gt;
+      &lt;/item&gt;
+    &lt;/items&gt;
+  &lt;/event&gt;
+&lt;/message&gt;
+</pre></figure>
+    <p class="" style="">Note: these alternate links were not posted by the original client because clients can't compute them themselves. These things SHOULD be inserted at server side though.</p>
+  </div>
+  <div class="indent"><h3 id="reply">2.5 Replying to a Post<a class="anchor-link" href="#reply"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Anyone can publish a post in reply to Romeo's post. Here we assume that a reply comes from Benvolio.</p>
+    <p class="" style="">Note: Inclusion of the "thr:in-reply-to" element defined in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc4685">RFC 4685</a></span>  [<a href="#nt-idm45641322799680">11</a>] indicates the post to which the user is replying. This reply includes two such elements (one pointing to the HTTP URL for the post and the other pointing to the XMPP URI for the post.</p>
+    <p class="" style="">Note: The post can be a reply to more than the only one another.</p>
+    <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Publishing a reply<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='benvolio@montague.lit/mobile'
+    id='uv2x37s5'
+    to='benvolio@montague.lit'
+    type='set'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:microblog:0'&gt;
+      &lt;item id='c4145006-1c53-11dd-b2d5-000bcd82471e'&gt;
+        &lt;entry xmlns='http://www.w3.org/2005/Atom'
+               xmlns:thr='http://purl.org/syndication/thread/1.0'&gt;
+          &lt;author&gt;
+            &lt;name&gt;Benvolio Montague&lt;/name&gt;
+            &lt;uri&gt;xmpp:romeo@montague.lit&lt;/uri&gt;
+          &lt;/author&gt;
+          &lt;title type='text'&gt;@romeo cappuccino this late in the day?&lt;/title&gt;
+          &lt;link rel='alternate'
+                type='text/html'
+                href='http://montague.lit/benvolio/posts/c4145006-1c53-11dd-b2d5-000bcd82471e'/&gt;
+          &lt;link rel='alternate'
+                href='xmpp:benvolio@montague.lit?;
+                      node=urn%3Axmpp%3Amicroblog%3A0;
+                      item=c4145006-1c53-11dd-b2d5-000bcd82471e'/&gt;
+          &lt;id&gt;tag:montague.lit,2008-05-08:posts-c4145006-1c53-11dd-b2d5-000bcd82471e&lt;/id&gt;
+          &lt;published&gt;2008-05-08T18:31:21Z&lt;/published&gt;
+          &lt;updated&gt;2008-05-08T18:31:21Z&lt;/updated&gt;
+          &lt;thr:in-reply-to
+               ref='tag:montague.lit,2008-05-08:posts-1cb57d9c-1c46-11dd-838c-001143d5d5db'
+               type='application/xhtml+xml'
+               href='http://montague.lit/romeo/posts/1cb57d9c-1c46-11dd-838c-001143d5d5db'/&gt;
+          &lt;thr:in-reply-to
+               ref='tag:montague.lit,2008-05-08:posts-1cb57d9c-1c46-11dd-838c-001143d5d5db'
+               href='xmpp:romeo@montague.lit?;node=urn%3Axmpp%3Amicroblog%3A0;item=1cb57d9c-1c46-11dd-838c-001143d5d5db'/&gt;
+        &lt;/entry&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">Assuming that Romeo has also shared presence with Benvolio and has advertised support for "urn:xmpp:microblog:0+notify", he will receive the reply that Benvolio sent.</p>
+  </div>
+  <div class="indent"><h3 id="repeat">2.6 Repeating a Post<a class="anchor-link" href="#repeat"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">When Benvolio wants to repeat a Romeo's post, his client publishes the same post under a different name. But to be able to track the repeated post original author, Benvolio's client MAY use specific "atom:author" child node, "atom:name" and "atom:uri", containing, respectively, the name of the original post author, and his XMPP URI (JID).</p>
+    <p class="" style="">If a comments link is present (see the <a href="#post_comments">Post Comments</a> section of this document), the client SHOULD repeat it to keep the same discussion about the post. The client also MAY create a separate node to discuss and specify it or specify both.</p>
+    <p class="" style="">The client SHOULD also put an "atom:link" element with "rel" attribute set to "via" and point it to the original post.</p>
+    <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> Repeating a Post<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='benvolio@montague.lit/mobile'
+    id='pub2'
+    to='benvolio@montague.lit'
+    type='set'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:microblog:0'&gt;
+      &lt;item id='1re57d3c-1q46-11dd-748r-024943d2d5rt'&gt;
+        &lt;entry xmlns='http://www.w3.org/2005/Atom'&gt;
+          &lt;author&gt;
+            &lt;name&gt;Romeo Montague&lt;/name&gt;
+            &lt;uri&gt;xmpp:romeo@montague.lit&lt;/uri&gt;
+          &lt;/author&gt;
+          &lt;title type='text'&gt;hanging out at the Caf&amp;#233; Napolitano&lt;/title&gt;
+          &lt;link rel='alternate'
+                type='text/html'
+                href='http://montague.lit/benvolio/posts/1re57d3c-1q46-11dd-748r-024943d2d5rt'/&gt;
+          &lt;link rel='alternate'
+                href='xmpp:benvolio@montague.lit?;node=urn%3Axmpp%3Amicroblog%3A0;item=1re57d3c-1q46-11dd-748r-024943d2d5rt'/&gt;
+          &lt;link rel='via'
+                href='xmpp:romeo@montague.lit?;node=urn%3Axmpp%3Amicroblog%3A0;item=1cb57d9c-1c46-11dd-838c-001143d5d5db'
+                ref='tag:montague.lit,2008-05-08:posts-1cb57d9c-1c46-11dd-838c-001143d5d5db'/&gt;
+          &lt;id&gt;tag:montague.lit,2008-05-08:posts-1re57d3c-1q46-11dd-748r-024943d2d5rt&lt;/id&gt;
+          &lt;published&gt;2008-05-08T18:30:02Z&lt;/published&gt;
+          &lt;updated&gt;2008-05-08T18:32:02Z&lt;/updated&gt;
+        &lt;/entry&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">Thus, a different author JID value lets the client know the microblog item has been repeated from another one.</p>
+    <p class="" style="">It's also possible for Benvolio to add his own thougths to the repost. To do this he SHOULD wrap the original content in the "xhtml:blockquote" element and after it add his own content. Also, the client MAY post reply without quotation to the original thread to inform users about the repost.</p>
+  </div>
+  <div class="indent"><h3 id="categories">2.7 Post Categories<a class="anchor-link" href="#categories"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">It's often handy to specify categories (or tags) to a post to make it easier to find it or to structure a blog. It's possible by adding "atom:category" element to the entry (it can be blog or replies entry).</p>
+    <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> Specify post's categories<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;entry xmlns='http://www.w3.org/2005/Atom'&gt;
+  ...
+  &lt;category term='humour'/&gt;
+  &lt;category term='xmpp'/&gt;
+  ...
+&lt;/entry&gt;
+</pre></figure>
+  </div>
+<h2 id="comments">3.
+       Comments<a class="anchor-link" href="#comments"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Juliet and Benvolio may want to discuss about latest Romeo's post. To enable this, Romeo's client MAY add a "atom:link" element to the PubSub item. The element MUST have "rel", "title" and "href" attributes, where "rel" MUST have the "replies" value; "title" MUST have the "comments" value; "href" MUST be an XMPP URI (see <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc5122">RFC 5122</a></span>  [<a href="#nt-idm45641322859296">5</a>] and <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc3986">RFC 3986</a></span>  [<a href="#nt-idm45641322849472">6</a>]).</p>
+  <div class="indent"><h3 id="post_comments">3.1 Post Comments<a class="anchor-link" href="#post_comments"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">We assume Romeo's client first created a comments node (named "urn:xmpp:microblog:0:comments/ID", where "ID" is the microblog item ID, or the SHA-1 encoded attachment URI, as defined in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc3174">RFC 3174</a></span>  [<a href="#nt-idm45641322761520">12</a>]).</p>
+    <figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> Adding a comments link to a Post<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='romeo@montague.lit/pda'
+    id='pub4'
+    to='romeo@montague.lit'
+    type='set'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:microblog:0'&gt;
+      &lt;item id='2ze57d9c-1c46-21df-830c-002143d3d2qgf'&gt;
+        &lt;entry xmlns='http://www.w3.org/2005/Atom'&gt;
+          &lt;title type='text'&gt;hanging out at the Caf&amp;#233; Napolitano&lt;/title&gt;
+          &lt;link rel='replies'
+                title='comments'
+                href='xmpp:pubsub.montague.lit?;node=urn%3Axmpp%3Amicroblog%3A0%3Acomments%2Fdd88c9bc58886fce0049ed050df0c5f2'/&gt;
+          &lt;id&gt;tag:montague.lit,2008-05-08:posts-2ze57d9c-1c46-21df-830c-002143d3d2qgf&lt;/id&gt;
+          &lt;published&gt;2008-05-08T18:38:02Z&lt;/published&gt;
+          &lt;updated&gt;2008-05-08T18:38:02Z&lt;/updated&gt;
+        &lt;/entry&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="comment_add">3.2 Adding a Comment<a class="anchor-link" href="#comment_add"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">If Juliet wants to comment Romeo's latest post, her client sends a new Atom entry to the defined PubSub node.</p>
+    <p class="" style="">Note: A comments node SHOULD be located at a generic publish-subscribe node that is not attached to a user's IM account, but MAY be located at a personal eventing (PEP) node.</p>
+    <figure class="code-example" id="example-8"><figcaption><strong>Example 8.</strong> Adding a comment to a comments node<a class="anchor-link" href="#example-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='juliet@capulet.lit/pc'
+    id='comment1'
+    to='pubsub.capulet.lit'
+    type='set'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:microblog:0:comments/dd88c9bc58886fce0049ed050df0c5f2'&gt;
+      &lt;item id='b2106a80de39ef5ec6b8f7b69cb610c2'&gt;
+        &lt;entry xmlns='http://www.w3.org/2005/Atom'&gt;
+          &lt;author&gt;
+            &lt;name&gt;Juliet Capulet&lt;/name&gt;
+            &lt;uri&gt;xmpp:juliet@capulet.lit&lt;/uri&gt;
+          &lt;/author&gt;
+          &lt;title type='text'&gt;She is so pretty!&lt;/title&gt;
+          &lt;published&gt;2008-05-08T18:39:02Z&lt;/published&gt;
+        &lt;/entry&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">If Benvolio wants to retrieve the comments node, his client will send a standard PubSub stanza to request all items (see <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm45641322874976">2</a>] for all items retrieving).</p>
+  </div>
+<h2 id="node_config">4.
+       Pubsub Node Configuration<a class="anchor-link" href="#node_config"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">We have described two pubsub nodes types here: the one is for the microblog itself and the other one is for comments to posts.</p>
+    <p class="" style="">Usage specific requires the special parameters to these nodes to be specified. This section describes recommendation for them.</p>
+    <div class="indent"><h3 id="microblog_node_config">4.1 Microblog node configuration<a class="anchor-link" href="#microblog_node_config"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+        <p class="" style="">Here are recommendations for a microblogging node (usually located at PEP and named by the "urn:xmpp:microblog:0" namespace) configuration:</p>
+        <ol start="" class="" style="">
+          <li class="" style="">The "pubsub#notify_retract" MUST be set to true to provide clients the ability to track if some items were retracted and reflect such changes in the UI correctly.</li>
+          <li class="" style="">The "pubsub#max_items" SHOULD be increased from the default value to some reasonable value.</li>
+          <li class="" style="">The "pubsub#send_last_published_item" SHOULD be changed to "never".</li>
+        </ol>
+    </div>
+    <div class="indent"><h3 id="comments_node_config">4.2 Comments node configuration<a class="anchor-link" href="#comments_node_config"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+        <p class="" style="">Here are recommendations for a comments node configuration:</p>
+        <ol start="" class="" style="">
+          <li class="" style="">The "pubsub#notify_retract" MUST be set to true to provide clients the ability to track if some items were retracted and reflect such changes in the UI correctly.</li>
+          <li class="" style="">The "pubsub#max_items" SHOULD be increased from the default value to some reasonable value.</li>
+          <li class="" style="">The "pubsub#access_model" SHOULD be set to "open" to allow any user to comment to a post. Other values are suitable too according to the user's settings.</li>
+        </ol>
+    </div>
+<h2 id="metadata">5.
+       Microblog Metadata<a class="anchor-link" href="#metadata"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">In order to provide users with some metadata (i.e. blog title or author information) about the microblog, the client MUST add an item with such information. The client MUST set the ID of the item to "0".</p>
+  <figure class="code-example" id="example-9"><figcaption><strong>Example 9.</strong> Publishing microblog metadata<a class="anchor-link" href="#example-9"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='romeo@montague.lit/pc'
+    id='pub8'
+    to='romeo@montague.lit'
+    type='set'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:microblog:0'&gt;
+      &lt;item id='0'&gt;
+        &lt;feed xmlns='http://www.w3.org/2005/Atom'&gt;
+          &lt;title&gt;Romeo&amp;apos;s Microblog&lt;/title&gt;
+          &lt;id&gt;tag:montague.lit,2008:home&lt;/id&gt;
+          &lt;updated&gt;2008-05-08T18:30:02Z&lt;/updated&gt;
+          &lt;author&gt;
+            &lt;name&gt;Romeo Montague&lt;/name&gt;
+            &lt;uri&gt;xmpp:romeo@montague.lit&lt;/uri&gt;
+          &lt;/author&gt;
+        &lt;/feed&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <p class="" style="">It also necessary to link a comments node to the post which discussed in the node. We will do it by adding the "atom:link" element with "rel=start" attribute:</p>
+
+  <figure class="code-example" id="example-10"><figcaption><strong>Example 10.</strong> Publishing comments node metadata<a class="anchor-link" href="#example-10"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='romeo@montague.lit/pc'
+    id='pub8'
+    to='pubsub.montague.lit'
+    type='set'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:microblog:0'&gt;
+      &lt;item id='0'&gt;
+        &lt;feed xmlns='http://www.w3.org/2005/Atom'&gt;
+          &lt;title&gt;Comments to a post&lt;/title&gt;
+          &lt;id&gt;tag:pubsub.montague.lit,2008:comments-2ze57d9c-1c46-21df-830c-002143d3d2qgf&lt;/id&gt;
+          &lt;updated&gt;2008-05-08T18:30:02Z&lt;/updated&gt;
+          &lt;link rel='start'
+                href='xmpp:romeo@montague.lit?;node=urn%3Axmpp%3Amicroblog%3A0;item=1cb57d9c-1c46-11dd-838c-001143d5d5db'
+                ref='tag:montague.lit,2008-05-08:posts-1cb57d9c-1c46-11dd-838c-001143d5d5db'/&gt;
+        &lt;/feed&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+<h2 id="geotagging">6.
+       Geotagging<a class="anchor-link" href="#geotagging"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Juliet may want to know which places are Romeo's notices related to. That's why Romeo's client MAY geotag microblog entries, using the <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0080.html">User Geolocation (XEP-0080)</a></span>  [<a href="#nt-idm45641322782784">13</a>] protocol for storing geolocation information.</p>
+  <p class="" style="">Romeo's client MUST create a "geoloc" element, with the <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0080.html">User Geolocation (XEP-0080)</a></span>  [<a href="#nt-idm45641322782784">13</a>] reference namespace: "http://jabber.org/protocol/geoloc".</p>
+  <figure class="code-example" id="example-11"><figcaption><strong>Example 11.</strong> Geotagging a Post<a class="anchor-link" href="#example-11"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='romeo@montague.lit/mobile'
+    id='pub7'
+    to='romeo@montague.lit'
+    type='set'&gt;
+  &lt;pubsub xmlns='http://jabber.org/protocol/pubsub'&gt;
+    &lt;publish node='urn:xmpp:microblog:0'&gt;
+      &lt;item id='1zr23z8a-3g12-34fh-750b-120867gjc1sqh'&gt;
+        &lt;entry xmlns='http://www.w3.org/2005/Atom'&gt;
+          &lt;author&gt;
+            &lt;name&gt;Romeo Montague&lt;/name&gt;
+            &lt;uri&gt;xmpp:romeo@montague.lit&lt;/uri&gt;
+          &lt;/author&gt;
+          &lt;title type='text'&gt;Is lost in the forest. Need help!&lt;/title&gt;
+          &lt;link rel='replies'
+                title='comments'
+                href='xmpp:pubsub.montague.lit?;node=urn%3Axmpp%3Amicroblog%3A0%3Acomments%2F36ec6dfe61e52b1e2cdb248823520233'/&gt;
+          &lt;id&gt;tag:montague.lit,2008-05-08:posts-1zr23z8a-3g12-34fh-750b-120867gjc1sqh&lt;/id&gt;
+          &lt;published&gt;2008-05-08T18:43:01Z&lt;/published&gt;
+          &lt;updated&gt;2008-05-08T18:43:01Z&lt;/updated&gt;
+          &lt;geoloc xmlns="http://jabber.org/protocol/geoloc"&gt;
+            &lt;lat&gt;48.171761&lt;/lat&gt;
+            &lt;lon&gt;-3.3667986&lt;/lon&gt;
+            &lt;country&gt;France&lt;/country&gt;
+            &lt;countrycode&gt;FR&lt;/countrycode&gt;
+            &lt;region&gt;Brittany&lt;/region&gt;
+          &lt;/geoloc&gt;
+        &lt;/entry&gt;
+      &lt;/item&gt;
+    &lt;/publish&gt;
+  &lt;/pubsub&gt;
+&lt;/iq&gt;
+</pre></figure>
+<h2 id="aggregators">7.
+       Aggregators<a class="anchor-link" href="#aggregators"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">In order to provide some statistical information, to represent the blogs other ways than XMPP (i.e. in web or NNTP), we will need other entities called "Aggregators".</p>
+  <p class="" style="">You can think of aggregators like about search engines in the web: they gather information from the whole web and then represent it suitable ways. The same is true here: Aggregators just subscibe to many entities and then they can build a database to make queries and show appropriate information according to these queries. Also they can be used to represent information in web or other networks.</p>
+  <p class="" style="">Unlike web search engines, an XMPP aggregator does not need to gather information by downloading it frequently to check if something was changed. Instead, it can listen to pubsub events and make its database up-to-date based on this information.</p>
+  <p class="" style="">Aggregators can be started by different people with different aims. It can be aggregator which devoted to the concrete blog service provider which will be subscribed only to its own users, or it can be a global search engine which tries to subscribe to most of users or to aggregate the feeds of other aggregators.</p>
+  <p class="" style="">This section will describe most used aggregator usecases but the list is not exhaustive.</p>
+  <div class="indent"><h3 id="pubsub_id_vs_atom_id">7.1 Pubsub Item ID vs. Atom Entry id<a class="anchor-link" href="#pubsub_id_vs_atom_id"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">There are two different things that carry a similar sense: the XMPP pubsub Item ID and the "atom:id" element. This section is devoted to make a separation between them.</p>
+    <p class="" style="">The pubsub Item ID MUST be used when linking to an entry with an XMPP channel (i.e. by including it in the URI with the "xmpp" schema). the Atom entry ID MUST be built according to <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc4287">RFC 4287</a></span>  [<a href="#nt-idm45641322877968">3</a>] and used in aggregators with the aim of revealing of post duplicates, reposts, mentions, syndications, etc.</p>
+    <p class="" style="">Note that the rules of comparing, building and security notes for "atom:id" are listed in the <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc4287">RFC 4287</a></span>  [<a href="#nt-idm45641322877968">3</a>].</p>
+  </div>
+  <div class="indent"><h3 id="aggregator_usecases">7.2 Aggregator Usecases<a class="anchor-link" href="#aggregator_usecases"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <div class="indent"><h4 id="aggregator_web">7.2.1 Representing Posts in the Web<a class="anchor-link" href="#aggregator_web"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">One of the possible aims of aggregator services is to provide web representaion of blogs.</p>
+      <p class="" style="">TBD: insert alternate link to the post with the http address of the post.</p>
+    </div>
+  </div>
+<h2 id="body">8.
+       Message Body<a class="anchor-link" href="#body"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Depending on service policies and the value of the "pubsub#include_body" node configuration option, microblogging notifications SHOULD include a message "body" element for backwards-compatibility with Jabber clients that are not pubsub-capable. It is RECOMMENDED for the XML character value of the "body" element to be the same as that of the "atom:title" child of the "atom:entry".</p>
+<h2 id="security">9.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="comment_author">9.1 Comment Author<a class="anchor-link" href="#comment_author"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The client SHOULD check that the comment author information (provided in the "author" element) is valid, by checking that the "publisher" item attribute value matches the "uri" element value. If there is a difference or the check can not be performed because there was not a "publisher" attribute included, the comment can be displayed, but it is RECOMMENDED to specify there is a security problem.</p>
+  </div>
+<h2 id="iana">10.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm45641322671072">14</a>].</p>
+<h2 id="registrar">11.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45641322664736">15</a>] is requested to issue an initial namespace of "urn:xmpp:microblog:0".</p>
+<h2 id="schema">12.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This specification re-uses the schema for the Atom content format, i.e., the 'http://www.w3.org/2005/Atom' namespace (see <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc4287">RFC 4287</a></span>  [<a href="#nt-idm45641322877968">3</a>]).</p>
+<h2 id="ack">13.
+       Acknowledgements<a class="anchor-link" href="#ack"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Thanks to Ralph Meijer and Paul Scott for their suggestions.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0277</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Deferred">Deferred</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.6.5</dd><dt>Last Updated</dt><dd>2022-02-15</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>
+                None
+              </dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>microblog</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0277.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0277.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0277.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Peter Saint-Andre</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:stpeter@stpeter.im">stpeter@stpeter.im</a></dd><dt>JabberID</dt><dd><a href="xmpp:stpeter@jabber.org">stpeter@jabber.org</a></dd><dt>URI</dt><dd><a href="https://stpeter.im/">https://stpeter.im/</a></dd></dl><h5>Joe Hildebrand</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:jhildebr@cisco.com">jhildebr@cisco.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:hildjj@jabber.org">hildjj@jabber.org</a></dd></dl><h5>Sergey Dobrov</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:binary@jrudevels.org">binary@jrudevels.org</a></dd><dt>JabberID</dt><dd><a href="xmpp:binary@jrudevels.org">binary@jrudevels.org</a></dd><dt>URI</dt><dd><a href="http://jrudevels.org/">http://jrudevels.org/</a></dd></dl><h5>Valerian Saliou</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:valerian@valeriansaliou.name">valerian@valeriansaliou.name</a></dd><dt>JabberID</dt><dd><a href="xmpp:valerian@jappix.com">valerian@jappix.com</a></dd><dt>URI</dt><dd><a href="https://valeriansaliou.name/">https://valeriansaliou.name/</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45641322883968">1</a>. XEP-0163: Personal Eventing Protocol &lt;<a href="https://xmpp.org/extensions/xep-0163.html">https://xmpp.org/extensions/xep-0163.html</a>&gt;.</p><p><a name="nt-idm45641322874976">2</a>. XEP-0060: Publish-Subscribe &lt;<a href="https://xmpp.org/extensions/xep-0060.html">https://xmpp.org/extensions/xep-0060.html</a>&gt;.</p><p><a name="nt-idm45641322877968">3</a>. RFC 4287: The Atom Syndication Format &lt;<a href="http://tools.ietf.org/html/rfc4287">http://tools.ietf.org/html/rfc4287</a>&gt;.</p><p><a name="nt-idm45641322869680">4</a>. Atomsub: Transporting Atom Notifications over the Publish-Subscribe Extension to the Extensible Messaging and Presence Protocol (XMPP) &lt;<a href="https://tools.ietf.org/html/draft-saintandre-atompub-notify-07">https://tools.ietf.org/html/draft-saintandre-atompub-notify-07</a>&gt;. Work in progress.</p><p><a name="nt-idm45641322859296">5</a>. RFC 5122: Internationalized Resource Identifiers (IRIs) and Uniform Resource Identifiers (URIs) for the Extensible Messaging and Presence Protocol (XMPP) &lt;<a href="http://tools.ietf.org/html/rfc5122">http://tools.ietf.org/html/rfc5122</a>&gt;.</p><p><a name="nt-idm45641322849472">6</a>. RFC 3986: Uniform Resource Identifiers (URI): Generic Syntax &lt;<a href="http://tools.ietf.org/html/rfc3986">http://tools.ietf.org/html/rfc3986</a>&gt;.</p><p><a name="nt-idm45641322847648">7</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm45641322839248">8</a>. XEP-0115: Entity Capabilities &lt;<a href="https://xmpp.org/extensions/xep-0115.html">https://xmpp.org/extensions/xep-0115.html</a>&gt;.</p><p><a name="nt-idm45641322831152">9</a>. RFC 5023: The Atom Publishing Protocol &lt;<a href="http://tools.ietf.org/html/rfc5023">http://tools.ietf.org/html/rfc5023</a>&gt;.</p><p><a name="nt-idm45641322814448">10</a>. XEP-0071: XHTML-IM &lt;<a href="https://xmpp.org/extensions/xep-0071.html">https://xmpp.org/extensions/xep-0071.html</a>&gt;.</p><p><a name="nt-idm45641322799680">11</a>. RFC 4685: Atom Threading Extensions &lt;<a href="http://tools.ietf.org/html/rfc4685">http://tools.ietf.org/html/rfc4685</a>&gt;.</p><p><a name="nt-idm45641322761520">12</a>. RFC 3174: US Secure Hash Algorithm 1 (SHA1) &lt;<a href="http://tools.ietf.org/html/rfc3174">http://tools.ietf.org/html/rfc3174</a>&gt;.</p><p><a name="nt-idm45641322782784">13</a>. XEP-0080: User Geolocation &lt;<a href="https://xmpp.org/extensions/xep-0080.html">https://xmpp.org/extensions/xep-0080.html</a>&gt;.</p><p><a name="nt-idm45641322671072">14</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm45641322664736">15</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.6.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0277-0.6.5.html">0.6.5</a> (2022-02-15)<a class="anchor-link" href="#revision-history-v0.6.5"><abbr title="Link to this point in the document">¶</abbr></a></div>Fix incorrect double-escaping of entities in examples<div class="revision-author">gh/@Yuubi-san</div></li><li id="revision-history-v0.6.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0277-0.6.4.html">0.6.4</a> (2020-10-06)<a class="anchor-link" href="#revision-history-v0.6.4"><abbr title="Link to this point in the document">¶</abbr></a></div>Add atom:generator element to examples<div class="revision-author">pep</div></li><li id="revision-history-v0.6.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0277-0.6.3.html">0.6.3</a> (2019-03-26)<a class="anchor-link" href="#revision-history-v0.6.3"><abbr title="Link to this point in the document">¶</abbr></a></div>Wording fixes<div class="revision-author">pep</div></li><li id="revision-history-v0.6.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0277-0.6.2.html">0.6.2</a> (2017-11-28)<a class="anchor-link" href="#revision-history-v0.6.2"><abbr title="Link to this point in the document">¶</abbr></a></div>Editing<div class="revision-author">fs (XEP Editor: jwi)</div></li><li id="revision-history-v0.6.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0277-0.6.1.html">0.6.1</a> (2015-12-09)<a class="anchor-link" href="#revision-history-v0.6.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Updated contact information for Valerian Saliou</p><div class="revision-author">XEP Editor (mam)</div></li><li id="revision-history-v0.6"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0277-0.6.html">0.6</a> (2012-05-22)<a class="anchor-link" href="#revision-history-v0.6"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added node configuration suggestions; removed file attachments; added rich content examples; change atom:content to atom:title anywhere in the document; invented the "Aggregator" entity; changed nodes metainformation locations; added possibility to add own content to repost.</p><div class="revision-author">snd</div></li><li id="revision-history-v0.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0277-0.5.html">0.5</a> (2011-06-15)<a class="anchor-link" href="#revision-history-v0.5"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Changed the commenting Pubsub service from PEP to external.</p><div class="revision-author">vs</div></li><li id="revision-history-v0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0277-0.4.html">0.4</a> (2011-06-01)<a class="anchor-link" href="#revision-history-v0.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added microblog metadata feature, ID innacurracy fixed, urn:xmpp:inbox support added, new commenting namespaces, first comment marker, security considerations added.</p><div class="revision-author">vs</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0277-0.3.html">0.3</a> (2011-04-26)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Comments link "link[rel=related]" is now "link[rel=replies]" and "title" is now "content[type=text]" or "content[type=xhtml]"; added geolocation feature; added commenting feature on attachments.</p><div class="revision-author">vs</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0277-0.2.html">0.2</a> (2011-04-20)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added file attachment and commenting features; updated XML namespaces in examples.</p><div class="revision-author">vs</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0277-0.1.html">0.1</a> (2010-01-27)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial version as accepted for publication by the XMPP Council.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0277-0.0.1.html">0.0.1</a> (2008-05-07)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">psa/jh</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{saint-andre2008microblog,
+  title = {Microblogging over XMPP},
+  author = {Saint-Andre, Peter and Hildebrand, Joe and Dobrov, Sergey and Saliou, Valerian},
+  type = {XEP},
+  number = {0277},
+  version = {0.6.5},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0277.html},
+  date = {2008-05-07/2022-02-15},
+}</pre><p>END</p></body></html>

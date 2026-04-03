@@ -1,0 +1,966 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0313: Message Archive Management</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0313";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Message Archive Management"><meta name="DC.Creator" content="Matthew Wild"><meta name="DC.Creator" content="Kevin Smith"><meta name="DC.Description" content="This document defines a protocol to query and control an archive of messages stored on a server."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2025-04-09"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0313"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0313: Message Archive Management</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This document defines a protocol to query and control an archive of messages stored on a server.</dd><dt>Authors</dt><dd><ul class="authors"><li>Matthew Wild</li><li>Kevin Smith</li></ul></dd><dt>Copyright</dt><dd>© 2012 – 2025 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Stable</p><div id="status-notice" class="draft standards track">NOTICE: The protocol defined herein is a <strong>Stable Standard</strong> of the XMPP Standards Foundation. Implementations are encouraged and the protocol is appropriate for deployment in production systems, but some changes to the protocol are possible before it becomes a Final Standard.</div></dd><dt>Supersedes</dt><dd><a href="xep-0136.html">XEP-0136</a></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>1.1.3 (2025-04-09)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li class="current">Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#requirements">Requirements</a></li><li><a href="#archives">Message archives</a><ol><li><a href="#archive_order">Order of messages</a></li><li><a href="#archives_deletion">Message retention and deletion</a></li><li><a href="#archiving_entities">Archiving entities</a><ol><li><a href="#archives_user">User archives</a></li><li><a href="#archives_muc">MUC archives</a></li></ol></li><li><a href="#entities">Querying Entities</a></li><li><a href="#archives_id">Communicating the archive ID</a></li></ol></li><li><a href="#query">Querying an archive</a><ol><li><a href="#filter">Filtering results</a><ol><li><a href="#filter-jid">Filtering by JID</a></li><li><a href="#filter-time">Filtering by time received</a></li><li><a href="#query-limit-id">Limiting results by id</a></li><li><a href="#query-include-groupchat">Including groupchat results in a user archive</a></li><li><a href="#query-form">Retrieving form fields</a></li></ol></li><li><a href="#results">Query results</a></li><li><a href="#query-paging">Paging through results</a><ol><li><a href="#query-paging-limit">Page limits</a></li><li><a href="#query-paging-request">Requesting pages</a></li><li><a href="#sect-idm45061211997872">Requesting the last page</a></li><li><a href="#query-paging-flip">Flipped pages</a></li></ol></li></ol></li><li><a href="#archive-metadata">Archive metadata</a></li><li><a href="#business_rules">Business Rules</a><ol><li><a href="#business-storeret">Storage and Retrieval Rules</a><ol><li><a href="#business-storeret-user-archives">User Archives</a></li><li><a href="#business-storeret-muc-archives">MUC Archives</a></li><li><a href="#business-storeret-pubsub-archives">Pubsub archives</a></li></ol></li><li><a href="#business-ids">IDs</a></li><li><a href="#sync">Client synchronization</a></li></ol></li><li><a href="#support">Determining support</a></li><li><a href="#security">Security Considerations</a><ol><li><a href="#security-privacy">Data privacy</a></li><li><a href="#security-impersonation">Sender Impersonation</a></li><li><a href="#security-stanza-ids">Stanza IDs</a></li><li><a href="#security-muc-spoofing">MUC message spoofing</a></li></ol></li><li><a href="#impl">Implementation Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#registrar-ns">Protocol Namespaces</a></li><li><a href="#registrar-form">Form Types</a></li></ol></li><li><a href="#acks">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">It is a common desire for users of XMPP to want to store their messages in a central archive
+  on their server. This feature allows them to record conversations that take place on clients that do not
+  support local history storage, to synchronise conversation history seamlessly between
+  multiple clients, to read the history of a MUC room, or to view old items in a pubsub node.</p>
+<h2 id="requirements">2.
+       Requirements<a class="anchor-link" href="#requirements"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">As this extension aims to make things easy for client developers, some research was made into the
+  way clients handle history today. The resulting protocol was designed to allow for the following primary
+  usage scenarios:</p>
+  <ul class="" style="">
+    <li class="" style="">Automatic history synchronization between multiple clients.</li>
+    <li class="" style="">Calendar-based on-demand display of historic messages in a client that doesn't keep local history.</li>
+    <li class="" style="">So-called 'infinite' scrollback, whereby a client automatically fetches and displays historical messages
+    naturally in the message log as the user scrolls back in time.</li>
+  </ul>
+  <p class="" style="">Another extension for archiving already exists in XMPP, <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0136.html">Message Archiving (XEP-0136)</a></span>  [<a href="#nt-idm45061212195248">1</a>]). However implementation experience has
+  shown that the protocol defined therein supports rather more functionality than is typically needed for the
+  above uses, and is significantly more effort to implement.</p>
+  <p class="" style="">This specification aims to define a much simpler and modular protocol for working with a server-side
+  message store. Through this it is hoped to boost implementation and deployment of archiving in XMPP. It
+  should be noted that (although not required) a server is free to implement XEP-0136 alongside this
+  protocol if it so chooses, though a mapping between both protocols is beyond the scope of this specification.</p>
+  <p class="" style="">Notable functionality in XEP-0136 that is intentionally not defined by this specification for simplicity:</p>
+  <ul class="" style="">
+    <li class="" style="">Support for 'collections'. Few clients even support this concept for local history storage, and
+    it is possible to apply the logic for splitting a stream of messages into conversations on the
+    client-side, thus greatly simplifying the protocol.</li>
+    <li class="" style="">Support for uploading to the archive. On the assumption that a server automatically archives
+    messages to and from the client, it is typically rare for a client to end up with messages that are
+    not already in the archive. Uploading could be useful for bootstrapping an empty archive however, and
+    may be defined in a future specification if there is demand for such functionality.</li>
+    <li class="" style="">Support for 'off the record' chats (OTR; not to be confused with the encryption algorithm of
+    the same name). This allowed complex negotiation for either the user or contact to command specific
+    conversations to bypass the archive. In reality the archiving behaviour of a contact's server cannot
+    be enforced (they could ignore the OTR request and archive the messages anyway without your consent)
+    so this specification does not try and regulate that. Equivalent functionality can be implemented with
+    server logic for not including encrypted or specially-tagged messages in the archive (out of scope for
+    this specification).</li>
+    <li class="" style="">Support per-session configuration. This feature was deemed unnecessary for the majority of
+    implementations, and hence the configuration protocol in this specification is much simplified,
+    which allows for a simple user interface in clients. Advanced configuration however may be performed
+    through ad-hoc commands depending on the server implementation.</li>
+  </ul>
+<h2 id="archives">3.
+       Message archives<a class="anchor-link" href="#archives"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">An archive contains a collection of messages relevant to a particular XMPP address, e.g. a user, MUC,
+  pubsub node, server. Note: while a service might have many "archives" as defined here (one per JID
+  capable of being queried) this is a conceptual distinction, and a server is not bound to any particular
+  implementation or arrangement of data stores.</p>
+  <p class="" style="">Exactly which messages a server archives is up to implementation and deployment policy,
+        but it is expected that all messages that hold meaningful content, rather than state changes such as Chat State Notifications, would be archived. Rules are specified later in this document.</p>
+    <p class="" style="">A stored message consists of at least the following pieces of information:</p>
+    <ul class="" style="">
+      <li class="" style="">A timestamp of when the message was sent (for an outgoing message) or received (for
+      an incoming message).</li>
+      <li class="" style="">The remote JID that the stanza is to (for an outgoing message) or from (for an
+      incoming message).</li>
+      <li class="" style="">A server-assigned UID that MUST be unpredictable and unique within the archive.</li>
+      <li class="" style="">The message stanza itself. The entire original stanza SHOULD be stored, but at a minimum only the &lt;body/&gt; tag MUST
+      be preserved (ie. the server might, at its discretion, strip certain extensions from messages before storage), in
+      addition to all standard attributes of the stanza (e.g. to, from, type, id).</li>
+    </ul>
+    <p class="" style="">Note that 'incoming' and 'outgoing' messages are viewed within the context of the archived JID, rather than the system as a whole. For example, if romeo@montegue.lit sent a message to juliet@capulet.lit, it would be an outgoing message in the context of archiving for Romeo, and an incoming message in the context of archiving for Juliet.</p>
+    <div class="indent"><h3 id="archive_order">3.1 Order of messages<a class="anchor-link" href="#archive_order"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Order within the archive MUST be preserved, where the order of messages is the same as the order that the client originally received them (or would have received them if online). Throughout this document the term 'chronological order' refers to this order, however implementors should take care not to rely on timestamps alone for
+    ordering messages, as multiple messages may share the same timestamp.</p>
+    </div>
+    <div class="indent"><h3 id="archives_deletion">3.2 Message retention and deletion<a class="anchor-link" href="#archives_deletion"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">A server MAY impose limits on the size of an individual archive. For example a server might begin
+    to discard old messages once the archive reaches a certain size, or only keep messages until they
+    reach a certain age. Any such deleted messages MUST be the oldest in the archive, i.e. it is not permitted
+    to create gaps or "holes" in the archive. The UIDs of deleted messages MUST NOT be reused for new messages.</p>
+
+    <p class="" style="">However a server that wishes to remove messages from the middle of an archive, e.g. to remove accidentally transmitted
+    sensitive information may omit the &lt;message&gt; stanza from inside the &lt;forwarded&gt; element or replace the
+    message with  an appropriate placeholder when transmitting the result in response to a query. However servers
+    MUST retain the UID, timestamp and JID of the original message internally to ensure that all queries remain consistent.
+    It should also be understood that clients maintaining their own local copy of the archive may still retain the original
+    message locally in this case, and this protocol provides no mechanism for forcibly removing messages from any local archive
+    or cache that clients may keep.</p>
+    </div>
+    <div class="indent"><h3 id="archiving_entities">3.3 Archiving entities<a class="anchor-link" href="#archiving_entities"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+  <p class="" style="">There is no restriction on which services can expose archives, although only user and MUC archives are discussed here.</p>
+  <div class="indent"><h4 id="archives_user">3.3.1 User archives<a class="anchor-link" href="#archives_user"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+    <p class="" style="">The most typical address is that of a user's own bare JID, within which those messages sent to or from that
+    user's account would generally automatically be stored by the server. The collection
+    is ordered chronologically by the time each message was sent/received.</p>
+
+    <p class="" style="">Servers that expose archive messages of sent/received messages on behalf of local users MUST expose these archives to the user on the user's bare JID.</p>
+  </div>
+  <div class="indent"><h4 id="archives_muc">3.3.2 MUC archives<a class="anchor-link" href="#archives_muc"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+    <p class="" style="">A MUC service allowing MAM queries for a room MUST expose the MAM archive on the room's bare JID.</p>
+  </div>
+  </div>
+  <div class="indent"><h3 id="entities">3.4 Querying Entities<a class="anchor-link" href="#entities"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">While this document talks about 'clients' and 'servers', as these are the common cases, the querying entity (referred to as a 'client') need not be an XMPP client as defined by RFC6120, but could potentially be any type of entity, and the queried entity (referred to as a 'server') need not be an XMPP server as defined by RFC6120, although access controls might prohibit any given entity from being able to access an archive.</p>
+  </div>
+  <div class="indent"><h3 id="archives_id">3.5 Communicating the archive ID<a class="anchor-link" href="#archives_id"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">When a message is archived, the server MUST add an &lt;stanza-id/&gt; element as defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0359.html">Unique and Stable Stanza IDs (XEP-0359)</a></span>  [<a href="#nt-idm45061213529008">2</a>] to the message, which informs the recipient of where and under what ID the message is stored. When doing this the server MUST follow the business rules defined in XEP-0359. The 'by' attribute MUST be set to the address of the archive. For regular users that’s the bare JID of the account and for MUC that’s the bare JID of the room.</p>
+    <p class="" style="">Servers MUST NOT include the &lt;stanza-id/&gt; element in messages addressed to JIDs that do not have permissions to access the archive, such as a users’s outgoing messages to their contacts. However servers SHOULD include the element as a child of the forwarded message when using <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0280.html">Message Carbons (XEP-0280)</a></span>  [<a href="#nt-idm45061212138800">3</a>]</p>
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Client receives a message that has been archived<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='juliet@capulet.lit/balcony'
+         from='romeo@montague.lit/orchard'
+         type='chat'&gt;
+  &lt;body&gt;Call me but love, and I'll be new baptized; Henceforth I never will be Romeo.&lt;/body&gt;
+  &lt;stanza-id xmlns='urn:xmpp:sid:0'
+             by='juliet@capulet.lit'
+             id='28482-98726-73623' /&gt;
+&lt;/message&gt;</pre></figure>
+    <p class="" style="">Note: Previous versions of this protocol did not specify any interaction with stanza-id, and clients MUST NOT interpret XEP-0359 IDs in messages as archive IDs unless the server advertises support for 'urn:xmpp:mam:2' specifically.</p>
+  </div>
+<h2 id="query">4.
+       Querying an archive<a class="anchor-link" href="#query"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">An entity is able to query (subject to appropriate access rights) an archive for all messages within a certain timespan, optionally
+  restricting results to those to/from a particular JID. To allow limiting the results or paging
+  through them a client may use <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0059.html">Result Set Management (XEP-0059)</a></span>  [<a href="#nt-idm45061212130144">4</a>], which MUST be supported by both the client and the server.</p>
+  <p class="" style="">A query consists of an &lt;iq/&gt; stanza of type 'set' addressed to the account or server entity hosting
+  the archive, with a 'query' payload. On receiving the query, the server pushes to the client a
+  series of messages in chronological order from the archive that match the client's given criteria. After the
+  results it then returns the &lt;iq/&gt; result to indicate that the query is completed.</p>
+  <p class="" style="">The final &lt;iq/&gt; result response MUST include an RSM &lt;set/&gt; element, wrapped into a &lt;fin/&gt;
+  element qualified by the 'urn:xmpp:mam:2' namespace, indicating the
+  UID of the first and last message of the (possibly limited) result set. This
+  allows clients to accurately page through messages.</p>
+    <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> A user queries their archive for messages<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' id='juliet1'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2' queryid='f27' /&gt;
+&lt;/iq&gt;</pre></figure>
+
+    <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Their server sends the matching messages<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message id='aeb213' to='juliet@capulet.lit/chamber'&gt;
+  &lt;result xmlns='urn:xmpp:mam:2' queryid='f27' id='28482-98726-73623'&gt;
+    &lt;forwarded xmlns='urn:xmpp:forward:0'&gt;
+      &lt;delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/&gt;
+      &lt;message xmlns='jabber:client' from="witch@shakespeare.lit" to="macbeth@shakespeare.lit"&gt;
+        &lt;body&gt;Hail to thee&lt;/body&gt;
+      &lt;/message&gt;
+    &lt;/forwarded&gt;
+  &lt;/result&gt;
+&lt;/message&gt;</pre></figure>
+
+    <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Server returns the result IQ to signal the end<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result' id='juliet1'&gt;
+  &lt;fin xmlns='urn:xmpp:mam:2'&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;first index='0'&gt;28482-98726-73623&lt;/first&gt;
+      &lt;last&gt;09af3-cc343-b409f&lt;/last&gt;
+    &lt;/set&gt;
+  &lt;/fin&gt;
+&lt;/iq&gt;</pre></figure>
+  <p class="" style="">To ensure that the client knows when the results are complete, the server MUST send the &lt;iq/&gt; result after last query result has been sent
+  to the client. The client can optionally include a 'queryid' attribute in their query, which allows the client to match results to their initiating query.</p>
+  <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> A user queries an archive for messages<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq to='pubsub.shakespeare.lit' type='set' id='juliet1'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2' queryid='f28' /&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <div class="indent"><h3 id="filter">4.1 Filtering results<a class="anchor-link" href="#filter"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">By default all messages match a query, and filters are used to request a subset of the archived
+    messages. Filters are specified in a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0004.html">Data Forms (XEP-0004)</a></span>  [<a href="#nt-idm45061212115296">5</a>] data form included with the query. The hidden FORM_TYPE field
+    MUST be set to this protocol's namespace, 'urn:xmpp:mam:2'. Six further fields are defined by this
+    XEP and MUST be supported by servers, though all of them are optional for the client. These fields are:</p>
+    <ul class="" style="">
+        <li class="" style="">start</li>
+        <li class="" style="">end</li>
+        <li class="" style="">with</li>
+        <li class="" style="">before-id (*)</li>
+        <li class="" style="">after-id (*)</li>
+        <li class="" style="">ids (*)</li>
+    </ul>
+
+    <p class="" style="">Servers supporting fields marked with an asterisk (*) MUST advertise the disco feature 'urn:xmpp:mam:2#extended' and clients
+    that depend on these fields MUST verify that the server advertises this feature before attempting to use them.</p>
+
+    <p class="" style="">Other fields may be used, but are not defined in this document - the naming of new fields MUST be
+    consistent with the format defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0068.html">Field Standardization for Data Forms (XEP-0068)</a></span>  [<a href="#nt-idm45061212102000">6</a>]. Servers MUST NOT mark any fields in the form as
+    being required (i.e. with the data forms &lt;required/&gt; element), regardless of whether they are
+    defined in this document or elsewhere.</p>
+
+    <p class="" style="">Except where explicitly noted below (i.e. 'Limiting results by id'), a query is still considered successful even
+    if the archive is empty or if no messages match the filter criteria - such queries simply return no results.</p>
+
+    <div class="indent"><h4 id="filter-jid">4.1.1 Filtering by JID<a class="anchor-link" href="#filter-jid"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">If a 'with' field is present in the form, it contains a JID against which to match messages. The
+      server MUST only return messages if they match the supplied JID. A message in a user's archive matches if the JID matches either the to or from of the message. An item in a MUC archive matches if the publisher of the item matches the JID; note that this should only be available to entities that would already have been allowed to know the publisher of the events (e.g. this could not be used by a visitor to a semi-anonymous MUC).</p>
+      <p class="" style="">To allow querying for messages the user sent to themselves, the client needs to set the 'with' attribute to the account JID. In that case, the server MUST only return results where both the 'to' and 'from' match the bare JID (either as bare or by ignoring the resource), as otherwise every message in the archive would match.</p>
+      <p class="" style="">If 'with' is omitted, the server MUST match all messages in the selected timespan with the query,
+      regardless of the to/from addresses on each message.</p>
+    <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> Querying for all messages to/from a particular JID<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' id='juliet1'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2'&gt;
+    &lt;x xmlns='jabber:x:data' type='submit'&gt;
+      &lt;field var='FORM_TYPE' type='hidden'&gt;
+        &lt;value&gt;urn:xmpp:mam:2&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='with'&gt;
+        &lt;value&gt;juliet@capulet.lit&lt;/value&gt;
+      &lt;/field&gt;
+    &lt;/x&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">If (and only if) the supplied JID is a bare JID (i.e. no resource is present), then
+    the server SHOULD return messages if their bare to/from address for a user archive, or from address otherwise, would match it. For example,
+    if the client supplies a 'with' of "juliet@capulet.lit" a query to their own archive would also match messages to
+    or from "juliet@capulet.lit/balcony" and "juliet@capulet.lit/chamber".</p>
+    </div>
+    <div class="indent"><h4 id="filter-time">4.1.2 Filtering by time received<a class="anchor-link" href="#filter-time"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">The 'start' and 'end' fields, if provided, MUST contain timestamps
+      formatted according to the DateTime profile defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0082.html">XMPP Date and Time Profiles (XEP-0082)</a></span>  [<a href="#nt-idm45061212086752">7</a>]</p>
+      <p class="" style="">The 'start' field is used to filter out messages before a certain date/time.
+      If specified, a server MUST only return messages whose timestamp is equal to or later
+      than the given timestamp.</p>
+      <p class="" style="">If omitted, the server SHOULD assume the value of 'start' to be equal to the
+      date/time of the earliest message stored in the archive.</p>
+      <p class="" style="">Conversely, the 'end' field is used to exclude from the results messages
+      after a certain point in time. If specified, a server MUST only return messages whose
+      timestamp is equal to or earlier than the timestamp given in the 'end' field.</p>
+      <p class="" style="">If omitted, the server SHOULD assume the value of 'end' to be equal to the
+      date/time of the most recent message stored in the archive.</p>
+      <figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> Querying the archive for all messages in a certain timespan<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' id='juliet1'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2'&gt;
+    &lt;x xmlns='jabber:x:data' type='submit'&gt;
+      &lt;field var='FORM_TYPE' type='hidden'&gt;
+        &lt;value&gt;urn:xmpp:mam:2&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='start'&gt;
+        &lt;value&gt;2010-06-07T00:00:00Z&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='end'&gt;
+        &lt;value&gt;2010-07-07T13:23:54Z&lt;/value&gt;
+      &lt;/field&gt;
+    &lt;/x&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+      <figure class="code-example" id="example-8"><figcaption><strong>Example 8.</strong> Querying the archive for all messages after a certain time<a class="anchor-link" href="#example-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' id='juliet1'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2'&gt;
+    &lt;x xmlns='jabber:x:data' type='submit'&gt;
+      &lt;field var='FORM_TYPE' type='hidden'&gt;
+        &lt;value&gt;urn:xmpp:mam:2&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='start'&gt;
+        &lt;value&gt;2010-08-07T00:00:00Z&lt;/value&gt;
+      &lt;/field&gt;
+    &lt;/x&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    </div>
+    <div class="indent"><h4 id="query-limit-id">4.1.3 Limiting results by id<a class="anchor-link" href="#query-limit-id"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">If the client has already seen some messages, it may choose to restrict its query to
+      before and/or after messages it already knows about. This may be done through the 'before-id'
+      and 'after-id' fields.
+        In some cases 'before-id' and 'after-id' are the same as using RSM's
+        'before' and 'after' parameters. For more information, see the
+        <a href="#impl">Implementation Considerations</a> section.
+      </p>
+      <figure class="code-example" id="example-9"><figcaption><strong>Example 9.</strong> Querying the archive for all messages after a certain message<a class="anchor-link" href="#example-9"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' id='juliet1'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2'&gt;
+    &lt;x xmlns='jabber:x:data' type='submit'&gt;
+      &lt;field var='FORM_TYPE' type='hidden'&gt;
+        &lt;value&gt;urn:xmpp:mam:2&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='after-id'&gt;
+        &lt;value&gt;09af3-cc343-b409f&lt;/value&gt;
+      &lt;/field&gt;
+    &lt;/x&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+      <figure class="code-example" id="example-10"><figcaption><strong>Example 10.</strong> Querying the archive for all messages between two known messages<a class="anchor-link" href="#example-10"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' id='juliet1'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2'&gt;
+    &lt;x xmlns='jabber:x:data' type='submit'&gt;
+      &lt;field var='FORM_TYPE' type='hidden'&gt;
+        &lt;value&gt;urn:xmpp:mam:2&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='after-id'&gt;
+        &lt;value&gt;28482-98726-73623&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='before-id'&gt;
+        &lt;value&gt;09af3-cc343-b409f&lt;/value&gt;
+      &lt;/field&gt;
+    &lt;/x&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+      <p class="" style="">If the client already knows the UID of one or more messages it wants to fetch, it can use
+         the 'ids' field:</p>
+
+      <figure class="code-example" id="example-11"><figcaption><strong>Example 11.</strong> Fetching a specific message from the archive<a class="anchor-link" href="#example-11"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' id='juliet1'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2'&gt;
+    &lt;x xmlns='jabber:x:data' type='submit'&gt;
+      &lt;field var='FORM_TYPE' type='hidden'&gt;
+        &lt;value&gt;urn:xmpp:mam:2&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='ids'&gt;
+        &lt;value&gt;28482-98726-73623&lt;/value&gt;
+      &lt;/field&gt;
+    &lt;/x&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+      <p class="" style="">If any UID requested by the client in any of the 'before-id', 'after-id' or 'ids' form fields is not present in the archive, the server MUST return an item-not-found error in response to the query.</p>
+
+    </div>
+    <div class="indent"><h4 id="query-include-groupchat">4.1.4 Including groupchat results in a user archive<a class="anchor-link" href="#query-include-groupchat"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">If the server advertises that it includes groupchat messages in a user's archive (see <a href="#support">Determining support</a>), a client may query a user archive and request for them to be included in the result with the 'include-groupchat' field set to 'true'.
+      </p>
+      <figure class="code-example" id="example-12"><figcaption><strong>Example 12.</strong> Querying the archive and including groupchat messages in results<a class="anchor-link" href="#example-12"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' id='juliet1'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2'&gt;
+    &lt;x xmlns='jabber:x:data' type='submit'&gt;
+      &lt;field var='FORM_TYPE' type='hidden'&gt;
+        &lt;value&gt;urn:xmpp:mam:2&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='include-groupchat'&gt;
+        &lt;value&gt;true&lt;/value&gt;
+      &lt;/field&gt;
+      ...
+    &lt;/x&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">If the server advertises that it includes groupchat messages in the archive, or it advertises that it doesn't, a client may request that they not be included by setting the 'include-groupchat' field to 'false'.</p>
+      <figure class="code-example" id="example-13"><figcaption><strong>Example 13.</strong> Querying the archive and excluding groupchat messages from results<a class="anchor-link" href="#example-13"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' id='juliet1'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2'&gt;
+    &lt;x xmlns='jabber:x:data' type='submit'&gt;
+      &lt;field var='FORM_TYPE' type='hidden'&gt;
+        &lt;value&gt;urn:xmpp:mam:2&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='include-groupchat'&gt;
+        &lt;value&gt;false&lt;/value&gt;
+      &lt;/field&gt;
+      ...
+    &lt;/x&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">Note that where the client doesn't specify the 'include-groupchat' field, it is implementation-defined whether groupchat messages are included in the results (see <a href="#business_rules">Business Rules</a>). Clients MUST NOT include this field where servers don't advertise support, as the server would reject such a form.</p>
+    </div>
+    <div class="indent"><h4 id="query-form">4.1.5 Retrieving form fields<a class="anchor-link" href="#query-form"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">In order for the client find out about additional fields the server might support, it can send an iq stanza of type 'get' addressed to the archive like this:</p>
+      <figure class="code-example" id="example-14"><figcaption><strong>Example 14.</strong> Client requests supported query fields<a class="anchor-link" href="#example-14"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get' id='form1'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+      <p class="" style="">The server replies with all the form fields it supports in queries, which MUST include the mandatory fields specified in this document.</p>
+      <figure class="code-example" id="example-15"><figcaption><strong>Example 15.</strong> Server returns supported fields<a class="anchor-link" href="#example-15"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result' id='form1'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2'&gt;
+    &lt;x xmlns='jabber:x:data' type='form'&gt;
+      &lt;field type='hidden' var='FORM_TYPE'&gt;
+        &lt;value&gt;urn:xmpp:mam:2&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field type='jid-single' var='with'/&gt;
+      &lt;field type='text-single' var='start'/&gt;
+      &lt;field type='text-single' var='end'/&gt;
+      &lt;field type='text-single' var='before-id'/&gt;
+      &lt;field type='text-single' var='after-id'/&gt;
+      &lt;field type='list-multi' var='ids'&gt;
+        &lt;validate xmlns="http://jabber.org/protocol/xdata-validate" datatype="xs:string"&gt;
+          &lt;open/&gt;
+        &lt;/validate&gt;
+      &lt;/field&gt;
+      &lt;field type='boolean' var='include-groupchat'/&gt;
+      &lt;field type='text-single' var='{http://example.com/}free-text-search'/&gt;
+      &lt;field type='text-single' var='{http://example.com/}stanza-content'/&gt;
+    &lt;/x&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+      <p class="" style="">If the client understands any of the additional fields it MAY proceed to include any of them in subsequent queries. It is not required to include any or all of the supported fields in queries.</p>
+      <p class="" style="">A special note about the 'ids' field: this field is of type 'list-multi' which typically is used to allow the client to select from a provided list of options. In this case the list of all possible ids MUST NOT be provided by the server, as it is likely to be extremely large. Instead the server MUST include a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0122.html">Data Forms Validation (XEP-0122)</a></span>  [<a href="#nt-idm45061212052752">8</a>] &lt;validate/&gt; element that signals the list is open to arbitrary values provided by the client.</p>
+      <p class="" style="">As specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0068.html">Field Standardization for Data Forms (XEP-0068)</a></span>  [<a href="#nt-idm45061212102000">6</a>], names of custom fields SHOULD use Clark notation to avoid conflicts with other extensions.</p>
+      <figure class="code-example" id="example-16"><figcaption><strong>Example 16.</strong> Client uses two discovered query fields in a query<a class="anchor-link" href="#example-16"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' id='query4'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2'&gt;
+    &lt;x xmlns='jabber:x:data' type='submit'&gt;
+      &lt;field type='hidden' var='FORM_TYPE'&gt;
+        &lt;value&gt;urn:xmpp:mam:2&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field type='text-single' var='{http://example.com/}free-text-search'&gt;
+        &lt;value&gt;Where arth thou, my Juliet?&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field type='text-single' var='{http://example.com/}stanza-content'&gt;
+        &lt;value&gt;{http://jabber.org/protocol/mood}mood/lonely&lt;/value&gt;
+      &lt;/field&gt;
+    &lt;/x&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+      <p class="" style="">Note that as the 'with', 'start' and 'end' fields MUST be implemented by servers, clients are able to submit forms using combinations of only these fields without needing to first fetch the form from the server and the types of these fields MUST be 'jid-single', 'text-single' and 'text-single' respectively. A server MUST NOT rely on a client having first requested the form before submitting queries.</p>
+      <p class="" style="">If a client includes a form field that the server does not recognise, the server MUST respond with a 'feature-not-implemented' error.</p>
+    </div>
+  </div>
+
+  <div class="indent"><h3 id="results">4.2 Query results<a class="anchor-link" href="#results"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The server responds to the archive query by transmitting to the client all the messages
+       that match the criteria the client requested, subject to implementation limits. The results are sent as individual stanzas,
+       with the original message encapsulated in a &lt;forwarded/&gt; element as described in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0297.html">Stanza Forwarding (XEP-0297)</a></span>  [<a href="#nt-idm45061212037504">9</a>].
+    </p>
+    <p class="" style="">The result messages MUST contain a &lt;result/&gt; element with an 'id' attribute that gives
+       the current message's archive UID (archived messages MAY also contain a XEP-0359 &lt;stanza-id&gt; element, but clients MUST NOT depend
+       on it). If the client gave a 'queryid' attribute in its initial query, the server MUST also include that in this result element.
+    </p>
+    <p class="" style="">The &lt;result/&gt; element contains a &lt;forwarded/&gt; element which SHOULD contain the
+       original message as it was received, and SHOULD also contain a &lt;delay/&gt; element
+       qualified by the 'urn:xmpp:delay' namespace specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0203.html">Delayed Delivery (XEP-0203)</a></span>  [<a href="#nt-idm45061212030768">10</a>]. The value of the 'stamp'
+       attribute MUST be the time the message was originally received by the forwarding entity.
+    </p>
+    <p class="" style="">The archive results MUST be sorted in chronological order, both within the returned results and within the ordering of RSM such that if a client were to request the first 10 stanzas in an archive, then use RSM to request the next 10 stanzas (by providing the 'after' element with the UID of the 10th stanza in the first results) all 20 result stanzas would be received in chronological order.
+    </p>
+    <figure class="code-example" id="example-17"><figcaption><strong>Example 17.</strong> Server returns two matching messages<a class="anchor-link" href="#example-17"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message id='aeb213' to='juliet@capulet.lit/chamber'&gt;
+  &lt;result xmlns='urn:xmpp:mam:2' queryid='f27' id='28482-98726-73623'&gt;
+    &lt;forwarded xmlns='urn:xmpp:forward:0'&gt;
+      &lt;delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/&gt;
+      &lt;message xmlns='jabber:client'
+               to='juliet@capulet.lit/balcony'
+               from='romeo@montague.lit/orchard'
+               type='chat'&gt;
+        &lt;body&gt;Call me but love, and I'll be new baptized; Henceforth I never will be Romeo.&lt;/body&gt;
+      &lt;/message&gt;
+    &lt;/forwarded&gt;
+  &lt;/result&gt;
+&lt;/message&gt;
+
+&lt;message id='aeb214' to='juliet@capulet.lit/chamber'&gt;
+  &lt;result xmlns='urn:xmpp:mam:2' queryid='f27' id='5d398-28273-f7382'&gt;
+    &lt;forwarded xmlns='urn:xmpp:forward:0'&gt;
+      &lt;delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:09:32Z'/&gt;
+      &lt;message xmlns='jabber:client'
+               to='romeo@montague.lit/orchard'
+               from='juliet@capulet.lit/balcony'
+               type='chat' id='8a54s'&gt;
+        &lt;body&gt;What man art thou that thus bescreen'd in night so stumblest on my counsel?&lt;/body&gt;
+      &lt;/message&gt;
+    &lt;/forwarded&gt;
+  &lt;/result&gt;
+&lt;/message&gt;
+</pre></figure>
+  </div>
+
+  <div class="indent"><h3 id="query-paging">4.3 Paging through results<a class="anchor-link" href="#query-paging"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <div class="indent"><h4 id="query-paging-limit">4.3.1 Page limits<a class="anchor-link" href="#query-paging-limit"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">A client or server will typically want to limit the number of results transmitted at
+      a time, thereby breaking the result stream into smaller 'pages'. For this purpose a
+      server MUST support <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0059.html">Result Set Management (XEP-0059)</a></span>  [<a href="#nt-idm45061212130144">4</a>] and MUST support the paging mechanism defined therein.
+      A client MAY include a &lt;set/&gt; element in its query.</p>
+      <p class="" style="">For the purposes of this protocol, the UIDs used by RSM correspond with the UIDs of the
+      stanzas stored in the archive.</p>
+      <figure class="code-example" id="example-18"><figcaption><strong>Example 18.</strong> A query using Result Set Management<a class="anchor-link" href="#example-18"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' id='q29302'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2'&gt;
+    &lt;x xmlns='jabber:x:data' type='submit'&gt;
+      &lt;field var='FORM_TYPE' type='hidden'&gt;
+        &lt;value&gt;urn:xmpp:mam:2&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='start'&gt;
+        &lt;value&gt;2010-08-07T00:00:00Z&lt;/value&gt;
+      &lt;/field&gt;
+    &lt;/x&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;max&gt;10&lt;/max&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+      <p class="" style="">To conserve resources, a server MAY place a reasonable limit on how many stanzas may be
+      pushed to a client in one request. Whether or not the client query included a &lt;set/&gt; element, the server MAY simply return
+      its limited results, modifying the &lt;set/&gt; element it returns appropriately.</p>
+      <figure class="code-example" id="example-19"><figcaption><strong>Example 19.</strong> Server responds to client with limited results using RSM<a class="anchor-link" href="#example-19"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;!-- result messages --&gt;
+&lt;iq type='result' id='q29302'&gt;
+  &lt;fin xmlns='urn:xmpp:mam:2'&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;first index='0'&gt;28482-98726-73623&lt;/first&gt;
+      &lt;last&gt;09af3-cc343-b409f&lt;/last&gt;
+      &lt;count&gt;20&lt;/count&gt;
+    &lt;/set&gt;
+  &lt;/fin&gt;
+&lt;/iq&gt;
+</pre></figure>
+    </div>
+    <div class="indent"><h4 id="query-paging-request">4.3.2 Requesting pages<a class="anchor-link" href="#query-paging-request"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">The &lt;first&gt; and &lt;last&gt; elements specify the UID of the first and last returned
+      results (not necessarily of all the messages that matched the query, if the results have been limited).</p>
+
+      <p class="" style="">The RSM &lt;count&gt; element and the 'index' attribute on the RSM &lt;first&gt; element are optional,
+      a server MAY include them, but a client MUST NOT depend on them being present. Please refer to the RSM
+      specification for more information surrounding their meaning and use.</p>
+      <p class="" style="">Having previously made a query that returned results limited by the server (as described above), a client
+      can re-send the same request and receive the next 'page' of results. It does this by including a &lt;set&gt;
+      element with its request, containing an &lt;after/&gt; with the UID of the last message it received
+      from the previous query.</p>
+      <figure class="code-example" id="example-20"><figcaption><strong>Example 20.</strong> A page query using Result Set Management<a class="anchor-link" href="#example-20"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' id='q29303'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2'&gt;
+    &lt;x xmlns='jabber:x:data' type='submit'&gt;
+      &lt;field var='FORM_TYPE' type='hidden'&gt;&lt;value&gt;urn:xmpp:mam:2&lt;/value&gt;&lt;/field&gt;
+      &lt;field var='start'&gt;&lt;value&gt;2010-08-07T00:00:00Z&lt;/value&gt;&lt;/field&gt;
+    &lt;/x&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;max&gt;10&lt;/max&gt;
+      &lt;after&gt;09af3-cc343-b409f&lt;/after&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">Note: There is no concept of an "open query", and servers MUST be prepared to receive arbitrary page requests at any time.</p>
+    <p class="" style="">RSM does not define the behaviour of including both &lt;before&gt; and &lt;after&gt; in the same request. To retrieve a range of items between two known ids, use before-id and after-id in the query form instead.</p>
+    <p class="" style="">If the UID contained within an &lt;after&gt; or &lt;before&gt; element is not present in the archive, the server MUST return an item-not-found error in response to the query.</p>
+      <figure class="code-example" id="example-21"><figcaption><strong>Example 21.</strong> Message id not found in archive<a class="anchor-link" href="#example-21"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='error' id='q29303'&gt;
+  &lt;error type='cancel'&gt;
+    &lt;item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/&gt;
+  &lt;/error&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">When the results returned by the server are complete (that is: when they have not been limited by the maximum size of the result page (either as specified or enforced by the server)), the server MUST include a 'complete' attribute on the &lt;fin&gt; element, with a value of 'true'; this informs the client that it doesn't need to perform further paging to retreive the requested data. If it is not the last page of the result set, the server MUST either omit the 'complete' attribute, or give it a value of 'false'.</p>
+    <figure class="code-example" id="example-22"><figcaption><strong>Example 22.</strong> Server completes a result with the last page of messages<a class="anchor-link" href="#example-22"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;!-- result messages --&gt;
+&lt;iq type='result' id='u29303'&gt;
+  &lt;fin xmlns='urn:xmpp:mam:2' complete='true'&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;first index='0'&gt;23452-4534-1&lt;/first&gt;
+      &lt;last&gt;390-2342-22&lt;/last&gt;
+      &lt;count&gt;16&lt;/count&gt;
+    &lt;/set&gt;
+  &lt;/fin&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">Sometimes (e.g. due to network or storage partitioning, or other transient errors) the server might return results to a client that are unstable (e.g. they might later change in sequence or content). In such a situation the server MUST stamp the &lt;fin&gt; element with a 'stable' attribute with a value of 'false'. If the server knows that the data it's serving are stable it MUST either stamp a 'stable' attribute with a value of 'true', or no such attribute. An example of when unstable might legitimately be returned is if the MAM service uses a clustered data store and a query covers a time period for which the data store has not yet converged; it the server could return best-guess results and tell the client that they may be unstable. A client SHOULD NOT cache unstable results long-term without later confirming (by reissuing appropriate queries) that they have become stable.</p>
+    </div>
+    <div class="indent"><h4 id="sect-idm45061211997872">4.3.3 Requesting the last page<a class="anchor-link" href="#sect-idm45061211997872"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+        <p class="" style="">To request the page at the end of the archive (i.e. the most recent messages), include just an empty &lt;before/&gt; element in the RSM part of the query. As defined by RSM, this will return the last page of the archive.</p>
+      <figure class="code-example" id="example-23"><figcaption><strong>Example 23.</strong> A request for the last page in an archive<a class="anchor-link" href="#example-23"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' id='q29303'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2'&gt;
+    &lt;x xmlns='jabber:x:data' type='submit'&gt;
+      &lt;field var='FORM_TYPE' type='hidden'&gt;&lt;value&gt;urn:xmpp:mam:2&lt;/value&gt;&lt;/field&gt;
+      &lt;field var='start'&gt;&lt;value&gt;2010-08-07T00:00:00Z&lt;/value&gt;&lt;/field&gt;
+    &lt;/x&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;max&gt;10&lt;/max&gt;
+      &lt;before/&gt;
+    &lt;/set&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+         <p class="" style="">Within the returned page, all results are still in chronological order, that is, the first result you receive will be the oldest item in the page, and the last result you receive will be the last item in the archive.</p>
+    </div>
+    <div class="indent"><h4 id="query-paging-flip">4.3.4 Flipped pages<a class="anchor-link" href="#query-paging-flip"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">When fetching a page, the client may prefer for the server to send the results within that page in reverse order.
+      For example, if a client implements a user interface that automatically fetches older messages as a user scrolls backward,
+      it may want to receive and display the newest messages first, instead of waiting for the whole page to be received.</p>
+      <p class="" style="">A client wishing for a reversed page should include the &lt;flip-page/&gt; element in its query, like so:</p>
+      <figure class="code-example" id="example-24"><figcaption><strong>Example 24.</strong> Requesting a page that is flipped<a class="anchor-link" href="#example-24"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='set' id='q29309'&gt;
+  &lt;query xmlns='urn:xmpp:mam:2'&gt;
+    &lt;x xmlns='jabber:x:data' type='submit'&gt;
+      &lt;field var='FORM_TYPE' type='hidden'&gt;&lt;value&gt;urn:xmpp:mam:2&lt;/value&gt;&lt;/field&gt;
+      &lt;field var='start'&gt;&lt;value&gt;2010-08-07T00:00:00Z&lt;/value&gt;&lt;/field&gt;
+    &lt;/x&gt;
+    &lt;set xmlns='http://jabber.org/protocol/rsm'&gt;
+      &lt;max&gt;10&lt;/max&gt;
+      &lt;after&gt;09af3-cc343-b409f&lt;/after&gt;
+    &lt;/set&gt;
+    &lt;flip-page/&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+      <p class="" style="">It is important to note that flipping a page does not affect what results are returned in response to the query. It only affects the
+      order in which they are transmitted from the server to the client.</p>
+      <p class="" style="">A client that wishes to use flipped pages MUST ensure that the server advertises the 'urn:xmpp:mam:2#extended' feature.</p>
+    </div>
+  </div>
+
+<h2 id="archive-metadata">5.
+       Archive metadata<a class="anchor-link" href="#archive-metadata"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">When planning a query, a client may wish to learn the current state of the archive. This includes information about the first/last entries in the archive.</p>
+
+  <p class="" style="">When the archive advertises support for 'urn:xmpp:mam:2#extended' then the archive supports queries for this metadata via an iq of type 'get' to the
+     archive's address, with a &lt;metadata/&gt; payload in the 'urn:xmpp:mam:2' namespace.</p>
+
+  <figure class="code-example" id="example-25"><figcaption><strong>Example 25.</strong> Requesting archive metadata<a class="anchor-link" href="#example-25"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get' id='jui8921rr9'&gt;
+  &lt;metadata xmlns='urn:xmpp:mam:2'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+  <figure class="code-example" id="example-26"><figcaption><strong>Example 26.</strong> Server returns archive metadata<a class="anchor-link" href="#example-26"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result' id='jui8921rr9'&gt;
+  &lt;metadata xmlns='urn:xmpp:mam:2'&gt;
+    &lt;start id='YWxwaGEg' timestamp='2008-08-22T21:09:04Z' /&gt;
+    &lt;end id='b21lZ2Eg' timestamp='2020-04-20T14:34:21Z' /&gt;
+  &lt;/metadata&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+  <p class="" style="">The server response includes a &lt;metadata/&gt; element containing information about the archive. If the archive is not empty, this element MUST include &lt;start/&gt; and &lt;end/&gt;
+     elements, which each have an 'id' and XEP-0082 formatted 'timestamp of the first and last messages in the archive respectively.</p>
+  <p class="" style="">If the archive is empty, the server MUST instead send an empty &lt;metadata/&gt; element.</p>
+<h2 id="business_rules">6.
+       Business Rules<a class="anchor-link" href="#business_rules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="business-storeret">6.1 Storage and Retrieval Rules<a class="anchor-link" href="#business-storeret"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Different entities will have different requirements for which data are stored, as might different deployments. This section provides general rules within which a server will act. While there may be local policy restrictions that prevent archiving of some aspects discussed here, this is a RECOMMENDED baseline. A server MAY implement any subset of possible archives for JIDs it controls (although it MUST advertise support only for those JIDs that support it).</p>
+  <p class="" style="">No requirements are placed on how a server implements its storage beyond that it has to store data sufficient to be able to comply with this document. When this document describes storage requirements (e.g. MUST NOT store more than one copy...), it refers to what would appear to have been stored in order to satisfy the query.</p>
+    <p class="" style="">If an entity (user's server, MUC room, pubsub node, ...) rejects an incoming message (such as from an occupant not allowed to send messages to the room, a user not authorized to publish to a pubsub node, a contact blocked by the user etc.) that message should not appear in the archive for the entity that rejected it - the archive should represent what logical entities (MUC occupants, users, pubsub subscribers...) would have received, and so only contain messages accepted for delivery to such entities.</p>
+    <div class="indent"><h4 id="business-storeret-user-archives">6.1.1 User Archives<a class="anchor-link" href="#business-storeret-user-archives"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">A user archive is anticipated to provide the user with the ability to access their prior conversations. To this end, a server SHOULD include in a user archive all of the messages a user sends or receives of type 'normal' or 'chat' that contain a &lt;body&gt; element.  A server MAY include additional non-conversation messages. A server MAY include messages of type 'headline', but this is not generally suggested.</p>
+      <p class="" style="">Previous versions of this specification stated that a server SHOULD also include messages of type 'groupchat' that have a &lt;body&gt; - however many deployments did not follow this (although some did). This advice has now been dropped, and servers MAY include groupchat messages in their archives. Whether a server stores groupchat messages or not is now left as an implementation (or deployment) decision. Whether a client wants to receive groupchat messages in results can be signalled with the 'include-groupchat' field (if supported by the server - see <a href="#support">Determining support</a>) - where the server doesn't support this field, or where a client doesn't specify it in the query, whether groupchat messages are included in the result is implementation-defined; this allows existing deployments to not break with the introduction of the 'include-groupchat' query field in a later version of this specification, but it is RECOMMENDED that all client implementations of the current version of this specification always include the field where the server supports it, and RECOMMENDED that servers support it.</p>
+      <p class="" style="">At a minimum, the server MUST store the &lt;body&gt; elements of a stanza. It is suggested that other elements that are used in a given deployment to supplement conversations (e.g. XHTML-IM payloads) are also stored. Other elements MAY be stored.</p>
+      <p class="" style="">If a server supports mechanisms that multiply copies of a stanza (e.g. Carbons, or forking a stanza to a bare JID), it MUST store such a stanza within a given archive only once, irrespective of multiple connected clients receiving copies.</p>
+      <p class="" style="">A server MAY choose not to deliver offline messages to a client that has already queried their MAM archive and received the archived copies of those messages that would otherwise be delivered - while not required of an implementation, this is helpful to avoid duplicate messages for clients, so is suggested.</p>
+    </div>
+    <div class="indent"><h4 id="business-storeret-muc-archives">6.1.2 MUC Archives<a class="anchor-link" href="#business-storeret-muc-archives"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">A MUC archives allows a user to view the conversation within a room. All messages sent to the room that contain a &lt;body&gt; element SHOULD be stored, as should subject change stanzas, apart from those messages that the room rejects.</p>
+      <p class="" style="">A MUC archive MUST store each message only once (not, for example, every copy sent out to an occupant).</p>
+      <p class="" style="">A MUC archive MUST NOT include 'private message' results (those sent directly between occupants, not shared in the room) in the results.</p>
+      <p class="" style="">A MUC archive MUST check that the user requesting the archive has the right to enter it at the time of the query and only allow access if so. In a members-only chat room, only owners, admins or members can query a room archive. In the case of open MUC rooms, the MUC archives can generally be accessed by any users (including those who have never entered the room) who do not have an affiliation of 'outcast', but a MUC archive MAY further limit access based on other criteria as part of the deployment policy. A MUC archive MAY, if it stores historical data about previous configuration states, limit the results returned to only those that the querying user would have been authorised to see at the time (e.g. it MAY limit the results to not include results while a user was an outcast).</p>
+      <p class="" style="">When sending out the archives to a requesting client, the forwarded stanza MUST NOT have a 'to' attribute, and the 'from' MUST be the occupant JID of the sender of the archived message.</p>
+      <p class="" style="">In the case of non-anonymous rooms or if the recipient of the MUC archive has the right to access the sender real JID at the time of the query, the archive message will use extended message information in an &lt;x/&gt; element qualified by the 'http://jabber.org/protocol/muc#user' namespace and containing an &lt;item/&gt; child with a 'jid' attribute specifying the occupant's full JID, as defined for non-anonymous room presence in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45061211953376">11</a>]. The archiving entity MUST strip any pre-existing &lt;x&gt; element from MUC messages (as MUC rooms are not required to do this).</p>
+      <figure class="code-example" id="example-27"><figcaption><strong>Example 27.</strong> Server returns MUC messages<a class="anchor-link" href="#example-27"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message id='iasd207' from='coven@chat.shakespeare.lit' to='hag66@shakespeare.lit/pda'&gt;
+  &lt;result xmlns='urn:xmpp:mam:2' queryid='g27' id='78527-06716-51603'&gt;
+    &lt;forwarded xmlns='urn:xmpp:forward:0'&gt;
+      &lt;delay xmlns='urn:xmpp:delay' stamp='2002-10-13T23:58:37Z'/&gt;
+      &lt;message xmlns="jabber:client"
+               from='coven@chat.shakespeare.lit/firstwitch'
+               id='162BEBB1-F6DB-4D9A-9BD8-CFDCC801A0B2'
+               type='groupchat'&gt;
+        &lt;body&gt;Thrice the brinded cat hath mew'd.&lt;/body&gt;
+        &lt;x xmlns='http://jabber.org/protocol/muc#user'&gt;
+          &lt;item affiliation='owner'
+                jid='crone1@shakespeare.lit'
+                role='participant' /&gt;
+        &lt;/x&gt;
+      &lt;/message&gt;
+    &lt;/forwarded&gt;
+  &lt;/result&gt;
+&lt;/message&gt;
+
+&lt;message id='iasd207' from='coven@chat.shakespeare.lit' to='hag66@shakespeare.lit/pda'&gt;
+  &lt;result xmlns='urn:xmpp:mam:2' queryid='g27' id='34482-21985-73620'&gt;
+    &lt;forwarded xmlns='urn:xmpp:forward:0'&gt;
+      &lt;delay xmlns='urn:xmpp:delay' stamp='2002-10-13T23:58:43Z'/&gt;
+      &lt;message xmlns="jabber:client"
+               from='coven@chat.shakespeare.lit/secondwitch'
+               id='90057840-30FD-4141-AA44-103EEDF218FC'
+               type='groupchat'&gt;
+        &lt;body&gt;Thrice and once the hedge-pig whined.&lt;/body&gt;
+        &lt;x xmlns='http://jabber.org/protocol/muc#user'&gt;
+          &lt;item affiliation='admin'
+                jid='wiccarocks@shakespeare.lit'
+                role='participant' /&gt;
+        &lt;/x&gt;
+      &lt;/message&gt;
+    &lt;/forwarded&gt;
+  &lt;/result&gt;
+&lt;/message&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h4 id="business-storeret-pubsub-archives">6.1.3 Pubsub archives<a class="anchor-link" href="#business-storeret-pubsub-archives"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+    <p class="" style="">
+      This specification reserves the 'node' attribute of the &lt;query&gt;
+      element for use with pubsub archives.
+      Its use is defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0442.html">Pubsub Message Archive Management (XEP-0442)</a></span>  [<a href="#nt-idm45061211942624">12</a>].
+    </p>
+  </div>
+  </div>
+  <div class="indent"><h3 id="business-ids">6.2 IDs<a class="anchor-link" href="#business-ids"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+        <p class="" style="">The IDs used within an archive MUST be unique per item stored and MUST NOT be reused, even if the original item with a given ID has since been removed from the archive. If a server provides multiple archives (e.g. many user archives, or many MUC archives), the IDs do not need to be unique across all of these archives unless the server also allows a single query to be run across multiple archives (e.g. searching of all MUC rooms), discussion of which is beyond the scope of this document. These IDs are strings that servers may construct in any manner, and clients must treat as opaque strings (e.g. there is no requirement for them to be numeric, sequenced or GUIDs).</p>
+  </div>
+  <div class="indent"><h3 id="sync">6.3 Client synchronization<a class="anchor-link" href="#sync"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">In addition to one-off queries, clients may use this protocol to synchronize a local archive with the server's archive. However
+       because this protocol is detached from normal routing of messages, it is possible that a client will receive messages while trying
+       to synchronize, which has the potential to cause duplicated messages. Resolving this is beyond the scope of this specification,
+       but may instead be solved during the initial connection phase by using an alternative connection protocol such as <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0386.html">Bind 2.0 (XEP-0386)</a></span>  [<a href="#nt-idm45061211932592">13</a>].</p>
+  </div>
+<h2 id="support">7.
+       Determining support<a class="anchor-link" href="#support"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+        <p class="" style="">If a server or other entity hosts archives and supports MAM queries, it MUST advertise
+          the 'urn:xmpp:mam:2' and 'urn:xmpp:mam:2#extended' features in response to <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45061211926112">14</a>] requests
+          made to archiving JIDs (i.e. JIDs hosting an archive, such as users' bare JIDs):
+        </p>
+<figure class="code-example" id="example-28"><figcaption><strong>Example 28.</strong> Client queries for server features<a class="anchor-link" href="#example-28"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get' id='disco1' to='juliet@capulet.lit' from='juliet@capulet.lit/balcony'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+<figure class="code-example" id="example-29"><figcaption><strong>Example 29.</strong> Server responds with features<a class="anchor-link" href="#example-29"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result' id='disco1' from='juliet@capulet.lit' to='juliet@capulet.lit/balcony'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+    ...
+    &lt;feature var='urn:xmpp:mam:2'/&gt;
+    &lt;feature var='urn:xmpp:mam:2#extended'/&gt;
+    ...
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+    <p class="" style="">Servers advertising the 'urn:xmpp:mam:2#extended' feature MUST implement the 'before-id' and 'after-id' fields, as well as support for
+       flipped pages and single-item retrieval. The 'urn:xmpp:mam:2#extended' feature MUST NOT be advertised by a server without also advertising
+       'urn:xmpp:mam:2'.</p>
+
+    <figure class="table"><figcaption id="table-1"><strong>Table 1:</strong> Extended namespace feature comparison<a class="anchor-link" href="#table-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+      <tr class="body">
+        <th colspan="" rowspan="">Feature</th>
+        <th colspan="" rowspan="">urn:xmpp:mam:2</th>
+        <th colspan="" rowspan="">urn:xmpp:mam:2#extended</th>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">Queries using 'with', 'start' and 'end'</td>
+        <td align="" colspan="" rowspan="">Required</td>
+        <td align="" colspan="" rowspan="">Required</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">Error responses for missing UIDs</td>
+        <td align="" colspan="" rowspan="">Required</td>
+        <td align="" colspan="" rowspan="">Required</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">Queries using 'before-id', 'after-id' or 'ids'</td>
+        <td align="" colspan="" rowspan="">-</td>
+        <td align="" colspan="" rowspan="">Required</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">Page flipping</td>
+        <td align="" colspan="" rowspan="">-</td>
+        <td align="" colspan="" rowspan="">Required</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">Archive metadata query</td>
+        <td align="" colspan="" rowspan="">-</td>
+        <td align="" colspan="" rowspan="">Required</td>
+      </tr>
+    </table></figure>
+
+    <p class="" style="">Servers that understand the 'include-groupchat' field MUST advertise the 'urn:xmpp:mam:2#groupchat-field' (even if they cannot return groupchat messages), and servers that understand the 'include-groupchat' field and store groupchat messages in the user's archive must advertise the 'urn:xmpp:mam:2#groupchat-available' feature</p>
+
+<h2 id="security">8.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="security-privacy">8.1 Data privacy<a class="anchor-link" href="#security-privacy"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">An archive generally consists of private conversations, and so
+    a server MUST adequately protect an archive from unauthorized third-party
+    access. For example authorized parties for a user's archive would likely include
+    just the user, and a MUC archive for a private room might be restricted
+    to room members. An implementation MAY choose to allow access to any archive
+    by server administrators. If a client requests access to an archive it does not
+    have permissions for the server MUST return an iq with type error, and the error
+    condition SHOULD be 'forbidden'.</p>
+    <p class="" style="">A server SHOULD provide a mechanism for a user to disable archiving of
+    messages with all or specific contacts, such as via the configuration
+    protocol described in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0441.html">Message Archive Management Preferences (XEP-0441)</a></span>  [<a href="#nt-idm45061211886688">15</a>]. This allows the user to prevent the
+    archiving of potentially sensitive messages in the first place.</p>
+    <p class="" style="">A server MAY automatically prevent certain sensitive messages from being
+    archived. How such messages are identified is beyond the scope of this
+    specification, but technologies such as <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0258.html">Security Labels in XMPP (XEP-0258)</a></span>  [<a href="#nt-idm45061211881792">16</a>] may be used, for example.</p>
+  </div>
+  <div class="indent"><h3 id="security-impersonation">8.2 Sender Impersonation<a class="anchor-link" href="#security-impersonation"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">A client MUST verify the source of MAM query results against an open query (i.e. checking the stanza 'from' matches the entity that was queried) and MUST either ignore or otherwise disregard (maybe with a warning to the user) unsolicited results - whether because the 'from' doesn't match an open query, or because there is no open query. This is to avoid the situation where a malicious entity sends MAM results while the client is querying a different entity and the client processes the malicious results as if they were part of the legitimate results. Additionally, if the client has multiple queries in flight at once, it MUST also check that the query ID for a result matches that of an open query for that entity.</p>
+  </div>
+  <div class="indent"><h3 id="security-stanza-ids">8.3 Stanza IDs<a class="anchor-link" href="#security-stanza-ids"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Entities that implement this specification must also adhere to the security requirements of XEP-0359.</p>
+  </div>
+  <div class="indent"><h3 id="security-muc-spoofing">8.4 MUC message spoofing<a class="anchor-link" href="#security-muc-spoofing"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">This specification re-uses the &lt;x&gt; element from the 'http://jabber.org/protocol/muc#user' namespace to convey information about the sender of a message in a MUC room. However this element is not sanitized by MUC services, so the archiving entity MUST strip any existing &lt;x&gt; element in the 'http://jabber.org/protocol/muc#user' namespace from messages before archiving them (regardless of whether it adds in its own &lt;x&gt; element).</p>
+  </div>
+<h2 id="impl">9.
+       Implementation Considerations<a class="anchor-link" href="#impl"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">
+    Queries in the 'urn:xmpp:mam:2' namespace can be limited using the RSM
+    'before' and 'after' parameters.
+    Normally these are opaque identifiers that are not known until the results
+    of the first query are returned at which point they can be used to fetch
+    subsequent pages.
+    However, MAM specifically defines them as being equal to the archive ID,
+    meaning that an acceptable value can be known and used in the initial query.
+    This makes them equivalent to 'before-id' and 'after-id' defined in the
+    'urn:xmpp:mam:2#extended' namespace except for the following differences:
+  </p>
+  <ol start="" class="" style="">
+    <li class="" style="">
+      The behavior of using RSM's 'before' and 'after' together is undefined,
+    </li>
+    <li class="" style="">
+      And using 'before' implies paging backwards through the result set while
+      using 'before-id' does not.
+    </li>
+  </ol>
+<h2 id="registrar">10.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="registrar-ns">10.1 Protocol Namespaces<a class="anchor-link" href="#registrar-ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">This specification defines the following XML namespace:</p>
+    <ul class="" style="">
+      <li class="" style="">urn:xmpp:mam:2</li>
+    </ul>
+    <p class="" style="">
+      Upon advancement of this specification from a status of Experimental to a
+      status of Draft, the <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45061211856272">17</a>] shall add the foregoing namespace to the
+      registry located at &lt;<a href="https://xmpp.org/registrar/disco-features.html">https://xmpp.org/registrar/disco-features.html</a>&gt; as described in Section 4 of
+      <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0053.html">XMPP Registrar Function (XEP-0053)</a></span>  [<a href="#nt-idm45061211851952">18</a>].
+    </p>
+    <figure class="code"><figcaption>Service Discovery Features Registry Submission</figcaption><pre class="prettyprint">
+&lt;var&gt;
+  &lt;name&gt;urn:xmpp:mam:2&lt;/name&gt;
+  &lt;desc&gt;Support for Message Archive Management.&lt;/desc&gt;
+  &lt;doc&gt;&amp;xep0313;&lt;/doc&gt;
+&lt;/var&gt;</pre></figure>
+    <p class="" style="">
+      The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45061211856272">17</a>] shall also add the foregoing namespace to the Jabber/XMPP
+      Protocol Namespaces Registry located at &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt;.
+    </p>
+    <figure class="code"><figcaption>Jabber/XMPP Protocol Namespaces Registry Submission</figcaption><pre class="prettyprint">
+&lt;ns&gt;
+  &lt;name&gt;urn:xmpp:mam:2&lt;/name&gt;
+  &lt;doc&gt;&amp;xep0313;&lt;/doc&gt;
+&lt;/ns&gt;</pre></figure>
+  </div>
+  <div class="indent"><h3 id="registrar-form">10.2 Form Types<a class="anchor-link" href="#registrar-form"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">
+      This specification defines the following form types:
+    </p>
+    <ul class="" style="">
+      <li class="" style="">urn:xmpp:mam:2</li>
+    </ul>
+    <p class="" style="">
+      Upon advancement of this specification from a status of Experimental to a
+      status of Draft, the <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45061211856272">17</a>] shall add the foregoing namespace to the
+      registry located at &lt;<a href="https://xmpp.org/registrar/formtypes.html">https://xmpp.org/registrar/formtypes.html</a>&gt; as described in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0068.html">Field Standardization for Data Forms (XEP-0068)</a></span>  [<a href="#nt-idm45061212102000">6</a>].
+    </p>
+    <figure class="code"><figcaption>FORM_TYPEs Registry Submission</figcaption><pre class="prettyprint">
+&lt;form_type&gt;
+  &lt;name&gt;urn:xmpp:mam:2&lt;/name&gt;
+  &lt;doc&gt;&amp;xep0313;&lt;/doc&gt;
+  &lt;desc&gt;Query for items in a message archive.&lt;/desc&gt;
+  &lt;field
+      var='with'
+      type='jid-single'
+      label='A JID that should appear in query results to or from attributes.'/&gt;
+  &lt;field
+      var='start'
+      type='text-single'
+      label='A timestamp indicating the earliest message in the query results.'/&gt;
+  &lt;field
+      var='end'
+      type='text-single'
+      label='A timestamp indicating the latest message in the query results.'/&gt;
+  &lt;field
+      var='before-id'
+      type='text-single'
+      label='A stanza ID indicating the last message in the query results.'/&gt;
+  &lt;field
+      var='after-id'
+      type='text-single'
+      label='A stanza ID indicating the first message in the query results.'/&gt;
+  &lt;field
+      var='ids'
+      type='text-multi'
+      label='A list of stanza IDs corresponding to messages that should be included in query results.'/&gt;
+&lt;/form_type&gt;</pre></figure>
+  </div>
+<h2 id="acks">11.
+       Acknowledgements<a class="anchor-link" href="#acks"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+        <p class="" style="">Many thanks to Dave Cridland, Kim Alvefur, Yann Leboulanger, Evgeny Khramtsov, Florian Schmaus, Lance Stout,
+       Waqas Hussain, Daniel Gultsch, Philipp Hörist, Jonas Schäfer and Georg Lukas for their input and feedback on this specification.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0313</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Draft">Stable</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>1.1.3</dd><dt>Last Updated</dt><dd>2025-04-09</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, <a href="xep-0030.html">XEP-0030</a>, <a href="xep-0059.html">XEP-0059</a>, <a href="xep-0297.html">XEP-0297</a></dd><dt>Supersedes</dt><dd><a href="xep-0136.html">XEP-0136</a></dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>mam</dd><dt>Schema</dt><dd>
+        &lt;<a href="http://www.xmpp.org/schemas/archive-management.xsd">http://www.xmpp.org/schemas/archive-management.xsd</a>&gt;<br></dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0313.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0313.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0313.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Matthew Wild</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:mwild1@gmail.com">mwild1@gmail.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:me@matthewwild.co.uk">me@matthewwild.co.uk</a></dd></dl><h5>Kevin Smith</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:kevin@kismith.co.uk">kevin@kismith.co.uk</a></dd><dt>JabberID</dt><dd><a href="xmpp:kevin@doomsong.co.uk">kevin@doomsong.co.uk</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45061212195248">1</a>. XEP-0136: Message Archiving &lt;<a href="https://xmpp.org/extensions/xep-0136.html">https://xmpp.org/extensions/xep-0136.html</a>&gt;.</p><p><a name="nt-idm45061213529008">2</a>. XEP-0359: Unique and Stable Stanza IDs &lt;<a href="https://xmpp.org/extensions/xep-0359.html">https://xmpp.org/extensions/xep-0359.html</a>&gt;.</p><p><a name="nt-idm45061212138800">3</a>. XEP-0280: Message Carbons &lt;<a href="https://xmpp.org/extensions/xep-0280.html">https://xmpp.org/extensions/xep-0280.html</a>&gt;.</p><p><a name="nt-idm45061212130144">4</a>. XEP-0059: Result Set Management &lt;<a href="https://xmpp.org/extensions/xep-0059.html">https://xmpp.org/extensions/xep-0059.html</a>&gt;.</p><p><a name="nt-idm45061212115296">5</a>. XEP-0004: Data Forms &lt;<a href="https://xmpp.org/extensions/xep-0004.html">https://xmpp.org/extensions/xep-0004.html</a>&gt;.</p><p><a name="nt-idm45061212102000">6</a>. XEP-0068: Field Data Standardization for Data Forms &lt;<a href="https://xmpp.org/extensions/xep-0068.html">https://xmpp.org/extensions/xep-0068.html</a>&gt;.</p><p><a name="nt-idm45061212086752">7</a>. XEP-0082: XMPP Date and Time Profiles &lt;<a href="https://xmpp.org/extensions/xep-0082.html">https://xmpp.org/extensions/xep-0082.html</a>&gt;.</p><p><a name="nt-idm45061212052752">8</a>. XEP-0122: Data Forms Validation &lt;<a href="https://xmpp.org/extensions/xep-0122.html">https://xmpp.org/extensions/xep-0122.html</a>&gt;.</p><p><a name="nt-idm45061212037504">9</a>. XEP-0297: Stanza Forwarding &lt;<a href="https://xmpp.org/extensions/xep-0297.html">https://xmpp.org/extensions/xep-0297.html</a>&gt;.</p><p><a name="nt-idm45061212030768">10</a>. XEP-0203: Delayed Delivery &lt;<a href="https://xmpp.org/extensions/xep-0203.html">https://xmpp.org/extensions/xep-0203.html</a>&gt;.</p><p><a name="nt-idm45061211953376">11</a>. XEP-0045: Multi-User Chat &lt;<a href="https://xmpp.org/extensions/xep-0045.html">https://xmpp.org/extensions/xep-0045.html</a>&gt;.</p><p><a name="nt-idm45061211942624">12</a>. XEP-0442: Pubsub Message Archive Management &lt;<a href="https://xmpp.org/extensions/xep-0442.html">https://xmpp.org/extensions/xep-0442.html</a>&gt;.</p><p><a name="nt-idm45061211932592">13</a>. XEP-0386: Bind 2.0 &lt;<a href="https://xmpp.org/extensions/xep-0386.html">https://xmpp.org/extensions/xep-0386.html</a>&gt;.</p><p><a name="nt-idm45061211926112">14</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm45061211886688">15</a>. XEP-0441: Message Archive Management Preferences &lt;<a href="https://xmpp.org/extensions/xep-0441.html">https://xmpp.org/extensions/xep-0441.html</a>&gt;.</p><p><a name="nt-idm45061211881792">16</a>. XEP-0258: Security Labels in XMPP &lt;<a href="https://xmpp.org/extensions/xep-0258.html">https://xmpp.org/extensions/xep-0258.html</a>&gt;.</p><p><a name="nt-idm45061211856272">17</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p><p><a name="nt-idm45061211851952">18</a>. XEP-0053: XMPP Registrar Function &lt;<a href="https://xmpp.org/extensions/xep-0053.html">https://xmpp.org/extensions/xep-0053.html</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v1.1.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-1.1.3.html">1.1.3</a> (2025-04-09)<a class="anchor-link" href="#revision-history-v1.1.3"><abbr title="Link to this point in the document">¶</abbr></a></div>Fixed typo<div class="revision-author">XEP Editor (dg)</div></li><li id="revision-history-v1.1.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-1.1.2.html">1.1.2</a> (2024-09-18)<a class="anchor-link" href="#revision-history-v1.1.2"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <ul class="" style="">
+        <li class="" style="">Fix JID and affiliation of the first two witches in the MUC example.</li>
+        <li class="" style="">Fix duplicated 'id' in MUC example.</li>
+        <li class="" style="">Fix indentation in examples.</li>
+      </ul>
+    <div class="revision-author">egp</div></li><li id="revision-history-v1.1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-1.1.1.html">1.1.1</a> (2024-02-20)<a class="anchor-link" href="#revision-history-v1.1.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Add XEP-0136 to superseded specifications</p>
+    <div class="revision-author">gdk</div></li><li id="revision-history-v1.1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-1.1.0.html">1.1.0</a> (2023-03-09)<a class="anchor-link" href="#revision-history-v1.1.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <ul class="" style="">
+        <li class="" style="">Clarify archive metadata response in the case of an empty archive.</li>
+        <li class="" style="">Clarify query response in the case of no matching results.</li>
+      </ul>
+    <div class="revision-author">mw</div></li><li id="revision-history-v1.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-1.0.1.html">1.0.1</a> (2022-02-16)<a class="anchor-link" href="#revision-history-v1.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <ul class="" style="">
+        <li class="" style="">Fix inconsistency in example namespaces.</li>
+        <li class="" style="">Fix indentation, especially in examples.</li>
+      </ul>
+    <div class="revision-author">egp</div></li><li id="revision-history-v1.0.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-1.0.0.html">1.0.0</a> (2021-11-02)<a class="anchor-link" href="#revision-history-v1.0.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Advance to Stable as per Council Vote from 2021-10-27.<div class="revision-author">XEP Editor (jsc)</div></li><li id="revision-history-v0.8.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.8.0.html">0.8.0</a> (2021-10-12)<a class="anchor-link" href="#revision-history-v0.8.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Update groupchat-messages-in-user-archive advice, introducing fields and disco features to make behaviour explicit in future implementations, in light of Last Call feedback.</p>
+    <div class="revision-author">ks</div></li><li id="revision-history-v0.7.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.7.5.html">0.7.5</a> (2021-09-24)<a class="anchor-link" href="#revision-history-v0.7.5"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">End some sentences with full stop.</p>
+    <div class="revision-author">ka</div></li><li id="revision-history-v0.7.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.7.4.html">0.7.4</a> (2021-08-23)<a class="anchor-link" href="#revision-history-v0.7.4"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Add implementation note about before/after and before-id/after-id</p>
+    <div class="revision-author">ssw</div></li><li id="revision-history-v0.7.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.7.3.html">0.7.3</a> (2021-03-02)<a class="anchor-link" href="#revision-history-v0.7.3"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Add registrar section; fix another broken link to MAM-PUBSUB</p>
+    <div class="revision-author">ssw</div></li><li id="revision-history-v0.7.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.7.2.html">0.7.2</a> (2020-09-29)<a class="anchor-link" href="#revision-history-v0.7.2"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Clean up references after MAM split</p>
+    <div class="revision-author">mar-v-in</div></li><li id="revision-history-v0.7.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.7.1.html">0.7.1</a> (2020-08-04)<a class="anchor-link" href="#revision-history-v0.7.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Fix missing part of sentence to make more sense</p>
+    <div class="revision-author">rufferson</div></li><li id="revision-history-v0.7.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.7.0.html">0.7.0</a> (2020-03-20)<a class="anchor-link" href="#revision-history-v0.7.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Add 'before-id' and 'after-id' fields, flipped pages, single-item retrieval and a new mandatory disco feature</p>
+      <p class="" style="">Split preferences protocol into a separate document</p>
+      <p class="" style="">Split the details of pubsub archives into a separate document</p>
+    <div class="revision-author">mw</div></li><li id="revision-history-v0.6.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.6.3.html">0.6.3</a> (2018-07-16)<a class="anchor-link" href="#revision-history-v0.6.3"><abbr title="Link to this point in the document">¶</abbr></a></div>Tweak the 'complete' wording to more clearly reflect original intent<div class="revision-author">ks</div></li><li id="revision-history-v0.6.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.6.2.html">0.6.2</a> (2018-07-05)<a class="anchor-link" href="#revision-history-v0.6.2"><abbr title="Link to this point in the document">¶</abbr></a></div>Fix invalid statement about 'to' address of archive stanzas<div class="revision-author">bg</div></li><li id="revision-history-v0.6.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.6.1.html">0.6.1</a> (2017-02-22)<a class="anchor-link" href="#revision-history-v0.6.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+        <p class="" style="">Warn of spoofing of &lt;x&gt; elements in MUC stanzas</p>
+    <div class="revision-author">mw</div></li><li id="revision-history-v0.6"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.6.html">0.6</a> (2017-02-17)<a class="anchor-link" href="#revision-history-v0.6"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Namespace bump from mam:1 to mam:2</p>
+      <p class="" style="">Added method for server to communicate the archive id</p>
+      <p class="" style="">Incorporated editorial clarifications based on implementation feedback</p>
+      <p class="" style="">Clarifications on the topics of message ordering, message deletion and use of the protocol for synchronization</p>
+    <div class="revision-author">dg, mw</div></li><li id="revision-history-v0.5.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.5.1.html">0.5.1</a> (2016-03-07)<a class="anchor-link" href="#revision-history-v0.5.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Bump old namespace version in examples (Kevin Smith)</p>
+    <div class="revision-author">XEP Editor (ssw)</div></li><li id="revision-history-v0.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.5.html">0.5</a> (2016-01-20)<a class="anchor-link" href="#revision-history-v0.5"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Added clarifications and enhancements when interacting with Multi-User Chat (MUC) (Mickaël Rémond)</p>
+    <div class="revision-author">XEP Editor (mam)</div></li><li id="revision-history-v0.4.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.4.1.html">0.4.1</a> (2015-09-29)<a class="anchor-link" href="#revision-history-v0.4.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Fix Example #9 from &lt;/message/&gt; to &lt;/iq&gt; (Florian Schmaus)</p>
+      <p class="" style="">Add missing jabber:client namespace in Example #2 (Christian Schudt)</p>
+    <div class="revision-author">XEP Editor (mam)</div></li><li id="revision-history-v0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.4.html">0.4</a> (2015-09-21)<a class="anchor-link" href="#revision-history-v0.4"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Switch the sentinel message back to the iq result.</p>
+      <p class="" style="">Various small fixes to the document.</p>
+    <div class="revision-author">ks/mw</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.3.html">0.3</a> (2014-08-14)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Fetching current preferences,
+      switch to iq-set for searching,
+      switch to using a data form,
+      describe how to fetch that form, remove the archived element and
+      use a sentinel message instead of iq reply.</p><div class="revision-author">ka/ks</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.2.html">0.2</a> (2013-05-31)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Document the ability to page through results by message UIDs, define the &lt;archived/&gt; element, and various minor improvements.</p><div class="revision-author">mw</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0313-0.1.html">0.1</a> (2012-04-18)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial version, to much rejoicing.</p><div class="revision-author">mw</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{wild2012mam,
+  title = {Message Archive Management},
+  author = {Wild, Matthew and Smith, Kevin},
+  type = {XEP},
+  number = {0313},
+  version = {1.1.3},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0313.html},
+  date = {2012-04-18/2025-04-09},
+}</pre><p>END</p></body></html>

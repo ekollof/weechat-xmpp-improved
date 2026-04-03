@@ -1,0 +1,1101 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0071: XHTML-IM</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0071";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="XHTML-IM"><meta name="DC.Creator" content="Peter Saint-Andre"><meta name="DC.Description" content="This specification defines an XHTML 1.0 Integration Set for use in exchanging instant messages that contain lightweight text markup. The protocol enables an XMPP entity to format a message using a small range of commonly-used HTML elements, attributes, and style properties that are suitable for use in instant messaging. The protocol also excludes HTML constructs that may introduce malware and other vulnerabilities (such as scripts and objects) for improved security."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2018-03-08"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0071"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0071: XHTML-IM</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification defines an XHTML 1.0 Integration Set for use in exchanging instant messages that contain lightweight text markup. The protocol enables an XMPP entity to format a message using a small range of commonly-used HTML elements, attributes, and style properties that are suitable for use in instant messaging. The protocol also excludes HTML constructs that may introduce malware and other vulnerabilities (such as scripts and objects) for improved security.</dd><dt>Author</dt><dd>Peter Saint-Andre</dd><dt>Copyright</dt><dd>© 2003 – 2018 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Deprecated</p><div id="status-notice" class="deprecated standards track">WARNING: This document has been <strong>Deprecated</strong> by the XMPP Standards Foundation. Implementation of the protocol described herein is not recommended. Developers desiring similar functionality are advised to implement the protocol that supersedes this one (if any).</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>1.5.4 (2018-03-08)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li>Stable</li><li>Final</li><li class="current">Deprecated</li><li>Obsolete</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#tech">Choice of Technology</a></li><li><a href="#reqs">Requirements</a></li><li><a href="#concepts">Concepts and Approach</a></li><li><a href="#wrapper">Wrapper Element</a></li><li><a href="#def">XHTML-IM Integration Set</a><ol><li><a href="#def-structure">Structure Module Definition</a></li><li><a href="#def-text">Text Module Definition</a></li><li><a href="#def-hypertext">Hypertext Module Definition</a></li><li><a href="#def-list">List Module Definition</a></li><li><a href="#def-image">Image Module Definition</a></li><li><a href="#def-style">Style Attribute Module Definition</a></li></ol></li><li><a href="#profile">Recommended Profile</a><ol><li><a href="#profile-structure">Structure Module Profile</a></li><li><a href="#profile-text">Text Module Profile</a></li><li><a href="#profile-hypertext">Hypertext Module Profile</a></li><li><a href="#profile-list">List Module Profile</a></li><li><a href="#profile-image">Image Module Profile</a></li><li><a href="#profile-style">Style Attribute Module Profile</a><ol><li><a href="#profile-style-properties">Recommended Style Properties</a></li></ol></li><li><a href="#profile-attributes">Recommended Attributes</a><ol><li><a href="#profile-attributes-common">Common Attributes</a></li><li><a href="#profile-attributes-special">Specialized Attributes</a></li><li><a href="#profile-attributes-other">Other Attributes</a></li></ol></li><li><a href="#profile-summary">Summary of Recommendations</a></li></ol></li><li><a href="#bizrules">Business Rules</a></li><li><a href="#examples">Examples</a></li><li><a href="#discovery">Discovering Support for XHTML-IM</a><ol><li><a href="#discovery-explicit">Explicit Discovery</a></li><li><a href="#discovery-implicit">Implicit Discovery</a></li></ol></li><li><a href="#security">Security Considerations</a><ol><li><a href="#security-code">Malicious Objects</a></li><li><a href="#security-phishing">Phishing</a></li><li><a href="#security-presence">Presence Leaks</a></li></ol></li><li><a href="#w3c">W3C Considerations</a><ol><li><a href="#w3c-doctype">Document Type Name</a></li><li><a href="#w3c-conformance">User Agent Conformance</a></li><li><a href="#w3c-modularization">XHTML Modularization</a></li><li><a href="#w3c-review">W3C Review</a></li><li><a href="#w3c-versions">XHTML Versioning</a></li></ol></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#registrar-ns">Protocol Namespaces</a></li></ol></li><li><a href="#schemas">XML Schemas</a><ol><li><a href="#schemas-wrapper">XHTML-IM Wrapper</a></li><li><a href="#schemas-driver">XHTML-IM Schema Driver</a></li><li><a href="#schemas-model">XHTML-IM Content Model</a></li></ol></li><li><a href="#ack">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document defines methods for exchanging instant messages that contain lightweight text markup. In the context of this document, "lightweight text markup" is to be understood as a combination of minimal structural elements and presentational styles that can easily be rendered on a wide variety of devices without requiring a full rich-text rendering engine such as a web browser. Examples of lightweight text markup include basic text blocks (e.g., paragraphs and blockquotes), structural elements (e.g., emphasis and strength), lists, hyperlinks, image references, and font styles (e.g., sizes and colors).</p>
+  <p class="" style="">Note: This specification essentially defines a recommended set of XHTML elements and attributes for use in instant messaging by applying a series of "filters" to the wealth of XHTML features; however, developers of Jabber/XMPP clients mainly need to pay attention to the <a href="#profile-summary">Summary of Recommendations</a> rather than the complexities of how the recommendations are derived.</p>
+<h2 id="tech">2.
+       Choice of Technology<a class="anchor-link" href="#tech"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">In the past, there have existed several incompatible methods within the Jabber community for exchanging instant messages that contain lightweight text markup. The most notable such methods have included derivatives of <span class="ref" style=""><a href="http://www.w3.org/TR/xhtml1">XHTML 1.0</a></span>  [<a href="#nt-idm46733121221248">1</a>] as well as of <span class="ref" style=""><a href="http://msdn.microsoft.com/library/en-us/dnrtfspec/html/rtfspec.asp">Rich Text Format (RTF)</a></span>  [<a href="#nt-idm46733121212256">2</a>].</p>
+  <p class="" style="">Although it is sometimes easier for client developers to implement RTF support (this is especially true on certain Microsoft Windows operating systems), there are several reasons (consistent with the <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0134.html">XMPP Design Guidelines (XEP-0134)</a></span>  [<a href="#nt-idm46733121210096">3</a>]) for the <span class="ref" style=""><a href="https://xmpp.org/about/xmpp-standards-foundation">XMPP Standards Foundation (XSF)</a></span>  [<a href="#nt-idm46733121205744">4</a>] to avoid the use of RTF in developing a protocol for lightweight text markup. Specifically:</p>
+  <ol start="" class="" style="">
+    <li class="" style="">RTF is not a structured vocabulary derived from SGML (as is <span class="ref" style=""><a href="http://www.w3.org/TR/REC-html40">HTML 4.0</a></span>  [<a href="#nt-idm46733121198304">5</a>]) or, more relevantly, from XML (as is XHTML 1.0).</li>
+    <li class="" style="">RTF is under the control of the Microsoft Corporation and thus is not an open standard maintained by a recognized standards development organization; therefore the XSF is unable to contribute to or influence its development if necessary, and any protocol the XSF developed using RTF would introduce unwanted dependencies.</li>
+  </ol>
+  <p class="" style="">Conversely, there are several reasons to prefer XHTML for lightweight text markup:</p>
+  <ol start="" class="" style="">
+    <li class="" style="">XHTML is a structured format that is defined as an application of <span class="ref" style=""><a href="http://www.w3.org/TR/REC-xml/">XML 1.0</a></span>  [<a href="#nt-idm46733121188800">6</a>], making it especially appropriate for sending over Jabber/XMPP, which is at root a technology for streaming XML (see <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6120">XMPP Core</a></span>  [<a href="#nt-idm46733121179280">7</a>]).</li>
+    <li class="" style="">XHTML is an open standard developed by the <span class="ref" style=""><a href="http://www.w3.org/">World Wide Web Consortium (W3C)</a></span>  [<a href="#nt-idm46733121177344">8</a>], a recognized standards development organization.</li>
+  </ol>
+  <p class="" style="">Therefore, this document defines support for lightweight text markup in the form of an XMPP extension that encapsulates content defined by an XHTML 1.0 Integration Set that we label "XHTML-IM". The remainder of this document discusses lightweight text markup in terms of XHTML 1.0 only and does not further consider RTF or other technologies.</p>
+<h2 id="reqs">3.
+       Requirements<a class="anchor-link" href="#reqs"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">HTML was originally designed for authoring and presenting stuctured documents on the World Wide Web, and was subsequently extended to handle more advanced functionality such as image maps and interactive forms. However, the requirements for publishing documents (or developing transactional websites) for presentation by dedicated XHTML user agents on traditional computers or small-screen devices are fundamentally different from the requirements for lightweight text markup of instant messages; for this reason, only a reduced set of XHTML features is needed for XHTML-IM. In particular:</p>
+  <ol start="" class="" style="">
+    <li class="" style=""><p class="" style="">IM clients are not XHTML clients: their primary purpose is not to read pre-existing XHTML documents, but to read <em>and generate</em> relatively large numbers of fairly small instant messages.</p></li>
+    <li class="" style=""><p class="" style="">The underlying context for XHTML content in Jabber/XMPP instant messaging is provided not by a full XHTML document, but by an XML stream, and specifically by a message stanza within that stream. Thus the &lt;head/&gt; element and all its children are unnecessary. Only the &lt;body/&gt; element and some of its children are appropriate for use in instant messaging.</p></li>
+    <li class="" style=""><p class="" style="">The XHTML content that is read by one's IM client is normally generated on the fly by one's conversation partner (or, to be precise, by his or her IM client). Thus there is an inherent limit to the sophistication of the XHTML markup involved. Even in normal XHTML documents, fairly basic structural and rendering elements such as definition lists, abbreviations, addresses, and computer input handling (e.g., &lt;kbd/&gt; and &lt;var/&gt;) are relatively rare. There is little or no foreseeable need for such elements within the context of instant messaging.</p></li>
+    <li class="" style=""><p class="" style="">The foregoing is doubly true of more advanced markup such as tables, frames, and forms (however, there exists an XMPP extension that provides an instant messaging equivalent of the latter, as defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0004.html">Data Forms (XEP-0004)</a></span>  [<a href="#nt-idm46733121159856">9</a>]).</p></li>
+    <li class="" style=""><p class="" style="">Although ad-hoc styles are useful for messaging (by means of the 'style' attribute), full support for <span class="ref" style=""><a href="http://www.w3.org/TR/REC-CSS1">Cascading Style Sheets</a></span>  [<a href="#nt-idm46733121155232">10</a>] (defined by the &lt;style/&gt; element or a standalone .css file, and implemented via the 'class' attribute) would be overkill since many CSS1 properties (e.g., box, classification, and text properties) were developed especially for sophisticated page layout.</p></li>
+    <li class="" style=""><p class="" style="">Background images, audio, animated text, layers, applets, scripts, and other multimedia content types are unnecessary, especially given the existence of XMPP extensions such as <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0096.html">SI File Transfer (XEP-0096)</a></span>  [<a href="#nt-idm46733121146144">11</a>], <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0166.html">Jingle (XEP-0166)</a></span>  [<a href="#nt-idm46733121141472">12</a>], and <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0234.html">Jingle File Transfer (XEP-0234)</a></span>  [<a href="#nt-idm46733121132064">13</a>].</p></li>
+    <li class="" style=""><p class="" style="">Content transformations such as those defined by <span class="ref" style=""><a href="http://www.w3.org/TR/xslt/">XSL Transformations</a></span>  [<a href="#nt-idm46733121129424">14</a>] must not be necessary in order for an instant messaging application to present lightweight text markup to an end user.</p></li>
+  </ol>
+  <p class="" style="">As explained below, some of these requirements are addressed by the definition of the XHTML-IM Integration Set itself, while others are addressed by a recommended "profile" for that Integration Set in the context of instant messaging applications.</p>
+<h2 id="concepts">4.
+       Concepts and Approach<a class="anchor-link" href="#concepts"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document defines an adaptation of XHTML 1.0 (specifically, an XHTML 1.0 Integration Set) that makes it possible to provide lightweight text markup of instant messages (mainly for Jabber/XMPP instant messages, although the Integration Set defined herein could be used by other protocols). This pattern is familiar from email, wherein the HTML-formatted version of the message supplements but does not supersede the text-only version of the message.  [<a href="#nt-idm46733121124192">15</a>]</p>
+  <p class="" style="">In Jabber/XMPP communications, the meaning (as opposed to markup) of the message MUST always be represented as best as possible in the normal &lt;body/&gt; child element or elements of the &lt;message/&gt; stanza qualified by the 'jabber:client' (or 'jabber:server') namespace. Lightweight text markup is then provided within an &lt;html/&gt; element qualified by the 'http://jabber.org/protocol/xhtml-im' namespace.  [<a href="#nt-idm46733121121792">16</a>] However, this &lt;html/&gt; element is used solely as a "wrapper" for the XHTML content itself, which content is encapsulated via one or more &lt;body/&gt; elements qualified by the 'http://www.w3.org/1999/xhtml' namespace, along with appropriate child elements thereof.</p>
+  <p class="" style="">The following example illustrates this approach.</p>
+  <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> A simple example<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message&gt;
+  &lt;body&gt;hi!&lt;/body&gt;
+  &lt;html xmlns='http://jabber.org/protocol/xhtml-im'&gt;
+    &lt;body xmlns='http://www.w3.org/1999/xhtml'&gt;
+      &lt;p style='font-weight:bold'&gt;hi!&lt;/p&gt;
+    &lt;/body&gt;
+  &lt;/html&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">Technically speaking, there are three aspects to the approach taken herein:</p>
+  <ol start="" class="" style="">
+    <li class="" style="">Definition of the &lt;html/&gt; "wrapper" element, which functions as an XMPP extension within XMPP &lt;message/&gt; stanzas.</li>
+    <li class="" style="">Definition of the XHTML-IM Integration Set itself in terms of supported XHTML 1.0 modules, using the concepts defined in <span class="ref" style=""><a href="http://www.w3.org/TR/2004/WD-xhtml-modularization-20040218/">Modularization of XHTML</a></span>  [<a href="#nt-idm46733121112320">17</a>].</li>
+    <li class="" style="">A recommended "profile" regarding the specific XHTML 1.0 elements and attributes to be supported from each XHTML 1.0 module.</li>
+  </ol>
+  <p class="" style="">These three aspects are defined in the three document sections that follow.</p>
+<h2 id="wrapper">5.
+       Wrapper Element<a class="anchor-link" href="#wrapper"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The root element for including XHTML content within XMPP stanzas is &lt;html/&gt;. This element is qualified by the 'http://jabber.org/protocol/xhtml-im' namespace. From the perspective of XMPP, the wrapper element functions as an XMPP extension element; from the perspective of XHTML, it functions as a wrapper for XHTML 1.0 content qualified by the 'http://www.w3.org/1999/xhtml' namespace. Such XHTML content MUST be contained in one or more &lt;body/&gt; elements qualified by the 'http://www.w3.org/1999/xhtml' namespace and MUST conform to the XHTML-IM Integration Set defined in the following section. If more than one &lt;body/&gt; element is included in the &lt;html/&gt; wrapper element, each &lt;body/&gt; element MUST possess an 'xml:lang' attribute with a distinct value, where the value of that attribute MUST adhere to the rules defined in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc5646">RFC 5646</a></span>  [<a href="#nt-idm46733121102400">18</a>]. A formal definition of the &lt;html/&gt; element is provided in the <a href="#schemas-wrapper">XHTML-IM Wrapper Schema</a>.</p>
+  <p class="" style="">The XHTML &lt;body/&gt; element is not to be confused with the XMPP &lt;body/&gt; element, which is a child of a &lt;message/&gt; stanza and is qualified by the 'jabber:client' or 'jabber:server' namespace as described in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6121">XMPP IM</a></span>  [<a href="#nt-idm46733121095808">19</a>]. The &lt;html/&gt; wrapper element is intended for inclusion only as a direct child element of the XMPP &lt;message/&gt; stanza and only in order to specify a marked-up version of the message &lt;body/&gt; element or elements, but MAY be included elsewhere in accordance with the "extended namespace" rules defined in the <span class="ref">XMPP IM</span> specification.</p>
+  <p class="" style="">Until and unless (1) additional integration sets are defined and (2) mechanisms are specified for discovering or negotiating which integration sets are supported, the XHTML markup contained within the &lt;html/&gt; wrapper element:</p>
+  <ol start="" class="" style="">
+    <li class="" style="">MUST NOT include elements and attributes that are not part of the XHTML-IM Integration Set defined in Section 6 of this document; any such elements and attributes MUST be ignored if received.</li>
+    <li class="" style="">SHOULD NOT include elements and attributes that are not part of the recommended profile of the XHTML-IM Integration Set defined in Section 7 of this document; any such elements and attributes SHOULD be ignored if received.</li>
+  </ol>
+  <p class="" style="">Note: In the foregoing restrictions, the meaning of "ignore" is defined by the conformance requirements of <span class="ref">Modularization of XHTML</span>, as summarized in the <a href="#w3c-conformance">User Agent Conformance</a> section of this document).</p>
+<h2 id="def">6.
+       XHTML-IM Integration Set<a class="anchor-link" href="#def"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This section defines an XHTML 1.0 Integration Set for use in the context of instant messaging. Given its intended usage, we label it "XHTML-IM".</p>
+  <p class="" style=""><span class="ref">Modularization of XHTML</span> provides the ability to formally define subsets of XHTML 1.0 via the concept of "modularization" (which may be familiar from <span class="ref" style=""><a href="http://www.w3.org/TR/xhtml-basic">XHTML Basic</a></span>  [<a href="#nt-idm46733121080208">20</a>]). Many of the defined modules are not necessary or useful in the context of instant messaging, and in the context of Jabber/XMPP instant messaging specifically some modules have been superseded by well-defined XMPP extensions. This document specifies that XHTML-IM shall be based on the following XHTML 1.0 modules:</p>
+  <ul class="" style="">
+    <li class="" style="">Core Modules
+      <ul class="" style="">
+        <li class="" style="">Structure Module</li>
+        <li class="" style="">Text Module</li>
+        <li class="" style="">Hypertext Module</li>
+        <li class="" style="">List Module</li>
+      </ul>
+    </li>
+    <li class="" style="">Image Module</li>
+    <li class="" style="">Style Attribute Module</li>
+  </ul>
+  <p class="" style=""><span class="ref">Modularization of XHTML</span> defines many additional modules, such as Table Modules, Form Modules, Object Modules, and Frame Modules. None of these modules is part of the XHTML-IM Integration Set. If support for such modules is desired, it MUST be defined in a separate and distinct integration set.</p>
+  <div class="indent"><h3 id="def-structure">6.1 Structure Module Definition<a class="anchor-link" href="#def-structure"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The Structure Module is defined as including the following elements and attributes:  [<a href="#nt-idm46733121066864">21</a>]</p>
+    <figure class="table"><figcaption id="table-1"><strong>Table 1:</strong> Defined Structure Module Elements and Attributes<a class="anchor-link" href="#table-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+      <tr class="body"><th colspan="" rowspan="">Element</th><th colspan="" rowspan="">Attributes</th></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;body/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;head/&gt;</td><td align="" colspan="" rowspan="">profile</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;html/&gt;</td><td align="" colspan="" rowspan="">version</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;title/&gt;</td><td align="" colspan="" rowspan=""></td></tr>
+    </table></figure>
+  </div>
+  <div class="indent"><h3 id="def-text">6.2 Text Module Definition<a class="anchor-link" href="#def-text"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The Text Module is defined as including the following elements and attributes:</p>
+    <figure class="table"><figcaption id="table-2"><strong>Table 2:</strong> Defined Text Module Elements and Attributes<a class="anchor-link" href="#table-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+      <tr class="body"><th colspan="" rowspan="">Element</th><th colspan="" rowspan="">Attributes</th></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;abbr/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;acronym/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;address/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;blockquote/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style; cite</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;br/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;cite/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;code/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;dfn/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;div/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;em/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;h1/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;h2/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;h3/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;h4/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;h5/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;h6/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;kbd/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;p/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;pre/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;q/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style; cite</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;samp/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;span/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;strong/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;var/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+    </table></figure>
+  </div>
+  <div class="indent"><h3 id="def-hypertext">6.3 Hypertext Module Definition<a class="anchor-link" href="#def-hypertext"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The Hypertext Module is defined as including the &lt;a/&gt; element only:</p>
+    <figure class="table"><figcaption id="table-3"><strong>Table 3:</strong> Defined Hypertext Module Elements and Attributes<a class="anchor-link" href="#table-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+      <tr class="body"><th colspan="" rowspan="">Element</th><th colspan="" rowspan="">Attributes</th></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;a/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style; accesskey, charset, href, hreflang, rel, rev, tabindex, type</td></tr>
+    </table></figure>
+  </div>
+  <div class="indent"><h3 id="def-list">6.4 List Module Definition<a class="anchor-link" href="#def-list"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The List Module is defined as including the following elements and attributes:</p>
+    <figure class="table"><figcaption id="table-4"><strong>Table 4:</strong> Defined List Module Elements and Attributes<a class="anchor-link" href="#table-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+      <tr class="body"><th colspan="" rowspan="">Element</th><th colspan="" rowspan="">Attributes</th></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;dl/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;dt/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;dd/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;ol/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;ul/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;li/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style</td></tr>
+    </table></figure>
+  </div>
+  <div class="indent"><h3 id="def-image">6.5 Image Module Definition<a class="anchor-link" href="#def-image"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The Image Module is defined as including the &lt;img/&gt; element only:</p>
+    <figure class="table"><figcaption id="table-5"><strong>Table 5:</strong> Defined Image Module Elements and Attributes<a class="anchor-link" href="#table-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+      <tr class="body"><th colspan="" rowspan="">Element</th><th colspan="" rowspan="">Attributes</th></tr>
+      <tr class="body"><td align="" colspan="" rowspan="">&lt;img/&gt;</td><td align="" colspan="" rowspan="">class, id, title; style; alt, height, longdesc, src, width</td></tr>
+    </table></figure>
+  </div>
+  <div class="indent"><h3 id="def-style">6.6 Style Attribute Module Definition<a class="anchor-link" href="#def-style"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The Style Attribute Module is defined as including the style attribute only, as included in the preceding definition tables.</p>
+  </div>
+<h2 id="profile">7.
+       Recommended Profile<a class="anchor-link" href="#profile"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Even within the restricted set of modules specified as defining the XHTML-IM Integration Set (see preceding section), some elements and attributes are inappropriate or unnecessary for the purpose of instant messaging; although such elements and attributes MAY be included in accordance with the XHTML-IM Integration Set, further recommended restrictions regarding which elements and attributes to include in XHTML content are specified below.</p>
+  <div class="indent"><h3 id="profile-structure">7.1 Structure Module Profile<a class="anchor-link" href="#profile-structure"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The intent of the protocol defined herein is to support lightweight text markup of XMPP message bodies only. Therefore the &lt;head/&gt;, &lt;html/&gt;, and &lt;title/&gt; elements SHOULD NOT be generated by a compliant implementation, and SHOULD be ignored if received (where the meaning of "ignore" is defined by the conformance requirements of <span class="ref">Modularization of XHTML</span>, as summarized in the <a href="#w3c-conformance">User Agent Conformance</a> section of this document). However, the &lt;body/&gt; element is REQUIRED, since it is the root element for all XHTML-IM content.</p>
+  </div>
+  <div class="indent"><h3 id="profile-text">7.2 Text Module Profile<a class="anchor-link" href="#profile-text"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Not all of the Text Module elements are appropriate in the context of instant messaging, since the XHTML content that one views is generated by one's conversation partner in what is often a rapid-fire conversation thread. Only the following elements are RECOMMENDED in XHTML-IM:</p>
+    <ul class="" style="">
+      <li class="" style="">&lt;blockquote/&gt;</li>
+      <li class="" style="">&lt;br/&gt;</li>
+      <li class="" style="">&lt;cite/&gt;</li>
+      <li class="" style="">&lt;em/&gt;</li>
+      <li class="" style="">&lt;p/&gt;</li>
+      <li class="" style="">&lt;span/&gt;</li>
+      <li class="" style="">&lt;strong/&gt;</li>
+    </ul>
+    <p class="" style="">The other Text Module elements MAY be generated by a compliant implementation but MAY be ignored if received (where the meaning of "ignore" is defined by the conformance requirements of <span class="ref">Modularization of XHTML</span>, as summarized in the <a href="#w3c-conformance">User Agent Conformance</a> section of this document).</p>
+  </div>
+  <div class="indent"><h3 id="profile-hypertext">7.3 Hypertext Module Profile<a class="anchor-link" href="#profile-hypertext"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The only recommended attributes of the &lt;a/&gt; element are specified in the <a href="#profile-attributes">Recommended Attributes</a> section of this document.</p>
+  </div>
+  <div class="indent"><h3 id="profile-list">7.4 List Module Profile<a class="anchor-link" href="#profile-list"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Because it is unlikely that an instant messaging user would generate a definition list, only ordered and unordered lists are RECOMMENDED. Definition lists SHOULD NOT be generated by a compliant implementation, and SHOULD be ignored if received (where the meaning of "ignore" is defined by the conformance requirements of <span class="ref">Modularization of XHTML</span>, as summarized in the <a href="#w3c-conformance">User Agent Conformance</a> section of this document).</p>
+  </div>
+  <div class="indent"><h3 id="profile-image">7.5 Image Module Profile<a class="anchor-link" href="#profile-image"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The only recommended attributes of the &lt;img/&gt; element are specified in the <a href="#profile-attributes">Recommended Attributes</a> section of this document.</p>
+    <p class="" style="">The XHTML specification allows a "data:" URL <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc2397">RFC 2397</a></span>  [<a href="#nt-idm46733120922736">22</a>] as the value of the 'src' attribute. This is NOT RECOMMENDED for use in XHTML-IM, because it can significantly increase the size of the message stanza and XMPP is not optimized for large stanzas. If the image data is small (less than 8 kilobytes), clients MAY use <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0231.html">Bits of Binary (XEP-0231)</a></span>  [<a href="#nt-idm46733120912464">23</a>] in coordination with XHTML-IM; if the image data is large, the value of the 'src' SHOULD be a pointer to an externally available file for the image (or the sender SHOULD use a dedicated file transfer method such as <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0047.html">In-Band Bytestreams (XEP-0047)</a></span>  [<a href="#nt-idm46733120911040">24</a>] or <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0065.html">SOCKS5 Bytestreams (XEP-0065)</a></span>  [<a href="#nt-idm46733120906464">25</a>]).</p>
+    <p class="" style="">For security reasons or because of display constraints, a compliant client MAY choose to display 'alt' text only, not the image itself (for details, see the <a href="#security-code">Malicious Objects</a> section of this document).</p>
+  </div>
+  <div class="indent"><h3 id="profile-style">7.6 Style Attribute Module Profile<a class="anchor-link" href="#profile-style"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">This module MUST be supported in XHTML-IM if possible; although clients written for certain platforms (e.g., console clients, mobile phones, and handheld computers) or for certain classes of users (e.g., text-to-speech clients) might not be able to support all of the recommended styles directly, they SHOULD attempt to emulate or translate the defined style properties into text or other presentation styles that are appropriate for the platform or user base in question.</p>
+    <p class="" style="">A full list of recommended style properties is provided below.</p>
+    <div class="indent"><h4 id="profile-style-properties">7.6.1 Recommended Style Properties<a class="anchor-link" href="#profile-style-properties"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style=""><span class="ref">CSS1</span> defines 42 "atomic" style properties (which are categorized into font, color and background, text, box, and classification properties) as well as 11 "shorthand" properties ("font", "background", "margin", "padding", "border-width", "border-top", "border-right", "border-bottom", "border-left", "border", and "list-style"). Many of these properties are not appropriate for use in text-based instant messaging, for one or more of the following reasons:</p>
+      <ol start="" class="" style="">
+        <li class="" style="">The property applies to or depends on the inclusion of images other than those handled by the XHTML Image Module (e.g., the "background-image", "background-repeat", "background-attachment", "background-position", and "list-style-image"  properties).</li>
+        <li class="" style="">The property is intended for advanced document layout (e.g., the "line-height" property and most of the box properties, with the exception of "margin-left", which is useful for indenting text, and "margin-right", which can be useful when dealing with images).</li>
+        <li class="" style="">The property is unnecessary since it can be emulated via user input or recommended XHTML stuctural elements (e.g., the "text-transform" property can be emulated by the user's keystrokes or use of the caps lock key)</li>
+        <li class="" style="">The property is otherwise unlikely to ever be used in the context of rapid-fire conversations (e.g., the "font-variant", "word-spacing", "letter-spacing", and "list-style-position" properties).</li>
+        <li class="" style="">The property is a shorthand property but some of the properties it includes are not appropriate for instant messaging applications according to the foregoing considerations (in fact this applies to all of the shorthand properties).</li>
+      </ol>
+      <p class="" style="">Unfortunately, <span class="ref">CSS1</span> does not include mechanisms for defining profiles thereof (as does XHTML 1.0 in the form of XHTML Modularization). While there exist reduced sets of CSS2, these introduce more complexity than is desirable in the context of XHTML-IM. Therefore we simply provide a list of recommended CSS1 style properties.</p>
+      <p class="" style="">XHTML-IM stipulates that only the following style properties are RECOMMENDED:</p>
+      <ul class="" style="">
+        <li class="" style="">background-color</li>
+        <li class="" style="">color</li>
+        <li class="" style="">font-family</li>
+        <li class="" style="">font-size</li>
+        <li class="" style="">font-style</li>
+        <li class="" style="">font-weight</li>
+        <li class="" style="">margin-left</li>
+        <li class="" style="">margin-right</li>
+        <li class="" style="">text-align</li>
+        <li class="" style="">text-decoration</li>
+      </ul>
+      <p class="" style="">Although a compliant implementation MAY generate or process other style properties defined in CSS1, such behavior is NOT RECOMMENDED by this document.</p>
+    </div>
+  </div>
+  <div class="indent"><h3 id="profile-attributes">7.7 Recommended Attributes<a class="anchor-link" href="#profile-attributes"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <div class="indent"><h4 id="profile-attributes-common">7.7.1 Common Attributes<a class="anchor-link" href="#profile-attributes-common"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">Section 5.1 of <span class="ref">Modularization of XHTML</span> describes several "common" attribute collections: a "Core" collection ('class', 'id', 'title'), an "I18N" collection ('xml:lang', not shown below since it is implied in XML), an "Events" collection (not included in the XHTML-IM Integration Set because the Intrinsic Events Module is not selected), and a "Style" collection ('style'). The following table summarizes the recommended profile of these common attributes within the XHTML 1.0 content itself:</p>
+      <figure class="table"><figcaption id="table-6"><strong>Table 6:</strong> Recommended Usage of Common Attributes<a class="anchor-link" href="#table-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+        <tr class="body"><th colspan="" rowspan="">Attribute</th><th colspan="" rowspan="">Usage</th><th colspan="" rowspan="">Reason</th></tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">class</td>
+          <td align="" colspan="" rowspan="">NOT RECOMMENDED</td>
+          <td align="" colspan="" rowspan="">External stylesheets (which 'class' would typically reference) are not recommended.</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">id</td>
+          <td align="" colspan="" rowspan="">NOT RECOMMENDED</td>
+          <td align="" colspan="" rowspan="">Internal links and message fragments are not recommended in IM content, nor are external stylesheets (which also make use of the 'id' attribute).</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">title</td>
+          <td align="" colspan="" rowspan="">NOT RECOMMENDED</td>
+          <td align="" colspan="" rowspan="">Granting of titles to elements in IM content seems unnecessary.</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">style</td>
+          <td align="" colspan="" rowspan="">REQUIRED</td>
+          <td align="" colspan="" rowspan="">The 'style' attribute is required since it is the vehicle for presentational styles.</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">xml:lang</td>
+          <td align="" colspan="" rowspan="">NOT RECOMMENDED</td>
+          <td align="" colspan="" rowspan="">Differentiation of language identification SHOULD occur at the level of the &lt;body/&gt; element only.</td>
+        </tr>
+      </table></figure>
+    </div>
+    <div class="indent"><h4 id="profile-attributes-special">7.7.2 Specialized Attributes<a class="anchor-link" href="#profile-attributes-special"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">Beyond the "common" attributes, certain elements within the modules selected for the XHTML-IM Integration Set are allowed to possess other attributes, such as eight attributes for the &lt;a/&gt; element and five attributes for the &lt;img/&gt; element. The recommended profile for such attributes is provided in the following table:</p>
+      <figure class="table"><figcaption id="table-7"><strong>Table 7:</strong> Recommended Usage of Specialized Attributes<a class="anchor-link" href="#table-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+        <tr class="body"><th colspan="" rowspan="">Element Scope</th><th colspan="" rowspan="">Attribute</th><th colspan="" rowspan="">Usage</th></tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">&lt;a/&gt;</td>
+          <td align="" colspan="" rowspan="">accesskey</td>
+          <td align="" colspan="" rowspan="">NOT RECOMMENDED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">&lt;a/&gt;</td>
+          <td align="" colspan="" rowspan="">charset</td>
+          <td align="" colspan="" rowspan="">NOT RECOMMENDED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">&lt;a/&gt;</td>
+          <td align="" colspan="" rowspan="">href</td>
+          <td align="" colspan="" rowspan="">REQUIRED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">&lt;a/&gt;</td>
+          <td align="" colspan="" rowspan="">hreflang</td>
+          <td align="" colspan="" rowspan="">NOT RECOMMENDED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">&lt;a/&gt;</td>
+          <td align="" colspan="" rowspan="">rel</td>
+          <td align="" colspan="" rowspan="">NOT RECOMMENDED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">&lt;a/&gt;</td>
+          <td align="" colspan="" rowspan="">rev</td>
+          <td align="" colspan="" rowspan="">NOT RECOMMENDED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">&lt;a/&gt;</td>
+          <td align="" colspan="" rowspan="">tabindex</td>
+          <td align="" colspan="" rowspan="">NOT RECOMMENDED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">&lt;a/&gt;</td>
+          <td align="" colspan="" rowspan="">type</td>
+          <td align="" colspan="" rowspan="">RECOMMENDED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">&lt;cite/&gt;</td>
+          <td align="" colspan="" rowspan="">uri</td>
+          <td align="" colspan="" rowspan="">NOT RECOMMENDED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">&lt;img/&gt;</td>
+          <td align="" colspan="" rowspan="">alt</td>
+          <td align="" colspan="" rowspan="">REQUIRED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">&lt;img/&gt;</td>
+          <td align="" colspan="" rowspan="">height</td>
+          <td align="" colspan="" rowspan="">RECOMMENDED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">&lt;img/&gt;</td>
+          <td align="" colspan="" rowspan="">longdesc</td>
+          <td align="" colspan="" rowspan="">NOT RECOMMENDED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">&lt;img/&gt;</td>
+          <td align="" colspan="" rowspan="">src</td>
+          <td align="" colspan="" rowspan="">REQUIRED</td>
+        </tr>
+        <tr class="body">
+          <td align="" colspan="" rowspan="">&lt;img/&gt;</td>
+          <td align="" colspan="" rowspan="">width</td>
+          <td align="" colspan="" rowspan="">RECOMMENDED</td>
+        </tr>
+      </table></figure>
+    </div>
+    <div class="indent"><h4 id="profile-attributes-other">7.7.3 Other Attributes<a class="anchor-link" href="#profile-attributes-other"><abbr title="Link to this point in the document">¶</abbr></a></h4>
+      <p class="" style="">Other XHTML 1.0 attributes SHOULD NOT be generated by a compliant implementation, and SHOULD be ignored if received (where the meaning of "ignore" is defined by the conformance requirements of <span class="ref">Modularization of XHTML</span>, as summarized in the <a href="#w3c-conformance">User Agent Conformance</a> section of this document).</p>
+    </div>
+  </div>
+  <div class="indent"><h3 id="profile-summary">7.8 Summary of Recommendations<a class="anchor-link" href="#profile-summary"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The following table summarizes the elements and attributes that are recommended within the XHTML-IM Integration Set.</p>
+    <figure class="table"><figcaption id="table-8"><strong>Table 8:</strong> Recommended Elements and Attributes<a class="anchor-link" href="#table-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+      <tr class="body">
+        <th colspan="" rowspan="">Element</th>
+        <th colspan="" rowspan="">Attributes</th>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;a/&gt;</td>
+        <td align="" colspan="" rowspan="">href, style, type</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;blockquote/&gt;</td>
+        <td align="" colspan="" rowspan="">style</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;body/&gt;</td>
+        <td align="" colspan="" rowspan="">style, xml:lang  [<a href="#nt-idm46733120767504">26</a>]</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;br/&gt;</td>
+        <td align="" colspan="" rowspan="">-none-</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;cite/&gt;</td>
+        <td align="" colspan="" rowspan="">style</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;em/&gt;</td>
+        <td align="" colspan="" rowspan="">-none-</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;img/&gt;</td>
+        <td align="" colspan="" rowspan="">alt, height, src, style, width</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;li/&gt;</td>
+        <td align="" colspan="" rowspan="">style</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;ol/&gt;</td>
+        <td align="" colspan="" rowspan="">style</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;p/&gt;</td>
+        <td align="" colspan="" rowspan="">style</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;span/&gt;</td>
+        <td align="" colspan="" rowspan="">style</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;strong/&gt;</td>
+        <td align="" colspan="" rowspan="">-none-</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">&lt;ul/&gt;</td>
+        <td align="" colspan="" rowspan="">style</td>
+      </tr>
+    </table></figure>
+    <p class="" style="">Any other elements and attributes defined in the XHTML 1.0 modules that are included in the XHTML-IM Integration Set SHOULD NOT be generated by a compliant implementation, and SHOULD be ignored if received (where the meaning of "ignore" is defined by the conformance requirements of <span class="ref">Modularization of XHTML</span>, as summarized in the <a href="#w3c-conformance">User Agent Conformance</a> section of this document).</p>
+  </div>
+<h2 id="bizrules">8.
+       Business Rules<a class="anchor-link" href="#bizrules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The following rules apply to the generation and processing of XHTML content by Jabber clients or other XMPP entities.</p>
+  <ol start="" class="" style="">
+    <li class="" style=""><p class="" style="">XHTML-IM content is designed to provide a formatted version of the XML character data provided in the &lt;body/&gt; of an XMPP &lt;message/&gt; stanza; if such content is included in an XMPP message, the &lt;html/&gt; element MUST be a direct child of the &lt;message/&gt; stanza and the XHTML-IM content MUST be understood as a formatted version of the message body. XHTML-IM content MAY be included within XMPP &lt;iq/&gt; stanzas (or children thereof), but any such usage is undefined. In order to preserve bandwidth, XHTML-IM content SHOULD NOT be included within XMPP &lt;presence/&gt; stanzas; however, if it is so included, the &lt;html/&gt; element MUST be a direct child of the &lt;presence/&gt; stanza and the XHTML-IM content MUST be understood as a formatted version of the XML character data provided in the &lt;status/&gt; element.</p></li>
+    <li class="" style=""><p class="" style="">The sending client MUST ensure that, if XHTML content is sent, its meaning is the same as that of the plaintext version, and that the two versions differ only in markup rather than meaning.</p></li>
+    <li class="" style=""><p class="" style="">XHTML-IM is a reduced set of <span class="ref">XHTML 1.0</span> and thus also of <span class="ref">XML 1.0</span>. Therefore all opening tags MUST be completed by inclusion of an appropriate closing tag.</p></li>
+    <li class="" style=""><p class="" style=""><span class="ref">XMPP Core</span> specifies that an XMPP &lt;message/&gt; MAY contain more than one &lt;body/&gt; child as long as each &lt;body/&gt; possesses an 'xml:lang' attribute with a distinct value. In order to ensure correct internationalization, if an XMPP &lt;message/&gt; stanza contains more than one &lt;body/&gt; child and is also sent as XHTML-IM, the &lt;html/&gt; element SHOULD also contain more than one &lt;body/&gt; child, with one such element for each &lt;body/&gt; child of the &lt;message/&gt; stanza (distinguished by an appropriate 'xml:lang' attribute).</p></li>
+    <li class="" style=""><p class="" style="">Section 11.1 of <span class="ref">XMPP Core</span> stipulates that character entities other than the five general entities defined in Section 4.6 of the XML specification (i.e., &amp;lt;, &amp;gt;, &amp;amp;, &amp;apos;, and &amp;quot;) MUST NOT be sent over an XML stream. Therefore implementations of XHTML-IM MUST NOT include predefined XHTML 1.0 entities such as &amp;nbsp; -- instead, implementations MUST use the equivalent character references as specified in Section 4.1 of the XML specification (even in non-obvious places such as URIs that are included in the 'href' attribute).</p></li>
+    <li class="" style=""><p class="" style="">For elements and attributes qualified by the 'http://www.w3.org/1999/xhtml' namespace, user agent conformance is guided by the requirements defined in <span class="ref">Modularization of XHTML</span>; for details, refer to the <a href="#w3c-conformance">User Agent Conformance</a> section of this document.</p></li>
+    <li class="" style=""><p class="" style="">Where strictly presentational style are desired (e.g., colored text), it might be necessary to use 'style' attributes (e.g., &lt;span style='font-color: green'&gt;this is green&lt;/span&gt;). However, where possible it is instead RECOMMENDED to use appropriate structural elements (e.g., &lt;strong/&gt; and &lt;blockquote/&gt; instead of, say, style='font-weight: bold' or style='margin-left: 5%').</p></li>
+    <li class="" style=""><p class="" style="">Nesting of block structural elements (&lt;p/&gt;) and list elements (&lt;dl/&gt;, &lt;ol/&gt;, &lt;ul/&gt;) is NOT RECOMMENDED, except within &lt;div/&gt; elements.</p></li>
+    <li class="" style=""><p class="" style="">It is RECOMMENDED for implementations to replace line breaks with the &lt;br/&gt; element and to replace significant whitepace with the appropriate number of non-breaking spaces (via the NO-BREAK SPACE character or its equivalent), where "significant whitespace" means whitespace that makes some material difference (e.g., one or more spaces at the beginning of a line or more than one space anywhere else within a line), not "normal" whitespace separating words or punctuation.</p></li>
+    <li class="" style=""><p class="" style="">When rendering XHTML-IM content, a receiving user agent MUST NOT render as XHTML any text that was not structured by the sending user agent using XHTML elements and attributes; if the sender wishes text to be structured (e.g., for certain words to be emphasized or for URIs to be linked), the sending user agent MUST represent the text using the appropriate XHTML elements and attributes.</p></li>
+  </ol>
+<h2 id="examples">9.
+       Examples<a class="anchor-link" href="#examples"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The following examples provide an insight into the inclusion of XHTML content in XMPP &lt;message/&gt; stanzas but are by no means exhaustive or definitive.</p>
+  <p class="" style="">(Note: The examples might not render correctly in all web browsers, since not all web browsers comply fully with the XHTML 1.0 and CSS1 standards. Markup in the examples may include line breaks for readability. Example renderings are shown with a colored background to set them off from the rest of the text.)</p>
+  <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Emphasis, font colors, strength<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message&gt;
+  &lt;body&gt;Wow, I&amp;apos;m green with envy!&lt;/body&gt;
+  &lt;html xmlns='http://jabber.org/protocol/xhtml-im'&gt;
+    &lt;body xmlns='http://www.w3.org/1999/xhtml'&gt;
+      &lt;p style='font-size:large'&gt;
+        &lt;em&gt;Wow&lt;/em&gt;, I&amp;apos;m &lt;span style='color:green'&gt;green&lt;/span&gt;
+        with &lt;strong&gt;envy&lt;/strong&gt;!
+      &lt;/p&gt;
+    &lt;/body&gt;
+  &lt;/html&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">This could be rendered as follows:</p>
+  <figure class="example" style="">
+    <p class="" style="font-size: large"><em>Wow</em>, I'm <span class="" style="color:green">green</span> with <strong>envy</strong>!</p>
+  </figure>
+  <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Blockquote, cite<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message&gt;
+  &lt;body&gt;As Emerson said in his essay Self-Reliance:
+
+     &amp;quot;A foolish consistency is the hobgoblin of little minds.&amp;quot;
+  &lt;/body&gt;
+  &lt;html xmlns='http://jabber.org/protocol/xhtml-im'&gt;
+    &lt;body xmlns='http://www.w3.org/1999/xhtml'&gt;
+      &lt;p&gt;As Emerson said in his essay &lt;cite&gt;Self-Reliance&lt;/cite&gt;:&lt;/p&gt;
+      &lt;blockquote&gt;
+        &amp;quot;A foolish consistency is the hobgoblin of little minds.&amp;quot;
+      &lt;/blockquote&gt;
+    &lt;/body&gt;
+  &lt;/html&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">This could be rendered as follows:</p>
+  <figure class="example" style="">
+    <p class="" style="">As Emerson said in his essay <span class="ref">Self-Reliance</span>:</p>
+    <blockquote>
+      "A foolish consistency is the hobgoblin of little minds."
+    </blockquote>
+  </figure>
+  <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> An image and a hyperlink<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message&gt;
+  &lt;body&gt;Hey, are you licensed to Jabber?
+
+  http://www.xmpp.org/images/psa-license.jpg
+  &lt;/body&gt;
+  &lt;html xmlns='http://jabber.org/protocol/xhtml-im'&gt;
+    &lt;body xmlns='http://www.w3.org/1999/xhtml'&gt;
+      &lt;p&gt;Hey, are you licensed to &lt;a href='http://www.jabber.org/'&gt;Jabber&lt;/a&gt;?&lt;/p&gt;
+      &lt;p&gt;&lt;img src='http://www.xmpp.org/images/psa-license.jpg'
+              alt='A License to Jabber'
+              height='261'
+              width='537'/&gt;&lt;/p&gt;
+    &lt;/body&gt;
+  &lt;/html&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">This could be rendered as follows:</p>
+  <div class="indent" style="">
+    <p class="" style="">Hey, are you licensed to <a href="http://www.jabber.org/">Jabber</a>?</p>
+    <p class="" style=""><img alt="A License to Jabber" height="261" src="data:image/jpeg;base64,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" width="537"></p>
+  </div>
+  <p class="" style="">Note the large size of the image. Including the 'height' and 'width' attributes is therefore quite friendly, since it gives the receiving application hints as to whether the image is too large to fit into the current interface (naturally, these are hints only and cannot necessarily be relied upon in determining the size of the image).</p>
+  <p class="" style="">Rendering the 'alt' value rather than the image would yield something like the following:</p>
+  <figure class="example" style="">
+    <p class="" style="">Hey, are you licensed to <a href="http://www.jabber.org/">Jabber</a>?</p>
+    <p class="" style="">IMG: "A License to Jabber"</p>
+  </figure>
+  <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> Two lists<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message&gt;
+  &lt;body&gt;Here&amp;apos;s my .plan for today:
+  1. Add the following examples to XEP-0071:
+     - ordered and unordered lists
+     - more styles (e.g., indentation)
+  2. Kick back and relax
+  &lt;/body&gt;
+  &lt;html xmlns='http://jabber.org/protocol/xhtml-im'&gt;
+    &lt;body xmlns='http://www.w3.org/1999/xhtml'&gt;
+      &lt;p&gt;Here&amp;apos;s my .plan for today:&lt;/p&gt;
+      &lt;ol&gt;
+        &lt;li&gt;Add the following examples to XEP-0071:
+          &lt;ul&gt;
+            &lt;li&gt;ordered and unordered lists&lt;/li&gt;
+            &lt;li&gt;more styles (e.g., indentation)&lt;/li&gt;
+          &lt;/ul&gt;
+        &lt;/li&gt;
+        &lt;li&gt;Kick back and relax&lt;/li&gt;
+      &lt;/ol&gt;
+    &lt;/body&gt;
+  &lt;/html&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">This could be rendered as follows:</p>
+  <figure class="example" style="">
+    <p class="" style="">Here's my .plan for today:</p>
+    <ol start="" class="" style="">
+      <li class="" style="">Add the following examples to XEP-0071:
+        <ul class="" style="">
+          <li class="" style="">ordered and unordered lists</li>
+          <li class="" style="">more styles (e.g., indentation)</li>
+        </ul>
+      </li>
+      <li class="" style="">Kick back and relax</li>
+    </ol>
+  </figure>
+  <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> Quoted text<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message&gt;
+  &lt;body&gt;
+You wrote:
+
+   I think we have consensus on the following:
+
+   1. Remove &amp;lt;div/&amp;gt;
+   2. Nesting is not recommended
+   3. Don't preserve whitespace
+
+   Yes, no, maybe?
+
+That seems fine to me.
+  &lt;/body&gt;
+  &lt;html xmlns='http://jabber.org/protocol/xhtml-im'&gt;
+    &lt;body xmlns='http://www.w3.org/1999/xhtml'&gt;
+      &lt;p&gt;You wrote:&lt;/p&gt;
+      &lt;blockquote&gt;
+        &lt;p&gt;I think we have consensus on the following:&lt;/p&gt;
+        &lt;ol&gt;
+          &lt;li&gt;Remove &amp;lt;div/&amp;gt;&lt;/li&gt;
+          &lt;li&gt;Nesting is not recommended&lt;/li&gt;
+          &lt;li&gt;Don't preserve whitespace&lt;/li&gt;
+        &lt;/ol&gt;
+        &lt;p&gt;Yes, no, maybe?&lt;/p&gt;
+      &lt;/blockquote&gt;
+      &lt;p&gt;That seems fine to me.&lt;/p&gt;
+    &lt;/body&gt;
+  &lt;/html&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">Although quoting received messages is relatively uncommon in IM, it does happen. This could be rendered as follows:</p>
+  <figure class="example" style="">
+      <p class="" style="">You wrote:</p>
+      <div class="" style="margin-left: 5%">
+        <p class="" style="">I think we have consensus on the following:</p>
+        <ol start="" class="" style="">
+          <li class="" style="">Remove &lt;div/&gt;</li>
+          <li class="" style="">Nesting is not recommended</li>
+          <li class="" style="">Don't preserve whitespace</li>
+        </ol>
+        <p class="" style="">Yes, no, maybe?</p>
+      </div>
+      <p class="" style="">That seems fine to me.</p>
+  </figure>
+  <figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> Multiple bodies<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message&gt;
+  &lt;body xml:lang='en-US'&gt;awesome!&lt;/body&gt;
+  &lt;body xml:lang='de-DE'&gt;ausgezeichnet!&lt;/body&gt;
+  &lt;html xmlns='http://jabber.org/protocol/xhtml-im'&gt;
+    &lt;body xml:lang='en-US' xmlns='http://www.w3.org/1999/xhtml'&gt;
+      &lt;p&gt;&lt;strong&gt;awesome!&lt;/strong&gt;&lt;/p&gt;
+    &lt;/body&gt;
+    &lt;body xml:lang='de-DE' xmlns='http://www.w3.org/1999/xhtml'&gt;
+      &lt;p&gt;&lt;strong&gt;ausgezeichnet!&lt;/strong&gt;&lt;/p&gt;
+    &lt;/body&gt;
+  &lt;/html&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">How multiple bodies would best be rendered will depend on the user agent and relevant application. For example, a specialized Jabber client that is used in foreign language instruction might show two languages side by side, whereas a dedicated IM client might show content only in a human user's preferred language as captured in the client configuration.</p>
+  <figure class="code-example" id="example-8"><figcaption><strong>Example 8.</strong> Unrecognized Elements and Attributes<a class="anchor-link" href="#example-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message&gt;
+  &lt;body&gt;
+    The XHTML user agent conformance requirements say to ignore
+    elements and attributes you don't understand, to wit:
+
+      4. If a user agent encounters an element it does
+         not recognize, it must continue to process the
+         children of that element. If the content is text,
+         the text must be presented to the user.
+
+      5. If a user agent encounters an attribute it does
+         not recognize, it must ignore the entire attribute
+         specification (i.e., the attribute and its value).
+  &lt;/body&gt;
+  &lt;html xmlns='http://jabber.org/protocol/xhtml-im'&gt;
+    &lt;body xmlns='http://www.w3.org/1999/xhtml'&gt;
+      &lt;p&gt;The &lt;acronym&gt;XHTML&lt;/acronym&gt; user agent conformance
+         requirements say to ignore elements and attributes
+         you don't understand, to wit:&lt;/p&gt;
+      &lt;ol type='1' start='4'&gt;
+        &lt;li&gt;&lt;p&gt;
+          If a user agent encounters an element it does
+          not recognize, it must continue to process the
+          children of that element. If the content is text,
+          the text must be presented to the user.
+        &lt;/p&gt;&lt;/li&gt;
+        &lt;li&gt;&lt;p&gt;
+          If a user agent encounters an attribute it does
+          not recognize, it must ignore the entire attribute
+          specification (i.e., the attribute and its value).
+        &lt;/p&gt;&lt;/li&gt;
+      &lt;/ol&gt;
+    &lt;/body&gt;
+  &lt;/html&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">Let us assume that the recipient's user agent recognizes neither the &lt;acronym/&gt; element (which is discouraged in XHTML-IM) nor the 'type' and 'start' attributes of the &lt;ol/&gt; element (which, after all, were deprecated in HTML 4.0), and that it does not render nested elements (e.g., the &lt;p/&gt; elements within the &lt;li/&gt; elements); in this case, it could render the content as follows (note that the element value is shown as text and the attribute value is not rendered):</p>
+  <figure class="example" style="">
+    <p class="" style="">The XHTML user agent conformance requirements say to ignore elements and attributes you don't understand, to wit:</p>
+    <ol start="" class="" style="">
+      <li class="" style="">If a user agent encounters an element it does not recognize, it must continue to process the children of that element. If the content is text, the text must be presented to the user.</li>
+      <li class="" style="">If a user agent encounters an attribute it does not recognize, it must ignore the entire attribute specification (i.e., the attribute and its value).</li>
+    </ol>
+  </figure>
+<h2 id="discovery">10.
+       Discovering Support for XHTML-IM<a class="anchor-link" href="#discovery"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This section describes methods for discovering whether a Jabber client or other XMPP entity supports the protocol defined herein.</p>
+  <div class="indent"><h3 id="discovery-explicit">10.1 Explicit Discovery<a class="anchor-link" href="#discovery-explicit"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The primary means of discovering support for XHTML-IM is <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm46733120641408">27</a>] (or the dynamic profile of service discovery defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm46733120651104">28</a>]).</p>
+    <figure class="code-example" id="example-9"><figcaption><strong>Example 9.</strong> Seeking to Discover XHTML-IM Support<a class="anchor-link" href="#example-9"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get'
+    from='juliet@shakespeare.lit/balcony'
+    to='romeo@shakespeare.lit/orchard'
+    id='disco1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">If the queried entity supports XHTML-IM, it MUST return a &lt;feature/&gt; element with a 'var' attribute set to a value of "http://jabber.org/protocol/xhtml-im" in the IQ result.</p>
+    <figure class="code-example" id="example-10"><figcaption><strong>Example 10.</strong> Contact Returns Disco Info Results<a class="anchor-link" href="#example-10"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result'
+    from='romeo@shakespeare.lit/orchard'
+    to='juliet@shakespeare.lit/balcony'
+    id='disco1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+    ...
+    &lt;feature var='http://jabber.org/protocol/xhtml-im'/&gt;
+    ...
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">Naturally, support can also be discovered via the dynamic, presence-based profile of service discovery defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm46733120651104">28</a>].</p>
+  </div>
+  <div class="indent"><h3 id="discovery-implicit">10.2 Implicit Discovery<a class="anchor-link" href="#discovery-implicit"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">A Jabber user's client MAY send XML &lt;message/&gt; stanzas containing XHTML-IM extensions without first discovering if the conversation partner's client supports XHTML-IM. If the user's client sends a message that includes XHTML-IM markup and the conversation partner's client replies to that message but does not include XHTML-IM markup, the user's client SHOULD NOT continue sending XHTML-IM markup.</p>
+  </div>
+<h2 id="security">11.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="security-code">11.1 Malicious Objects<a class="anchor-link" href="#security-code"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">While scripts, applets, binary objects and other potentially executable code is excluded from the profiles used in XHTML-IM, malicious entities still may inject those and thus exploit entities which rely on this exclusion. Entities thus MUST assume that inbound XHTML-IM may be mailicious and MUST sanitize it according to the profile used, by ignoring elements and removing attributes as needed.</p>
+    <p class="" style="">To further reduce the risk of such exposure, an implementation MAY choose to:</p>
+    <ul class="" style="">
+      <li class="" style="">Not make hyperlinks clickable</li>
+      <li class="" style="">Not fetch or present images but instead show only the 'alt' text.</li>
+    </ul>
+    <p class="" style="">In addition, an implementation MUST make it possible for a user to prevent the automatic fetching and presentation of images (rather than leave it up to the implementation).</p>
+  </div>
+  <div class="indent"><h3 id="security-phishing">11.2 Phishing<a class="anchor-link" href="#security-phishing"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">To reduce the risk of phishing attacks  [<a href="#nt-idm46733120534720">29</a>], an implementation MAY choose to:</p>
+    <ul class="" style="">
+      <li class="" style="">Display the value of the XHTML 'href' attribute instead of the XML character data of the &lt;a/&gt; element.</li>
+      <li class="" style="">Display the value of XHTML 'href' attribute in addition to the XML character data of the &lt;a/&gt; element if the two values do not match.</li>
+    </ul>
+  </div>
+  <div class="indent"><h3 id="security-presence">11.3 Presence Leaks<a class="anchor-link" href="#security-presence"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The network availability of the receiver may be revealed if the receiver's client automatically loads images or the receiver clicks a link included in a message. Therefore an implementation MAY choose to:</p>
+    <ul class="" style="">
+      <li class="" style="">Not fetch images offered by senders that are not authorized to view the receiver's presence.</li>
+      <li class="" style="">Warn the receiver before allowing the user to visit a URI provided by the sender.</li>
+    </ul>
+  </div>
+<h2 id="w3c">12.
+       W3C Considerations<a class="anchor-link" href="#w3c"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The usage of XHTML 1.0 defined herein meets the requirements for XHTML 1.0 Integration Set document type conformance as defined in Section 3 ("Conformance Definition") of <span class="ref">Modularization of XHTML</span>.</p>
+  <div class="indent"><h3 id="w3c-doctype">12.1 Document Type Name<a class="anchor-link" href="#w3c-doctype"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The Formal Public Identifier (FPI) for the XHTML-IM document type definition is:</p>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+-//JSF//DTD Instant Messaging with XHTML//EN
+</pre></figure>
+    <p class="" style="">The fields of this FPI are as follows:</p>
+    <ol start="" class="" style="">
+      <li class="" style="">The leading field is "-", which indicates that this is a privately-defined resource.</li>
+      <li class="" style="">The second field is "JSF" (an abbreviation for Jabber Software Foundation, the former name for the <span class="ref" style=""><a href="https://xmpp.org/about/xmpp-standards-foundation">XMPP Standards Foundation (XSF)</a></span>  [<a href="#nt-idm46733121205744">4</a>]), which identifies the organization that maintains the named item.</li>
+      <li class="" style="">The third field contains two constructs:
+        <ol start="" class="" style="">
+          <li class="" style="">The public text class is "DTD", which adheres to ISO 8879 Clause 10.2.2.1.</li>
+          <li class="" style="">The public text description is "Instant Messaging with XHTML", which contains but does not begin with the string "XHTML" (as recommended for an XHTML 1.0 Integration Set).</li>
+        </ol>
+      </li>
+      <li class="" style="">The fourth field is "EN", which identifies the language (English) in which the item is defined.</li>
+    </ol>
+  </div>
+  <div class="indent"><h3 id="w3c-conformance">12.2 User Agent Conformance<a class="anchor-link" href="#w3c-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">A user agent that implements this specification MUST conform to Section 3.5 ("XHTML Family User Agent Conformance") of <span class="ref">Modularization of XHTML</span>. Many of the requirements defined therein are already met by Jabber clients simply because they already include XML parsers.</p>
+    <p class="" style="">However, "ignore" has a special meaning in XHTML modularization (different from its meaning in XMPP). Specifically, criteria 4 through 6 of Section 3.5 of <span class="ref">Modularization of XHTML</span> state:</p>
+    <ol start="4" class="" style="">
+      <li class="" style="">
+        <p class="" style=""><em>W3C TEXT:</em> If a user agent encounters an element it does not recognize, it must continue to process the children of that element. If the content is text, the text must be presented to the user.</p>
+        <p class="" style=""><em>XSF COMMENT:</em> This behavior is different from that defined by <span class="ref">XMPP Core</span>, and in the context of XHTML-IM implementations applies only to XML elements qualified by the 'http://www.w3.org/1999/xhtml' namespace as defined herein. This criterion MUST be applied to all XHTML 1.0 elements except those explicitly included in XHTML-IM as described in the <a href="#def">XHTML-IM Integration Set</a> and <a href="#profile">Recommended Profile</a> sections of this document. Therefore, an XHTML-IM implementation MUST process all XHTML 1.0 child elements of the XHTML-IM &lt;html/&gt; element even if such child elements are not included in the XHTML 1.0 Integration Set defined herein, and MUST present to the recipient the XML character data contained in such child elements.</p>
+      </li>
+      <li class="" style="">
+        <p class="" style=""><em>W3C TEXT:</em> If a user agent encounters an attribute it does not recognize, it must ignore the entire attribute specification (i.e., the attribute and its value).</p>
+        <p class="" style=""><em>XSF COMMENT:</em> This criterion MUST be applied to all XHTML 1.0 attributes except those explicitly included in XHTML-IM as described in the <a href="#def">XHTML-IM Integration Set</a> and <a href="#profile">Recommended Profile</a> sections of this document. Therefore, an XHTML-IM implementation MUST ignore all attributes of elements qualified by the 'http://www.w3.org/1999/xhtml' namespace if such attributes are not explicitly included in the XHTML 1.0 Integration Set defined herein.</p>
+      </li>
+      <li class="" style="">
+        <p class="" style=""><em>W3C TEXT:</em> If a user agent encounters an attribute value it doesn't recognize, it must use the default attribute value.</p>
+        <p class="" style=""><em>XSF COMMENT:</em> Since not one of the attributes included in XHTML-IM has a default value defined for it in <span class="ref">XHTML 1.0</span>, in practice this criterion does not apply to XHTML-IM implementations.</p>
+      </li>
+    </ol>
+  </div>
+  <div class="indent"><h3 id="w3c-modularization">12.3 XHTML Modularization<a class="anchor-link" href="#w3c-modularization"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">For information regarding XHTML modularization in XML schema for the XHTML 1.0 Integration Set defined in this specification, refer to the <a href="#schemas-driver">Schema Driver</a> section of this document.</p>
+  </div>
+  <div class="indent"><h3 id="w3c-review">12.4 W3C Review<a class="anchor-link" href="#w3c-review"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The XHTML 1.0 Integration Set defined herein has been reviewed informally by an editor of the <span class="ref">XHTML Modularization in XML Schema</span> specification but has not undergone formal review by the W3C. Before the XHTML-IM specification proceeds to a status of Final within the standards process of the XMPP Standards Foundation, the <span class="ref" style=""><a href="https://xmpp.org/about/xmpp-standards-foundation#council">XMPP Council</a></span>  [<a href="#nt-idm46733120478000">30</a>] is encouraged to pursue a formal review through communication with the Hypertext Coordination Group within the W3C.</p>
+  </div>
+  <div class="indent"><h3 id="w3c-versions">12.5 XHTML Versioning<a class="anchor-link" href="#w3c-versions"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The W3C is actively working on <span class="ref" style=""><a href="http://www.w3.org/TR/xhtml2">XHTML 2.0</a></span>  [<a href="#nt-idm46733120470064">31</a>] and may produce additional versions of XHTML in the future. This specification addresses XHTML 1.0 only, but it may be superseded or supplemented in the future by a XMPP Extension Protocol specification that defines methods for encapsulating XHTML 2.0 content in XMPP.</p>
+  </div>
+<h2 id="iana">13.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm46733120462224">32</a>].</p>
+<h2 id="registrar">14.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="registrar-ns">14.1 Protocol Namespaces<a class="anchor-link" href="#registrar-ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm46733120453872">33</a>] includes 'http://jabber.org/protocol/xhtml-im' in its registry of protocol namespaces.</p>
+  </div>
+<h2 id="schemas">15.
+       XML Schemas<a class="anchor-link" href="#schemas"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="schemas-wrapper">15.1 XHTML-IM Wrapper<a class="anchor-link" href="#schemas-wrapper"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The following schema defines the XMPP extension element that serves as a wrapper for XHTML content.</p>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    xmlns:xhtml='http://www.w3.org/1999/xhtml'
+    targetNamespace='http://jabber.org/protocol/xhtml-im'
+    xmlns='http://jabber.org/protocol/xhtml-im'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:import namespace='http://www.w3.org/1999/xhtml'
+             schemaLocation='http://www.w3.org/2002/08/xhtml/xhtml1-strict.xsd'/&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+
+      This schema defines the &lt;html/&gt; element qualified by
+      the 'http://jabber.org/protocol/xhtml-im' namespace.
+      The only allowable child is a &lt;body/&gt; element qualified
+      by the 'http://www.w3.org/1999/xhtml' namespace. Refer
+      to the XHTML-IM schema driver for the definition of the
+      XHTML 1.0 Integration Set.
+
+      Full documentation of this Integration Set is contained in
+      "XEP-0071: XHTML-IM", a specification published by the
+      XMPP Standards Foundation.
+
+         http://www.xmpp.org/extensions/xep-0071.html
+
+    &lt;/xs:documentation&gt;
+    &lt;xs:documentation source="http://www.xmpp.org/extensions/xep-0071.html"/&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:element name='html'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:sequence&gt;
+        &lt;xs:element ref='xhtml:body'
+                    minOccurs='0'
+                    maxOccurs='unbounded'/&gt;
+      &lt;/xs:sequence&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="schemas-driver">15.2 XHTML-IM Schema Driver<a class="anchor-link" href="#schemas-driver"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The following schema defines the modularization schema driver for XHTML-IM.</p>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='http://www.w3.org/1999/xhtml'
+    xmlns='http://www.w3.org/1999/xhtml'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+
+      This is the XML Schema driver for XHTML-IM, an XHTML 1.0
+      Integration Set for use in exchanging marked-up instant
+      messages between entities that conform to the Extensible
+      Messaging and Presence Protocol (XMPP). This Integration
+      Set includes a subset of the modules defined for XHTML 1.0
+      but does not redefine any existing modules, nor does it
+      define any new modules. Specifically, it includes the
+      following modules only:
+
+         - Structure
+         - Text
+         - Hypertext
+         - List
+         - Image
+         - Style Attribute
+
+      The Formal Public Identifier (FPI) for this Integration
+      Set is:
+
+         -//JSF//DTD Instant Messaging with XHTML//EN
+
+      Full documentation of this Integration Set is contained in
+      "XEP-0071: XHTML-IM", a specification published by the
+      XMPP Standards Foundation, which is available at the
+      following URL:
+
+         http://www.xmpp.org/extensions/xep-0071.html
+
+    &lt;/xs:documentation&gt;
+    &lt;xs:documentation source="http://www.xmpp.org/extensions/xep-0071.html"/&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:include
+      schemaLocation="http://www.w3.org/MarkUp/SCHEMA/xhtml-blkphras-1.xsd"/&gt;
+  &lt;xs:include
+      schemaLocation="http://www.w3.org/MarkUp/SCHEMA/xhtml-blkstruct-1.xsd"/&gt;
+  &lt;xs:include
+      schemaLocation="http://www.w3.org/MarkUp/SCHEMA/xhtml-hypertext-1.xsd"/&gt;
+  &lt;xs:include
+      schemaLocation="http://www.w3.org/MarkUp/SCHEMA/xhtml-image-1.xsd"/&gt;
+  &lt;xs:include
+      schemaLocation="http://www.w3.org/MarkUp/SCHEMA/xhtml-inlphras-1.xsd"/&gt;
+  &lt;xs:include
+      schemaLocation="http://www.w3.org/MarkUp/SCHEMA/xhtml-inlstruct-1.xsd"/&gt;
+  &lt;xs:include
+      schemaLocation="http://www.w3.org/MarkUp/SCHEMA/xhtml-inlstyle-1.xsd"/&gt;
+  &lt;xs:include
+      schemaLocation="http://www.w3.org/MarkUp/SCHEMA/xhtml-list-1.xsd"/&gt;
+  &lt;xs:include
+      schemaLocation="http://www.w3.org/MarkUp/SCHEMA/xhtml-struct-1.xsd"/&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+  </div>
+  <div class="indent"><h3 id="schemas-model">15.3 XHTML-IM Content Model<a class="anchor-link" href="#schemas-model"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The following schema defines the content model for XHTML-IM.</p>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://www.w3.org/1999/xhtml"
+           xmlns="http://www.w3.org/1999/xhtml"&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+
+      This is the XML Schema module of named XHTML 1.0 content models
+      for XHTML-IM, an XHTML 1.0 Integration Set for use in exchanging
+      marked-up instant messages between entities that conform to
+      the Extensible Messaging and Presence Protocol (XMPP). This
+      Integration Set includes a subset of the modules defined for
+      XHTML 1.0 but does not redefine any existing modules, nor
+      does it define any new modules. Specifically, it includes the
+      following modules only:
+
+         - Structure
+         - Text
+         - Hypertext
+         - List
+         - Image
+         - Style Attribute
+
+      Therefore XHTML-IM uses the following content models:
+
+          Block.mix;            Block-like elements, e.g., paragraphs
+          Flow.mix;             Any block or inline elements
+          Inline.mix;           Character-level elements
+          InlineNoAnchor.class; Anchor element
+          InlinePre.mix;        Pre element
+
+      XHTML-IM also uses the following Attribute Groups:
+
+           Core.extra.attrib
+           I18n.extra.attrib
+           Common.extra
+
+      Full documentation of this Integration Set is contained in
+      "XEP-0071: XHTML-IM", a specification published by the
+      XMPP Standards Foundation.
+
+         http://www.xmpp.org/extensions/xep-0071.html
+
+    &lt;/xs:documentation&gt;
+    &lt;xs:documentation source="http://www.xmpp.org/extensions/xep-0071.html"/&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;!-- BEGIN ATTRIBUTE GROUPS --&gt;
+
+  &lt;xs:attributeGroup name="Core.extra.attrib"/&gt;
+  &lt;xs:attributeGroup name="I18n.extra.attrib"/&gt;
+  &lt;xs:attributeGroup name="Common.extra"&gt;
+    &lt;xs:attributeGroup ref="style.attrib"/&gt;
+  &lt;/xs:attributeGroup&gt;
+
+  &lt;!-- END ATTRIBUTE GROUPS --&gt;
+
+  &lt;!-- BEGIN HYPERTEXT MODULE "PRIMITIVES" --&gt;
+
+  &lt;xs:group name="Anchor.class"&gt;
+    &lt;xs:sequence&gt;
+      &lt;xs:element ref="a"/&gt;
+    &lt;/xs:sequence&gt;
+  &lt;/xs:group&gt;
+
+  &lt;!-- END HYPERTEXT MODULE "PRIMITIVES" --&gt;
+
+  &lt;!-- BEGIN IMAGE MODULE "PRIMITIVES" --&gt;
+
+  &lt;xs:group name="Image.class"&gt;
+    &lt;xs:choice&gt;
+      &lt;xs:element ref="img"/&gt;
+    &lt;/xs:choice&gt;
+  &lt;/xs:group&gt;
+
+  &lt;!-- END IMAGE MODULE "PRIMITIVES" --&gt;
+
+  &lt;!-- BEGIN LIST MODULE "PRIMITIVES" --&gt;
+
+  &lt;xs:group name="List.class"&gt;
+    &lt;xs:choice&gt;
+      &lt;xs:element ref="ul"/&gt;
+      &lt;xs:element ref="ol"/&gt;
+      &lt;xs:element ref="dl"/&gt;
+    &lt;/xs:choice&gt;
+  &lt;/xs:group&gt;
+
+  &lt;!-- END LIST MODULE "PRIMITIVES" --&gt;
+
+  &lt;!-- BEGIN TEXT MODULE "PRIMITIVES" --&gt;
+
+  &lt;xs:group name="BlkPhras.class"&gt;
+    &lt;xs:choice&gt;
+      &lt;xs:element ref="address"/&gt;
+      &lt;xs:element ref="blockquote"/&gt;
+      &lt;xs:element ref="pre"/&gt;
+    &lt;/xs:choice&gt;
+  &lt;/xs:group&gt;
+
+  &lt;xs:group name="BlkStruct.class"&gt;
+    &lt;xs:choice&gt;
+      &lt;xs:element ref="div"/&gt;
+      &lt;xs:element ref="p"/&gt;
+    &lt;/xs:choice&gt;
+  &lt;/xs:group&gt;
+
+  &lt;xs:group name="Heading.class"&gt;
+    &lt;xs:choice&gt;
+      &lt;xs:element ref="h1"/&gt;
+      &lt;xs:element ref="h2"/&gt;
+      &lt;xs:element ref="h3"/&gt;
+      &lt;xs:element ref="h4"/&gt;
+      &lt;xs:element ref="h5"/&gt;
+      &lt;xs:element ref="h6"/&gt;
+    &lt;/xs:choice&gt;
+  &lt;/xs:group&gt;
+
+  &lt;xs:group name="InlPhras.class"&gt;
+    &lt;xs:choice&gt;
+      &lt;xs:element ref="abbr"/&gt;
+      &lt;xs:element ref="acronym"/&gt;
+      &lt;xs:element ref="cite"/&gt;
+      &lt;xs:element ref="code"/&gt;
+      &lt;xs:element ref="dfn"/&gt;
+      &lt;xs:element ref="em"/&gt;
+      &lt;xs:element ref="kbd"/&gt;
+      &lt;xs:element ref="q"/&gt;
+      &lt;xs:element ref="samp"/&gt;
+      &lt;xs:element ref="strong"/&gt;
+      &lt;xs:element ref="var"/&gt;
+    &lt;/xs:choice&gt;
+  &lt;/xs:group&gt;
+
+  &lt;xs:group name="InlStruct.class"&gt;
+    &lt;xs:choice&gt;
+      &lt;xs:element ref="br"/&gt;
+      &lt;xs:element ref="span"/&gt;
+    &lt;/xs:choice&gt;
+  &lt;/xs:group&gt;
+
+  &lt;!-- END TEXT MODULE "PRIMITIVES" --&gt;
+
+  &lt;!-- BEGIN BLOCK COMBINATIONS --&gt;
+
+  &lt;xs:group name="Block.class"&gt;
+    &lt;xs:choice&gt;
+      &lt;xs:group ref="BlkPhras.class"/&gt;
+      &lt;xs:group ref="BlkStruct.class"/&gt;
+    &lt;/xs:choice&gt;
+  &lt;/xs:group&gt;
+
+  &lt;!-- END BLOCK COMBINATIONS --&gt;
+
+  &lt;!-- BEGIN INLINE COMBINATIONS --&gt;
+
+  &lt;!-- Any inline content --&gt;
+  &lt;xs:group name="Inline.class"&gt;
+    &lt;xs:choice&gt;
+      &lt;xs:group ref="Anchor.class"/&gt;
+      &lt;xs:group ref="Image.class"/&gt;
+      &lt;xs:group ref="InlPhras.class"/&gt;
+      &lt;xs:group ref="InlStruct.class"/&gt;
+    &lt;/xs:choice&gt;
+  &lt;/xs:group&gt;
+
+  &lt;!-- Inline content contained in a hyperlink --&gt;
+  &lt;xs:group name="InlNoAnchor.class"&gt;
+    &lt;xs:choice&gt;
+      &lt;xs:group ref="Image.class"/&gt;
+      &lt;xs:group ref="InlStruct.class"/&gt;
+      &lt;xs:group ref="InlPhras.class"/&gt;
+    &lt;/xs:choice&gt;
+  &lt;/xs:group&gt;
+
+  &lt;!-- END INLINE COMBINATIONS --&gt;
+
+  &lt;!-- BEGIN TOP-LEVEL MIXES --&gt;
+
+  &lt;xs:group name="Block.mix"&gt;
+    &lt;xs:choice&gt;
+      &lt;xs:group ref="Block.class"/&gt;
+      &lt;xs:group ref="Heading.class"/&gt;
+      &lt;xs:group ref="List.class"/&gt;
+    &lt;/xs:choice&gt;
+  &lt;/xs:group&gt;
+
+  &lt;xs:group name="Flow.mix"&gt;
+    &lt;xs:choice&gt;
+      &lt;xs:group ref="Block.class"/&gt;
+      &lt;xs:group ref="Heading.class"/&gt;
+      &lt;xs:group ref="Inline.class"/&gt;
+      &lt;xs:group ref="List.class"/&gt;
+    &lt;/xs:choice&gt;
+  &lt;/xs:group&gt;
+
+  &lt;xs:group name="Inline.mix"&gt;
+    &lt;xs:choice&gt;
+      &lt;xs:group ref="Inline.class"/&gt;
+    &lt;/xs:choice&gt;
+  &lt;/xs:group&gt;
+
+  &lt;xs:group name="InlNoAnchor.mix"&gt;
+    &lt;xs:choice&gt;
+      &lt;xs:group ref="InlNoAnchor.class"/&gt;
+    &lt;/xs:choice&gt;
+  &lt;/xs:group&gt;
+
+  &lt;xs:group name="InlinePre.mix"&gt;
+    &lt;xs:choice&gt;
+      &lt;xs:group ref="Anchor.class"/&gt;
+      &lt;xs:group ref="InlPhras.class"/&gt;
+      &lt;xs:group ref="InlStruct.class"/&gt;
+    &lt;/xs:choice&gt;
+  &lt;/xs:group&gt;
+
+  &lt;!-- END TOP-LEVEL MIXES --&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+  </div>
+<h2 id="ack">16.
+       Acknowledgements<a class="anchor-link" href="#ack"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This specification formalizes and extends earlier work by Jeremie Miller and Julian Missig on XHTML formatting of Jabber messages. Many thanks to Shane McCarron for his assistance regarding XHTML modularization and conformance issues. Thanks also to contributors on the discussion list of the XSF's <span class="ref" style=""><a href="https://mail.jabber.org/mailman/listinfo/standards/">Standards SIG</a></span>  [<a href="#nt-idm46733120433088">34</a>] for their feedback and suggestions.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0071</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Deprecated">Deprecated</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>1.5.4</dd><dt>Last Updated</dt><dd>2018-03-08</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, XMPP IM, XHTML 1.0, Modularization of XHTML, <a href="xep-0030.html">XEP-0030</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>xhtml-im</dd><dt>Schema</dt><dd>
+        XML Schema for the 'wrapper namespace' namespace: &lt;<a href="http://www.xmpp.org/schemas/xhtml-im-wrapper.xsd">http://www.xmpp.org/schemas/xhtml-im-wrapper.xsd</a>&gt;<br></dd><dd>
+        XML Schema for the 'schema driver' namespace: &lt;<a href="http://www.xmpp.org/schemas/xhtml-im-driver.xsd">http://www.xmpp.org/schemas/xhtml-im-driver.xsd</a>&gt;<br></dd><dd>
+        XML Schema for the 'content model' namespace: &lt;<a href="http://www.xmpp.org/schemas/xhtml-im-model.xsd">http://www.xmpp.org/schemas/xhtml-im-model.xsd</a>&gt;<br></dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0071.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0071.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0071.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Peter Saint-Andre</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:stpeter@stpeter.im">stpeter@stpeter.im</a></dd><dt>JabberID</dt><dd><a href="xmpp:stpeter@jabber.org">stpeter@jabber.org</a></dd><dt>URI</dt><dd><a href="https://stpeter.im/">https://stpeter.im/</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm46733121221248">1</a>. XHTML 1.0 &lt;<a href="http://www.w3.org/TR/xhtml1">http://www.w3.org/TR/xhtml1</a>&gt;.</p><p><a name="nt-idm46733121212256">2</a>. Rich Text Format (RTF) Version 1.5 Specification &lt;<a href="http://msdn.microsoft.com/library/en-us/dnrtfspec/html/rtfspec.asp">http://msdn.microsoft.com/library/en-us/dnrtfspec/html/rtfspec.asp</a>&gt;.</p><p><a name="nt-idm46733121210096">3</a>. XEP-0134: XMPP Design Guidelines &lt;<a href="https://xmpp.org/extensions/xep-0134.html">https://xmpp.org/extensions/xep-0134.html</a>&gt;.</p><p><a name="nt-idm46733121205744">4</a>. The XMPP Standards Foundation (XSF) is an independent, non-profit membership organization that develops open extensions to the IETF's Extensible Messaging and Presence Protocol (XMPP). For further information, see &lt;<a href="https://xmpp.org/about/xmpp-standards-foundation">https://xmpp.org/about/xmpp-standards-foundation</a>&gt;.</p><p><a name="nt-idm46733121198304">5</a>. HTML 4.0 &lt;<a href="http://www.w3.org/TR/REC-html40">http://www.w3.org/TR/REC-html40</a>&gt;.</p><p><a name="nt-idm46733121188800">6</a>. Extensible Markup Language (XML) 1.0 (Fourth Edition) &lt;<a href="http://www.w3.org/TR/REC-xml/">http://www.w3.org/TR/REC-xml/</a>&gt;.</p><p><a name="nt-idm46733121179280">7</a>. RFC 6120: Extensible Messaging and Presence Protocol (XMPP): Core &lt;<a href="http://tools.ietf.org/html/rfc6120">http://tools.ietf.org/html/rfc6120</a>&gt;.</p><p><a name="nt-idm46733121177344">8</a>. The World Wide Web Consortium defines data formats and markup languages (such as HTML and XML) for use over the Internet. For further information, see &lt;<a href="http://www.w3.org/">http://www.w3.org/</a>&gt;.</p><p><a name="nt-idm46733121159856">9</a>. XEP-0004: Data Forms &lt;<a href="https://xmpp.org/extensions/xep-0004.html">https://xmpp.org/extensions/xep-0004.html</a>&gt;.</p><p><a name="nt-idm46733121155232">10</a>. Cascading Style Sheets, level 1 &lt;<a href="http://www.w3.org/TR/REC-CSS1">http://www.w3.org/TR/REC-CSS1</a>&gt;.</p><p><a name="nt-idm46733121146144">11</a>. XEP-0096: SI File Transfer &lt;<a href="https://xmpp.org/extensions/xep-0096.html">https://xmpp.org/extensions/xep-0096.html</a>&gt;.</p><p><a name="nt-idm46733121141472">12</a>. XEP-0166: Jingle &lt;<a href="https://xmpp.org/extensions/xep-0166.html">https://xmpp.org/extensions/xep-0166.html</a>&gt;.</p><p><a name="nt-idm46733121132064">13</a>. XEP-0234: Jingle File Transfer &lt;<a href="https://xmpp.org/extensions/xep-0234.html">https://xmpp.org/extensions/xep-0234.html</a>&gt;.</p><p><a name="nt-idm46733121129424">14</a>. XSL Transformations &lt;<a href="http://www.w3.org/TR/xslt/">http://www.w3.org/TR/xslt/</a>&gt;.</p><p><a name="nt-idm46733121124192">15</a>. The XHTML is merely an alternative version of the message body or bodies, and the semantic meaning is to be derived from the textual message body or bodies rather than the XHTML version.</p><p><a name="nt-idm46733121121792">16</a>. It might have been better to use an element name other than &lt;html/&gt; for the wrapper element; however, changing it would not be backwards-compatible with the older protocol and existing implementations.</p><p><a name="nt-idm46733121112320">17</a>. Modularization of XHTML &lt;<a href="http://www.w3.org/TR/2004/WD-xhtml-modularization-20040218/">http://www.w3.org/TR/2004/WD-xhtml-modularization-20040218/</a>&gt;.</p><p><a name="nt-idm46733121102400">18</a>. RFC 5646: Tags for Identifying Languages &lt;<a href="http://tools.ietf.org/html/rfc5646">http://tools.ietf.org/html/rfc5646</a>&gt;.</p><p><a name="nt-idm46733121095808">19</a>. RFC 6121: Extensible Messaging and Presence Protocol (XMPP): Instant Messaging and Presence &lt;<a href="http://tools.ietf.org/html/rfc6121">http://tools.ietf.org/html/rfc6121</a>&gt;.</p><p><a name="nt-idm46733121080208">20</a>. XHTML Basic &lt;<a href="http://www.w3.org/TR/xhtml-basic">http://www.w3.org/TR/xhtml-basic</a>&gt;.</p><p><a name="nt-idm46733121066864">21</a>. The 'style' attribute is specified herein where appropriate because the Style Attribute Module is included in the definition of the XHTML-IM Integration Set, whereas the event-related attributes (e.g., 'onclick') are not specified because the Implicit Events Module is not included.</p><p><a name="nt-idm46733120922736">22</a>. RFC 2397: The data: URL scheme &lt;<a href="http://tools.ietf.org/html/rfc2397">http://tools.ietf.org/html/rfc2397</a>&gt;.</p><p><a name="nt-idm46733120912464">23</a>. XEP-0231: Bits of Binary &lt;<a href="https://xmpp.org/extensions/xep-0231.html">https://xmpp.org/extensions/xep-0231.html</a>&gt;.</p><p><a name="nt-idm46733120911040">24</a>. XEP-0047: In-Band Bytestreams &lt;<a href="https://xmpp.org/extensions/xep-0047.html">https://xmpp.org/extensions/xep-0047.html</a>&gt;.</p><p><a name="nt-idm46733120906464">25</a>. XEP-0065: SOCKS5 Bytestreams &lt;<a href="https://xmpp.org/extensions/xep-0065.html">https://xmpp.org/extensions/xep-0065.html</a>&gt;.</p><p><a name="nt-idm46733120767504">26</a>. When contained within the &lt;html xmlns='http://jabber.org/protocol/xhtml-im'&gt; element, a &lt;body/&gt; element is qualified by the 'http://www.w3.org/1999/xhtml' namespace; naturally, this is a namespace declaration rather than an attribute per se, and therefore is not mentioned in the attribute enumeration.</p><p><a name="nt-idm46733120641408">27</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm46733120651104">28</a>. XEP-0115: Entity Capabilities &lt;<a href="https://xmpp.org/extensions/xep-0115.html">https://xmpp.org/extensions/xep-0115.html</a>&gt;.</p><p><a name="nt-idm46733120534720">29</a>. Phishing has been defined by the Financial Services Technology Consortium Counter-Phishing Initiative as "a broadly launched social engineering attack in which an electronic identity is misrepresented in an attempt to trick individuals into revealing personal credentials that can be used fraudulently against them".</p><p><a name="nt-idm46733120478000">30</a>. The XMPP Council is a technical steering committee, authorized by the XSF Board of Directors and elected by XSF members, that approves of new XMPP Extensions Protocols and oversees the XSF's standards process. For further information, see &lt;<a href="https://xmpp.org/about/xmpp-standards-foundation#council">https://xmpp.org/about/xmpp-standards-foundation#council</a>&gt;.</p><p><a name="nt-idm46733120470064">31</a>. XHTML 2.0 &lt;<a href="http://www.w3.org/TR/xhtml2">http://www.w3.org/TR/xhtml2</a>&gt;.</p><p><a name="nt-idm46733120462224">32</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm46733120453872">33</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p><p><a name="nt-idm46733120433088">34</a>. The Standards SIG is a standing Special Interest Group devoted to development of XMPP Extension Protocols. The discussion list of the Standards SIG is the primary venue for discussion of XMPP protocol extensions, as well as for announcements by the XMPP Extensions Editor and XMPP Registrar. To subscribe to the list or view the list archives, visit &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards/">https://mail.jabber.org/mailman/listinfo/standards/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v1.5.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-1.5.4.html">1.5.4</a> (2018-03-08)<a class="anchor-link" href="#revision-history-v1.5.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Correction: Council voted to Deprecate, not Obsolete.</p><div class="revision-author">XEP Editor (jwi)</div></li><li id="revision-history-v1.5.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-1.5.3.html">1.5.3</a> (2018-02-28)<a class="anchor-link" href="#revision-history-v1.5.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the XMPP Council, advanced to Obsolete.</p><div class="revision-author">XEP Editor (ssw)</div></li><li id="revision-history-v1.5.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-1.5.2.html">1.5.2</a> (2017-10-12)<a class="anchor-link" href="#revision-history-v1.5.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarify security considerations.</p><div class="revision-author">jwi</div></li><li id="revision-history-v1.5.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-1.5.1.html">1.5.1</a> (2016-01-05)<a class="anchor-link" href="#revision-history-v1.5.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Update plain version of blockquote example to escape &lt;div/&gt; (Thijs Alkemade).</p><div class="revision-author">XEP Editor (mam)</div></li><li id="revision-history-v1.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-1.5.html">1.5</a> (2012-11-28)<a class="anchor-link" href="#revision-history-v1.5"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Addressed feedback received during Call for Experience: (1) generalized business rule about not adding XHTML rendering in the receiving client, (2) modified business rule about structure vs. style to recommend structural elements.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-1.4.html">1.4</a> (2008-09-03)<a class="anchor-link" href="#revision-history-v1.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Encouraged support for several more structural elements from the text module (blockquote, cite, em, and strong); further clarified security considerations regarding fetching and presentation of images; modified several examples; clarified several points throughout the text.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-1.3.html">1.3</a> (2007-08-29)<a class="anchor-link" href="#revision-history-v1.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Reorganized and further clarified security considerations regarding malicious objects, phishing, and presence leaks; added business rule about inclusion and processing of hyperlinks.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-1.2.html">1.2</a> (2007-03-14)<a class="anchor-link" href="#revision-history-v1.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified security considerations regarding images.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-1.1.html">1.1</a> (2006-01-11)<a class="anchor-link" href="#revision-history-v1.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">More clearly specified that XHTML-IM content is intended for use only within message stanzas, that it may be included in IQ stanzas (usage undefined) and that it may be included in presence stanzas (usage: formatted version of status); specified security consideration regarding hyperlinks.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-1.0.html">1.0</a> (2004-09-29)<a class="anchor-link" href="#revision-history-v1.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the Jabber Council, advanced status to Draft.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.19"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.19.html">0.19</a> (2004-09-27)<a class="anchor-link" href="#revision-history-v0.19"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per list discussion, removed recommendation to preserve whitespace in XHTML bodies (instead, use of &lt;br/&gt; and non-breaking spaces is recommended); noted that nesting of elements is not recommended except within &lt;div/&gt; elements; and switched from padding-left to margin-left for indentation.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.18"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.18.html">0.18</a> (2004-09-15)<a class="anchor-link" href="#revision-history-v0.18"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added recommendation to preserve whitespace in XHTML bodies.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.17"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.17.html">0.17</a> (2004-09-08)<a class="anchor-link" href="#revision-history-v0.17"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Simplified the recommended profiles based on list discussion; changed the examples accordingly.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.16"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.16.html">0.16</a> (2004-08-30)<a class="anchor-link" href="#revision-history-v0.16"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Specified the scope of the proposal; clarified reasons for the choice of technology; clarified one business rule; corrected several typographical errors.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.15"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.15.html">0.15</a> (2004-07-29)<a class="anchor-link" href="#revision-history-v0.15"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Based on W3C feedback, added content model and refactored the text to ensure separation between the XHTML 1.0 Integration Set itself and the XSF's recommended profile of the Integration Set; also split the requirements out from the Concepts and Approach section, added several more examples, and showed renderings of the examples.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.14"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.14.html">0.14</a> (2004-05-19)<a class="anchor-link" href="#revision-history-v0.14"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified relationship between wrapper element and XHTML content.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.13"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.13.html">0.13</a> (2004-05-18)<a class="anchor-link" href="#revision-history-v0.13"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial version of XHTML modularization.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.12"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.12.html">0.12</a> (2004-03-10)<a class="anchor-link" href="#revision-history-v0.12"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified and corrected several points in the text; improved and added to the examples.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.11"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.11.html">0.11</a> (2003-12-05)<a class="anchor-link" href="#revision-history-v0.11"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Defined XHTML 1.0 Integration Set conformance; removed schema pending work on XHTML modularization with W3C.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.10"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.10.html">0.10</a> (2003-11-25)<a class="anchor-link" href="#revision-history-v0.10"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Cleaned up the schema; added W3C considerations.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.9"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.9.html">0.9</a> (2003-09-30)<a class="anchor-link" href="#revision-history-v0.9"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Changed status to Deferred pending discussion with the W3C regarding XHTML modularization.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.8"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.8.html">0.8</a> (2003-09-16)<a class="anchor-link" href="#revision-history-v0.8"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Changed MUST to SHOULD for support of the Style Attribute Module; clarified relationship of XHTML-IM schema to XHTML schema; slight text cleanup.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.7"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.7.html">0.7</a> (2003-08-19)<a class="anchor-link" href="#revision-history-v0.7"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added the &lt;code/&gt; element.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.6"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.6.html">0.6</a> (2003-06-24)<a class="anchor-link" href="#revision-history-v0.6"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Made image support recommended (not mandatory); removed references to conversation threads; fixed some issues in the schema; made small editorial changes throughout.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.5.html">0.5</a> (2003-04-29)<a class="anchor-link" href="#revision-history-v0.5"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Fixed the schema, made several small editorial changes.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.4.html">0.4</a> (2003-02-20)<a class="anchor-link" href="#revision-history-v0.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Brought back several content-based elements; added preliminary schema.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.3.html">0.3</a> (2003-02-19)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Defined the attributes and style properties required by this document.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.2.html">0.2</a> (2003-02-17)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Described the requirements more fully; added additional restrictions above and beyond the standard XHTML 1.0 Modules; added disco examples.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0071-0.1.html">0.1</a> (2003-02-16)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial version.</p><div class="revision-author">psa</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{saint-andre2003xhtml-im,
+  title = {XHTML-IM},
+  author = {Saint-Andre, Peter},
+  type = {XEP},
+  number = {0071},
+  version = {1.5.4},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0071.html},
+  date = {2003-02-16/2018-03-08},
+}</pre><p>END</p></body></html>

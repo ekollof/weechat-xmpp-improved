@@ -1,0 +1,228 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0392: Consistent Color Generation</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0392";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Consistent Color Generation"><meta name="DC.Creator" content="Jonas Schäfer"><meta name="DC.Description" content="This specification provides a set of algorithms to consistently generate colors given a string. The string can be a nickname, a JID or any other piece of information. All entities adhering to this specification generate the same color for the same string, which provides a consistent user experience across platforms."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2025-10-03"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0392"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0392: Consistent Color Generation</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification provides a set of algorithms to consistently generate colors given a string. The string can be a nickname, a JID or any other piece of information. All entities adhering to this specification generate the same color for the same string, which provides a consistent user experience across platforms.</dd><dt>Author</dt><dd>Jonas Schäfer</dd><dt>Copyright</dt><dd>© 2017 – 2025 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Stable</p><div id="status-notice" class="draft standards track">NOTICE: The protocol defined herein is a <strong>Stable Standard</strong> of the XMPP Standards Foundation. Implementations are encouraged and the protocol is appropriate for deployment in production systems, but some changes to the protocol are possible before it becomes a Final Standard.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>1.0.1 (2025-10-03)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li class="current">Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#reqs">Requirements</a></li><li><a href="#usecases">Use Cases</a><ol><li><a href="#usecase-textcolor">Generating a color</a></li></ol></li><li><a href="#rules">Business Rules</a></li><li><a href="#algorithm">Algorithms</a><ol><li><a href="#algorithm-angle">Angle generation</a></li><li><a href="#algorithm-rgb">RGB generation</a></li><li><a href="#algorithm-genpalette">Conversion of an RGB color palette to a Hue palette</a></li><li><a href="#algorithm-mappalette">Mapping of a Hue angle to closest palette color</a></li></ol></li><li><a href="#impl">Implementation Notes</a><ol><li><a href="#impl-gamma">Gamma Correction</a></li><li><a href="#impl-norm">Normalization</a></li></ol></li><li><a href="#access">Accessibility Considerations</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#design">Design Considerations</a><ol><li><a href="#design-ycbcr">The YCbCr color space</a></li><li><a href="#design-hsv">Hue-Saturation-Value/Lightness color space</a></li><li><a href="#design-context">Palette-based and context-aware coloring</a></li><li><a href="#design-mixing">Choice of mixing function in angle generation</a></li><li><a href="#design-palette-mapping">Palette-mapping function</a></li><li><a href="#design-cvd-corr">Color Vision Deficiency corrections</a></li></ol></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a></li><li><a href="#acknowledgements">Acknowledgements</a></li><li><a href="#vectors">Test Vectors</a><ol><li><a href="#testvectors-fullrange">Test Vectors</a></li><li><a href="#testvectors-palette">Test Vectors for mapping to 216 color palette</a></li></ol></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Colors provide a valuable visual cue to recognize shapes. Recognition of colors works much faster than recognition of text. Together with the length and overall shape of a piece of text (such as a nickname),  a color provides a decent amount of entropy to distinguish a reasonable amount of entities, without having to actually read the text.</p>
+  <p class="" style="">Clients have been using randomly or deterministically chosen colors for users in multi-user situations for a long time already. However, since there has been no standard for how this is implemented, the experience differs across platforms. The goal of this XEP is to provide a uniform, platform-independent, stateless and easy-to-implement way to map arbitrary bytestrings to colors.</p>
+  <p class="" style="">To allow cross-client use, it is important that the color scheme can be adapted to different environments. This specification provides means to adapt colors to different background colors as well as Color Vision Deficiencies.</p>
+  <p class="" style="">In no way is the system presented in this specification a replacement for names. It only serves as an additional visual aid.</p>
+<h2 id="reqs">2.
+       Requirements<a class="anchor-link" href="#reqs"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The color generation mechanism should provide the following features:</p>
+  <ul class="" style="">
+    <li class="" style="">Consistent generation of color across all platforms depending solely on the identifier used as input for the algorithm.</li>
+    <li class="" style="">The system should be reasonably fast; it must be possible to, for example, apply it to all roster entries even of very large rosters in reasonable amount of time.</li>
+    <li class="" style="">It must be able to provide decent contrast on any background.</li>
+    <li class="" style="">The implementation should be stateless and not be complex.</li>
+    <li class="" style="">A fallback path for users with common types of Color Vision Deficiencies must be provided.</li>
+    <li class="" style="">A fallback path for systems which can only use colors from a restricted palette must be provided.</li>
+  </ul>
+<h2 id="usecases">3.
+       Use Cases<a class="anchor-link" href="#usecases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="usecase-textcolor">3.1 Generating a color<a class="anchor-link" href="#usecase-textcolor"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">To generate a color from a string of text, the following algorithms are applied in order:</p>
+    <ol start="" class="" style="">
+      <li class="" style=""><a href="#algorithm-angle">Generate a Hue value from the text</a>.</li>
+      <li class="" style="">If constraints mandate the use of only a small palette of colors, <a href="#algorithm-mappalette">map the angle to the closest palette color</a>. (Such situations could for example be a UI environment with guidelines to only use a specific set of colors or an output device which only supports a limited amount of colors.)</li>
+      <li class="" style="">If the output device supports RGB output, <a href="#algorithm-rgb">Convert the angle to a RGB</a>.</li>
+    </ol>
+  </div>
+<h2 id="rules">4.
+       Business Rules<a class="anchor-link" href="#rules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <ul class="" style="">
+    <li class="" style="">Implementations SHOULD allow the user to turn off any colorization completely.</li>
+  </ul>
+<h2 id="algorithm">5.
+       Algorithms<a class="anchor-link" href="#algorithm"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The algorithms in this document use the <span class="ref" style=""><a href="http://www.hsluv.org/">HSLuv</a></span>  [<a href="#nt-idm45385512495984">1</a>] color space. It provides consistent brightness (for a given luminosity) across its entire definition space. There is also widespread library support.</p>
+  <div class="indent"><h3 id="algorithm-angle">5.1 Angle generation<a class="anchor-link" href="#algorithm-angle"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Input: An identifier, encoded as octets of UTF-8 (<span class="ref" style=""><a href="http://tools.ietf.org/html/rfc3269">RFC 3269</a></span>  [<a href="#nt-idm45385512491552">2</a>]).</p>
+    <p class="" style="">Output: Hue angle.</p>
+    <p class="" style="">Note: The goal of this algorithm is to convert arbitrary text into a scalar value which can then be used to calculate a color.</p>
+    <ol start="" class="" style="">
+      <li class="" style="">Run the input through SHA-1 (<span class="ref" style=""><a href="http://tools.ietf.org/html/rfc3174">RFC 3174</a></span>  [<a href="#nt-idm45385512481008">3</a>]).</li>
+      <li class="" style="">Treat the output as little endian and extract the least-significant 16 bits. (These are the first two bytes of the output, with the second byte being the most significant one.)</li>
+      <li class="" style="">Divide the value by 65536 (use float division) and multiply it by 360 (to map it to degrees in a full circle).</li>
+    </ol>
+  </div>
+  <div class="indent"><h3 id="algorithm-rgb">5.2 RGB generation<a class="anchor-link" href="#algorithm-rgb"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Use the HSLuv operation <code>hsluvToRgb</code> to convert the Hue angle to a color. The saturation and lightness are to be defined by the implementation (see also the <a href="#accessibility-cr">Contrast Ratio considerations</a>).</p>
+  </div>
+  <div class="indent"><h3 id="algorithm-genpalette">5.3 Conversion of an RGB color palette to a Hue palette<a class="anchor-link" href="#algorithm-genpalette"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Input: A set of RGB colors (each component from 0 to 1).</p>
+    <p class="" style="">Output: A mapping from angles (integer, from 0 to 360) to RGB colors.</p>
+    <p class="" style="">Note: when the algorithm finishes, the mapping maps angles (rounded to two decimal places) to the R, G, B triples which come closest to the desired color and lightness.</p>
+    <ol start="" class="" style="">
+      <li class="" style="">Create an empty mapping M which maps from Hue angles to quadruples of L, R, G and B.</li>
+      <li class="" style="">For each color R, G, B from the input palette:
+        <ol start="" class="" style="">
+          <li class="" style="">If the R, G and B values are equal, skip the color and continue with the next. (Grayscale does not work well, since its saturation and hue are undefined.)</li>
+          <li class="" style="">Calculate H, S and L from R, G, B using HSLuv.</li>
+          <li class="" style="">Round the angle to the next integer value.</li>
+          <li class="" style="">If the angle is not in the mapping M yet, or if the L value of the existing entry is farther away from 73.2 than the new L value, put the L, R, G, and B values as value for the angle into the mapping.</li>
+        </ol>
+      </li>
+      <li class="" style="">Strip the L values from the values of mapping M.</li>
+      <li class="" style="">Return M as the result of the algorithm.</li>
+    </ol>
+    <p class="" style="">Implementations are free to choose a representation for palette colors different from R, G, B triplets. The exact representation does not matter, as long as it can be converted to a Hue angle accordingly.</p>
+  </div>
+  <div class="indent"><h3 id="algorithm-mappalette">5.4 Mapping of a Hue angle to closest palette color<a class="anchor-link" href="#algorithm-mappalette"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Input: (a) A mapping which maps angles to R, G, B triplets and (b) a color to map to the closest palette color as angle alpha.</p>
+    <p class="" style="">Output: A palette color as R, G, B triplet.</p>
+    <p class="" style="">Note: See <a href="#algorithm-genpalette">Conversion of an RGB color palette to a Hue palette</a> on how to convert an R, G, B triplet to an angle.</p>
+    <ol start="" class="" style="">
+      <li class="" style="">First, check if alpha rounded to an integer. If so, return that match immediately.</li>
+      <li class="" style="">For each angle beta in the palette, calculate the distance metric: <figure class="code"><figcaption></figcaption><pre class="prettyprint">D = min((alpha - beta) % 360, (beta - alpha) % 360)</pre></figure>.</li>
+      <li class="" style="">Return the R, G, B triplet associated with the angle with the smallest distance metric D.</li>
+    </ol>
+    <p class="" style="">Implementations are free to choose a representation for palette colors different from R, G, B triplets. The exact representation does not matter, as long as it can be converted to a Hue angle accordingly.</p>
+  </div>
+<h2 id="impl">6.
+       Implementation Notes<a class="anchor-link" href="#impl"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="impl-gamma">6.1 Gamma Correction<a class="anchor-link" href="#impl-gamma"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Implementations should be aware of Gamma correction and apply it as needed.</p>
+  </div>
+  <div class="indent"><h3 id="impl-norm">6.2 Normalization<a class="anchor-link" href="#impl-norm"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">When processing JIDs as text input, implementations MUST prepare the JID as it would for comparing it to another JID with a case-sensitive comparison function.</p>
+  </div>
+<h2 id="access">7.
+       Accessibility Considerations<a class="anchor-link" href="#access"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This specification describes the generation of colors for strings. Users with color vision deficiencies may have a lower range of distinguishable colors. Implementations should observe the usual recommendations regarding the use of color in that regard.</p>
+  <p class="" style="">Some users may find a huge variety of colors on their screen distracting. Any implementation making use of this color generation algorithm should support replacing all generated colors with a static, potentially user-configurable, color.</p>
+  <p class="" style="">Implementations should adapt the lightness value according to the background on which the color is rendered in order to achieve a good contrast ratio.</p>
+<h2 id="security">8.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This specification extracts a bit more information from an entity and shows it alongside the existing information to the user. As the algorithm is likely to produce different colors for look-alikes (see <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0165.html">Best Practices to Prevent JID Mimicking (XEP-0165)</a></span>  [<a href="#nt-idm45385512435168">4</a>] for examples) in JIDs, it may add additional protection against attacks based on those.</p>
+  <p class="" style="">Due to the limited set of distinguishable colors and only extracting 16 bits of the hash function output, possible Color Vision Deficiencies and/or use of palettes, entities MUST NOT rely on colors being unique in any context.</p>
+<h2 id="design">9.
+       Design Considerations<a class="anchor-link" href="#design"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This section provides an overview of design considerations made while writing this specification. It shows alternatives which have been considered, and eventually rejected.</p>
+  <div class="indent"><h3 id="design-ycbcr">9.1 The YCbCr color space<a class="anchor-link" href="#design-ycbcr"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The versions up to 0.5 of this document used a variant of the YCbCr color space (namely <span class="ref" style=""><a href="https://www.itu.int/rec/R-REC-BT.601-7-201103-I/en">BT.601</a></span>  [<a href="#nt-idm45385512424592">5</a>]) along with a custom algorithm to convert from angles to CbCr and from there to RGB. The HSLuv color space provides extremely consistent apparent brightness of the colors which cannot be achieved with simple application of YCbCr. In addition, HSLuv has widespread library support.</p>
+  </div>
+  <div class="indent"><h3 id="design-hsv">9.2 Hue-Saturation-Value/Lightness color space<a class="anchor-link" href="#design-hsv"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The HSV and HSL color spaces fail to provide uniform luminosity with fixed value/lightness and saturation parameters. Adapting those parameters for uniform luminosity across the hue range would have complicated the algorithm with litte to no gain.</p>
+  </div>
+  <div class="indent"><h3 id="design-context">9.3 Palette-based and context-aware coloring<a class="anchor-link" href="#design-context"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">Given a fixed-size and finite palette of colors, it would be possible to ensure that, until the number of entities to color exceeds the number of colors, no color collisions happen.</p>
+    <p class="" style="">There are issues with this approach when the set of entities is dynamic. In such cases, it is possible that an entity changes its associated color (for example by re-joining a colored group chat), which defeats the original purpose.</p>
+    <p class="" style="">In addition, more state needs to be taken into account, increasing the complexity of choosing a color.</p>
+  </div>
+  <div class="indent"><h3 id="design-mixing">9.4 Choice of mixing function in angle generation<a class="anchor-link" href="#design-mixing"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">This specification needs to collapse an arbitrarily long string into just a few bits (the angle in the CbCr plane). To do so, SHA-1 (<span class="ref" style=""><a href="http://tools.ietf.org/html/rfc3174">RFC 3174</a></span>  [<a href="#nt-idm45385512481008">3</a>]) is used.</p>
+    <p class="" style="">CRC32 and Adler32 have been considered as faster alternatives. Downsides of these functions:</p>
+    <ul class="" style="">
+      <li class="" style="">Bad mixing without additional entropy.</li>
+      <li class="" style="">Adler32 is rarely available in standard libraries.</li>
+      <li class="" style="">CRC32 is ambiguous: there are multiple polynomials in widespread use (e.g. the Ethernet and the zlib polynomials). Often it is not clear which polynomial is used by a library.</li>
+    </ul>
+    <p class="" style="">SHA-1 is widely available. From a security point of view, the exact choice of hash function does not matter here, since it is truncated to 16 bits. At this length, any cryptographic hash function is weak.</p>
+  </div>
+  <div class="indent"><h3 id="design-palette-mapping">9.5 Palette-mapping function<a class="anchor-link" href="#design-palette-mapping"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The palette-mapping algorithm operates on angles only and disregards the lightness value except if the angles match. This has the downside that the brightness is not equal over the range of the palette mapped colors.</p>
+    <p class="" style="">The alternative would be to require the lightness to be close to the target lightness. This has several issues:</p>
+    <ul class="" style="">
+      <li class="" style="">We cannot know if a palette can satisfy the given lightness at all.</li>
+      <li class="" style="">Many colors from e.g. the "Web Safe" palette (used in 256 color terminals and the test vectors) will not satisfy any given lightness, reducing the size of the effective palette drastically.</li>
+    </ul>
+    <p class="" style="">For the sake of having more colors available, the given algorithm was chosen which prefers many colors with hue conformance over fewer colors with hue and lightness conformance.</p>
+  </div>
+  <div class="indent"><h3 id="design-cvd-corr">9.6 Color Vision Deficiency corrections<a class="anchor-link" href="#design-cvd-corr"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">An earlier version of this spec included a makeshift algorithm to correct for Color Vision Deficiencies. However, this was considered suboptimal for the following reasons:</p>
+    <ul class="" style="">
+      <li class="" style="">Any operating system level Color Vision Deficiency correction is likely to produce better results.</li>
+      <li class="" style="">The actual benefit from an accessibility point of view is unclear, given that the Color Vision Deficiency itself already reduces the dynamic range; if the Color Vision Deficiency correction algorithm and the Color Vision Deficiency are not fully in tune about the range reduction, unnecessary additional loss of information may occur.</li>
+      <li class="" style="">The algorithms introduced significant complexity on some platforms.</li>
+    </ul>
+    <p class="" style="">Future versions of this spec may re-introduce recommendations if especially the second point can be refuted by credible sources.</p>
+  </div>
+<h2 id="iana">10.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm45385512382608">6</a>]. </p>
+<h2 id="registrar">11.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45385512379920">7</a>]. </p>
+<h2 id="acknowledgements">12.
+       Acknowledgements<a class="anchor-link" href="#acknowledgements"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Thanks to Klaus Herberth, Daniel Gultsch, Georg Lukas, Tobias Markmann, Christian Schudt, and Marcus Waldvogel for their input and feedback on this document.</p>
+<h2 id="vectors">13.
+       Test Vectors<a class="anchor-link" href="#vectors"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="testvectors-fullrange">13.1 Test Vectors<a class="anchor-link" href="#testvectors-fullrange"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">This section holds test vectors. The test vectors are provided as Comma Separated Values. Strings are enclosed by single quotes ('). The first line contains a header. Each row contains, in that order, the original text, the text encoded as UTF-8 as hexadecimal octets, the angle in degrees, the calculated hue in degrees (hue and angle are the same as of version 0.8.0), and the Red, Green, and Blue values at saturation 100 and lightness 50.</p>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">text,hextext,angle,hue,r,g,b
+'Romeo','526f6d656f',327.255249,327.255249,0.865,0.000,0.686
+'juliet@capulet.lit','6a756c69657440636170756c65742e6c6974',209.410400,209.410400,0.000,0.515,0.573
+'😺','f09f98ba',331.199341,331.199341,0.872,0.000,0.659
+'council','636f756e63696c',359.994507,359.994507,0.918,0.000,0.394
+'Board','426f617264',171.430664,171.430664,0.000,0.527,0.457</pre></figure>
+  </div>
+  <div class="indent"><h3 id="testvectors-palette">13.2 Test Vectors for mapping to 216 color palette<a class="anchor-link" href="#testvectors-palette"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The used palette can be generated by sampling the RGB cube evenly with six samples on each axis (resulting in 210 colors (grayscales are excluded)). The resulting palette is commonly known as the palette of so-called "Web Safe" colors.</p>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">text,hextext,hue,best_hue,r,g,b
+'Romeo','526f6d656f',327.255249,327,1.000,0.000,0.800
+'juliet@capulet.lit','6a756c69657440636170756c65742e6c6974',209.410400,226,0.000,0.800,1.000
+'😺','f09f98ba',331.199341,331,1.000,0.400,0.800
+'council','636f756e63696c',359.994507,359,0.800,0.200,0.400
+'Board','426f617264',171.430664,161,0.000,1.000,0.800</pre></figure>
+  </div>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0392</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Draft">Stable</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>1.0.1</dd><dt>Last Updated</dt><dd>2025-10-03</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>
+                None
+              </dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>colors</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0392.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0392.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0392.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Jonas Schäfer</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:jonas@wielicki.name">jonas@wielicki.name</a></dd><dt>JabberID</dt><dd><a href="xmpp:jonas@wielicki.name">jonas@wielicki.name</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45385512495984">1</a>. HSLuv &lt;<a href="http://www.hsluv.org/">http://www.hsluv.org/</a>&gt;.</p><p><a name="nt-idm45385512491552">2</a>. RFC 3269: UTF-8, a transformation format of ISO 10646 &lt;<a href="http://tools.ietf.org/html/rfc3269">http://tools.ietf.org/html/rfc3269</a>&gt;.</p><p><a name="nt-idm45385512481008">3</a>. RFC 3174: US Secure Hash Algorithm 1 (SHA1) &lt;<a href="http://tools.ietf.org/html/rfc3174">http://tools.ietf.org/html/rfc3174</a>&gt;.</p><p><a name="nt-idm45385512435168">4</a>. XEP-0165: Best Practices to Prevent JID Mimicking &lt;<a href="https://xmpp.org/extensions/xep-0165.html">https://xmpp.org/extensions/xep-0165.html</a>&gt;.</p><p><a name="nt-idm45385512424592">5</a>. BT.601: Studio encoding parameters of digital television for standard 4:3 and wide screen 16:9 aspect ratios &lt;<a href="https://www.itu.int/rec/R-REC-BT.601-7-201103-I/en">https://www.itu.int/rec/R-REC-BT.601-7-201103-I/en</a>&gt;</p><p><a name="nt-idm45385512382608">6</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm45385512379920">7</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v1.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0392-1.0.1.html">1.0.1</a> (2025-10-03)<a class="anchor-link" href="#revision-history-v1.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Add missing saturation and lightness information to compute the test vectors.</p><div class="revision-author">egp</div></li><li id="revision-history-v1.0.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0392-1.0.0.html">1.0.0</a> (2024-03-27)<a class="anchor-link" href="#revision-history-v1.0.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Accept as Stable as per Council Vote from 2024-03-27.<div class="revision-author">XEP Editor (dg)</div></li><li id="revision-history-v0.8.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0392-0.8.0.html">0.8.0</a> (2021-10-26)<a class="anchor-link" href="#revision-history-v0.8.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Remove Color Vision Deficiency correction algorithms and substitute
+        them with a better recommendation.</p>
+    <div class="revision-author">jsc</div></li><li id="revision-history-v0.7.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0392-0.7.0.html">0.7.0</a> (2019-10-16)<a class="anchor-link" href="#revision-history-v0.7.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Remove anything except the Hue generation from the specification. The
+        other parts were user interface suggestions which are out of scope for
+        the XSF standards process.</p>
+    <div class="revision-author">jsc</div></li><li id="revision-history-v0.6.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0392-0.6.0.html">0.6.0</a> (2018-10-02)<a class="anchor-link" href="#revision-history-v0.6.0"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Fix CVD rules: they were incorrect in the last update.</p>
+      <p class="" style="">Update test vectors after CVD fix.</p>
+      <p class="" style="">Add note about floating-point modulo operator implementation interoperability.</p>
+    <div class="revision-author">jsc</div></li><li id="revision-history-v0.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0392-0.5.html">0.5</a> (2018-10-01)<a class="anchor-link" href="#revision-history-v0.5"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Switch from custom YCbCr-based algorithm to HSLuv.</p>
+      <p class="" style="">Prioritize bare JIDs over nicknames.</p>
+      <p class="" style="">Write down normalization rules.</p>
+    <div class="revision-author">jsc</div></li><li id="revision-history-v0.4.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0392-0.4.1.html">0.4.1</a> (2018-07-28)<a class="anchor-link" href="#revision-history-v0.4.1"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Fix a typo. (thanks zinid)</p>
+    <div class="revision-author">egp</div></li><li id="revision-history-v0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0392-0.4.html">0.4</a> (2017-11-29)<a class="anchor-link" href="#revision-history-v0.4"><abbr title="Link to this point in the document">¶</abbr></a></div>
+      <p class="" style="">Use different formulas for Color Vision Deficiency correction, as suggested by Marcus Waldvogel.</p>
+      <p class="" style="">Update test vectors.</p>
+      <p class="" style="">Clarify generation of the angle.</p>
+      <p class="" style="">Prioritize nicknames over bare JIDs.</p>
+      <p class="" style="">Add rationale for new palette mapping algorithm introduced in 0.3.</p>
+    <div class="revision-author">jwi</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0392-0.3.html">0.3</a> (2017-11-13)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">
+      Fix wording in angle generation section which did still use CRC32.
+      Rework palette mapping after with implementation experience.
+    </p><div class="revision-author">jwi</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0392-0.2.html">0.2</a> (2017-10-04)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">
+        Move to SHA-1 as mixing function;
+        Properly reference BT.601 and include constants in text;
+        Prefer bare JID over roster name when selecting the hash function input;
+        Editing.
+    </p><div class="revision-author">jwi</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0392-0.1.html">0.1</a> (2017-09-27)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Accepted as Experimental by Council.</p><div class="revision-author">XEP Editor: jwi</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0392-0.0.1.html">0.0.1</a> (2017-09-14)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">jwi</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{schäfer2017colors,
+  title = {Consistent Color Generation},
+  author = {Schäfer, Jonas},
+  type = {XEP},
+  number = {0392},
+  version = {1.0.1},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0392.html},
+  date = {2017-09-14/2025-10-03},
+}</pre><p>END</p></body></html>

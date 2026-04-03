@@ -1,0 +1,320 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0444: Message Reactions</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0444";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Message Reactions"><meta name="DC.Creator" content="Natalie Wirth"><meta name="DC.Creator" content="Marvin Wißfeld"><meta name="DC.Description" content="This specification defines a way for adding reactions to a message."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2024-04-15"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0444"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0444: Message Reactions</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification defines a way for adding reactions to a message.</dd><dt>Authors</dt><dd><ul class="authors"><li>Natalie Wirth</li><li>Marvin Wißfeld</li></ul></dd><dt>Copyright</dt><dd>© 2019 – 2024 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Experimental</p><div id="status-notice" class="experimental standards track">WARNING: This Standards-Track document is Experimental. Publication as an XMPP Extension Protocol does not imply approval of this proposal by the XMPP Standards Foundation. Implementation of the protocol described herein is encouraged in exploratory implementations, but production systems are advised to carefully consider whether it is appropriate to deploy implementations of this protocol before it advances to a status of Draft.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>0.2.1 (2024-04-15)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li class="current">Experimental</li><li>Proposed</li><li>Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#disco">Discovering support</a><ol><li><a href="#disco-base">Basic support</a></li><li><a href="#disco-restricted">Restricted reactions</a></li></ol></li><li><a href="#usecases">Use Cases</a><ol><li><a href="#sending-reactions">Sending reactions to a message</a></li><li><a href="#updating-reactions">Updating reactions to a message</a></li><li><a href="#rejecting">Rejecting a reaction</a></li></ol></li><li><a href="#rules">Business Rules</a><ol><li><a href="#acceptable-reactions">Acceptable reactions</a></li><li><a href="#business-id">Using the correct ID</a></li></ol></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#ns">Protocol Namespaces</a></li></ol></li><li><a href="#schema">XML Schema</a><ol><li><a href="#schema-reactions">urn:xmpp:reactions:0</a></li></ol></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">
+    Message reactions allow to express an opinion or feeling towards a message
+    in a quick and light-weight way. Reactions are described in the form of
+    emojis and can enhance communication especially when chatting with multiple
+    parties. Other possible uses include voting and checking to-do list items.
+  </p>
+  <p class="" style="">
+    Reactions are typically displayed in a summarized fashion visually attached
+    to the message they belong to.
+  </p>
+  <p class="" style="">
+    Related work has been done in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0367.html">Message Attaching (XEP-0367)</a></span>  [<a href="#nt-idm46112632209568">1</a>]. However, it can't be used for
+    reactions, as it would cause difficulties with non-supporting clients, is
+    not tailored to emojis and does not specify removal of reactions. To solve
+    these issues, this XEP introduces a separate XML element for reactions.
+  </p>
+<h2 id="disco">2.
+       Discovering support<a class="anchor-link" href="#disco"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="disco-base">2.1 Basic support<a class="anchor-link" href="#disco-base"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">
+      If a client implements message reactions, it MUST specify the 
+      'urn:xmpp:reactions:0' feature in its service discovery information features
+      as specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm46112632202400">2</a>] and the Entity Capabilities profile specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm46112632193152">3</a>].
+    </p>
+    <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Client requests information about a chat partner's client<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='get'
+    to='romeo@montague.lit/orchard'
+    from='juliet@capulet.lit/balcony'
+    id='info1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;</pre></figure>
+    <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Partner's client advertises support for reactions<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result'
+    to='juliet@capulet.lit/balcony'
+    from='romeo@montague.lit/orchard'
+    id='info1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+...
+    &lt;feature var='urn:xmpp:reactions:0'/&gt;
+...
+  &lt;/query&gt;
+  &lt;/iq&gt;</pre></figure>
+  </div>
+  <div class="indent"><h3 id="disco-restricted">2.2 Restricted reactions<a class="anchor-link" href="#disco-restricted"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">
+      In some cases, only a limited number and/or subset
+      of emojis are allowed to react to a message.
+      This is particularly useful in the context of gateways to other chat
+      networks that are not as permissive about which and how many emojis
+      can be used for message reactions.
+      MUC components may also allow room admins to restrict the subset and/or number
+      of emojis per message.
+    </p>
+    <p class="" style="">
+      To allow clients to adapt their UIs, entities that have such restrictions in place
+      SHOULD advertise it with <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0128.html">Service Discovery Extensions (XEP-0128)</a></span>  [<a href="#nt-idm46112632187568">4</a>] in a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0004.html">Data Forms (XEP-0004)</a></span>  [<a href="#nt-idm46112632178096">5</a>] using the
+      'urn:xmpp:reactions:0:restrictions' namespace as FORM_TYPE.
+    </p>
+    <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Entities advertises support for restricted reactions<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq type='result'
+    to='juliet@capulet.lit/balcony'
+    from='romeo@montague.lit/orchard'
+    id='info1'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+  ...
+    &lt;feature var='urn:xmpp:reactions:0'/&gt;
+    &lt;x xmlns='jabber:x:data' type='result'&gt;
+      &lt;field var='FORM_TYPE' type='hidden'&gt;
+        &lt;value&gt;urn:xmpp:reactions:0:restrictions&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='max_reactions_per_user'&gt;
+        &lt;value&gt;1&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='allowlist'&gt;
+        &lt;value&gt;💘&lt;/value&gt;
+        &lt;value&gt;❤️&lt;/value&gt;
+        &lt;value&gt;💜&lt;/value&gt;
+      &lt;/field&gt;
+    &lt;/x&gt; 
+  ...
+  &lt;/query&gt;
+&lt;/iq&gt;</pre></figure>
+  </div>
+<h2 id="usecases">3.
+       Use Cases<a class="anchor-link" href="#usecases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="sending-reactions">3.1 Sending reactions to a message<a class="anchor-link" href="#sending-reactions"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">
+      When a user chooses to react to a message with a certain emoji, the
+      client sends a &lt;message&gt; stanza containing a &lt;reactions&gt;
+      element. The chosen emoji is included in a &lt;reaction&gt; element within
+      the &lt;reactions&gt; element. The message is referred to by including its
+      ID or in MUCs its stanza-id as defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0359.html">Unique and Stable Stanza IDs (XEP-0359)</a></span>  [<a href="#nt-idm46112632173072">6</a>] in the 'id' attribute
+      of the &lt;reactions&gt; element.
+    </p>
+    <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Romeo sends a message<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='juliet@capulet.net/balcony' id='744f6e18-a57a-11e9-a656-4889e7820c76' type='chat'&gt;
+  &lt;body&gt;Hello, world!&lt;/body&gt;
+&lt;/message&gt;</pre></figure>
+    <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> Juliet sends a 👋 reaction to the message<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='romeo@capulet.net/orchard' id='7fdd29fa-a57a-11e9-b04a-4889e7820c76' type='chat'&gt;
+  &lt;reactions id='744f6e18-a57a-11e9-a656-4889e7820c76' xmlns='urn:xmpp:reactions:0'&gt;
+    &lt;reaction&gt;👋&lt;/reaction&gt;
+  &lt;/reactions&gt;
+  &lt;store xmlns="urn:xmpp:hints"/&gt;
+&lt;/message&gt;</pre></figure>
+  </div>
+    <div class="indent"><h3 id="updating-reactions">3.2 Updating reactions to a message<a class="anchor-link" href="#updating-reactions"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">
+        If the user chooses to remove reactions from or add reactions to a
+        message they have already reacted to, the client sends a &lt;message&gt;
+        with all &lt;reaction&gt; elements that are (still or newly) applicable
+        to that message.
+      </p>
+      <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> Juliet adds a 🐢 reaction to the message<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='romeo@capulet.net/orchard' id='96d73204-a57a-11e9-88b8-4889e7820c76' type='chat'&gt;
+  &lt;reactions id='744f6e18-a57a-11e9-a656-4889e7820c76' xmlns='urn:xmpp:reactions:0'&gt;
+    &lt;reaction&gt;👋&lt;/reaction&gt;
+    &lt;reaction&gt;🐢&lt;/reaction&gt;
+  &lt;/reactions&gt;
+  &lt;store xmlns="urn:xmpp:hints"/&gt;
+&lt;/message&gt;</pre></figure>
+      <p class="" style="">
+        In order to remove all reactions from a message, an empty
+        &lt;reactions&gt; element is sent.
+      </p>
+      <figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> Juliet removes all reactions from the message<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message to='romeo@capulet.net/orchard' id='973c9d2e-a57a-11e9-af82-4889e7820c76' type='chat'&gt;
+  &lt;reactions id='744f6e18-a57a-11e9-a656-4889e7820c76' xmlns='urn:xmpp:reactions:0'/&gt;
+  &lt;store xmlns="urn:xmpp:hints"/&gt;
+&lt;/message&gt;</pre></figure>
+  </div>
+  <div class="indent"><h3 id="rejecting">3.3 Rejecting a reaction<a class="anchor-link" href="#rejecting"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">
+      Entities implementing reaction restrictions MUST reply to invalid reactions payloads
+      with a message type="error" containing a 'not-acceptable' error.
+      The error payload SHOULD contain a human-readable text message explaining the reaction rules.
+    </p>
+    <figure class="code-example" id="example-8"><figcaption><strong>Example 8.</strong> Romeo sends a message<a class="anchor-link" href="#example-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message from="romeo@legacy-love-network.capulet.net"
+        to='juliet@capulet.net'
+        id='restricted-reactions-1'
+        type='chat'&gt;
+  &lt;body&gt;I shall only accept heart emojis as reactions&lt;/body&gt;
+&lt;/message&gt;</pre></figure>
+    <figure class="code-example" id="example-9"><figcaption><strong>Example 9.</strong> Juliet reacts with both a 💘 and a 💜<a class="anchor-link" href="#example-9"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message from="juliet@capulet.net"
+        to='romeo@legacy-love-network.capulet.net'
+        id='will-be-rejected1'
+        type='chat'&gt;
+  &lt;reactions id='restricted-reactions-1' xmlns='urn:xmpp:reactions:0'&gt;
+    &lt;reaction&gt;💘&lt;/reaction&gt;
+    &lt;reaction&gt;💜&lt;/reaction&gt;
+  &lt;/reactions&gt;
+  &lt;store xmlns="urn:xmpp:hints"/&gt;
+&lt;/message&gt;</pre></figure>
+    <figure class="code-example" id="example-10"><figcaption><strong>Example 10.</strong> Romeo rejects the reactions<a class="anchor-link" href="#example-10"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message from="romeo@legacy-love-network.capulet.net"
+        to="juliet@capulet.net"
+        type="error"
+        id="will-be-rejected1"&gt;
+  &lt;error xmlns="jabber:client" type="modify"&gt;
+    &lt;not-acceptable xmlns="urn:ietf:params:xml:ns:xmpp-stanzas" /&gt;
+    &lt;text xmlns="urn:ietf:params:xml:ns:xmpp-stanzas"&gt;
+      Only 💘, ❤️ and 💜 are allowed as reactions on this legacy IM network,
+      and you can only use a single emoji at once.
+    &lt;/text&gt;
+  &lt;/error&gt;
+&lt;/message&gt;</pre></figure>
+    <p class="" style="">
+      When receiving this error message, the reaction-sending entity MUST revert the "message reactions"
+      to its previous state in its user interface.
+    </p>
+  </div>
+<h2 id="rules">4.
+       Business Rules<a class="anchor-link" href="#rules"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Messages MUST NOT contain more than one &lt;reactions&gt; element</p>
+  <p class="" style="">
+    A message containing a &lt;reactions&gt; element SHOULD be of type 'chat'
+    or 'groupchat'.
+  </p>
+  <p class="" style="">
+    A &lt;reaction&gt; element SHOULD only contain Unicode codepoints that can
+    be displayed as a single emoji, as specified in the latest revision of the
+    <a href="http://www.unicode.org/reports/tr51/">Unicode® Technical Standard #51</a>  [<a href="#nt-idm46112632152768">7</a>].
+    Receiving entities MAY ignore &lt;reaction&gt; elements that do not comply
+    with this specification.
+  </p>
+  <p class="" style="">
+    A receiving client SHOULD show reactions attached to the message they were
+    in response to. Reactions MAY be displayed in a summarized fashion.
+  </p>
+  <p class="" style="">
+    A &lt;reactions&gt; element MUST NOT contain the same reaction more than
+    once. A receiving entity SHOULD ignore duplicate reactions inside a
+    &lt;reactions&gt; element.
+  </p>
+  <p class="" style="">
+    The sending entity SHOULD add a &lt;store/&gt; hint, as defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0334.html">Message Processing Hints (XEP-0334)</a></span>  [<a href="#nt-idm46112632145600">8</a>],
+    if the message being reacted to does not carry a &lt;no-store/&gt; hint.
+  </p>
+  <p class="" style="">
+    If a message is updated using <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0308.html">Last Message Correction (XEP-0308)</a></span>  [<a href="#nt-idm46112632141680">9</a>], the 'id' attribute of the
+    &lt;reactions&gt; element SHOULD reference the original message ID.
+    A receiving entity SHOULD accept messages with a &lt;reactions&gt; element
+    referencing a message correction and SHOULD handle such elements as if
+    it was using the message ID of the original message.
+  </p>
+  <div class="indent"><h3 id="acceptable-reactions">4.1 Acceptable reactions<a class="anchor-link" href="#acceptable-reactions"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">
+      In direct conversations, a reaction MUST only be accepted if the sender's
+      bare JID matches the bare JID of any of the two involved parties.
+    </p>
+    <p class="" style="">
+      In MUCs and MUC PMs, the recipient SHOULD ensure that the real bare JID of
+      the sending occupant did not already send a reaction to that message to
+      accept it as a new reaction, e.g. by keeping track of leave/join
+      presences since the message was sent. This implies that in semi-anonymous
+      MUCs it MAY be impossible to attach reactions to a message received from
+      the history. A reaction MAY still be a valid reaction update (as per the
+      next paragraph) if it was not accepted as a new reaction.
+    </p>
+    <p class="" style="">
+      A reaction MUST only be considered an update if it orignates from the same
+      sender as a previous reaction message. In direct conversations, this means
+      the bare JID MUST match the original bare JID. In MUCs and MUC PMs, the
+      sender's full JID MAY not match the original full JID, but the recipient
+      MUST ensure that the real bare JID of the sending occupant is the same as
+      the real bare JID of the previous reaction message, e.g. by keeping track
+      of leave/join presences.
+    </p>
+    <p class="" style="">
+      If a message containing a &lt;reactions&gt; element arrives delayed, which
+      means it carries a &lt;delay/&gt; element as defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0203.html">Delayed Delivery (XEP-0203)</a></span>  [<a href="#nt-idm46112632127792">10</a>], it SHOULD
+      only be accepted if no newer reaction from the same sender was already
+      accepted.
+    </p>
+  </div>
+  <div class="indent"><h3 id="business-id">4.2 Using the correct ID<a class="anchor-link" href="#business-id"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">
+      For messages of type 'groupchat', the stanza's 'id' attribute MUST NOT be
+      used for reactions. Instead, in group chat situations, the ID assigned to
+      the stanza by the group chat itself must be used. This is discovered in a
+      &lt;stanza-id&gt; element with a 'by' attribute that matches the bare JID
+      of the group chat, as defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0359.html">Unique and Stable Stanza IDs (XEP-0359)</a></span>  [<a href="#nt-idm46112632173072">6</a>].
+    </p>
+    <p class="" style="">
+      This implies that group chat messages without a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0359.html">Unique and Stable Stanza IDs (XEP-0359)</a></span>  [<a href="#nt-idm46112632173072">6</a>] stanza-id cannot
+      be reacted to.
+    </p>
+    <p class="" style="">
+      For other message types, the sender should use the 'id' from a <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0359.html">Unique and Stable Stanza IDs (XEP-0359)</a></span>  [<a href="#nt-idm46112632173072">6</a>]
+      &lt;origin-id&gt; if present, or the value of the 'id' attribute on the
+      &lt;message&gt; otherwise.
+    </p>
+  </div>
+<h2 id="iana">5.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm46112632109072">11</a>].</p>
+<h2 id="registrar">6.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="ns">6.1 Protocol Namespaces<a class="anchor-link" href="#ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm46112632101728">12</a>] includes 'urn:xmpp:reactions:0' in its registry of protocol namespaces (see &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt;).</p>
+    <ul class="" style="">
+      <li class="" style="">urn:xmpp:reactions:0</li>
+    </ul>
+  </div>
+<h2 id="schema">7.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="schema-reactions">7.1 urn:xmpp:reactions:0<a class="anchor-link" href="#schema-reactions"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='urn:xmpp:reactions:0'
+    xmlns='urn:xmpp:reactions:0'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:element name='reactions'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:sequence minOccurs='0' maxOccurs='unbounded'&gt;
+        &lt;xs:element name='reaction' type='xs:string'/&gt;
+      &lt;/xs:sequence&gt;
+      &lt;xs:attribute name='id' type='xs:string' use='required'/&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+&lt;/xs:schema&gt;</pre></figure>
+  </div>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0444</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Experimental">Experimental</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>0.2.1</dd><dt>Last Updated</dt><dd>2024-04-15</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, <a href="xep-0001.html">XEP-0001</a>, <a href="xep-0030.html">XEP-0030</a>, <a href="xep-0115.html">XEP-0115</a>, <a href="xep-0203.html">XEP-0203</a>, <a href="xep-0334.html">XEP-0334</a>, <a href="xep-0359.html">XEP-0359</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>reactions</dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0444.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0444.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0444.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Natalie Wirth</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:nataliew@laposte.net">nataliew@laposte.net</a></dd></dl><h5>Marvin Wißfeld</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:xmpp@larma.de">xmpp@larma.de</a></dd><dt>JabberID</dt><dd><a href="xmpp:jabber@larma.de">jabber@larma.de</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm46112632209568">1</a>. XEP-0367: Message Attaching &lt;<a href="https://xmpp.org/extensions/xep-0367.html">https://xmpp.org/extensions/xep-0367.html</a>&gt;.</p><p><a name="nt-idm46112632202400">2</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm46112632193152">3</a>. XEP-0115: Entity Capabilities &lt;<a href="https://xmpp.org/extensions/xep-0115.html">https://xmpp.org/extensions/xep-0115.html</a>&gt;.</p><p><a name="nt-idm46112632187568">4</a>. XEP-0128: Service Discovery Extensions &lt;<a href="https://xmpp.org/extensions/xep-0128.html">https://xmpp.org/extensions/xep-0128.html</a>&gt;.</p><p><a name="nt-idm46112632178096">5</a>. XEP-0004: Data Forms &lt;<a href="https://xmpp.org/extensions/xep-0004.html">https://xmpp.org/extensions/xep-0004.html</a>&gt;.</p><p><a name="nt-idm46112632173072">6</a>. XEP-0359: Unique and Stable Stanza IDs &lt;<a href="https://xmpp.org/extensions/xep-0359.html">https://xmpp.org/extensions/xep-0359.html</a>&gt;.</p><p><a name="nt-idm46112632152768">7</a>. Unicode® Technical Standard #51 &lt;<a href="http://www.unicode.org/reports/tr51/">http://www.unicode.org/reports/tr51/</a>&gt;.</p><p><a name="nt-idm46112632145600">8</a>. XEP-0334: Message Processing Hints &lt;<a href="https://xmpp.org/extensions/xep-0334.html">https://xmpp.org/extensions/xep-0334.html</a>&gt;.</p><p><a name="nt-idm46112632141680">9</a>. XEP-0308: Last Message Correction &lt;<a href="https://xmpp.org/extensions/xep-0308.html">https://xmpp.org/extensions/xep-0308.html</a>&gt;.</p><p><a name="nt-idm46112632127792">10</a>. XEP-0203: Delayed Delivery &lt;<a href="https://xmpp.org/extensions/xep-0203.html">https://xmpp.org/extensions/xep-0203.html</a>&gt;.</p><p><a name="nt-idm46112632109072">11</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm46112632101728">12</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v0.2.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0444-0.2.1.html">0.2.1</a> (2024-04-15)<a class="anchor-link" href="#revision-history-v0.2.1"><abbr title="Link to this point in the document">¶</abbr></a></div>fix grammar and spelling<div class="revision-author">wb</div></li><li id="revision-history-v0.2.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0444-0.2.0.html">0.2.0</a> (2022-12-30)<a class="anchor-link" href="#revision-history-v0.2.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Add emoji rejection mechanism.<div class="revision-author">NC</div></li><li id="revision-history-v0.1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0444-0.1.1.html">0.1.1</a> (2022-12-30)<a class="anchor-link" href="#revision-history-v0.1.1"><abbr title="Link to this point in the document">¶</abbr></a></div>Add the XML Schema<div class="revision-author">egp</div></li><li id="revision-history-v0.1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0444-0.1.0.html">0.1.0</a> (2020-10-13)<a class="anchor-link" href="#revision-history-v0.1.0"><abbr title="Link to this point in the document">¶</abbr></a></div>Accepted by vote of Council on 2020-10-07.<div class="revision-author">XEP Editor (jsc)</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0444-0.0.1.html">0.0.1</a> (2019-07-14)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">nw/mw</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{wirth2019reactions,
+  title = {Message Reactions},
+  author = {Wirth, Natalie and Wißfeld, Marvin},
+  type = {XEP},
+  number = {0444},
+  version = {0.2.1},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0444.html},
+  date = {2019-07-14/2024-04-15},
+}</pre><p>END</p></body></html>

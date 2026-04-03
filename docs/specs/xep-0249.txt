@@ -1,0 +1,165 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0249: Direct MUC Invitations</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0249";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Direct MUC Invitations"><meta name="DC.Creator" content="Peter Saint-Andre"><meta name="DC.Description" content="This specification defines a method for inviting a contact to a multi-user chat room directly, instead of sending the invitation through the chat room."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2011-09-22"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0249"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0249: Direct MUC Invitations</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This specification defines a method for inviting a contact to a multi-user chat room directly, instead of sending the invitation through the chat room.</dd><dt>Author</dt><dd>Peter Saint-Andre</dd><dt>Copyright</dt><dd>© 2008 – 2011 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Stable</p><div id="status-notice" class="draft standards track">NOTICE: The protocol defined herein is a <strong>Stable Standard</strong> of the XMPP Standards Foundation. Implementations are encouraged and the protocol is appropriate for deployment in production systems, but some changes to the protocol are possible before it becomes a Final Standard.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>1.2 (2011-09-22)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li class="current">Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a></li><li><a href="#howitworks">How It Works</a></li><li><a href="#support">Determining Support</a></li><li><a href="#impl">Implementation Notes</a></li><li><a href="#security">Security Considerations</a></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#ns">Protocol Namespaces</a></li></ol></li><li><a href="#schema">XML Schema</a></li><li><a href="#ack">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style=""><span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45735677469568">1</a>] defines a protocol for groupchat over XMPP. That specification includes a method for inviting a contact to a room, where the invitation is mediated by the room itself: the user sends the invitation to the room, which in turn sends it to the contact. Unfortunately, a mediated invitation might not be delivered to the contact, for example if the contact blocks communication with entities not in its roster as specified in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0016.html">Privacy Lists (XEP-0016)</a></span>  [<a href="#nt-idm45735677460016">2</a>]. As privacy lists have become more common, MUC invitations have been increasingly blocked at the server side, resulting in an undesirable user experience. Therefore, this specification defines a method for sending an invitation directly from the user to the contact, which re-uses the original 'jabber:x:conference' namespace in use before <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45735677469568">1</a>] was written (with the addition of 'reason', 'continue', and 'thread' attributes for feature parity with mediated invitations).</p>
+<h2 id="howitworks">2.
+       How It Works<a class="anchor-link" href="#howitworks"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">A user invites a contact to a room by sending a &lt;message/&gt; stanza containing only an &lt;x/&gt; element qualified by the 'jabber:x:conference' namespace.</p>
+  <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> A direct invitation<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='crone1@shakespeare.lit/desktop'
+    to='hecate@shakespeare.lit'&gt;
+  &lt;x xmlns='jabber:x:conference'
+     jid='darkcave@macbeth.shakespeare.lit'
+     password='cauldronburn'
+     reason='Hey Hecate, this is the place for all good witches!'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">The 'jid' attribute, which is REQUIRED, specifies the address of the groupchat room to be joined.</p>
+  <p class="" style="">The 'password' attribute, which is OPTIONAL, specifies a password needed for entry into a password-protected room and maps to the &lt;password/&gt; element in a mediated invitation.</p>
+  <p class="" style="">The 'reason' attribute, which is OPTIONAL, specifies a human-readable purpose for the invitation and maps to the &lt;reason/&gt; element in a mediated invitation.</p>
+  <p class="" style="">The 'continue' and 'thread' attributes, which are OPTIONAL, specify that the groupchat room continues a one-to-one chat having the designated thread; these map to the &lt;continue/&gt; element (with 'thread' attribute) in a mediated invitation. Note that the 'continue' attribute has a datatype of boolean.  [<a href="#nt-idm45735677446624">3</a>]</p>
+  <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> A direct invitation that continues a one-to-one chat<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;message
+    from='crone1@shakespeare.lit/desktop'
+    to='hecate@shakespeare.lit'&gt;
+  &lt;x xmlns='jabber:x:conference'
+     continue='true'
+     jid='darkcave@macbeth.shakespeare.lit'
+     password='cauldronburn'
+     reason='Hey Hecate, this is the place for all good witches!'
+     thread='e0ffe42b28561960c6b12b944a092794b9683a38'/&gt;
+&lt;/message&gt;
+</pre></figure>
+  <p class="" style="">Upon receiving a direct invitation, the contact's client SHOULD present the invitation to the contact so that the contact can accept it or decline it. If the contact accepts the invitation, the contact's client shall join the room as described in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45735677469568">1</a>]. If the contact declines the invitation, it shall silently discard the invitation.</p>
+<h2 id="support">3.
+       Determining Support<a class="anchor-link" href="#support"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">If an entity supports the protocol specified herein, it MUST advertise that fact by returning a feature of "jabber:x:conference" in response to <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm45735677440320">4</a>] information requests (see <a href="#ns">Protocol Namespaces</a> regarding issuance of one or more permanent namespaces).</p>
+  <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Service discovery information request<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='crone1@shakespeare.lit/desktop'
+    id='disco1'
+    to='hecate@shakespeare.lit/broom'
+    type='get'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Service discovery information response<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='hecate@shakespeare.lit/broom'
+    id='disco1'
+    to='crone1@shakespeare.lit/desktop'
+    type='result'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+    &lt;feature var='jabber:x:conference'/&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <p class="" style="">In order for an application to determine whether an entity supports this protocol, where possible it SHOULD use the dynamic, presence-based profile of service discovery defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0115.html">Entity Capabilities (XEP-0115)</a></span>  [<a href="#nt-idm45735677433808">5</a>]. However, if an application has not received entity capabilities information from an entity, it SHOULD use explicit service discovery instead.</p>
+<h2 id="impl">4.
+       Implementation Notes<a class="anchor-link" href="#impl"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Before inviting a contact to a members-only room, a user SHOULD check to see if the contact is already a member and, if not, add the contact to the member list (or ask a room administrator to do so).</p>
+  <p class="" style="">If a client receives multiple invitations to the same room (e.g., a mediated invitation as defined in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm45735677469568">1</a>] and a direct invitation as defined here), the client SHOULD present only one of the invitations to a human user. If a client receives an invitation to a room in which the user is already an occupant, the client SHOULD silently discard the invitation.</p>
+<h2 id="security">5.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">The following attacks are possible, in roughly the order of probability. See also <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0205.html">Best Practices to Discourage Denial of Service Attacks (XEP-0205)</a></span>  [<a href="#nt-idm45735677418640">6</a>] and <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc3552">RFC 3552</a></span>  [<a href="#nt-idm45735677409040">7</a>].</p>
+  <ol start="" class="" style="">
+    <li class="" style=""><p class="" style="">The sender of an invitation could overload the 'reason' attribute with malicious or offensive text. The recipient can mitigate this attack by blocking the sender using technologies such as <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0016.html">Privacy Lists (XEP-0016)</a></span>  [<a href="#nt-idm45735677460016">2</a>] and <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0191.html">Blocking Command (XEP-0191)</a></span>  [<a href="#nt-idm45735677403360">8</a>].</p></li>
+    <li class="" style=""><p class="" style="">A passive attacker could flood the recipient with a large number of chatroom invitations. This attack, too, can be mitigated with <span class="ref">Privacy Lists</span> or <span class="ref">Simple Communications Blocking</span>.</p></li>
+    <li class="" style=""><p class="" style="">A passive attacker could use a mimicked JID to fool the recipient into thinking that the sender is a known or trusted contact. This attack requires knowledge of the recipient's known or trusted contacts, and can be mitigated by following the recommendations in <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0165.html">Best Practices to Prevent JID Mimicking (XEP-0165)</a></span>  [<a href="#nt-idm45735677393760">9</a>].</p></li>
+    <li class="" style=""><p class="" style="">In the absence of end-to-end encryption, a passive attacker could eavesdrop on the chatroom invitations that a user sends or receives. This is especially threatening if the invitation includes a 'password' attribute for a password-protected room.</p></li>
+    <li class="" style=""><p class="" style="">In the absence of end-to-end encryption or signing, an active attacker could modify the invitation in transit so that the recipient is directed to a different room than intended by the sender.</p></li>
+  </ol>
+<h2 id="iana">6.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm45735677383568">10</a>].</p>
+<h2 id="registrar">7.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <div class="indent"><h3 id="ns">7.1 Protocol Namespaces<a class="anchor-link" href="#ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm45735677376368">11</a>] includes 'jabber:x:conference' in its registry of protocol namespaces at &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt;, as described in Section 4 of <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0053.html">XMPP Registrar Function (XEP-0053)</a></span>  [<a href="#nt-idm45735677368848">12</a>].</p>
+  </div>
+<h2 id="schema">8.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='jabber:x:conference'
+    xmlns='jabber:x:conference'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+      The protocol documented by this schema is defined in
+      XEP-0249: http://www.xmpp.org/extensions/xep-0249.html
+    &lt;/xs:documentation&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:element name='x'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:simpleContent&gt;
+        &lt;xs:extension base='empty'&gt;
+          &lt;xs:attribute
+              name='continue'
+              type='xs:boolean'
+              use='optional'/&gt;
+          &lt;xs:attribute
+              name='jid'
+              type='xs:string'
+              use='required'/&gt;
+          &lt;xs:attribute
+              name='password'
+              type='xs:string'
+              use='optional'/&gt;
+          &lt;xs:attribute
+              name='reason'
+              type='xs:string'
+              use='optional'/&gt;
+          &lt;xs:attribute
+              name='thread'
+              type='xs:string'
+              use='optional'/&gt;
+        &lt;/xs:extension&gt;
+      &lt;/xs:simpleContent&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+  &lt;xs:simpleType name='empty'&gt;
+    &lt;xs:restriction base='xs:string'&gt;
+      &lt;xs:enumeration value=''/&gt;
+    &lt;/xs:restriction&gt;
+  &lt;/xs:simpleType&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+<h2 id="ack">9.
+       Acknowledgements<a class="anchor-link" href="#ack"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+  <p class="" style="">Thanks to Joe Hildebrand for his feedback.</p>
+<hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0249</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Draft">Stable</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>1.2</dd><dt>Last Updated</dt><dd>2011-09-22</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, <a href="xep-0045.html">XEP-0045</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>x-conference</dd><dt>Schema</dt><dd>
+        &lt;<a href="http://xmpp.org/schemas/x-conference.xsd">http://xmpp.org/schemas/x-conference.xsd</a>&gt;<br></dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0249.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0249.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0249.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Peter Saint-Andre</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:stpeter@stpeter.im">stpeter@stpeter.im</a></dd><dt>JabberID</dt><dd><a href="xmpp:stpeter@jabber.org">stpeter@jabber.org</a></dd><dt>URI</dt><dd><a href="https://stpeter.im/">https://stpeter.im/</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm45735677469568">1</a>. XEP-0045: Multi-User Chat &lt;<a href="https://xmpp.org/extensions/xep-0045.html">https://xmpp.org/extensions/xep-0045.html</a>&gt;.</p><p><a name="nt-idm45735677460016">2</a>. XEP-0016: Privacy Lists &lt;<a href="https://xmpp.org/extensions/xep-0016.html">https://xmpp.org/extensions/xep-0016.html</a>&gt;.</p><p><a name="nt-idm45735677446624">3</a>. In accordance with Section 3.2.2.1 of <span class="ref">XML Schema Part 2: Datatypes</span>, the allowable lexical representations for the xs:boolean datatype are the strings "0" and "false" for the concept 'false' and the strings "1" and "true" for the concept 'true'; implementations MUST support both styles of lexical representation.</p><p><a name="nt-idm45735677440320">4</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm45735677433808">5</a>. XEP-0115: Entity Capabilities &lt;<a href="https://xmpp.org/extensions/xep-0115.html">https://xmpp.org/extensions/xep-0115.html</a>&gt;.</p><p><a name="nt-idm45735677418640">6</a>. XEP-0205: Best Practices to Discourage Denial of Service Attacks &lt;<a href="https://xmpp.org/extensions/xep-0205.html">https://xmpp.org/extensions/xep-0205.html</a>&gt;.</p><p><a name="nt-idm45735677409040">7</a>. RFC 3552: Guidelines for Writing RFC Text on Security Considerations &lt;<a href="http://tools.ietf.org/html/rfc3552">http://tools.ietf.org/html/rfc3552</a>&gt;.</p><p><a name="nt-idm45735677403360">8</a>. XEP-0191: Blocking Command &lt;<a href="https://xmpp.org/extensions/xep-0191.html">https://xmpp.org/extensions/xep-0191.html</a>&gt;.</p><p><a name="nt-idm45735677393760">9</a>. XEP-0165: Best Practices to Prevent JID Mimicking &lt;<a href="https://xmpp.org/extensions/xep-0165.html">https://xmpp.org/extensions/xep-0165.html</a>&gt;.</p><p><a name="nt-idm45735677383568">10</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p><p><a name="nt-idm45735677376368">11</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p><p><a name="nt-idm45735677368848">12</a>. XEP-0053: XMPP Registrar Function &lt;<a href="https://xmpp.org/extensions/xep-0053.html">https://xmpp.org/extensions/xep-0053.html</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v1.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0249-1.2.html">1.2</a> (2011-09-22)<a class="anchor-link" href="#revision-history-v1.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added continue and thread attributes for feature parity with mediated invitations when converting a one-to-one chat to a groupchat.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0249-1.1.html">1.1</a> (2009-12-07)<a class="anchor-link" href="#revision-history-v1.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added password attribute for feature parity with mediated invitations.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0249-1.0.html">1.0</a> (2009-06-25)<a class="anchor-link" href="#revision-history-v1.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the XMPP Council, advanced specification from Experimental to Draft.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0249-0.3.html">0.3</a> (2009-06-22)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Defined several possible security attacks along with solutions.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0249-0.2.html">0.2</a> (2009-03-30)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added optional reason attribute for feature parity with XEP-0045.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0249-0.1.html">0.1</a> (2008-09-03)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial published version.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0249-0.0.5.html">0.0.5</a> (2008-09-02)<a class="anchor-link" href="#revision-history-v0.0.5"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Modified to use old jabber:x:conference namespace.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0249-0.0.4.html">0.0.4</a> (2008-08-18)<a class="anchor-link" href="#revision-history-v0.0.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added note about handling multiple invitations.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0249-0.0.3.html">0.0.3</a> (2008-08-16)<a class="anchor-link" href="#revision-history-v0.0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added implementation note about members-only rooms.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0249-0.0.2.html">0.0.2</a> (2008-08-14)<a class="anchor-link" href="#revision-history-v0.0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Changed venue element to conference element.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0249-0.0.1.html">0.0.1</a> (2008-08-12)<a class="anchor-link" href="#revision-history-v0.0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">First draft.</p><div class="revision-author">psa</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{saint-andre2008x-conference,
+  title = {Direct MUC Invitations},
+  author = {Saint-Andre, Peter},
+  type = {XEP},
+  number = {0249},
+  version = {1.2},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0249.html},
+  date = {2008-08-12/2011-09-22},
+}</pre><p>END</p></body></html>

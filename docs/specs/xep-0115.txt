@@ -1,0 +1,568 @@
+<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XEP-0115: Entity Capabilities</title><style type="text/css">
+/* don't mind this hack */
+nav#toc h2:before {
+display: none;
+content: "XEP-0115";
+}
+        </style><link rel="stylesheet" type="text/css" href="xmpp.css"><link href="prettify.css" type="text/css" rel="stylesheet"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"><script type="text/javascript" src="prettify.js"></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="DC.Title" content="Entity Capabilities"><meta name="DC.Creator" content="Joe Hildebrand"><meta name="DC.Creator" content="Peter Saint-Andre"><meta name="DC.Creator" content="Remko Tronçon"><meta name="DC.Creator" content="Jacek Konieczny"><meta name="DC.Description" content="This document defines an XMPP protocol extension for broadcasting and dynamically discovering client, device, or generic entity capabilities. In order to minimize network impact, the transport mechanism is standard XMPP presence broadcast (thus forestalling the need for polling related to service discovery data), the capabilities information can be cached either within a session or across sessions, and the format has been kept as small as possible."><meta name="DC.Publisher" content="XMPP Standards Foundation"><meta name="DC.Contributor" content="XMPP Extensions Editor"><meta name="DC.Date" content="2022-03-08"><meta name="DC.Type" content="XMPP Extension Protocol"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="XEP-0115"><meta name="DC.Language" content="en"><meta name="DC.Rights" content="This XMPP Extension Protocol is copyright © 1999 – 2024 by the XMPP Standards Foundation (XSF)."></head><body onload="prettyPrint()"><h1>XEP-0115: Entity Capabilities</h1><div class="docmeta-wrap"><dl id="docmeta" class="compact"><dt>Abstract</dt><dd>This document defines an XMPP protocol extension for broadcasting and dynamically discovering client, device, or generic entity capabilities. In order to minimize network impact, the transport mechanism is standard XMPP presence broadcast (thus forestalling the need for polling related to service discovery data), the capabilities information can be cached either within a session or across sessions, and the format has been kept as small as possible.</dd><dt>Authors</dt><dd><ul class="authors"><li>Joe Hildebrand</li><li>Peter Saint-Andre</li><li>Remko Tronçon</li><li>Jacek Konieczny</li></ul></dd><dt>Copyright</dt><dd>© 2003 – 2022 XMPP Standards Foundation. <a href="#appendix-legal">SEE LEGAL NOTICES</a>.</dd><dt>Status</dt><dd><p>Stable</p><div id="status-notice" class="draft standards track">NOTICE: The protocol defined herein is a <strong>Stable Standard</strong> of the XMPP Standards Foundation. Implementations are encouraged and the protocol is appropriate for deployment in production systems, but some changes to the protocol are possible before it becomes a Final Standard.</div></dd><dt>Type</dt><dd>Standards Track</dd><dt>Version</dt><dd>1.6.0 (2022-03-08)</dd></dl><div class="timeline-wrap"><div class="timeline-head">Document Lifecycle</div><ol class="timeline"><li>Experimental</li><li>Proposed</li><li class="current">Stable</li><li>Final</li></ol></div></div><nav id="toc"><a href="#top"><h2>Table of Contents</h2></a><ol class="toc"><li><a href="#intro">Introduction</a><ol><li><a href="#motivation">Motivation</a></li><li><a href="#howitworks">How It Works</a></li></ol></li><li><a href="#assumptions">Assumptions</a></li><li><a href="#reqs">Requirements</a></li><li><a href="#protocol">Protocol</a></li><li><a href="#ver">Verification String</a><ol><li><a href="#ver-gen">Generation Method</a></li><li><a href="#ver-gen-simple">Simple Generation Example</a></li><li><a href="#ver-gen-complex">Complex Generation Example</a></li><li><a href="#ver-proc">Processing Method</a></li></ol></li><li><a href="#usecases">Use Cases</a><ol><li><a href="#advertise">Advertising Capabilities</a></li><li><a href="#discover">Discovering Capabilities</a></li><li><a href="#stream">Stream Feature</a></li></ol></li><li><a href="#support">Determining Support</a></li><li><a href="#impl">Implementation Notes</a><ol><li><a href="#impl-hash">Hashing Algorithm Support</a></li><li><a href="#impl-cache">Caching</a></li><li><a href="#impl-presence">Directed Presence</a></li><li><a href="#impl-optimize">Caps Optimization</a></li></ol></li><li><a href="#security">Security Considerations</a><ol><li><a href="#security-mti">Mandatory-to-Implement Technologies</a></li><li><a href="#security-preimage">Preimage Attacks</a></li><li><a href="#security-poisoning">Caps Poisoning</a></li><li><a href="#security-exposure">Information Exposure</a></li></ol></li><li><a href="#iana">IANA Considerations</a></li><li><a href="#registrar">XMPP Registrar Considerations</a><ol><li><a href="#ns">Protocol Namespaces</a></li><li><a href="#registrar-features">Service Discovery Features</a></li><li><a href="#registrar-stream-features">Stream Features</a></li></ol></li><li><a href="#schema">XML Schema</a></li><li><a href="#legacy">Legacy Format</a></li><li><a href="#ack">Acknowledgements</a></li></ol><h6><a href="#appendices">Appendices</a></h6><ol class="toc-appendices"><li><a href="#appendix-docinfo">Document Information</a></li><li><a href="#appendix-authorinfo">Author Information</a></li><li><a href="#appendix-legal">Legal Notices</a></li><li><a href="#appendix-xmpp">Relation to XMPP</a></li><li><a href="#appendix-discuss">Discussion Venue</a></li><li><a href="#appendix-conformance">Requirements Conformance</a></li><li><a href="#appendix-notes">Notes</a></li><li><a href="#appendix-revs">Revision History</a></li><li><a href="#appendix-biblatex">Bib(La)Tex Entry</a></li></ol></nav><h2 id="intro">1.
+       Introduction<a class="anchor-link" href="#intro"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <div class="indent"><h3 id="motivation">1.1 Motivation<a class="anchor-link" href="#motivation"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">It is often desirable for an XMPP application (commonly but not necessarily a client) to take different actions depending on the capabilities of another application from which it receives presence information. Examples include:</p>
+      <ul class="" style="">
+        <li class="" style="">Showing a different set of icons depending on the capabilities of other entities.</li>
+        <li class="" style="">Not sending <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0071.html">XHTML-IM (XEP-0071)</a></span>  [<a href="#nt-idm44853439667872">1</a>] or other rich content to plaintext clients such as cell phones.</li>
+        <li class="" style="">Allowing the initiation of a Voice over IP (VoIP) session only to clients that support <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0166.html">Jingle (XEP-0166)</a></span>  [<a href="#nt-idm44853439657680">2</a>] and <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0167.html">Jingle RTP Sessions (XEP-0167)</a></span>  [<a href="#nt-idm44853439656720">3</a>].</li>
+        <li class="" style="">Not showing a "Send a File" button if another user's client does not support <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0096.html">SI File Transfer (XEP-0096)</a></span>  [<a href="#nt-idm44853439651472">4</a>].</li>
+        <li class="" style="">Filtering <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm44853439641088">5</a>] notifications based on advertised subscriber interests.</li>
+      </ul>
+      <p class="" style="">In the past, after logging in some Jabber clients sent one <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm44853439638768">6</a>] and one <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0092.html">Software Version (XEP-0092)</a></span>  [<a href="#nt-idm44853439634304">7</a>] request to each entity from which they received presence. That "disco/version flood" resulted in an excessive use of bandwidth and was impractical on a larger scale, particularly for users with large rosters. Therefore this document defines a more robust and scalable solution: namely, a presence-based mechanism  [<a href="#nt-idm44853439631872">8</a>] for exchanging information about entity capabilities. Clients should not engage in the older "disco/version flood" behavior and instead should use Entity Capabilities as specified herein.</p>
+    </div>
+    <div class="indent"><h3 id="howitworks">1.2 How It Works<a class="anchor-link" href="#howitworks"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">This section provides a friendly introduction to entity capabilities ("caps").</p>
+      <p class="" style="">Imagine that you are a Shakespearean character named Juliet and one of your contacts, a handsome fellow named Romeo, becomes available. His client wants to publish its capabilities, and does this by adding to its presence packets a &lt;c/&gt; element with special attributes. As a result, your client receives the following presence packet:</p>
+      <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;presence from='romeo@montague.lit/orchard'&gt;
+  &lt;c xmlns='http://jabber.org/protocol/caps'
+     hash='sha-1'
+     node='http://code.google.com/p/exodus'
+     ver='QgayPKawpkPSDYmwT/WM94uAlu0='/&gt;
+&lt;/presence&gt;
+</pre></figure>
+      <p class="" style="">The 'node' attribute represents the client software Romeo is using. The 'ver' attribute is a specially-constructed string (called a "verification string") that represents the entity's service discovery identity (category and type as registered at &lt;<a href="https://xmpp.org/registrar/disco-categories.html">https://xmpp.org/registrar/disco-categories.html</a>&gt;, as well as, optionally, xml:lang and name) and supported features (as registered at &lt;<a href="https://xmpp.org/registrar/disco-features.html">https://xmpp.org/registrar/disco-features.html</a>&gt; as well as, optionally, extended service discovery information data registered at &lt;<a href="https://xmpp.org/registrar/formtypes.html">https://xmpp.org/registrar/formtypes.html</a>&gt;).</p>
+      <p class="" style="">At this point, your client has no idea what the capabilities are of someone with a verification string 'QgayPKawpkPSDYmwT/WM94uAlu0='. Your client therefore sends a service discovery query to Romeo, asking what his client can do.</p>
+      <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;iq from='juliet@capulet.lit/chamber'
+    id='disco1'
+    to='romeo@montague.lit/orchard'
+    type='get'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'
+         node='http://code.google.com/p/exodus#QgayPKawpkPSDYmwT/WM94uAlu0='/&gt;
+&lt;/iq&gt;
+</pre></figure>
+      <p class="" style="">The response is:</p>
+      <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;iq from='romeo@montague.lit/orchard'
+    id='disco1'
+    to='juliet@capulet.lit/chamber'
+    type='result'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'
+         node='http://code.google.com/p/exodus#QgayPKawpkPSDYmwT/WM94uAlu0='&gt;
+    &lt;identity category='client' name='Exodus 0.9.1' type='pc'/&gt;
+    &lt;feature var='http://jabber.org/protocol/caps'/&gt;
+    &lt;feature var='http://jabber.org/protocol/disco#info'/&gt;
+    &lt;feature var='http://jabber.org/protocol/disco#items'/&gt;
+    &lt;feature var='http://jabber.org/protocol/muc'/&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+      <p class="" style="">At this point, your client knows that a contact who advertises a verification string of 'QgayPKawpkPSDYmwT/WM94uAlu0=' supports <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0045.html">Multi-User Chat (XEP-0045)</a></span>  [<a href="#nt-idm44853439612320">9</a>] and the other features returned by Romeo because the contact in fact uses the same version of the same client software as Romeo, with the same enabled features, plugins, presented client name(s), and the like (i.e., the same input to the verification string <a href="#ver-gen">generation method</a>).  [<a href="#nt-idm44853439609504">10</a>] Your client remembers this information, so that it does not need to explicitly query the capabilities of a contact with the same verification string. For example, your Nurse may use the same client that Romeo does:</p>
+      <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;presence from='nurse@capulet.lit/chamber'&gt;
+  &lt;c xmlns='http://jabber.org/protocol/caps'
+     hash='sha-1'
+     node='http://code.google.com/p/exodus'
+     ver='QgayPKawpkPSDYmwT/WM94uAlu0='/&gt;
+&lt;/presence&gt;
+</pre></figure>
+      <p class="" style="">Therefore you know that she also supports the same features that Romeo does.</p>
+      <p class="" style="">On the other hand, for a person with the following presence ...</p>
+      <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;presence from='benvolio@capulet.lit/230193'&gt;
+  &lt;c xmlns='http://jabber.org/protocol/caps'
+     hash='sha-1'
+     node='http://psi-im.org'
+     ver='q07IKJEyjvHSyhy//CH0CxmKi8w='/&gt;
+&lt;/presence&gt;
+</pre></figure>
+      <p class="" style="">... or the following presence ...</p>
+      <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;presence from='bard@shakespeare.lit/globe'&gt;
+  &lt;c xmlns='http://jabber.org/protocol/caps'
+     hash='sha-1'
+     node='http://www.chatopus.com'
+     ver='zHyEOgxTrkpSdGcQKH8EFPLsriY='/&gt;
+&lt;/presence&gt;
+</pre></figure>
+      <p class="" style="">... you have no information about what this contact's client is capable of unless you have cached previous entity capabilities information; therefore you need to query for capabilities explicitly again via service discovery.</p>
+    </div>
+  <h2 id="assumptions">2.
+       Assumptions<a class="anchor-link" href="#assumptions"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">This document makes several assumptions:</p>
+    <ul class="" style="">
+      <li class="" style="">The identity of the client I am using is of interest to the people in my roster.</li>
+      <li class="" style="">Clients for the people on my roster might want to make user interface decisions based on my capabilities.</li>
+      <li class="" style="">Members of a community tend to cluster around a small set of clients with a small set of capabilities. More specifically, multiple people in my roster use the same client, and they upgrade versions relatively slowly (commonly a few times a year, perhaps once a week at most, certainly not once a minute).</li>
+      <li class="" style="">Some clients are running on networks without server-to-server connectivity enabled and without access to the Internet via HTTP.</li>
+      <li class="" style="">Conversations are possible between users who are not on each other's rosters.</li>
+      <li class="" style="">Client capabilities may change over the course of a presence session, as features are enabled or disabled.</li>
+    </ul>
+  <h2 id="reqs">3.
+       Requirements<a class="anchor-link" href="#reqs"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">The protocol defined herein addresses the following requirements:</p>
+    <ol start="1" class="" style="">
+      <li class="" style="">Clients must be able to participate even if they support only <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6120">XMPP Core</a></span>  [<a href="#nt-idm44853439587312">11</a>], <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6121">XMPP IM</a></span>  [<a href="#nt-idm44853439577808">12</a>], and <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm44853439638768">6</a>].</li>
+      <li class="" style="">Clients must be able to participate even if they are on networks without connectivity to other XMPP servers, services offering specialized XMPP extensions, or HTTP servers. [<a href="#nt-idm44853439576288">13</a>]</li>
+      <li class="" style="">Clients must be able to retrieve information without querying every entity with which they communicate.</li>
+      <li class="" style="">Since presence is normally broadcast to many contacts, the byte size of the proposed extension must be as small as possible.</li>
+      <li class="" style="">It must be possible to write a XEP-0045 server implementation that passes the given information along.</li>
+      <li class="" style="">It must be possible to publish a change in capabilities within a single presence session.</li>
+      <li class="" style="">Server infrastructure above and beyond that defined in <span class="ref">XMPP Core</span> and <span class="ref">XMPP IM</span> must not be required for this approach to work, although additional server infrastructure may be used for optimization purposes.</li>
+      <li class="" style="">The defined mechanism must not be limited to clients but must be usable by servers, components, and other network entities.</li>
+    </ol>
+  <h2 id="protocol">4.
+       Protocol<a class="anchor-link" href="#protocol"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">Entity capabilities are encapsulated in a &lt;c/&gt; element qualified by the 'http://jabber.org/protocol/caps' namespace. The attributes of the &lt;c/&gt; element are as follows.</p>
+    <figure class="table"><figcaption id="table-1"><strong>Table 1:</strong> Attributes<a class="anchor-link" href="#table-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><table>
+      <tr class="body">
+        <th colspan="" rowspan="">Name</th>
+        <th colspan="" rowspan="">Definition</th>
+        <th colspan="" rowspan="">Inclusion</th>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">ext</td>
+        <td align="" colspan="" rowspan="">A set of nametokens specifying additional feature bundles; this attribute is deprecated (see the <a href="#legacy">Legacy Format</a> section of this document).</td>
+        <td align="" colspan="" rowspan="">DEPRECATED</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">hash</td>
+        <td align="" colspan="" rowspan="">The hashing algorithm used to generate the verification string; see <a href="#security-mti">Mandatory-to-Implement Technologies</a> regarding supported hashing algorithms.</td>
+        <td align="" colspan="" rowspan="">REQUIRED</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">node</td>
+        <td align="" colspan="" rowspan="">A URI that uniquely identifies a software application, typically a URL at the website of the project or company that produces the software. *</td>
+        <td align="" colspan="" rowspan="">REQUIRED</td>
+      </tr>
+      <tr class="body">
+        <td align="" colspan="" rowspan="">ver</td>
+        <td align="" colspan="" rowspan="">A string that is used to verify the identity and supported features of the entity. **</td>
+        <td align="" colspan="" rowspan="">REQUIRED</td>
+      </tr>
+    </table></figure>
+    <p class="" style="">* Note: It is RECOMMENDED for the value of the 'node' attribute to be an HTTP URL at which a user could find further information about the software product, such as "http://psi-im.org" for the Psi client; this enables a processing application to also determine a unique string for the generating application, which it could maintain in a list of known software implementations (e.g., associating the name received via the disco#info reply with the URL found in the caps data).</p>
+    <p class="" style="">**  Note: Before version 1.4 of this specification, the 'ver' attribute was used to specify the released version of the software; while the values of the 'ver' attribute that result from use of the algorithm specified herein are backwards-compatible, applications SHOULD appropriately handle the <a href="#legacy">Legacy Format</a>.</p>
+  <h2 id="ver">5.
+       Verification String<a class="anchor-link" href="#ver"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <div class="indent"><h3 id="ver-gen">5.1 Generation Method<a class="anchor-link" href="#ver-gen"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">In order to help prevent poisoning of entity capabilities information, the value of the verification string MUST be generated according to the following method.</p>
+      <p class="" style="">Note: All sorting operations MUST be performed using "i;octet" collation as specified in Section 9.3 of <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc4790">RFC 4790</a></span>  [<a href="#nt-idm44853439535104">14</a>].</p>
+      <ol start="1" class="" style="">
+        <li class="" style="">Initialize an empty string S.</li>
+        <li class="" style="">Sort the service discovery identities  [<a href="#nt-idm44853439529696">15</a>] by category and then by type and then by xml:lang (if it exists), formatted as CATEGORY '/' [TYPE] '/' [LANG] '/' [NAME].  [<a href="#nt-idm44853439528544">16</a>] Note that each slash is included even if the LANG or NAME is not included (in accordance with <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm44853439638768">6</a>], the category and type MUST be included).</li>
+        <li class="" style="">For each identity, append the 'category/type/lang/name' to S, followed by the '&lt;' character.</li>
+        <li class="" style="">Sort the supported service discovery features.  [<a href="#nt-idm44853439523120">17</a>]</li>
+        <li class="" style="">For each feature, append the feature to S, followed by the '&lt;' character.</li>
+        <li class="" style="">If the service discovery information response includes <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0128.html">Service Discovery Extensions (XEP-0128)</a></span>  [<a href="#nt-idm44853439517328">18</a>] data forms, sort the forms by the FORM_TYPE (i.e., by the XML character data of the &lt;value/&gt; element).</li>
+        <li class="" style="">For each extended service discovery information form:
+          <ol start="1" class="" style="">
+            <li class="" style="">Append the XML character data of the FORM_TYPE field's &lt;value/&gt; element, followed by the '&lt;' character.</li>
+            <li class="" style="">Sort the fields by the value of the "var" attribute.</li>
+            <li class="" style="">For each field other than FORM_TYPE:
+              <ol start="1" class="" style="">
+                <li class="" style="">Append the value of the "var" attribute, followed by the '&lt;' character.</li>
+                <li class="" style="">Sort values by the XML character data of the &lt;value/&gt; element.</li>
+                <li class="" style="">For each &lt;value/&gt; element, append the XML character data, followed by the '&lt;' character.</li>
+              </ol>
+            </li>
+          </ol>
+        </li>
+        <li class="" style="">Ensure that S is encoded according to the UTF-8 encoding (<span class="ref" style=""><a href="http://tools.ietf.org/html/rfc3629">RFC 3629</a></span>  [<a href="#nt-idm44853439501600">19</a>]).</li>
+        <li class="" style="">Compute the verification string by hashing S using the algorithm specified in the 'hash' attribute (e.g., SHA-1 as defined in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc3174">RFC 3174</a></span>  [<a href="#nt-idm44853439491120">20</a>]). The hashed data MUST be generated with binary output and encoded using Base64 as specified in Section 4 of <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc4648">RFC 4648</a></span>  [<a href="#nt-idm44853439490160">21</a>] (note: the Base64 output MUST NOT include whitespace and MUST set padding bits to zero).  [<a href="#nt-idm44853439488320">22</a>]</li>
+      </ol>
+      <p class="box" style="">Note: If the four characters '&amp;', 'l', 't', ';' appear consecutively in any of the factors of the verification string S (e.g., a service discovery identity of 'SomeClient&amp;lt;http://jabber.org/protocol/muc') then that string of characters MUST be treated as literally '&amp;lt;' and MUST NOT be converted to the character '&lt;', because completing such a conversion would open the protocol to trivial attacks.</p>
+    </div>
+    <div class="indent"><h3 id="ver-gen-simple">5.2 Simple Generation Example<a class="anchor-link" href="#ver-gen-simple"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">Consider an entity whose category is "client", whose service discovery type is "pc", whose service discovery name is "Exodus 0.9.1", and whose supported features are "http://jabber.org/protocol/disco#info", "http://jabber.org/protocol/disco#items", and "http://jabber.org/protocol/muc". Using the SHA-1 algorithm, the verification string would be generated as follows (note: line breaks in the verification string are included only for the purposes of readability):</p>
+      <ol start="1" class="" style="">
+        <li class="" style="">
+          <p class="" style="">S = ''</p>
+        </li>
+        <li class="" style="">
+          <p class="" style="">Only one identity: "client/pc"</p>
+        </li>
+        <li class="" style="">
+          <p class="" style="">S = 'client/pc//Exodus 0.9.1&lt;'</p>
+        </li>
+        <li class="" style="">
+          <p class="" style="">Sort the features: "http://jabber.org/protocol/caps", "http://jabber.org/protocol/disco#info", "http://jabber.org/protocol/disco#items", "http://jabber.org/protocol/muc".</p>
+        </li>
+        <li class="" style="">
+          <p class="" style="">S = 'client/pc//Exodus 0.9.1&lt;http://jabber.org/protocol/caps&lt;http://jabber.org/protocol/disco#info&lt;
+            <br>http://jabber.org/protocol/disco#items&lt;http://jabber.org/protocol/muc&lt;'</p>
+        </li>
+        <li class="" style="">
+          <p class="" style="">ver = QgayPKawpkPSDYmwT/WM94uAlu0=</p>
+        </li>
+      </ol>
+    </div>
+    <div class="indent"><h3 id="ver-gen-complex">5.3 Complex Generation Example<a class="anchor-link" href="#ver-gen-complex"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">Consider a more complex example, where the entity includes several identities (with the service discovery name in different languages) as well as extended information formatted according to <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0128.html">Service Discovery Extensions (XEP-0128)</a></span>  [<a href="#nt-idm44853439517328">18</a>].</p>
+      <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;iq from='benvolio@capulet.lit/230193'
+    id='disco1'
+    to='juliet@capulet.lit/chamber'
+    type='result'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'
+         node='http://psi-im.org#q07IKJEyjvHSyhy//CH0CxmKi8w='&gt;
+    &lt;identity xml:lang='en' category='client' name='Psi 0.11' type='pc'/&gt;
+    &lt;identity xml:lang='el' category='client' name='Ψ 0.11' type='pc'/&gt;
+    &lt;feature var='http://jabber.org/protocol/caps'/&gt;
+    &lt;feature var='http://jabber.org/protocol/disco#info'/&gt;
+    &lt;feature var='http://jabber.org/protocol/disco#items'/&gt;
+    &lt;feature var='http://jabber.org/protocol/muc'/&gt;
+    &lt;x xmlns='jabber:x:data' type='result'&gt;
+      &lt;field var='FORM_TYPE' type='hidden'&gt;
+        &lt;value&gt;urn:xmpp:dataforms:softwareinfo&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='ip_version' type='text-multi' &gt;
+        &lt;value&gt;ipv4&lt;/value&gt;
+        &lt;value&gt;ipv6&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='os'&gt;
+        &lt;value&gt;Mac&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='os_version'&gt;
+        &lt;value&gt;10.5.1&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='software'&gt;
+        &lt;value&gt;Psi&lt;/value&gt;
+      &lt;/field&gt;
+      &lt;field var='software_version'&gt;
+        &lt;value&gt;0.11&lt;/value&gt;
+      &lt;/field&gt;
+    &lt;/x&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+      </pre></figure>
+      <p class="" style="">Using the SHA-1 algorithm, the verification string would be generated as follows (note: line breaks in the verification string are included only for the purposes of readability):</p>
+      <ol start="1" class="" style="">
+        <li class="" style="">
+          <p class="" style="">S = ''</p>
+        </li>
+        <li class="" style="">
+          <p class="" style="">Two identities: "client/pc/Psi" and "client/pc/Ψ"</p>
+        </li>
+        <li class="" style="">
+          <p class="" style="">S = 'client/pc/el/Ψ 0.11&lt;client/pc/en/Psi 0.11&lt;'</p>
+        </li>
+        <li class="" style="">
+          <p class="" style="">Sort the features: "http://jabber.org/protocol/caps", http://jabber.org/protocol/disco#info", "http://jabber.org/protocol/disco#items", "http://jabber.org/protocol/muc".</p>
+        </li>
+        <li class="" style="">
+          <p class="" style="">
+            S = 'client/pc/el/Ψ 0.11&lt;client/pc/en/Psi 0.11&lt;http://jabber.org/protocol/caps&lt;http://jabber.org/protocol/disco#info&lt;
+              <br>http://jabber.org/protocol/disco#items&lt;http://jabber.org/protocol/muc&lt;'.
+          </p>
+        </li>
+        <li class="" style="">
+          <p class="" style="">Sort the extended service discovery forms by FORM_TYPE (there is only one: "urn:xmpp:dataforms:softwareinfo").</p>
+        </li>
+        <li class="" style="">
+          <p class="" style="">S = 'client/pc/el/Ψ 0.11&lt;client/pc/en/Psi 0.11&lt;http://jabber.org/protocol/caps&lt;http://jabber.org/protocol/disco#info&lt;
+            <br>http://jabber.org/protocol/disco#items&lt;http://jabber.org/protocol/muc&lt;urn:xmpp:dataforms:softwareinfo&lt;'</p>
+        </li>
+        <li class="" style="">
+          <p class="" style="">Sort the fields by var and append the value(s): "ip_version&lt;ipv4&lt;ipv6", "os&lt;Mac", "os_version&lt;10.5.1", "software&lt;Psi", "software_version&lt;0.11".</p>
+        </li>
+        <li class="" style="">
+          <p class="" style="">S = 'client/pc/el/Ψ 0.11&lt;client/pc/en/Psi 0.11&lt;http://jabber.org/protocol/caps&lt;http://jabber.org/protocol/disco#info&lt;
+            <br>http://jabber.org/protocol/disco#items&lt;http://jabber.org/protocol/muc&lt;urn:xmpp:dataforms:softwareinfo&lt;
+            <br>ip_version&lt;ipv4&lt;ipv6&lt;os&lt;Mac&lt;os_version&lt;10.5.1&lt;software&lt;Psi&lt;software_version&lt;0.11&lt;'</p>
+        </li>
+        <li class="" style="">
+          <p class="" style="">ver = q07IKJEyjvHSyhy//CH0CxmKi8w=</p>
+        </li>
+      </ol>
+    </div>
+    <div class="indent"><h3 id="ver-proc">5.4 Processing Method<a class="anchor-link" href="#ver-proc"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">When an entity receives a value of the 'ver' attribute that appears to be a verification string generated in accordance with the generation method defined in this specification, it MUST process the 'ver' according to the following method.</p>
+      <ol start="1" class="" style="">
+        <li class="" style="">Verify that the &lt;c/&gt; element includes a 'hash' attribute. If it does not, ignore the 'ver' or treat it as generated in accordance with the <a href="#legacy">Legacy Format</a> (if supported).</li>
+        <li class="" style="">If the value of the 'hash' attribute does not match one of the processing application's supported hash functions, do the following:
+          <ol start="1" class="" style="">
+            <li class="" style="">Send a service discovery information request to the generating entity.</li>
+            <li class="" style="">Receive a service discovery information response from the generating entity.</li>
+            <li class="" style="">Do not validate or globally cache the verification string as described below; instead, the processing application SHOULD associate the discovered identity+features <em>only</em> with the JabberID of the generating entity.</li>
+          </ol>
+        </li>
+        <li class="" style="">If the value of the 'hash' attribute matches one of the processing application's supported hash functions, validate the verification string by doing the following:
+          <ol start="1" class="" style="">
+            <li class="" style="">Send a service discovery information request to the generating entity.</li>
+            <li class="" style="">Receive a service discovery information response from the generating entity.</li>
+            <li class="" style="">If the response includes more than one service discovery identity with the same category/type/lang/name, consider the entire response to be ill-formed.</li>
+            <li class="" style="">If the response includes more than one service discovery feature with the same XML character data, consider the entire response to be ill-formed.</li>
+            <li class="" style="">If the response includes more than one extended service discovery information form with the same FORM_TYPE or the FORM_TYPE field contains more than one &lt;value/&gt; element with different XML character data, consider the entire response to be ill-formed.</li>
+            <li class="" style="">If the response includes an extended service discovery information form where the FORM_TYPE field is not of type "hidden" or the form does not include a FORM_TYPE field, ignore the form but continue processing.</li>
+            <li class="" style="">If the response is considered well-formed, reconstruct the hash by using the service discovery information response to generate a local hash in accordance with the <a href="#ver-gen">Generation Method</a>).</li>
+            <li class="" style="">If the values of the received and reconstructed hashes match, the processing application MUST consider the result to be valid and SHOULD globally cache the result for all JabberIDs with which it communicates.</li>
+            <li class="" style="">If the values of the received and reconstructed hashes do not match, the processing application MUST consider the result to be invalid and MUST NOT globally cache the verification string; however, it SHOULD check the service discovery identity and supported features of another generating entity who advertises that value.</li>
+          </ol>
+        </li>
+      </ol>
+      <p class="box" style="">Note: If the four characters '&amp;', 'l', 't', ';' appear consecutively in any of the factors of the verification string S (e.g., a service discovery identity of 'SomeClient&amp;lt;http://jabber.org/protocol/muc') then that string of characters MUST be treated as literally '&amp;lt;' and MUST NOT be converted to the character '&lt;', because completing such a conversion would open the protocol to trivial attacks.</p>
+    </div>
+  <h2 id="usecases">6.
+       Use Cases<a class="anchor-link" href="#usecases"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <div class="indent"><h3 id="advertise">6.1 Advertising Capabilities<a class="anchor-link" href="#advertise"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">Each time a generating entity sends presence, it annotates that presence with an entity identifier ('node' attribute) and identity and feature identifier ('ver' attribute). So that servers can remember the last presence for use in responding to probes, a client SHOULD include entity capabilities with every presence notification it sends.</p>
+      <figure class="code-example" id="example-1"><figcaption><strong>Example 1.</strong> Presence with caps<a class="anchor-link" href="#example-1"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;presence&gt;
+  &lt;c xmlns='http://jabber.org/protocol/caps'
+     hash='sha-1'
+     node='http://code.google.com/p/exodus'
+     ver='QgayPKawpkPSDYmwT/WM94uAlu0='/&gt;
+&lt;/presence&gt;
+</pre></figure>
+       <p class="" style="">If the supported features change during a generating entity's presence session (e.g., a user installs an updated version of a client plugin), the application MUST recompute the verification string and SHOULD send a new presence broadcast.</p>
+      <figure class="code-example" id="example-2"><figcaption><strong>Example 2.</strong> Presence with recomputed ver attribute<a class="anchor-link" href="#example-2"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;presence&gt;
+  &lt;c xmlns='http://jabber.org/protocol/caps'
+     hash='sha-1'
+     node='http://code.google.com/p/exodus'
+     ver='66/0NaeaBKkwk85efJTGmU47vXI='/&gt;
+&lt;/presence&gt;
+</pre></figure>
+    </div>
+
+    <div class="indent"><h3 id="discover">6.2 Discovering Capabilities<a class="anchor-link" href="#discover"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">An application (the "requesting entity") can learn what features another entity supports by sending a disco#info request (see <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0030.html">Service Discovery (XEP-0030)</a></span>  [<a href="#nt-idm44853439638768">6</a>]) to the entity that generated the caps information (the "generating entity").</p>
+
+      <figure class="code-example" id="example-3"><figcaption><strong>Example 3.</strong> Disco#info request<a class="anchor-link" href="#example-3"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='juliet@capulet.lit/balcony'
+    id='disco1'
+    to='romeo@montague.lit/orchard'
+    type='get'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'
+         node='http://code.google.com/p/exodus#QgayPKawpkPSDYmwT/WM94uAlu0='/&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+      <p class="" style="">The disco#info request is sent by the requesting entity to the generating entity. The value of the 'to' attribute MUST be the exact JID of the generating entity, which in the case of a client will be the full JID &lt;localpart@domain.tld/resource&gt;.</p>
+      <p class="" style="">Note: The generating entity SHOULD NOT include the "caps node" in the list of entities it returns in its disco#items responses; i.e., the caps node is a kind of virtual or phantom node, not a true items node that is associated with the generating entity for service discovery purposes.</p>
+      <p class="" style="">The disco 'node' attribute MUST be included for backwards-compatibility. The value of the 'node' attribute SHOULD be generated by concatenating the value of the caps 'node' attribute (e.g., "http://code.google.com/p/exodus") as provided by the generating entity, the "#" character, and the value of the caps 'ver' attribute (e.g., "QgayPKawpkPSDYmwT/WM94uAlu0=") as provided by the generating entity.</p>
+
+      <p class="" style="">The generating entity then returns all of the capabilities it supports.</p>
+
+      <figure class="code-example" id="example-4"><figcaption><strong>Example 4.</strong> Disco#info response<a class="anchor-link" href="#example-4"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='romeo@montague.lit/orchard'
+    id='disco1'
+    to='juliet@capulet.lit/balcony'
+    type='result'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'
+         node='http://code.google.com/p/exodus#QgayPKawpkPSDYmwT/WM94uAlu0='&gt;
+    &lt;identity category='client' type='pc'/&gt;
+    &lt;feature var='http://jabber.org/protocol/disco#info'/&gt;
+    &lt;feature var='http://jabber.org/protocol/disco#items'/&gt;
+    &lt;feature var='http://jabber.org/protocol/muc'/&gt;
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+
+      <p class="" style="">Note: If the generating entity incorporated multiple identities with different xml:lang values in its verification string, it MUST return all of the identities even if the request specified a particular xml:lang.</p>
+
+    </div>
+
+    <div class="indent"><h3 id="stream">6.3 Stream Feature<a class="anchor-link" href="#stream"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">A server MAY include its entity capabilities in a stream feature element so that connecting clients and peer servers do not need to send service discovery requests each time they connect.</p>
+      <figure class="code-example" id="example-5"><figcaption><strong>Example 5.</strong> Stream feature element including capabilities<a class="anchor-link" href="#example-5"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;stream:features&gt;
+  &lt;c xmlns='http://jabber.org/protocol/caps'
+     hash='sha-1'
+     node='http://jabberd.org'
+     ver='ItBTI0XLDFvVxZ72NQElAzKS9sU='/&gt;
+&lt;/stream:features&gt;
+</pre></figure>
+      <p class="" style="">When a connected client or peer server sends a service discovery information request to determine the entity capabilities of a server that advertises capabilities via the stream feature, the requesting entity MUST send the disco#info request to the server's JID as provided in the 'from' attribute of the response stream header (the 'from' attribute was recommended by <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc3920">RFC 3920</a></span>  [<a href="#nt-idm44853439399152">23</a>] and is required by <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6120">RFC 6120</a></span>  [<a href="#nt-idm44853439587312">11</a>]). To enable this functionality, a server that advertises support for entity capabilities MUST provide a 'from' address in its response stream headers, in accordance with <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc6120">RFC 6120</a></span>  [<a href="#nt-idm44853439587312">11</a>].</p>
+    </div>
+  <h2 id="support">7.
+       Determining Support<a class="anchor-link" href="#support"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">If an entity supports the entity capabilities protocol, it MUST advertise that fact by returning a feature of <strong>'http://jabber.org/protocol/caps'</strong> in response to a service discovery information request.</p>
+    <figure class="code-example" id="example-6"><figcaption><strong>Example 6.</strong> Service discovery information request<a class="anchor-link" href="#example-6"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='romeo@montague.lit/orchard'
+    id='disco2'
+    to='juliet@capulet.lit/balcony'
+    type='get'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <figure class="code-example" id="example-7"><figcaption><strong>Example 7.</strong> Service discovery information response<a class="anchor-link" href="#example-7"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='juliet@capulet.lit/balcony'
+    id='disco2'
+    to='romeo@montague.lit/orchard'
+    type='result'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+    ...
+    &lt;feature var='http://jabber.org/protocol/caps'/&gt;
+    ...
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <p class="" style="">If a server supports the <a href="#impl-optimize">Caps Optimization</a> functionality, it MUST also return a feature of <strong>'http://jabber.org/protocol/caps#optimize'</strong> in response to service discovery information requests.</p>
+    <figure class="code-example" id="example-8"><figcaption><strong>Example 8.</strong> Service discovery information request<a class="anchor-link" href="#example-8"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='juliet@capulet.lit/balcony'
+    id='disco3'
+    to='capulet.lit'
+    type='get'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'/&gt;
+&lt;/iq&gt;
+</pre></figure>
+    <figure class="code-example" id="example-9"><figcaption><strong>Example 9.</strong> Service discovery information response<a class="anchor-link" href="#example-9"><abbr title="Link to this point in the document">¶</abbr></a></figcaption><pre class="prettyprint">
+&lt;iq from='capulet.lit'
+    id='disco3'
+    to='juliet@capulet.lit/balcony'
+    type='result'&gt;
+  &lt;query xmlns='http://jabber.org/protocol/disco#info'&gt;
+    ...
+    &lt;feature var='http://jabber.org/protocol/caps#optimize'/&gt;
+    ...
+  &lt;/query&gt;
+&lt;/iq&gt;
+</pre></figure>
+  <h2 id="impl">8.
+       Implementation Notes<a class="anchor-link" href="#impl"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <div class="indent"><h3 id="impl-hash">8.1 Hashing Algorithm Support<a class="anchor-link" href="#impl-hash"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">An application SHOULD maintain a list of hashing algorithms it supports, which MUST include the algorithm or algorithms listed in the <a href="#security-mti">Mandatory-to-Implement Technologies</a> section of this document.</p>
+    </div>
+    <div class="indent"><h3 id="impl-cache">8.2 Caching<a class="anchor-link" href="#impl-cache"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">It is RECOMMENDED for an application that processes entity capabilities information to cache associations between the verification string and discovered identity+features within the scope of one presence session. This obviates the need for extensive service discovery requests within a session.</p>
+      <p class="" style="">It is RECOMMENDED for an application to cache associations across presence sessions, since this obviates the need for extensive service discovery requests at the beginning of a session (this is especially helpful in bandwidth-constrained environments).</p>
+    </div>
+    <div class="indent"><h3 id="impl-presence">8.3 Directed Presence<a class="anchor-link" href="#impl-presence"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">If two entities exchange messages but they do not normally exchange presence (i.e., via presence subscription), the entities MAY choose to send directed presence to each other, where the presence information SHOULD be annotated with the same capabilities information as each entity sends in presence broadcasts. Until and unless capabilities information has been received from another entity, an application MUST assume that the other entity does not support capabilities.</p>
+    </div>
+    <div class="indent"><h3 id="impl-optimize">8.4 Caps Optimization<a class="anchor-link" href="#impl-optimize"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">A server that is managing an connected client's presence session MAY optimize presence notification traffic sent through the server by stripping off redundant capabilities annotations (i.e., the &lt;c/&gt; element). Because of this, receivers of presence notifications MUST NOT expect an annotation on every presence notification they receive. If the server performs caps optimization, it MUST ensure that the first presence notification each subscriber receives contains the annotation. The server MUST also ensure that any changes in the caps information (e.g., an updated 'ver' attribute) are sent to all subscribers.</p>
+      <p class="" style="">If a connected client determines that its server supports caps optimization, it MAY choose to send the capabilities annotation only on the first presence packet, as well as whenever its capabilities change.</p>
+    </div>
+  <h2 id="security">9.
+       Security Considerations<a class="anchor-link" href="#security"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <div class="indent"><h3 id="security-mti">9.1 Mandatory-to-Implement Technologies<a class="anchor-link" href="#security-mti"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">The SHA-1 hashing algorithm is mandatory to implement. All implementations MUST support SHA-1.</p>
+      <p class="" style="">An implementation MAY support other algorithms. Any such algorithm SHOULD be registered in the <span class="ref" style=""><a href="http://www.iana.org/assignments/hash-function-text-names">IANA Hash Function Textual Names Registry </a></span>  [<a href="#nt-idm44853439343280">24</a>].</p>
+      <p class="" style="">In the future, the <span class="ref" style=""><a href="https://xmpp.org/about/xmpp-standards-foundation#council">XMPP Council</a></span>  [<a href="#nt-idm44853439338704">25</a>] may, at its discretion, modify the mandatory-to-implement hashing algorithm if it determines that SHA-1 has become practically vulnerable to <a href="#security-preimage">Preimage Attacks</a>.</p>
+    </div>
+    <div class="indent"><h3 id="security-preimage">9.2 Preimage Attacks<a class="anchor-link" href="#security-preimage"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">As described in <span class="ref" style=""><a href="http://tools.ietf.org/html/rfc4270">RFC 4270</a></span>  [<a href="#nt-idm44853439328256">26</a>], protocols that use the output of hash functions such as MD5 or SHA-1 can be vulnerable to collision attacks or preimage attacks or both. Because of how the hash output is used in entity capabilities, the protocol will not be subject to collision attacks even if the hash function used is found to be vulnerable to collision attacks. However, it is <em>possible</em> that the protocol might become subject to preimage attacks if the hash function used is found to be vulnerable to preimage attacks.</p>
+      <p class="" style="">In theory, such a preimage attack would take one of the following forms:</p>
+      <ul class="" style="">
+        <li class="" style="">Given knowledge of a particular value V of the 'ver' attribute, an attacker can find an input message X such that hash(X) yields V (this is known as a "first preimage attack").</li>
+        <li class="" style="">Given knowledge of a particular value S used as the input message to the hash function, an attacker can find a value S' that yields V (this is known as a "second preimage attack").</li>
+      </ul>
+      <p class="" style="">In practice, a preimage attack would need to meet all of the following criteria in order to be effective against the entity capabilities protocol:</p>
+      <ol start="1" class="" style="">
+        <li class="" style="">The hashing algorithm used would need to be found not only theoretically but practically vulnerable to first or second preimage attacks (e.g., this is not yet true of the MD5 or SHA-1 algorithms, but may become true in the future).</li>
+        <li class="" style="">An attacker would need to find an input message X or S' that matches the hash V for a particular value of V or S, which may not be practical given that (a) the values of S used as input to the hash function in entity capabilities are relatively short and (b) cryptanalysis to date indicates that existing hash functions may not be vulnerable to preimage attacks except in the case of relatively long input messages (on the order of 2<span class="super" style="">55</span> blocks).</li>
+        <li class="" style="">The input message X or S' would need to conform to the structure of S as specified under <a href="#ver">Verification String</a>, including the order of service discovery identity or identities followed by service discovery features, delimited by the '&lt;' character and sorted using "i;octet" collation.</li>
+        <li class="" style="">The input messsage X or S' would need to make it seem as if a desirable feature (e.g., end-to-end encryption) is not supported by other entities that advertise the same hash V even though the feature is indeed supported (i.e., the attacker would need to return a set of service discovery identities and features that match X or S', and have that set be plausible for an entity that communicates via XMPP), or make it seem as if an undesirable feature is supported even though the feature is not supported.</li>
+        <li class="" style="">The attacker would need to propagate the hash V before some other entity with the true input message S could broadcast presence with the relevant entity capabilities data and provide the true service discovery response (thus the attacker might need to subvert the development process of a particular software project or subvert the namespace issuance process of the <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm44853439307232">27</a>], or both).</li>
+      </ol>
+      <p class="" style="">It currently seems extremely unlikely that an attacker could meet all of the foregoing conditions in the foreseeable future. However, the XMPP Council shall continue to monitor the state of cryptanalysis regarding the mandatory-to-implement hash function as well as the possibility that any vulnerabilities in that function might lead to practical threats against the entity capabilities protocol. If and when it becomes practical (or even possible) to launch effective preimage attacks against the entity capabilities protocol, the XMPP Council shall consider updating this specification to change the mandatory-to-implement hashing algorithm to a safer technology.</p>
+      <p class="box" style="">Note: If the four characters '&amp;', 'l', 't', ';' appear consecutively in any of the factors of the verification string S (e.g., a service discovery identity of 'SomeClient&amp;lt;http://jabber.org/protocol/muc') then that string of characters MUST be treated as literally '&amp;lt;' and MUST NOT be converted to the character '&lt;', because completing such a conversion would open the protocol to trivial attacks.</p>
+    </div>
+    <div class="indent"><h3 id="security-poisoning">9.3 Caps Poisoning<a class="anchor-link" href="#security-poisoning"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">Adherence to the method defined in the <a href="#ver">Verification String</a> section of this document for processing of the 'ver' attribute is known to be vulnerable to certain cache poisoning attacks that can not be fixed in a backwards compatible manner  [<a href="#nt-idm44853439298304">28</a>].</p>
+      <p class="" style="">If the value of the 'ver' attribute is a verification string as defined herein (i.e., if the 'ver' attribute is not generated according to the <a href="#legacy">Legacy Format</a>), inclusion of the 'hash' attribute is REQUIRED. Knowing explicitly that the value of the 'ver' attribute is a verification string enables the recipient to avoid spurious notification of invalid or poisoned hashes.</p>
+    </div>
+    <div class="indent"><h3 id="security-exposure">9.4 Information Exposure<a class="anchor-link" href="#security-exposure"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">Use of entity capabilities might make it easier for an attacker to launch certain application-specific attacks, since the attacker could more easily determine the type of client being used as well as its capabilities. However, since most clients respond to Service Discovery and Software Version requests without performing access control checks, there is no new vulnerability. Entities that wish to restrict access to capabilities information SHOULD use <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0016.html">Privacy Lists (XEP-0016)</a></span>  [<a href="#nt-idm44853439290256">29</a>] to define appropriate communications blocking (e.g., an entity MAY choose to allow IQ requests only from "trusted" entities, such as those with whom it has a presence subscription of "both"); note, however, that such restrictions may be incompatible with the recommendation regarding <a href="#directed">Directed Presence</a>.</p>
+    </div>
+  <h2 id="iana">10.
+       IANA Considerations<a class="anchor-link" href="#iana"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">This document requires no interaction with the <span class="ref" style=""><a href="http://www.iana.org/">Internet Assigned Numbers Authority (IANA)</a></span>  [<a href="#nt-idm44853439281936">30</a>]. </p>
+  <h2 id="registrar">11.
+       XMPP Registrar Considerations<a class="anchor-link" href="#registrar"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <div class="indent"><h3 id="ns">11.1 Protocol Namespaces<a class="anchor-link" href="#ns"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+    <p class="" style="">The <span class="ref" style=""><a href="https://xmpp.org/registrar/">XMPP Registrar</a></span>  [<a href="#nt-idm44853439307232">27</a>] includes "http://jabber.org/protocol/caps" in its registry of protocol namespaces  (see &lt;<a href="https://xmpp.org/registrar/namespaces.html">https://xmpp.org/registrar/namespaces.html</a>&gt;).</p>
+    </div>
+    <div class="indent"><h3 id="registrar-features">11.2 Service Discovery Features<a class="anchor-link" href="#registrar-features"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">The XMPP Registrar includes "http://jabber.org/protocol/caps" and "http://jabber.org/protocol/caps#optimize" in its registry of service discovery features (see &lt;<a href="https://xmpp.org/registrar/disco-features.html">https://xmpp.org/registrar/disco-features.html</a>&gt;).</p>
+    </div>
+    <div class="indent"><h3 id="registrar-stream-features">11.3 Stream Features<a class="anchor-link" href="#registrar-stream-features"><abbr title="Link to this point in the document">¶</abbr></a></h3>
+      <p class="" style="">The XMPP Registrar includes "http://jabber.org/protocol/caps" in its registry of stream features (see &lt;<a href="https://xmpp.org/registrar/stream-features.html">https://xmpp.org/registrar/stream-features.html</a>&gt;).</p>
+    </div>
+  <h2 id="schema">12.
+       XML Schema<a class="anchor-link" href="#schema"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <figure class="code"><figcaption></figcaption><pre class="prettyprint">
+&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+
+&lt;xs:schema
+    xmlns:xs='http://www.w3.org/2001/XMLSchema'
+    targetNamespace='http://jabber.org/protocol/caps'
+    xmlns='http://jabber.org/protocol/caps'
+    elementFormDefault='qualified'&gt;
+
+  &lt;xs:annotation&gt;
+    &lt;xs:documentation&gt;
+      The protocol documented by this schema is defined in
+      XEP-0115: http://www.xmpp.org/extensions/xep-0115.html
+    &lt;/xs:documentation&gt;
+  &lt;/xs:annotation&gt;
+
+  &lt;xs:element name='c'&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:simpleContent&gt;
+        &lt;xs:extension base='empty'&gt;
+          &lt;xs:attribute name='ext' type='xs:NMTOKENS' use='optional'/&gt;
+          &lt;xs:attribute name='hash' type='xs:NMTOKEN' use='required'/&gt;
+          &lt;xs:attribute name='node' type='xs:string' use='required'/&gt;
+          &lt;xs:attribute name='ver' type='xs:string' use='required'/&gt;
+        &lt;/xs:extension&gt;
+      &lt;/xs:simpleContent&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+
+  &lt;xs:simpleType name='empty'&gt;
+    &lt;xs:restriction base='xs:string'&gt;
+      &lt;xs:enumeration value=''/&gt;
+    &lt;/xs:restriction&gt;
+  &lt;/xs:simpleType&gt;
+
+&lt;/xs:schema&gt;
+</pre></figure>
+  <h2 id="legacy">13.
+       Legacy Format<a class="anchor-link" href="#legacy"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">Before Version 1.4 of this specification, the 'ver' attribute was generated differently, the 'ext' attribute was used more extensively, and the 'hash' attribute was absent. For historical purposes, Version 1.3 of this specification is archived at &lt;<a href="http://www.xmpp.org/extensions/attic/xep-0115-1.3.html">http://www.xmpp.org/extensions/attic/xep-0115-1.3.html</a>&gt;. For backwards-compatibility with the legacy format, the 'node' attribute is REQUIRED and the 'ext' attribute MAY be included.</p>
+    <p class="" style="">An application can determine if the legacy format is in use by checking for the presence of the 'hash' attribute, which is REQUIRED in the current format.</p>
+    <p class="" style="">If a caps-processing application supports the legacy format, it SHOULD check the 'node', 'ver', and 'ext' combinations as specified in the archived version 1.3 of this specification, and MAY cache the results.</p>
+    <p class="" style="">If a caps-processing application does not support the legacy format, it SHOULD ignore the 'ver' value entirely (since the value cannot be verified) and SHOULD NOT cache it, since the application cannot validate the identity and features by checking the hash.</p>
+  <h2 id="ack">14.
+       Acknowledgements<a class="anchor-link" href="#ack"><abbr title="Link to this point in the document">¶</abbr></a></h2>
+    <p class="" style="">Thanks to Rachel Blackman, Dave Cridland, Richard Dobson, Olivier Goffart, Sergei Golovan, Justin Karneges, Ralph Meijer, Ian Paterson, Kevin Smith, Tomasz Sterna, Michal Vaner, and Matt Yacobucci for comments and suggestions.</p>
+  <hr><a name="appendices"></a><h2>Appendices</h2><h3 id="appendix-docinfo">Appendix A: Document Information<a class="anchor-link" href="#appendix-docinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><dl class="compact"><dt>Series</dt><dd><a href="https://xmpp.org/extensions/">XEP</a></dd><dt>Number</dt><dd>0115</dd><dt>Publisher</dt><dd><a href="/xsf/">XMPP Standards Foundation</a></dd><dt>Status</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#states-Draft">Stable</a></dd><dt>Type</dt><dd><a href="https://xmpp.org/extensions/xep-0001.html#types-Standards%20Track">Standards Track</a></dd><dt>Version</dt><dd>1.6.0</dd><dt>Last Updated</dt><dd>2022-03-08</dd><dt>Approving Body</dt><dd><a href="https://xmpp.org/council/">XMPP Council</a></dd><dt>Dependencies</dt><dd>XMPP Core, XMPP IM, <a href="xep-0030.html">XEP-0030</a></dd><dt>Supersedes</dt><dd>None</dd><dt>Superseded By</dt><dd>None</dd><dt>Short Name</dt><dd>caps</dd><dt>Schema</dt><dd>
+        &lt;<a href="http://www.xmpp.org/schemas/caps.xsd">http://www.xmpp.org/schemas/caps.xsd</a>&gt;<br></dd><dt>Source Control</dt><dd><a class="standardsButton" href="https://github.com/xsf/xeps/blob/master/xep-0115.xml">HTML</a></dd></dl><p>
+          This document in other formats:
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0115.xml">XML</a> 
+          <a class="standardsButton" href="https://xmpp.org/extensions/xep-0115.pdf">PDF</a></p><h3 id="appendix-authorinfo">Appendix B: Author Information<a class="anchor-link" href="#appendix-authorinfo"><abbr title="Link to this point in the document">¶</abbr></a></h3><h5>Joe Hildebrand</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:jhildebr@cisco.com">jhildebr@cisco.com</a></dd><dt>JabberID</dt><dd><a href="xmpp:hildjj@jabber.org">hildjj@jabber.org</a></dd></dl><h5>Peter Saint-Andre</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:stpeter@stpeter.im">stpeter@stpeter.im</a></dd><dt>JabberID</dt><dd><a href="xmpp:stpeter@jabber.org">stpeter@jabber.org</a></dd><dt>URI</dt><dd><a href="https://stpeter.im/">https://stpeter.im/</a></dd></dl><h5>Remko Tronçon</h5><dl class="compact"><dt>URI</dt><dd><a href="http://el-tramo.be/">http://el-tramo.be/</a></dd></dl><h5>Jacek Konieczny</h5><dl class="compact"><dt>Email</dt><dd><a href="mailto:jajcus@jajcus.net">jajcus@jajcus.net</a></dd><dt>JabberID</dt><dd><a href="xmpp:jajcus@jabber.bnet.pl">jajcus@jabber.bnet.pl</a></dd></dl><h3 id="appendix-legal">Appendix C: Legal Notices<a class="anchor-link" href="#appendix-legal"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><h4>Copyright</h4><p>This XMPP Extension Protocol is copyright © 1999 – 2024 by the <a href="https://xmpp.org/">XMPP Standards Foundation</a> (XSF).</p><h4>Permissions</h4><p>Permission is hereby granted, free of charge, to any person obtaining a copy of this specification (the "Specification"), to make use of the Specification without restriction, including without limitation the rights to implement the Specification in a software program, deploy the Specification in a network service, and copy, modify, merge, publish, translate, distribute, sublicense, or sell copies of the Specification, and to permit persons to whom the Specification is furnished to do so, subject to the condition that the foregoing copyright notice and this permission notice shall be included in all copies or substantial portions of the Specification. Unless separate permission is granted, modified works that are redistributed shall not contain misleading information regarding the authors, title, number, or publisher of the Specification, and shall not claim endorsement of the modified works by the authors, any organization or project to which the authors belong, or the XMPP Standards Foundation.</p><h4>Disclaimer of Warranty</h4><p class="box info">## NOTE WELL: This Specification is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. ##</p><h4>Limitation of Liability</h4><p>In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the XMPP Standards Foundation or any author of this Specification be liable for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising from, out of, or in connection with the Specification or the implementation, deployment, or other use of the Specification (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if the XMPP Standards Foundation or such author has been advised of the possibility of such damages.</p><h4>IPR Conformance</h4><p>This XMPP Extension Protocol has been contributed in full conformance with the XSF's Intellectual Property Rights Policy (a copy of which can be found at &lt;<a href="https://xmpp.org/about/xsf/ipr-policy">https://xmpp.org/about/xsf/ipr-policy</a>&gt; or obtained by writing to XMPP Standards Foundation, P.O. Box 787, Parker, CO 80134 USA).</p><h4>Visual Presentation</h4><p>The HTML representation (you are looking at) is maintained by the XSF. It is based on the <a href="http://yaml.de">YAML CSS Framework</a>, which is licensed under the terms of the <a href="https://creativecommons.org/licenses/by/2.0/">CC-BY-SA 2.0</a> license.</p></div><h3 id="appendix-xmpp">Appendix D: Relation to XMPP<a class="anchor-link" href="#appendix-xmpp"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The Extensible Messaging and Presence Protocol (XMPP) is defined in the XMPP Core (RFC 6120) and XMPP IM (RFC 6121) specifications contributed by the XMPP Standards Foundation to the Internet Standards Process, which is managed by the Internet Engineering Task Force in accordance with RFC 2026. Any protocol defined in this document has been developed outside the Internet Standards Process and is to be understood as an extension to XMPP rather than as an evolution, development, or modification of XMPP itself.</p><h3 id="appendix-discuss">Appendix E: Discussion Venue<a class="anchor-link" href="#appendix-discuss"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">The primary venue for discussion of XMPP Extension Protocols is the &lt;<a href="https://mail.jabber.org/mailman/listinfo/standards">standards@xmpp.org</a>&gt; discussion list.</p><p class="indent">Discussion on other xmpp.org discussion lists might also be appropriate; see &lt;<a href="https://xmpp.org/community/">https://xmpp.org/community/</a>&gt; for a complete list.</p><p class="indent">Errata can be sent to &lt;<a href="mailto:editor@xmpp.org">editor@xmpp.org</a>&gt;.</p><h3 id="appendix-conformance">Appendix F: Requirements Conformance<a class="anchor-link" href="#appendix-conformance"><abbr title="Link to this point in the document">¶</abbr></a></h3><p class="indent">
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+          "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+          "MAY", and "OPTIONAL" in this document are to be interpreted as
+          described in <a href="https://tools.ietf.org/rfc/bcp/bcp14.txt">BCP 14</a>
+          [<a href="https://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]
+          [<a href="https://tools.ietf.org/rfc/rfc8174.txt">RFC8174</a>] when,
+          and only when, they appear in all capitals, as shown here.
+        </p><h3 id="appendix-notes">Appendix G: Notes<a class="anchor-link" href="#appendix-notes"><abbr title="Link to this point in the document">¶</abbr></a></h3><div class="indent"><p><a name="nt-idm44853439667872">1</a>. XEP-0071: XHTML-IM &lt;<a href="https://xmpp.org/extensions/xep-0071.html">https://xmpp.org/extensions/xep-0071.html</a>&gt;.</p><p><a name="nt-idm44853439657680">2</a>. XEP-0166: Jingle &lt;<a href="https://xmpp.org/extensions/xep-0166.html">https://xmpp.org/extensions/xep-0166.html</a>&gt;.</p><p><a name="nt-idm44853439656720">3</a>. XEP-0167: Jingle RTP Sessions &lt;<a href="https://xmpp.org/extensions/xep-0167.html">https://xmpp.org/extensions/xep-0167.html</a>&gt;.</p><p><a name="nt-idm44853439651472">4</a>. XEP-0096: SI File Transfer &lt;<a href="https://xmpp.org/extensions/xep-0096.html">https://xmpp.org/extensions/xep-0096.html</a>&gt;.</p><p><a name="nt-idm44853439641088">5</a>. XEP-0060: Publish-Subscribe &lt;<a href="https://xmpp.org/extensions/xep-0060.html">https://xmpp.org/extensions/xep-0060.html</a>&gt;.</p><p><a name="nt-idm44853439638768">6</a>. XEP-0030: Service Discovery &lt;<a href="https://xmpp.org/extensions/xep-0030.html">https://xmpp.org/extensions/xep-0030.html</a>&gt;.</p><p><a name="nt-idm44853439634304">7</a>. XEP-0092: Software Version &lt;<a href="https://xmpp.org/extensions/xep-0092.html">https://xmpp.org/extensions/xep-0092.html</a>&gt;.</p><p><a name="nt-idm44853439631872">8</a>. Entity capabilities is not limited to clients, and can be used by any entity that exchanges presence with another entity, e.g., a gateway. However, this specification mainly uses the example of clients.</p><p><a name="nt-idm44853439612320">9</a>. XEP-0045: Multi-User Chat &lt;<a href="https://xmpp.org/extensions/xep-0045.html">https://xmpp.org/extensions/xep-0045.html</a>&gt;.</p><p><a name="nt-idm44853439609504">10</a>. The string can be relied upon because of how it is generated and checked, as explained later in this document.</p><p><a name="nt-idm44853439587312">11</a>. RFC 6120: Extensible Messaging and Presence Protocol (XMPP): Core &lt;<a href="http://tools.ietf.org/html/rfc6120">http://tools.ietf.org/html/rfc6120</a>&gt;.</p><p><a name="nt-idm44853439577808">12</a>. RFC 6121: Extensible Messaging and Presence Protocol (XMPP): Instant Messaging and Presence &lt;<a href="http://tools.ietf.org/html/rfc6121">http://tools.ietf.org/html/rfc6121</a>&gt;.</p><p><a name="nt-idm44853439576288">13</a>. These first two requirements effectively eliminated <span class="ref" style=""><a href="https://xmpp.org/extensions/xep-0060.html">Publish-Subscribe (XEP-0060)</a></span>  [<a href="#nt-idm44853439641088">6</a>] as a possible implementation of entity capabilities.</p><p><a name="nt-idm44853439535104">14</a>. RFC 4790: Internet Application Protocol Collation Registry &lt;<a href="http://tools.ietf.org/html/rfc4790">http://tools.ietf.org/html/rfc4790</a>&gt;.</p><p><a name="nt-idm44853439529696">15</a>. A registry of service discovery identities is located at &lt;<a href="https://xmpp.org/registrar/disco-categories.html">https://xmpp.org/registrar/disco-categories.html</a>&gt;.</p><p><a name="nt-idm44853439528544">16</a>. The combination of category, type, and xml:lang forms a unique combination, so it is not necessary to also sort by name (the name merely provides some human-readable text associated with a category/type/lang).</p><p><a name="nt-idm44853439523120">17</a>. A registry of service discovery features is located at &lt;<a href="https://xmpp.org/registrar/disco-features.html">https://xmpp.org/registrar/disco-features.html</a>&gt;.</p><p><a name="nt-idm44853439517328">18</a>. XEP-0128: Service Discovery Extensions &lt;<a href="https://xmpp.org/extensions/xep-0128.html">https://xmpp.org/extensions/xep-0128.html</a>&gt;.</p><p><a name="nt-idm44853439501600">19</a>. RFC 3629: UTF-8, a transformation format of ISO 10646 &lt;<a href="http://tools.ietf.org/html/rfc3629">http://tools.ietf.org/html/rfc3629</a>&gt;.</p><p><a name="nt-idm44853439491120">20</a>. RFC 3174: US Secure Hash Algorithm 1 (SHA1) &lt;<a href="http://tools.ietf.org/html/rfc3174">http://tools.ietf.org/html/rfc3174</a>&gt;.</p><p><a name="nt-idm44853439490160">21</a>. RFC 4648: The Base16, Base32, and Base64 Data Encodings &lt;<a href="http://tools.ietf.org/html/rfc4648">http://tools.ietf.org/html/rfc4648</a>&gt;.</p><p><a name="nt-idm44853439488320">22</a>. The OpenSSL command for producing such output with SHA-1 is "echo -n 'S' | openssl dgst -binary -sha1 | openssl enc -nopad -base64".</p><p><a name="nt-idm44853439399152">23</a>. RFC 3920: Extensible Messaging and Presence Protocol (XMPP): Core &lt;<a href="http://tools.ietf.org/html/rfc3920">http://tools.ietf.org/html/rfc3920</a>&gt;.</p><p><a name="nt-idm44853439343280">24</a>. IANA registry of Hash Function Textual Names &lt;<a href="http://www.iana.org/assignments/hash-function-text-names">http://www.iana.org/assignments/hash-function-text-names</a>&gt;.</p><p><a name="nt-idm44853439338704">25</a>. The XMPP Council is a technical steering committee, authorized by the XSF Board of Directors and elected by XSF members, that approves of new XMPP Extensions Protocols and oversees the XSF's standards process. For further information, see &lt;<a href="https://xmpp.org/about/xmpp-standards-foundation#council">https://xmpp.org/about/xmpp-standards-foundation#council</a>&gt;.</p><p><a name="nt-idm44853439328256">26</a>. RFC 4270: Attacks on Cryptographic Hashes in Internet Protocols &lt;<a href="http://tools.ietf.org/html/rfc4270">http://tools.ietf.org/html/rfc4270</a>&gt;.</p><p><a name="nt-idm44853439307232">27</a>. The XMPP Registrar maintains a list of reserved protocol namespaces as well as registries of parameters used in the context of XMPP extension protocols approved by the XMPP Standards Foundation. For further information, see &lt;<a href="https://xmpp.org/registrar/">https://xmpp.org/registrar/</a>&gt;.</p><p><a name="nt-idm44853439298304">28</a>. <a href="https://mail.jabber.org/pipermail/security/2009-July/000812.html">[Security] Trivial preimage attack against the entity capabilities protocol</a>.</p><p><a name="nt-idm44853439290256">29</a>. XEP-0016: Privacy Lists &lt;<a href="https://xmpp.org/extensions/xep-0016.html">https://xmpp.org/extensions/xep-0016.html</a>&gt;.</p><p><a name="nt-idm44853439281936">30</a>. The Internet Assigned Numbers Authority (IANA) is the central coordinator for the assignment of unique parameter values for Internet protocols, such as port numbers and URI schemes. For further information, see &lt;<a href="http://www.iana.org/">http://www.iana.org/</a>&gt;.</p></div><h3 id="appendix-revs">Appendix H: Revision History<a class="anchor-link" href="#appendix-revs"><abbr title="Link to this point in the document">¶</abbr></a></h3><p>Note: Older versions of this specification might be available at <a href="https://xmpp.org/extensions/attic/">https://xmpp.org/extensions/attic/</a></p><ol class="revision-history"><li id="revision-history-v1.6.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0115-1.6.0.html">1.6.0</a> (2022-03-08)<a class="anchor-link" href="#revision-history-v1.6.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Mention preimage attacks explicitly</p><div class="revision-author">ssw</div></li><li id="revision-history-v1.5.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0115-1.5.2.html">1.5.2</a> (2020-05-05)<a class="anchor-link" href="#revision-history-v1.5.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">fix complex generation example by adding missing form field type</p><div class="revision-author">fs</div></li><li id="revision-history-v1.5.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0115-1.5.1.html">1.5.1</a> (2016-10-06)<a class="anchor-link" href="#revision-history-v1.5.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added registrar consideration about stream features.</p><div class="revision-author">egp</div></li><li id="revision-history-v1.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0115-1.5.html">1.5</a> (2008-02-26)<a class="anchor-link" href="#revision-history-v1.5"><abbr title="Link to this point in the document">¶</abbr></a></div>
+        <ul class="" style="">
+          <li class="" style="">Defined SHA-1 as mandatory to implement</li>
+          <li class="" style="">Specified that inclusion of hash attribute is required</li>
+          <li class="" style="">Defined the nature of possible preimage attacks</li>
+          <li class="" style="">More clearly specified security considerations</li>
+          <li class="" style="">More clearly specified implementation notes</li>
+          <li class="" style="">Modified generation method to incorporate service discovery extensions</li>
+          <li class="" style="">More clearly specified processing method</li>
+          <li class="" style="">Clarified meaning and construction of caps node attribute and disco node attribute</li>
+          <li class="" style="">Specified that node attribute shall be included in disco#info request for backwards-compatibility</li>
+          <li class="" style="">Clarified handling of the legacy format to assist developers</li>
+          <li class="" style="">Added service discovery feature for caps optimization to prevent confusion regarding server support of caps vs. caps optimization</li>
+        </ul>
+      <div class="revision-author">jjh/psa</div></li><li id="revision-history-v1.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0115-1.4.html">1.4</a> (2007-08-13)<a class="anchor-link" href="#revision-history-v1.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">In response to persistent security concerns over caps poisoning, redefined ver attribute to be a hash of the service discovery identity and features in a way that is backwards-compatible with the legacy format.</p><div class="revision-author">psa/jk/jjh</div></li><li id="revision-history-v1.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0115-1.3.html">1.3</a> (2007-04-10)<a class="anchor-link" href="#revision-history-v1.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added developer-friendly introduction; specified that ext names must be stable across application versions; further clarified examples; added stream feature use case; removed message example (send directed presence instead).</p><div class="revision-author">psa/rt/jjh</div></li><li id="revision-history-v1.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0115-1.2.html">1.2</a> (2007-02-15)<a class="anchor-link" href="#revision-history-v1.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified motivation and handling of service discovery requests.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0115-1.1.html">1.1</a> (2004-10-29)<a class="anchor-link" href="#revision-history-v1.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Clarified meaning of service discovery results for client#ver and client#ext.</p><div class="revision-author">psa</div></li><li id="revision-history-v1.0"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0115-1.0.html">1.0</a> (2004-08-01)<a class="anchor-link" href="#revision-history-v1.0"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Per a vote of the Jabber Council, advanced status to Draft.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.7"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0115-0.7.html">0.7</a> (2004-06-29)<a class="anchor-link" href="#revision-history-v0.7"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Added several items to the Security Considerations; clarified naming requirements regarding 'node', 'ver', and 'ext' attributes.</p><div class="revision-author">jjh/psa</div></li><li id="revision-history-v0.6"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0115-0.6.html">0.6</a> (2004-04-25)<a class="anchor-link" href="#revision-history-v0.6"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Made a number of editorial adjustments.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.5"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0115-0.5.html">0.5</a> (2004-01-05)<a class="anchor-link" href="#revision-history-v0.5"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Specified that the protocol can be used whenever presence is used (e.g., by gateways); improved the XML schema; made several editorial adjustments.</p><div class="revision-author">psa</div></li><li id="revision-history-v0.4"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0115-0.4.html">0.4</a> (2003-09-04)<a class="anchor-link" href="#revision-history-v0.4"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">IQ eets must be to a resource, since they are intended to go to a particular session.</p><div class="revision-author">jjh</div></li><li id="revision-history-v0.3"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0115-0.3.html">0.3</a> (2003-09-02)<a class="anchor-link" href="#revision-history-v0.3"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Servers MUST strip extras changed to MAY, due to implementer feedback.</p><div class="revision-author">jjh</div></li><li id="revision-history-v0.2"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0115-0.2.html">0.2</a> (2003-08-28)<a class="anchor-link" href="#revision-history-v0.2"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Add more clarifying assumptions and requirements, make it clear that clients don't have to send capabilities every time if the server is optimizing.</p><div class="revision-author">jjh</div></li><li id="revision-history-v0.1"><div class="revision-head">Version <a href="https://xmpp.org/extensions/attic/xep-0115-0.1.html">0.1</a> (2003-08-27)<a class="anchor-link" href="#revision-history-v0.1"><abbr title="Link to this point in the document">¶</abbr></a></div><p class="" style="">Initial version.</p><div class="revision-author">jjh</div></li></ol><h3 id="appendix-biblatex">Appendix I: Bib(La)TeX Entry</h3><pre>
+@report{hildebrand2003caps,
+  title = {Entity Capabilities},
+  author = {Hildebrand, Joe and Saint-Andre, Peter and Tronçon, Remko and Konieczny, Jacek},
+  type = {XEP},
+  number = {0115},
+  version = {1.6.0},
+  institution = {XMPP Standards Foundation},
+  url = {https://xmpp.org/extensions/xep-0115.html},
+  date = {2003-08-27/2022-03-08},
+}</pre><p>END</p></body></html>
