@@ -1,7 +1,7 @@
 %global debug_package %{nil}
 
 Name:           xepher
-Version:        0.5.0
+Version:        0.5.1
 Release:        1%{?dist}
 Summary:        Xepher — WeeChat plugin for XMPP/Jabber protocol
 
@@ -69,6 +69,11 @@ install -D -m 0755 xmpp.so %{buildroot}%{_libdir}/weechat/plugins/xmpp.so
 %{_libdir}/weechat/plugins/xmpp.so
 
 %changelog
+* Tue Apr 07 2026 Emiel Kollof <emiel@kollof.nl> - 0.5.1-1
+- Update to v0.5.1
+- Fix(omemo): show self-outbound MAM OMEMO messages as placeholder during replay
+- Fix(omemo): suppress noisy bundle-fetch and stale-session-recovery log messages during MAM catchup
+
 * Thu Apr 02 2026 Emiel Kollof <emiel@kollof.nl> - 0.5.0-1
 - Update to v0.5.0
 - Feat(omemo/atm): add /omemo fingerprint, /omemo approve, /omemo distrust manual trust UI (XEP-0450)
