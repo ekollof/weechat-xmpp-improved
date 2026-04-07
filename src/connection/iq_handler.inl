@@ -3742,6 +3742,44 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                     account.omemo.request_axolotl_devicelist(account, dl_target_jid);
             }
         }
+        else if (!is_item_not_found && (is_omemo2_devicelist_err || is_legacy_devicelist_err))
+        {
+            // A transient or cross-domain error (service-unavailable, forbidden,
+            // remote-server-not-found, timeout, etc.) — NOT a permanent "node missing"
+            // condition.  Clear the guard entries so the next encode attempt can
+            // retry the devicelist request rather than being permanently blocked.
+            std::string dl_target_jid;
+            auto dl_jid_it = account.omemo.pending_iq_jid.find(id);
+            if (dl_jid_it != account.omemo.pending_iq_jid.end())
+            {
+                dl_target_jid = dl_jid_it->second;
+                account.omemo.pending_iq_jid.erase(dl_jid_it);
+            }
+            else if (from)
+            {
+                const std::string dl_from_bare = ::jid(nullptr, from).bare;
+                if (!dl_from_bare.empty())
+                    dl_target_jid = dl_from_bare;
+            }
+
+            if (!dl_target_jid.empty())
+            {
+                if (is_omemo2_devicelist_err)
+                    account.omemo.missing_omemo2_devicelist.erase(dl_target_jid);
+                if (is_legacy_devicelist_err)
+                    account.omemo.missing_axolotl_devicelist.erase(dl_target_jid);
+
+                // Log the transient error so the user has visibility.
+                const char *err_text = dl_err_elem
+                    ? xmpp_stanza_get_text(dl_err_elem) : nullptr;
+                weechat_printf(account.buffer,
+                    "%somemo: transient devicelist fetch error for %s (%s) — "
+                    "guard cleared, will retry on next send",
+                    weechat_prefix("network"),
+                    dl_target_jid.c_str(),
+                    err_text ? err_text : "unknown error");
+            }
+        }
     }
 
     // After a successful node configure, re-publish the OMEMO bundle or
