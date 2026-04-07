@@ -886,8 +886,16 @@ xmpp_stanza_t *weechat::xmpp::omemo::encode(weechat::account *account,
                     if (out_incomplete_count)
                         ++*out_incomplete_count;
                     print_info(buffer, fmt::format(
-                        "OMEMO (legacy): failed to encrypt transport key for {}/{}",
+                        "OMEMO (legacy): failed to encrypt transport key for {}/{} — purging stale session",
                         recipient_jid, *remote_device_id));
+                    // The session exists in LMDB but is un-encryptable (e.g. corrupted
+                    // ratchet state from a previous buggy session).  Purge it so that
+                    // the next encode attempt will call establish_session_from_bundle()
+                    // and request a fresh bundle, recovering automatically.
+                    auto stale_addr = make_signal_address(
+                        recipient_jid, static_cast<std::int32_t>(*remote_device_id));
+                    signal_protocol_session_delete_session(store_context, &stale_addr.address);
+                    request_axolotl_bundle(*account, recipient_jid, *remote_device_id);
                     continue;
                 }
 

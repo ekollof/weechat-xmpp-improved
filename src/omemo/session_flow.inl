@@ -1247,11 +1247,13 @@ XMPP_TEST_EXPORT void weechat::xmpp::omemo::handle_bundle(weechat::account *acco
             {
                 failed_session_bootstrap.erase({bare_jid, remote_device_id});
                 const bool had_session_before = has_session(bare_jid.c_str(), remote_device_id);
-                // During MAM catchup, do NOT overwrite an existing session: messages
-                // still being replayed were encrypted under the current session state.
-                // Rebuilding the session here would make all remaining MAM messages
-                // undecryptable. Only bootstrap if there is no session yet.
-                const bool should_bootstrap = !had_session_before || !global_mam_catchup;
+                // Only bootstrap a new session when no session exists yet.
+                // Never overwrite an existing established session: doing so resets
+                // the Signal ratchet and causes the remote peer to receive a second
+                // PreKeySignalMessage that desynchronises its session state
+                // (the peer initialises from the new prekey bundle while we continue
+                // ratcheting from the original session, leading to undecryptable messages).
+                const bool should_bootstrap = !had_session_before;
                 if (should_bootstrap)
                 {
                     try
@@ -1426,11 +1428,13 @@ XMPP_TEST_EXPORT void weechat::xmpp::omemo::handle_bundle(weechat::account *acco
                 {
                     failed_session_bootstrap.erase({bare_jid, remote_device_id});
                     const bool had_session_before = has_session(bare_jid.c_str(), remote_device_id);
-                    // During MAM catchup, do NOT overwrite an existing session: messages
-                    // still being replayed were encrypted under the current session state.
-                    // Rebuilding the session here would make all remaining MAM messages
-                    // undecryptable. Only bootstrap if there is no session yet.
-                    const bool should_bootstrap = !had_session_before || !global_mam_catchup;
+                    // Only bootstrap a new session when no session exists yet.
+                    // Never overwrite an existing established session: doing so resets
+                    // the Signal ratchet and causes the remote peer to receive a second
+                    // PreKeySignalMessage that desynchronises its session state
+                    // (the peer initialises from the new prekey bundle while we continue
+                    // ratcheting from the original session, leading to undecryptable messages).
+                    const bool should_bootstrap = !had_session_before;
                     if (should_bootstrap)
                     {
                         try
