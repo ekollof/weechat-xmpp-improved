@@ -1,7 +1,7 @@
 %global debug_package %{nil}
 
 Name:           xepher
-Version:        0.5.1
+Version:        0.6.0
 Release:        1%{?dist}
 Summary:        Xepher — WeeChat plugin for XMPP/Jabber protocol
 
@@ -69,6 +69,12 @@ install -D -m 0755 xmpp.so %{buildroot}%{_libdir}/weechat/plugins/xmpp.so
 %{_libdir}/weechat/plugins/xmpp.so
 
 %changelog
+* Wed Apr 08 2026 Emiel Kollof <emiel@kollof.nl> - 0.6.0-1
+- Update to v0.6.0
+- Refactor(omemo): switch to axolotl-only (legacy XEP-0384) OMEMO with BTBV TOFU trust model
+- Fix(omemo): emit flat legacy <key rid="..."> layout for Gajim/Conversations compatibility
+- Fix(omemo): rewrite get_devicelist() to preserve peer devices via LMDB cache (singleton-clobber bug)
+
 * Tue Apr 07 2026 Emiel Kollof <emiel@kollof.nl> - 0.5.1-1
 - Update to v0.5.1
 - Fix(omemo): show self-outbound MAM OMEMO messages as placeholder during replay
