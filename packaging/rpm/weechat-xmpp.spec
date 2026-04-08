@@ -19,6 +19,7 @@ BuildRequires:  lmdb-devel
 BuildRequires:  libsignal-protocol-c-devel
 BuildRequires:  libomemo-c-devel
 BuildRequires:  gpgme-devel
+BuildRequires:  libgcrypt-devel
 BuildRequires:  fmt-devel
 BuildRequires:  libcurl-devel
 BuildRequires:  openssl-devel

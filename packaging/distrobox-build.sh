@@ -106,18 +106,14 @@ build_fedora() {
     echo " Fedora/RPM package build (container: ${CONTAINER})"
     echo "============================================================"
 
-    distrobox create \
-        --name "${CONTAINER}" \
-        --image fedora:latest \
-        --yes \
+    # Use docker run as root (same pattern as Alpine/Void) to avoid the
+    # Fedora requiretty sudo restriction inside a non-interactive distrobox session.
+    docker run --rm \
         --volume "${PROJECT_DIR}:/project:ro" \
-        --volume "${OUTPUT_DIR}:/output"
-
-    run_in_container "${CONTAINER}" \
+        --volume "${OUTPUT_DIR}:/output" \
+        fedora:latest \
         sh /project/packaging/scripts/build-rpm-inside.sh \
-            "${VERSION}" /output "${REPO_URL}"
-
-    teardown "${CONTAINER}"
+            "${VERSION}" /output
 }
 
 # ── Arch ──────────────────────────────────────────────────────────────────────

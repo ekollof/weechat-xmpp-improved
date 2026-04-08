@@ -1,5 +1,5 @@
 #!/bin/sh
-# Runs INSIDE a Fedora distrobox container.
+# Runs INSIDE a Fedora docker container as root.
 # Called by packaging/distrobox-build.sh — do not invoke directly.
 #
 # /project is the host repo mounted read-only.
@@ -11,8 +11,8 @@ OUTPUT_DIR="${2:-/output}"
 
 echo "=== [Fedora] Building xepher ${VERSION} ==="
 
-# Install build dependencies
-sudo dnf install -y \
+# Install build dependencies (running as root — no sudo needed)
+dnf install -y \
     rpm-build rpmdevtools \
     gcc-c++ git bison flex \
     libstrophe-devel \
@@ -20,7 +20,10 @@ sudo dnf install -y \
     lmdb-devel \
     libsignal-protocol-c-devel \
     libomemo-c-devel \
+    protobuf-c \
+    protobuf-c-devel \
     gpgme-devel \
+    libgcrypt-devel \
     fmt-devel \
     libcurl-devel \
     openssl-devel \

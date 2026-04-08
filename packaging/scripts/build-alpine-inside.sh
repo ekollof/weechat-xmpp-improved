@@ -19,7 +19,7 @@ apk update
 # Install build tools and dependencies
 apk add --no-cache \
     alpine-sdk \
-    git bison flex make pkgconf \
+    git bison flex flex-dev make pkgconf \
     g++ \
     libstrophe-dev \
     libxml2-dev \
