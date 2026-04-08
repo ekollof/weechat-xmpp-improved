@@ -600,6 +600,7 @@ weechat::channel::~channel()
     {
         account.mam_cache_clear_messages(id);
         account.mam_cache_set_last_timestamp(id, -1);  // -1 = deliberately closed
+        account.pm_open_unregister(id);                // remove from tertiary restore list
     }
     
     // Free members_speaking lists (created via weechat_list_new, must be freed)

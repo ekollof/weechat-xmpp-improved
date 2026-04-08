@@ -552,11 +552,13 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
                         else if (to_bare_cs && weechat_strcasecmp(to_bare_cs, account.jid().data()) != 0)
                             partner_jid = to_bare_cs;  // Message TO someone else (sent by us)
                         
-                        // Create PM channel if it doesn't exist
-                        if (partner_jid && !account.channels.contains(partner_jid))
+                        // Create PM channel if it doesn't exist and the user hasn't
+                        // deliberately closed it (last_mam_fetch == -1 in LMDB).
+                        if (partner_jid && !account.channels.contains(partner_jid)
+                            && account.mam_cache_get_last_timestamp(partner_jid) != static_cast<time_t>(-1))
                         {
                             XDEBUG("MAM: discovered conversation with {}", partner_jid);
-                            
+
                             account.channels.emplace(
                                 std::make_pair(partner_jid, weechat::channel {
                                         account, weechat::channel::chat_type::PM,
