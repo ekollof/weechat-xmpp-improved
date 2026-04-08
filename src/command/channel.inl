@@ -198,7 +198,7 @@ int command__open(const void *pointer, void *data,
                 // Proactively fetch OMEMO devicelist for this contact so that
                 // sessions can be established before sending the first message.
                 if (ptr_account->omemo)
-                    ptr_account->omemo.request_devicelist(*ptr_account, jid);
+                    ptr_account->omemo.request_axolotl_devicelist(*ptr_account, jid);
             }
 
             if (argc > 2)

@@ -61,7 +61,7 @@ int command__omemo(const void *pointer, void *data,
                            _("%sRepublishing OMEMO devicelist and bundle..."),
                            weechat_prefix("network"));
 
-            // Publish devicelist
+            // Publish axolotl devicelist
             auto devicelist_stanza = ptr_account->get_devicelist();
             if (devicelist_stanza)
             {
@@ -71,9 +71,9 @@ int command__omemo(const void *pointer, void *data,
                                weechat_prefix("network"), ptr_account->omemo.device_id);
             }
 
-            // Publish bundle
+            // Publish axolotl bundle
             std::string from_s(ptr_account->jid());
-            xmpp_stanza_t *bundle_stanza = ptr_account->omemo.get_bundle(
+            xmpp_stanza_t *bundle_stanza = ptr_account->omemo.get_axolotl_bundle(
                 ptr_account->context, from_s.data(), nullptr);
             if (bundle_stanza)
             {
@@ -87,33 +87,6 @@ int command__omemo(const void *pointer, void *data,
             {
                 weechat_printf(buffer,
                                _("%s%s: failed to generate OMEMO bundle"),
-                               weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
-            }
-
-            // Publish legacy OMEMO nodes for OMEMO:1 interoperability.
-            auto legacy_devicelist_stanza = ptr_account->get_legacy_devicelist();
-            if (legacy_devicelist_stanza)
-            {
-                ptr_account->connection.send(legacy_devicelist_stanza.get());
-                weechat_printf(buffer,
-                               _("%sLegacy devicelist published (device ID: %u)"),
-                               weechat_prefix("network"), ptr_account->omemo.device_id);
-            }
-
-            xmpp_stanza_t *legacy_bundle_stanza = ptr_account->omemo.get_axolotl_bundle(
-                ptr_account->context, from_s.data(), nullptr);
-            if (legacy_bundle_stanza)
-            {
-                ptr_account->connection.send(legacy_bundle_stanza);
-                xmpp_stanza_release(legacy_bundle_stanza);
-                weechat_printf(buffer,
-                               _("%sLegacy bundle published for device %u"),
-                               weechat_prefix("network"), ptr_account->omemo.device_id);
-            }
-            else
-            {
-                weechat_printf(buffer,
-                               _("%s%s: failed to generate legacy OMEMO bundle"),
                                weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
             }
 
@@ -180,30 +153,8 @@ int command__omemo(const void *pointer, void *data,
                                weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
                 return WEECHAT_RC_OK;
             }
-            // XEP-0450 §4.2: broadcast <distrust> to own devices and peer before
-            // wiping local keys so other clients learn the revocation decision.
-            if (weechat::config::instance
-                && weechat_config_boolean(weechat::config::instance->look.omemo_atm))
-            {
-                ptr_account->omemo.send_atm_distrust_pub(*ptr_account, argv[2]);
-            }
             // Remove stored identity keys → next message triggers TOFU re-store
             ptr_account->omemo.distrust_jid(buffer, argv[2]);
-            return WEECHAT_RC_OK;
-        }
-
-        if (weechat_strcasecmp(argv[1], "approve") == 0)
-        {
-            if (!require_omemo()) return WEECHAT_RC_OK;
-            if (argc < 3)
-            {
-                weechat_printf(buffer,
-                               _("%s%s: usage: /omemo approve <jid> [<fingerprint>]"),
-                               weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
-                return WEECHAT_RC_OK;
-            }
-            const char *fp = (argc > 3) ? argv[3] : nullptr;
-            ptr_account->omemo.approve_jid(buffer, *ptr_account, argv[2], fp);
             return WEECHAT_RC_OK;
         }
 
@@ -217,8 +168,22 @@ int command__omemo(const void *pointer, void *data,
                                weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
                 return WEECHAT_RC_OK;
             }
-            const char *fp = (argc > 3) ? argv[3] : nullptr;
-            ptr_account->omemo.distrust_fp(buffer, *ptr_account, argv[2], fp);
+            std::optional<std::uint32_t> device_id;
+            if (argc > 3)
+            {
+                char *endp = nullptr;
+                unsigned long v = std::strtoul(argv[3], &endp, 10);
+                if (endp && *endp == '\0' && v > 0 && v <= 0x7fffffffU)
+                    device_id = static_cast<std::uint32_t>(v);
+                else
+                {
+                    weechat_printf(buffer,
+                                   _("%s%s: /omemo distrust: device id must be a positive integer"),
+                                   weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
+                    return WEECHAT_RC_OK;
+                }
+            }
+            ptr_account->omemo.distrust_fp(buffer, *ptr_account, argv[2], device_id);
             return WEECHAT_RC_OK;
         }
 
@@ -315,45 +280,6 @@ int command__omemo(const void *pointer, void *data,
             }
 
             ptr_account->omemo.force_kex(*ptr_account, buffer, jid, device_id);
-            return WEECHAT_RC_OK;
-        }
-
-        if (weechat_strcasecmp(argv[1], "optout") == 0)
-        {
-            if (!require_omemo()) return WEECHAT_RC_OK;
-            const char *jid = nullptr;
-            if (argc > 2)
-                jid = argv[2];
-            else if (ptr_channel)
-                jid = ptr_channel->name.data();
-            if (!jid)
-            {
-                weechat_printf(buffer,
-                               _("%s%s: usage: /omemo optout <jid> [<reason>]"),
-                               weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
-                return WEECHAT_RC_OK;
-            }
-            const char *reason = (argc > 3) ? argv_eol[3] : nullptr;
-            ptr_account->omemo.send_opt_out(*ptr_account, buffer, jid, reason);
-            return WEECHAT_RC_OK;
-        }
-
-        if (weechat_strcasecmp(argv[1], "optout-ack") == 0)
-        {
-            if (!require_omemo()) return WEECHAT_RC_OK;
-            const char *jid = nullptr;
-            if (argc > 2)
-                jid = argv[2];
-            else if (ptr_channel)
-                jid = ptr_channel->name.data();
-            if (!jid)
-            {
-                weechat_printf(buffer,
-                               _("%s%s: usage: /omemo optout-ack <jid>"),
-                               weechat_prefix("error"), WEECHAT_XMPP_PLUGIN_NAME);
-                return WEECHAT_RC_OK;
-            }
-            ptr_account->omemo.optout_ack(buffer, jid);
             return WEECHAT_RC_OK;
         }
 

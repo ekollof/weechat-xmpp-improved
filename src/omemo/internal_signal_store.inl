@@ -748,23 +748,20 @@ int identity_save(const signal_protocol_address *address, std::uint8_t *key_data
         return SG_ERR_INVAL;
 
     const std::string addr_name = signal_address_name(address);
-    store_bytes(*self, key_for_identity(addr_name, address->device_id), key_data, key_len);
+    const auto device_id = static_cast<std::uint32_t>(address->device_id);
 
-    // XEP-0450 §5.2: apply any trust decisions that were deferred while this
-    // identity key was not yet known.
-    const std::vector<std::uint8_t> key_vec(key_data, key_data + key_len);
-    const std::string fp = atm_fingerprint_b64(key_vec);
-    if (!fp.empty())
+    // Only assign trust for truly new identities (not overwrites of known key).
+    const auto existing = load_bytes(*self, key_for_identity(addr_name, address->device_id));
+    if (!existing)
     {
-        const std::string pending_key = addr_name + '\x1F' + fp;
-        auto it = self->pending_atm_trust_for_unknown_key.find(pending_key);
-        if (it != self->pending_atm_trust_for_unknown_key.end())
-        {
-            store_atm_trust(*self, addr_name, fp, it->second);
-            self->pending_atm_trust_for_unknown_key.erase(it);
-        }
+        // BTBV: first key for this JID → BLIND; JID already has VERIFIED/UNTRUSTED → UNDECIDED.
+        const omemo_trust trust = get_default_trust(*self, addr_name);
+        store_tofu_trust(*self, addr_name, device_id, trust);
+        XDEBUG("omemo: new identity for {}/{} — assigned trust {}",
+               addr_name, device_id, static_cast<int>(trust));
     }
 
+    store_bytes(*self, key_for_identity(addr_name, address->device_id), key_data, key_len);
     return SG_SUCCESS;
 }
 
@@ -775,29 +772,30 @@ int identity_is_trusted(const signal_protocol_address *address, std::uint8_t *ke
     if (!self || !address || !key_data)
         return SG_ERR_INVAL;
 
-    // XEP-0450: if ATM trust level is stored, use it instead of plain TOFU.
-    if (weechat::config::instance && weechat_config_boolean(weechat::config::instance->look.omemo_atm))
+    const std::string addr_name = signal_address_name(address);
+    const auto device_id = static_cast<std::uint32_t>(address->device_id);
+
+    const auto stored = load_bytes(*self, key_for_identity(addr_name, address->device_id));
+    if (!stored)
     {
-        const std::vector<std::uint8_t> incoming {key_data, key_data + key_len};
-        const std::string fp = atm_fingerprint_b64(incoming);
-        if (!fp.empty())
-        {
-            const auto trust = load_atm_trust(*self, signal_address_name(address), fp);
-            if (trust)
-            {
-                if (*trust == "trusted")   return 1;
-                if (*trust == "distrusted") return 0;
-                // "undecided" → fall through to TOFU below
-            }
-        }
+        // No stored key yet — this will be a new identity; trust per BTBV default.
+        const omemo_trust trust = get_default_trust(*self, addr_name);
+        return (trust == omemo_trust::VERIFIED || trust == omemo_trust::BLIND) ? 1 : 0;
     }
 
-    const auto stored = load_bytes(*self, key_for_identity(signal_address_name(address), address->device_id));
-    if (!stored)
-        return 1;
-
+    // Key mismatch → identity changed; untrusted until user re-verifies.
     const std::vector<std::uint8_t> incoming {key_data, key_data + key_len};
-    return *stored == incoming ? 1 : 0;
+    if (*stored != incoming)
+        return 0;
+
+    // Key matches — check trust level.
+    const auto trust = load_tofu_trust(*self, addr_name, device_id);
+    if (!trust)
+    {
+        // No trust record yet (legacy DB row without trust key) → treat as BLIND.
+        return 1;
+    }
+    return (*trust == omemo_trust::VERIFIED || *trust == omemo_trust::BLIND) ? 1 : 0;
 }
 
 int pre_key_load(signal_buffer **record, std::uint32_t pre_key_id, void *user_data)
@@ -1067,93 +1065,3 @@ void remove_prefixed_keys(omemo &self, std::string_view prefix)
     transaction.commit();
 }
 
-[[nodiscard]] auto extract_devices_from_items(xmpp_stanza_t *items) -> std::vector<std::string>
-{
-    std::vector<std::string> device_ids;
-    if (!items)
-    {
-        weechat_printf(nullptr, "%somemo: extract_devices: items stanza is nullptr", weechat_prefix("error"));
-        return device_ids;
-    }
-
-    xmpp_stanza_t *item = xmpp_stanza_get_child_by_name(items, "item");
-    if (!item)
-    {
-        weechat_printf(nullptr, "%somemo: extract_devices: no <item> child in items", weechat_prefix("error"));
-        return device_ids;
-    }
-
-    xmpp_stanza_t *devices = xmpp_stanza_get_child_by_name_and_ns(
-        item, "devices", kOmemoNs.data());
-    if (!devices)
-    {
-        weechat_printf(nullptr, "%somemo: extract_devices: no <devices> with namespace %s in item", 
-                       weechat_prefix("error"), kOmemoNs.data());
-        return device_ids;
-    }
-
-    int total_children = 0;
-    int valid_devices = 0;
-    
-    for (xmpp_stanza_t *device = xmpp_stanza_get_children(devices);
-         device;
-         device = xmpp_stanza_get_next(device))
-    {
-        total_children++;
-        const char *name = xmpp_stanza_get_name(device);
-        if (!name || weechat_strcasecmp(name, "device") != 0)
-        {
-            XDEBUG("omemo: child {} has name '{}' (skipping, expected 'device')",
-                   total_children, name ? name : "(null)");
-            continue;
-        }
-
-        const char *id = xmpp_stanza_get_id(device);
-        if (!id || !*id)
-        {
-            XDEBUG("omemo: child {} is <device> but has no id attribute", total_children);
-            continue;
-        }
-
-        const auto parsed_id = parse_uint32(id);
-        if (!parsed_id || !is_valid_omemo_device_id(*parsed_id))
-        {
-            weechat_printf(nullptr,
-                           "%somemo: ignoring invalid device id '%s' in devicelist",
-                           weechat_prefix("error"),
-                           id);
-            continue;
-        }
-
-        valid_devices++;
-        XDEBUG("omemo: extracted device {} (valid_count={})", id, valid_devices);
-        device_ids.emplace_back(id);
-    }
-
-    XDEBUG("omemo: stanza had {} total children, {} valid devices extracted",
-           total_children, valid_devices);
-
-    std::sort(device_ids.begin(), device_ids.end());
-    device_ids.erase(std::unique(device_ids.begin(), device_ids.end()), device_ids.end());
-    return device_ids;
-}
-
-[[nodiscard]] auto extract_bundle_from_items(xmpp_stanza_t *items) -> std::optional<bundle_metadata>
-{
-    if (!items)
-        return std::nullopt;
-
-    xmpp_stanza_t *item = xmpp_stanza_get_child_by_name(items, "item");
-    if (!item)
-        return std::nullopt;
-
-    xmpp_stanza_t *bundle_stanza = xmpp_stanza_get_child_by_name_and_ns(item, "bundle", kOmemoNs.data());
-    if (!bundle_stanza)
-        return std::nullopt;
-
-    bundle_metadata bundle;
-
-    for (xmpp_stanza_t *child = xmpp_stanza_get_children(bundle_stanza);
-         child;
-         child = xmpp_stanza_get_next(child))
-    {

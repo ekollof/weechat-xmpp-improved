@@ -200,15 +200,14 @@ void command__init()
     hook = weechat_hook_command(
         "omemo",
         N_("manage omemo encryption for current buffer or account"),
-          N_("[check|republish|status|reset-keys|fingerprint [<jid>]|trust <jid>|devices [<jid>]|fetch [<jid>] [<device-id>]|kex [<jid>] [<device-id>]]"),
+          N_("[check|republish|status|reset-keys|fingerprint [<jid>]|trust <jid>|distrust <jid> [<fp>]|devices [<jid>]|fetch [<jid>] [<device-id>]|kex [<jid>] [<device-id>]]"),
         N_("       check: query server for published OMEMO devicelist and bundle\n"
            "   republish: republish OMEMO devicelist and bundle to server\n"
            "      status: show OMEMO status and device ID\n"
            "  reset-keys: reset OMEMO key database to force renegotiation\n"
            " fingerprint: show hex fingerprint of own identity key, or of a peer JID with trust status\n"
            "       trust: remove stored identity key for <jid> to re-accept on next contact\n"
-           "     approve: mark a peer's key(s) as trusted and broadcast ATM trust message\n"
-           "    distrust: mark a peer's key(s) as distrusted and broadcast ATM distrust message\n"
+           "    distrust: mark a peer's key(s) as UNTRUSTED (blocks encryption to those devices)\n"
               "     devices: show known device IDs for <jid>\n"
               "       fetch: force devicelist refresh and optional bundle fetch\n"
               "         kex: force key transport now (or queue after bundle fetch)\n"
@@ -223,8 +222,6 @@ void command__init()
            "  /omemo reset-keys        : reset OMEMO key database\n"
            "  /omemo fingerprint       : show own identity key fingerprint\n"
            "  /omemo fingerprint alice@example.com : show alice's fingerprints with trust status\n"
-           "  /omemo approve alice@example.com     : approve all undecided keys from alice\n"
-           "  /omemo approve alice@example.com AA:BB:CC... : approve one specific key\n"
            "  /omemo distrust alice@example.com    : distrust all keys from alice\n"
            "  /omemo distrust alice@example.com AA:BB:CC... : distrust one specific key\n"
            "  /omemo trust alice@example.com       : re-accept changed keys from alice (full reset)\n"
@@ -238,7 +235,6 @@ void command__init()
         " || reset-keys"
         " || fingerprint %(jabber_jids)"
         " || trust %(jabber_jids)"
-        " || approve %(jabber_jids)"
         " || distrust %(jabber_jids)"
           " || devices %(jabber_jids)"
           " || fetch %(jabber_jids)"

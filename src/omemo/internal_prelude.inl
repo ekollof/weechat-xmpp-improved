@@ -1,14 +1,10 @@
 
 using namespace weechat::xmpp;
 
-constexpr std::string_view kOmemoNs = "urn:xmpp:omemo:2";
-constexpr std::string_view kDevicesNode = "urn:xmpp:omemo:2:devices";
-constexpr std::string_view kBundlesNode = "urn:xmpp:omemo:2:bundles";
-
-// Legacy OMEMO (eu.siacs.conversations.axolotl / "OMEMO:1") constants
+// Axolotl (eu.siacs.conversations.axolotl) is the sole supported OMEMO namespace.
 constexpr std::string_view kLegacyOmemoNs = "eu.siacs.conversations.axolotl";
 constexpr std::string_view kLegacyDevicesNode = "eu.siacs.conversations.axolotl.devicelist";
-// Legacy bundles use per-device nodes: this prefix + deviceId
+// Bundles use per-device nodes: this prefix + deviceId
 constexpr std::string_view kLegacyBundlesNodePrefix = "eu.siacs.conversations.axolotl.bundles:";
 
 constexpr std::string_view kDeviceIdKey = "device_id";
@@ -106,19 +102,12 @@ struct gcry_mac_deleter {
 
 using unique_gcry_mac = std::unique_ptr<std::remove_pointer_t<gcry_mac_hd_t>, gcry_mac_deleter>;
 
-struct omemo2_payload {
-    // 32-byte random message key
-    std::array<std::uint8_t, 32> key {};
-    // 16-byte truncated HMAC-SHA-256 of ciphertext (transport-key bundle = key || hmac)
-    std::array<std::uint8_t, 16> hmac {};
-    // AES-256-CBC ciphertext only (IV is derived from key via HKDF, not transmitted)
-    std::vector<std::uint8_t> payload;
-};
-
-struct omemo2_keys {
-    std::array<std::uint8_t, 32> encryption {};
-    std::array<std::uint8_t, 32> authentication {};
-    std::array<std::uint8_t, 16> iv {};
+// BTBV trust levels — mirrors omemo_dr/const.py OMEMOTrust
+enum class omemo_trust : int {
+    UNTRUSTED = 0, // explicitly distrusted by user
+    VERIFIED  = 1, // manually verified (fingerprint/QR)
+    UNDECIDED = 2, // new device for JID that already has VERIFIED or UNTRUSTED keys
+    BLIND     = 3, // auto-trusted (TOFU — first contact with this JID)
 };
 
 using c_string = std::unique_ptr<char, decltype(&free)>;
@@ -141,72 +130,6 @@ using c_string = std::unique_ptr<char, decltype(&free)>;
 {
     const std::string bare = ::jid(nullptr, std::string {jid}).bare;
     return bare.empty() ? std::string {jid} : bare;
-}
-
-void request_devicelist(weechat::account &account, std::string_view jid)
-{
-    const std::string target_jid = normalize_bare_jid(account.context, jid);
-    if (account.omemo.missing_omemo2_devicelist.count(target_jid) != 0)
-        return;
-    account.omemo.missing_omemo2_devicelist.insert(target_jid);
-
-    const std::string uuid = stanza::uuid(account.context);
-    if (!uuid.empty())
-        account.omemo.pending_iq_jid[uuid] = target_jid;
-
-    auto items_el = stanza::xep0060::items(kDevicesNode);
-    auto pubsub_el = stanza::xep0060::pubsub();
-    pubsub_el.items(items_el);
-    auto iq_s = stanza::iq()
-        .type("get")
-        .id(uuid)
-        .from(account.jid())
-        .to(target_jid);
-    static_cast<stanza::xep0060::iq&>(iq_s).pubsub(pubsub_el);
-    auto stanza_ptr = iq_s.build(account.context);
-    account.connection.send(stanza_ptr.get());
-}
-
-void request_bundle(weechat::account &account, std::string_view jid, std::uint32_t device_id)
-{
-    const std::string target_jid = normalize_bare_jid(account.context, jid);
-    const std::string own_bare_jid = normalize_bare_jid(account.context, account.jid());
-    const bool is_own_jid = weechat_strcasecmp(target_jid.c_str(), own_bare_jid.c_str()) == 0;
-    if (!is_own_jid && !account.omemo.has_peer_traffic(account.context, target_jid))
-    {
-        XDEBUG("omemo: deferring OMEMO:2 bundle request for {}/{} until PM/MAM traffic is observed",
-               target_jid, device_id);
-        return;
-    }
-
-    const auto key = std::make_pair(target_jid, device_id);
-    if (account.omemo.pending_bundle_fetch.count(key))
-    {
-        XDEBUG("omemo: bundle request for {}/{} already pending (skipping duplicate)",
-               target_jid, device_id);
-        return;
-    }
-
-    const auto item_id = fmt::format("{}", device_id);
-    const std::string uuid = stanza::uuid(account.context);
-    if (!uuid.empty())
-        account.omemo.pending_iq_jid[uuid] = target_jid;
-    account.omemo.pending_bundle_fetch.insert(key);
-
-    XDEBUG("omemo: sent bundle request for {}/{} (uuid={})", target_jid, device_id, uuid.empty() ? "?" : uuid);
-
-    auto items_el = stanza::xep0060::items(kBundlesNode);
-    items_el.item(stanza::xep0060::item().id(item_id));
-    auto pubsub_el = stanza::xep0060::pubsub();
-    pubsub_el.items(items_el);
-    auto iq_s = stanza::iq()
-        .type("get")
-        .id(uuid)
-        .from(account.jid())
-        .to(target_jid);
-    static_cast<stanza::xep0060::iq&>(iq_s).pubsub(pubsub_el);
-    auto stanza_ptr = iq_s.build(account.context);
-    account.connection.send(stanza_ptr.get());
 }
 
 void print_info(t_gui_buffer *buffer, std::string_view message)
@@ -294,11 +217,6 @@ void print_error(t_gui_buffer *buffer, std::string_view message)
     return parsed;
 }
 
-[[nodiscard]] auto key_for_devicelist(std::string_view jid) -> std::string
-{
-    return fmt::format("devicelist:{}", jid);
-}
-
 [[nodiscard]] auto key_for_bundle(std::string_view jid, std::uint32_t device_id) -> std::string
 {
     return fmt::format("bundle:{}:{}", jid, device_id);
@@ -320,59 +238,74 @@ void print_error(t_gui_buffer *buffer, std::string_view message)
     return fmt::format("axolotl_bundle:{}:{}", jid, device_id);
 }
 
-[[nodiscard]] auto key_for_device_mode(std::string_view jid, std::uint32_t device_id) -> std::string
+[[nodiscard]] auto key_for_tofu_trust(std::string_view jid, std::uint32_t device_id) -> std::string
 {
-    return fmt::format("device_mode:{}:{}", jid, device_id);
+    return fmt::format("trust:{}:{}", jid, device_id);
 }
 
-void store_device_mode(omemo &self,
-                       std::string_view jid,
-                       std::uint32_t device_id,
-                       omemo::peer_mode mode)
+void store_tofu_trust(omemo &self,
+                      std::string_view jid,
+                      std::uint32_t device_id,
+                      omemo_trust trust)
 {
-    if (jid.empty() || device_id == 0)
+    if (!self.db_env || jid.empty() || device_id == 0)
         return;
-
-    const char *mode_value = nullptr;
-    if (mode == omemo::peer_mode::omemo2)
-        mode_value = "omemo2";
-    else if (mode == omemo::peer_mode::axolotl)
-        mode_value = "axolotl";
-    else
-        return;
-
-    if (!self.db_env)
-        return;
-
-    auto transaction = lmdb::txn::begin(self.db_env);
-    self.dbi.omemo.put(transaction, key_for_device_mode(jid, device_id), mode_value);
-    transaction.commit();
+    auto txn = lmdb::txn::begin(self.db_env);
+    self.dbi.omemo.put(txn, key_for_tofu_trust(jid, device_id),
+                       std::to_string(static_cast<int>(trust)));
+    txn.commit();
 }
 
-[[nodiscard]] auto load_device_mode(omemo &self,
-                                    std::string_view jid,
-                                    std::uint32_t device_id)
-    -> std::optional<omemo::peer_mode>
+[[nodiscard]] auto load_tofu_trust(omemo &self,
+                                   std::string_view jid,
+                                   std::uint32_t device_id)
+    -> std::optional<omemo_trust>
 {
-    if (jid.empty() || device_id == 0)
+    if (!self.db_env || jid.empty() || device_id == 0)
         return std::nullopt;
-
-    if (!self.db_env)
+    auto txn = lmdb::txn::begin(self.db_env, nullptr, MDB_RDONLY);
+    std::string_view value;
+    if (!self.dbi.omemo.get(txn, key_for_tofu_trust(jid, device_id), value))
         return std::nullopt;
-
-    auto transaction = lmdb::txn::begin(self.db_env, nullptr, MDB_RDONLY);
-    std::string_view mode_value;
-    if (!self.dbi.omemo.get(transaction, key_for_device_mode(jid, device_id), mode_value))
+    const auto parsed = parse_uint32(value);
+    if (!parsed || *parsed > 3)
         return std::nullopt;
+    return static_cast<omemo_trust>(*parsed);
+}
 
-    if (mode_value == "omemo2")
-        return omemo::peer_mode::omemo2;
-    // Accept both "axolotl" (new) and "legacy" (old DB) so existing databases
-    // do not lose device-mode knowledge after the rename migration.
-    if (mode_value == "axolotl" || mode_value == "legacy")
-        return omemo::peer_mode::axolotl;
+// BTBV get_default_trust() — mirrors Gajim storage/omemo.py:get_default_trust().
+// Scans all trust:{jid}:* keys.  If any has value VERIFIED(1) or UNTRUSTED(0),
+// new devices for that JID are UNDECIDED(2).  Otherwise BLIND(3).
+[[nodiscard]] auto get_default_trust(omemo &self, std::string_view jid) -> omemo_trust
+{
+    if (!self.db_env || jid.empty())
+        return omemo_trust::BLIND;
 
-    return std::nullopt;
+    const std::string prefix = fmt::format("trust:{}:", jid);
+    auto txn = lmdb::txn::begin(self.db_env, nullptr, MDB_RDONLY);
+    auto cursor = lmdb::cursor::open(txn, self.dbi.omemo);
+
+    std::string_view k, v;
+    // position cursor at first key >= prefix
+    k = prefix;
+    v = {};
+    const bool found = cursor.get(k, v, MDB_SET_RANGE);
+    if (!found)
+        return omemo_trust::BLIND;
+
+    do {
+        if (!k.starts_with(prefix))
+            break;
+        const auto parsed = parse_uint32(v);
+        if (parsed)
+        {
+            const auto t = static_cast<omemo_trust>(*parsed);
+            if (t == omemo_trust::VERIFIED || t == omemo_trust::UNTRUSTED)
+                return omemo_trust::UNDECIDED;
+        }
+    } while (cursor.get(k, v, MDB_NEXT));
+
+    return omemo_trust::BLIND;
 }
 
 [[nodiscard]] auto key_for_session(std::string_view jid, std::uint32_t device_id) -> std::string
@@ -388,40 +321,6 @@ void store_device_mode(omemo &self,
 [[nodiscard]] auto key_for_prekey_record(std::uint32_t id) -> std::string
 {
     return fmt::format("prekey:{}", id);
-}
-
-// XEP-0450: ATM trust level storage.
-// key_b64 is the Base64-encoded SHA-256 fingerprint of the raw identity key.
-[[nodiscard]] auto key_for_atm_trust(std::string_view jid, std::string_view key_b64) -> std::string
-{
-    return fmt::format("atm_trust:{}:{}", jid, key_b64);
-}
-
-// Values: "trusted", "distrusted", "undecided"
-void store_atm_trust(omemo &self,
-                     std::string_view jid,
-                     std::string_view key_b64,
-                     std::string_view level)
-{
-    if (!self.db_env || jid.empty() || key_b64.empty())
-        return;
-    auto txn = lmdb::txn::begin(self.db_env);
-    self.dbi.omemo.put(txn, key_for_atm_trust(jid, key_b64), std::string(level));
-    txn.commit();
-}
-
-[[nodiscard]] auto load_atm_trust(omemo &self,
-                                   std::string_view jid,
-                                   std::string_view key_b64)
-    -> std::optional<std::string>
-{
-    if (!self.db_env || jid.empty() || key_b64.empty())
-        return std::nullopt;
-    auto txn = lmdb::txn::begin(self.db_env, nullptr, MDB_RDONLY);
-    std::string_view value;
-    if (!self.dbi.omemo.get(txn, key_for_atm_trust(jid, key_b64), value))
-        return std::nullopt;
-    return std::string(value);
 }
 
 [[nodiscard]] auto key_for_signed_prekey_record(std::uint32_t id) -> std::string
@@ -471,16 +370,6 @@ void store_atm_trust(omemo &self,
     return base64_encode_raw(data, size);
 }
 
-// Compute Base64-encoded SHA-256 fingerprint of raw bytes — used as ATM key identifier.
-[[nodiscard]] auto atm_fingerprint_b64(const std::vector<std::uint8_t> &key_bytes) -> std::string
-{
-    if (key_bytes.empty())
-        return {};
-    unsigned char digest[32];
-    gcry_md_hash_buffer(GCRY_MD_SHA256, digest, key_bytes.data(), key_bytes.size());
-    return base64_encode_raw(digest, sizeof(digest));
-}
-
 [[nodiscard]] auto base64_decode([[maybe_unused]] xmpp_ctx_t *context, std::string_view encoded)
     -> std::vector<std::uint8_t>
 {
@@ -498,36 +387,6 @@ void store_atm_trust(omemo &self,
 
     const auto *ubuf = reinterpret_cast<const std::uint8_t *>(buf.data());
     return std::vector<std::uint8_t>(ubuf, ubuf + static_cast<std::size_t>(written));
-}
-
-[[nodiscard]] auto utc_timestamp_now() -> std::string
-{
-    const std::time_t now = std::time(nullptr);
-    std::tm utc {};
-    gmtime_r(&now, &utc);
-
-    std::ostringstream output;
-    output << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
-    return output.str();
-}
-
-[[nodiscard]] auto xml_escape(std::string_view text) -> std::string
-{
-    std::string escaped;
-    escaped.reserve(text.size());
-    for (const char ch : text)
-    {
-        switch (ch)
-        {
-            case '&': escaped += "&amp;"; break;
-            case '<': escaped += "&lt;"; break;
-            case '>': escaped += "&gt;"; break;
-            case '\"': escaped += "&quot;"; break;
-            case '\'': escaped += "&apos;"; break;
-            default: escaped.push_back(ch); break;
-        }
-    }
-    return escaped;
 }
 
 // Request the legacy OMEMO device list (eu.siacs.conversations.axolotl.devicelist) for jid.
@@ -601,78 +460,6 @@ void request_axolotl_bundle(weechat::account &account, std::string_view jid, std
     account.connection.send(stanza_ptr.get());
 }
 
-// Generate a random padding string for SCE <rpad/> (XEP-0420 §4.3 MUST).
-// Uses a random length in [1,64] and random alphanumeric characters.
-[[nodiscard]] static auto make_rpad() -> std::string
-{
-    static const std::string_view kAlphanum =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    thread_local std::mt19937 rng { std::random_device{}() };
-    std::uniform_int_distribution<std::size_t> len_dist { 1, 64 };
-    std::uniform_int_distribution<std::size_t> char_dist { 0, kAlphanum.size() - 1 };
-    const std::size_t len = len_dist(rng);
-    std::string pad;
-    pad.reserve(len);
-    for (std::size_t i = 0; i < len; ++i)
-        pad += kAlphanum[char_dist(rng)];
-    return pad;
-}
-
-// Build an SCE envelope for the plaintext message body (XEP-0420 §4.3).
-//  - <from jid='…'/>  always present (MUST per spec)
-//  - <to jid='…'/>    MUST be included iff the message is addressed to a group (MUC/MIX)
-//  - <time stamp='…'/>
-//  - <rpad>…</rpad>  random-length random-content padding (MUST per spec)
-[[nodiscard]] auto sce_wrap([[maybe_unused]] xmpp_ctx_t *context, weechat::account &account,
-                            std::string_view plaintext,
-                            std::string_view to_jid = {},
-                            bool is_muc = false) -> std::string
-{
-    const char *bound = xmpp_conn_get_bound_jid(account.connection);
-    const std::string from = bound ? ::jid(nullptr, bound).bare : std::string {};
-
-    // XEP-0420 §4.3: <to/> MUST be included if and only if addressed to a group.
-    const std::string to_elem = (is_muc && !to_jid.empty())
-        ? fmt::format("<to jid='{}'/>" , xml_escape(std::string(to_jid)))
-        : std::string {};
-
-    return fmt::format(
-        "<envelope xmlns='urn:xmpp:sce:1'><content><body xmlns='jabber:client'>{}</body></content>"
-        "<time stamp='{}'/><from jid='{}'/>{}<rpad>{}</rpad></envelope>",
-        xml_escape(plaintext),
-        utc_timestamp_now(),
-        xml_escape(from),
-        to_elem,
-        xml_escape(make_rpad()));
-}
-
-// Like sce_wrap() but places arbitrary pre-serialised XML as the sole child of
-// <content> instead of <body>.  Used by the ATM trust message path where the
-// content element is <trust-message xmlns='urn:xmpp:tm:1'> (XEP-0450 §4).
-// content_xml must already be properly XML-serialised (not further escaped).
-[[nodiscard]] auto sce_wrap_content([[maybe_unused]] xmpp_ctx_t *context,
-                                    weechat::account &account,
-                                    std::string_view content_xml,
-                                    std::string_view to_jid = {},
-                                    bool is_muc = false) -> std::string
-{
-    const char *bound = xmpp_conn_get_bound_jid(account.connection);
-    const std::string from = bound ? ::jid(nullptr, bound).bare : std::string {};
-
-    const std::string to_elem = (is_muc && !to_jid.empty())
-        ? fmt::format("<to jid='{}'/>" , xml_escape(std::string(to_jid)))
-        : std::string {};
-
-    return fmt::format(
-        "<envelope xmlns='urn:xmpp:sce:1'><content>{}</content>"
-        "<time stamp='{}'/><from jid='{}'/>{}<rpad>{}</rpad></envelope>",
-        content_xml,              // already serialised XML — not escaped again
-        utc_timestamp_now(),
-        xml_escape(from),
-        to_elem,
-        xml_escape(make_rpad()));
-}
-
 [[nodiscard]] auto pkcs7_pad(std::string_view plaintext, std::size_t block_size)
     -> std::vector<std::uint8_t>
 {
@@ -681,9 +468,3 @@ void request_axolotl_bundle(weechat::account &account, std::string_view jid, std
     output.insert(output.end(), actual_padding, static_cast<std::uint8_t>(actual_padding));
     return output;
 }
-
-[[nodiscard]] auto hmac_sha256(std::span<const std::uint8_t> key,
-                               std::span<const std::uint8_t> data) -> std::optional<std::array<std::uint8_t, 32>>
-{
-    gcry_mac_hd_t mac_raw = nullptr;
-    if (gcry_mac_open(&mac_raw, GCRY_MAC_HMAC_SHA256, 0, nullptr) != 0)
