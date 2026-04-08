@@ -2923,9 +2923,20 @@ message_handler_after_omemo:
     }
     else
     {
+        // PM channel: prefer a known-user prefix (avatar + colour), but fall
+        // back to a plain coloured bare-JID string so the nick column is never
+        // empty.  The user may be stored under the full JID (chatstate handler
+        // inserts with full JID as key) or the bare JID (roster), so try both.
         display_prefix = user::as_prefix_raw(&account, display_from);
+        if (display_prefix.empty() && from && *from)
+            display_prefix = user::as_prefix_raw(&account, from);
         if (display_prefix.empty())
-            display_prefix = user::as_prefix_raw(nick && *nick ? nick : from_bare);
+        {
+            std::string_view label = (nick && *nick) ? std::string_view(nick)
+                                   : from_bare       ? std::string_view(from_bare)
+                                                     : std::string_view("(unknown)");
+            display_prefix = user::as_prefix_raw(label);
+        }
     }
     
     // XEP-0461: Message Replies - extract reply context

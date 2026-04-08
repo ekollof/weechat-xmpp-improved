@@ -22,7 +22,8 @@ std::string weechat::user::get_colour()
 
 std::string weechat::user::get_colour(std::string_view name)
 {
-    return weechat_info_get("nick_color", std::string(name).c_str());
+    auto result = weechat_info_get("nick_color", std::string(name).c_str());
+    return result ? result : std::string{};
 }
 
 std::string weechat::user::get_colour_for_nicklist()
@@ -32,7 +33,8 @@ std::string weechat::user::get_colour_for_nicklist()
 
 std::string weechat::user::get_colour_for_nicklist(std::string_view name)
 {
-    return weechat_info_get("nick_color_name", std::string(name).c_str());
+    auto result = weechat_info_get("nick_color_name", std::string(name).c_str());
+    return result ? result : std::string{};
 }
 
 std::string weechat::user::as_prefix_raw()
@@ -45,10 +47,11 @@ std::string weechat::user::as_prefix_raw()
 
 std::string weechat::user::as_prefix_raw(std::string_view name)
 {
-    return fmt::format("{}{}{}",
-                       weechat_info_get("nick_color", std::string(name).c_str()),
-                       name,
-                       weechat_color("reset"));
+    auto color_ptr = weechat_info_get("nick_color", std::string(name).c_str());
+    auto reset_ptr = weechat_color("reset");
+    std::string color = color_ptr ? color_ptr : std::string{};
+    std::string reset = reset_ptr ? reset_ptr : std::string{};
+    return fmt::format("{}{}{}", color, name, reset);
 }
 
 std::string weechat::user::as_prefix()
