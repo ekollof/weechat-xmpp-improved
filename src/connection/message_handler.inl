@@ -1899,7 +1899,13 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
     
     if (encrypted && account.omemo)
     {
-        auto omemo_result = account.omemo.decode(&account, channel->buffer, from_bare, encrypted, is_mam_replay);
+        bool omemo_is_duplicate = false;
+        // Always attempt decryption — MAM messages can be decrypted if the
+        // Signal session is still valid.  quiet=false so errors are logged.
+        // out_is_duplicate distinguishes "already seen live" (SG_ERR_DUPLICATE_MESSAGE)
+        // from a genuine session failure, matching Gajim's DuplicateMessage→NodeProcessed.
+        auto omemo_result = account.omemo.decode(&account, channel->buffer, from_bare, encrypted,
+                                                 /*quiet=*/false, &omemo_is_duplicate);
         if (omemo_result)
         {
             omemo_cleartext_storage = std::move(*omemo_result);
@@ -1907,8 +1913,29 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
         }
         if (!cleartext)
         {
-            if (is_self_outbound_copy || is_mam_replay)
+            if (is_self_outbound_copy)
                 goto message_handler_after_omemo;
+
+            if (is_mam_replay)
+            {
+                if (omemo_is_duplicate)
+                {
+                    // Already decrypted on live delivery; ratchet has advanced past
+                    // this counter.  Skip silently — it was already displayed.
+                    goto message_handler_after_omemo;
+                }
+                // Genuine MAM decryption failure: show a placeholder so the user
+                // knows a message exists but could not be decrypted (matches what
+                // Conversations / Gajim show for undecryptable archived messages).
+                if (intext)
+                    xmpp_free(account.context, intext);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+                intext = xmpp_strdup(account.context, "[undecryptable OMEMO message]");
+#pragma GCC diagnostic pop
+                encrypted = nullptr;   // prevent the after-omemo null-text guard from skipping display
+                goto message_handler_after_omemo;
+            }
 
             xmpp_stanza_t *payload = xmpp_stanza_get_child_by_name(encrypted, "payload");
             const char *payload_text = payload ? xmpp_stanza_get_text_ptr(payload) : nullptr;
@@ -1929,14 +1956,16 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
 message_handler_after_omemo:
     // If OMEMO decryption produced no cleartext and this is a self-outbound copy
     // (MAM replay of a message we sent from another device, or a live carbon copy)
-    // or a MAM-replayed inbound message whose decryption failed, there is nothing
-    // to display.  Key-transport messages (null payload, all-zero IV) are the
-    // common case here — they establish the session but carry no user-visible
-    // content.  Falling through to the display path with text==nullptr would print
-    // a blank line (or crash on weechat_string_match(nullptr)).
+    // or a MAM-replayed inbound message whose decryption was a duplicate (already
+    // seen live), there is nothing to display.  Key-transport messages (null
+    // payload, all-zero IV) are the common case here — they establish the session
+    // but carry no user-visible content.  Falling through to the display path with
+    // text==nullptr would print a blank line (or crash on weechat_string_match(nullptr)).
     // Note: MAM replays of messages sent from THIS device have |encrypted| cleared
     // above so they bypass this check and flow to the display path with
     // intext=OMEMO_ADVICE (showing the user their sent history).
+    // Note: MAM replays with genuine decryption failure set intext=[undecryptable]
+    // and clear |encrypted|, so they also bypass this check and display the placeholder.
     if (encrypted && !cleartext && (is_self_outbound_copy || is_mam_replay))
         return 1;
 

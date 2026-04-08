@@ -396,12 +396,16 @@ struct axolotl_omemo_payload {
 }
 
 // Signal-decrypt a legacy OMEMO transport key bundle → {innerKey(16), authTag(16)}.
+// If the message was already decrypted (SG_ERR_DUPLICATE_MESSAGE), *out_is_duplicate
+// is set to true and nullopt is returned.  Callers should silently skip duplicates
+// rather than treating them as failures (matches Gajim DuplicateMessageException→NodeProcessed).
 [[nodiscard]] auto decrypt_axolotl_transport_key(omemo &self, std::string_view jid,
                                                 std::uint32_t remote_device_id,
                                                 const std::vector<std::uint8_t> &serialized,
                                                 bool is_prekey,
                                                 std::optional<std::uint32_t> *out_used_prekey_id = nullptr,
-                                                std::optional<std::uint32_t> *out_message_counter = nullptr)
+                                                std::optional<std::uint32_t> *out_message_counter = nullptr,
+                                                bool *out_is_duplicate = nullptr)
     -> std::optional<std::pair<std::array<std::uint8_t, 16>, std::array<std::uint8_t, 16>>>
 {
     OMEMO_ASSERT(self.context, "signal context required");
@@ -409,6 +413,9 @@ struct axolotl_omemo_payload {
     OMEMO_ASSERT(!jid.empty(), "peer jid required");
     OMEMO_ASSERT(remote_device_id != 0, "peer device id required");
     OMEMO_ASSERT(!serialized.empty(), "serialized message required");
+
+    if (out_is_duplicate)
+        *out_is_duplicate = false;
 
     auto address = make_signal_address(jid, static_cast<std::int32_t>(remote_device_id));
 
@@ -503,6 +510,19 @@ struct axolotl_omemo_payload {
 
     if (result != 0 || !plaintext_raw)
     {
+        if (result == SG_ERR_DUPLICATE_MESSAGE)
+        {
+            // The Signal library already decrypted this message (live delivery
+            // advanced the ratchet past this counter).  This is normal during
+            // MAM replay of messages that were received live before reconnect.
+            // Match Gajim's DuplicateMessageException → NodeProcessed behaviour:
+            // tell the caller to skip silently.
+            XDEBUG("omemo: (legacy) duplicate message for {}/{} — already decrypted",
+                   jid, remote_device_id);
+            if (out_is_duplicate)
+                *out_is_duplicate = true;
+            return std::nullopt;
+        }
         weechat_printf(nullptr, "%somemo: (legacy) session_cipher_decrypt failed for %.*s/%u: rc=%d",
                        weechat_prefix("error"),
                        static_cast<int>(jid.size()), jid.data(),

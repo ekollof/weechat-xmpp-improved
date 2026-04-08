@@ -172,12 +172,16 @@ namespace weechat {
             XMPP_TEST_EXPORT bool has_session(const char *jid, std::uint32_t remote_device_id);
 
             // Decode an OMEMO-encrypted message returning cleartext.
-            // Returns std::nullopt if decryption fails.
+            // Returns std::nullopt if decryption fails or if the message was a
+            // duplicate (already decrypted on a prior live delivery).
+            // If out_is_duplicate is non-null it is set to true in the latter case
+            // so callers can distinguish silent-skip from genuine failure.
             std::optional<std::string> decode(weechat::account *account,
                         struct t_gui_buffer *buffer,
                         const char *jid,
                         xmpp_stanza_t *encrypted,
-                        bool quiet = false);
+                        bool quiet = false,
+                        bool *out_is_duplicate = nullptr);
 
             // Encode a plaintext message using axolotl (eu.siacs.conversations.axolotl).
             // Produces AES-128-GCM ciphertext with explicit IV.

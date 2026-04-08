@@ -13,11 +13,15 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
                                    struct t_gui_buffer *buffer,
                                    const char *jid,
                                    xmpp_stanza_t *encrypted,
-                                   bool quiet)
+                                   bool quiet,
+                                   bool *out_is_duplicate)
 {
     OMEMO_ASSERT(account != nullptr, "OMEMO decode requires a valid account");
     OMEMO_ASSERT(jid != nullptr, "OMEMO decode requires a peer jid");
     OMEMO_ASSERT(encrypted != nullptr, "OMEMO decode requires an encrypted stanza");
+
+    if (out_is_duplicate)
+        *out_is_duplicate = false;
 
     if (!account || !jid || !encrypted)
     {
@@ -162,8 +166,9 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
 
             legacy_transport_key = decrypt_axolotl_transport_key(*this, jid, *sender_device_id, serialized, is_prekey,
                                                                  is_prekey ? &used_prekey_id : nullptr,
-                                                                 &ratchet_message_counter);
-            if (!legacy_transport_key && !quiet)
+                                                                 &ratchet_message_counter,
+                                                                 out_is_duplicate);
+            if (!legacy_transport_key && !quiet && !(out_is_duplicate && *out_is_duplicate))
                 print_error(buffer, "OMEMO (legacy) Signal decryption of transport key failed.");
         }
     }
@@ -209,7 +214,8 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
 
             legacy_transport_key = decrypt_axolotl_transport_key(*this, jid, *sender_device_id, serialized, is_prekey,
                                                                  is_prekey ? &used_prekey_id : nullptr,
-                                                                 &ratchet_message_counter);
+                                                                 &ratchet_message_counter,
+                                                                 out_is_duplicate);
         }
     }
 
@@ -257,9 +263,13 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
         else
         {
             // found_key_for_us==true but decryption failed.
-            if (!quiet)
+            // If it's a duplicate (SG_ERR_DUPLICATE_MESSAGE), the Signal ratchet
+            // already consumed this message on a prior live delivery.  Skip all
+            // recovery actions — there is nothing to recover.
+            const bool is_duplicate = out_is_duplicate && *out_is_duplicate;
+            if (!quiet && !is_duplicate)
                 print_error(buffer, "OMEMO transport key decryption failed.");
-            if (account && sender_device_id)
+            if (!is_duplicate && account && sender_device_id)
             {
                 const std::string bare_jid = normalize_bare_jid(*account->context, jid);
                 // Self-outbound copy: do not corrupt own session.
