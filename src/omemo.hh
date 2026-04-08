@@ -181,7 +181,8 @@ namespace weechat {
                         const char *jid,
                         xmpp_stanza_t *encrypted,
                         bool quiet = false,
-                        bool *out_is_duplicate = nullptr);
+                        bool *out_is_duplicate = nullptr,
+                        bool suppress_peer_traffic = false);
 
             // Encode a plaintext message using axolotl (eu.siacs.conversations.axolotl).
             // Produces AES-128-GCM ciphertext with explicit IV.

@@ -1905,7 +1905,8 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
         // out_is_duplicate distinguishes "already seen live" (SG_ERR_DUPLICATE_MESSAGE)
         // from a genuine session failure, matching Gajim's DuplicateMessage→NodeProcessed.
         auto omemo_result = account.omemo.decode(&account, channel->buffer, from_bare, encrypted,
-                                                 /*quiet=*/false, &omemo_is_duplicate);
+                                                 /*quiet=*/false, &omemo_is_duplicate,
+                                                 /*suppress_peer_traffic=*/is_mam_replay);
         if (omemo_result)
         {
             omemo_cleartext_storage = std::move(*omemo_result);

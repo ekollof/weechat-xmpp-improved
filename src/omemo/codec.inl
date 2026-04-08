@@ -14,7 +14,8 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
                                    const char *jid,
                                    xmpp_stanza_t *encrypted,
                                    bool quiet,
-                                   bool *out_is_duplicate)
+                                   bool *out_is_duplicate,
+                                   bool suppress_peer_traffic)
 {
     OMEMO_ASSERT(account != nullptr, "OMEMO decode requires a valid account");
     OMEMO_ASSERT(jid != nullptr, "OMEMO decode requires a peer jid");
@@ -80,10 +81,12 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
     // that peer — this unblocks bundle requests (which check has_peer_traffic)
     // so the recovery path can fetch their bundle and send a key-transport when
     // decryption fails due to a stale/mismatched session.
-    // During MAM replay (quiet=true) we suppress this: we must not mark peers
-    // as having observed live traffic based on archived messages, as that
-    // would trigger spurious bundle fetches (e.g. for own ConverseJS devices).
-    if (!quiet)
+    // During MAM replay we suppress this: we must not mark peers as having
+    // observed live traffic based on archived messages, as that would trigger
+    // spurious bundle fetches (e.g. for own ConverseJS devices).
+    // suppress_peer_traffic is passed as true for MAM replays; quiet alone is
+    // no longer sufficient since MAM now decodes with quiet=false for logging.
+    if (!quiet && !suppress_peer_traffic)
         note_peer_traffic(account->context, jid);
 
     // Legacy transport key: {innerKey16, authTag16}
