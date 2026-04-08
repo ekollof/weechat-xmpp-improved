@@ -427,6 +427,16 @@ View the buffer:
 /buffer xmpp.debug
 ```
 
+**`XDEBUG(...)` log file**: WeeChat writes the `xmpp.debug` buffer to:
+```
+~/.local/share/weechat/logs/xmpp.debug.weechatlog
+```
+This is the on-disk record of all `XDEBUG` output. Tail it directly to
+monitor debug messages without opening WeeChat:
+```bash
+tail -f ~/.local/share/weechat/logs/xmpp.debug.weechatlog
+```
+
 #### `xmpp.look.raw_xml_log` — wire-level XML file
 
 Appends every SEND and RECV XML stanza to a per-account log file:
