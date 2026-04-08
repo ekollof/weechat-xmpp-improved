@@ -1162,8 +1162,7 @@ int weechat::channel::send_message(std::string_view to, std::string_view body, b
     if (account.omemo && omemo.enabled)
     {
         std::shared_ptr<xmpp_stanza_t> encrypted;
-        const auto peer_mode = account.omemo.select_peer_mode(account, peer_bare);
-        const char *eme_namespace = "urn:xmpp:omemo:2";
+        constexpr const char *eme_namespace = "eu.siacs.conversations.axolotl";
 
         // Use a null-safe helper: xmpp_stanza_release(nullptr) segfaults, so
         // only install the deleter when the raw pointer is non-null.
@@ -1172,17 +1171,8 @@ int weechat::channel::send_message(std::string_view to, std::string_view body, b
             return { raw, xmpp_stanza_release };
         };
 
-        if (peer_mode == weechat::xmpp::omemo::peer_mode::axolotl)
-        {
-            encrypted = make_encrypted(
-                account.omemo.encode_axolotl(&account, buffer, to_str.c_str(), body_str.c_str()));
-            eme_namespace = "eu.siacs.conversations.axolotl";
-        }
-        else
-        {
-            encrypted = make_encrypted(
-                account.omemo.encode(&account, buffer, to_str.c_str(), body_str.c_str()));
-        }
+        encrypted = make_encrypted(
+            account.omemo.encode(&account, buffer, to_str.c_str(), body_str.c_str()));
 
         if (!encrypted)
         {
@@ -1192,7 +1182,7 @@ int weechat::channel::send_message(std::string_view to, std::string_view body, b
                     return WEECHAT_RC_ERROR;
 
                 queue_pending_omemo_message(body_str);
-                account.omemo.request_devicelist(account, peer_bare);
+                account.omemo.request_axolotl_devicelist(account, peer_bare);
                 weechat_printf_date_tags(buffer, 0, "notify_none", "%s%s",
                                          weechat_prefix("network"),
                                          "OMEMO not ready yet; queued message and requested device/bundle updates");

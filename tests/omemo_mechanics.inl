@@ -638,9 +638,9 @@ TEST_CASE("MAM replay self-session: Signal session to own device survives reinit
     CHECK(env.omemo->has_session(own_jid.c_str(), own_device_id));
 }
 
-// ── 11. Bootstrap-race guard: handle_bundle mirrors the same guarantee ────────
+// ── 11. Bootstrap-race guard: handle_axolotl_bundle mirrors the same guarantee ─
 
-TEST_CASE("handle_bundle sets race guard before clearing pending sets")
+TEST_CASE("handle_axolotl_bundle sets race guard before clearing pending sets")
 {
     omemo_test_env env;
 
@@ -651,17 +651,15 @@ TEST_CASE("handle_bundle sets race guard before clearing pending sets")
     env.omemo->pending_bundle_fetch.insert(key);
     env.omemo->pending_key_transport.insert(key);
 
-    // Minimal OMEMO:2 bundle stanza.
-    // <spk id='N'> text content = signed prekey; <spks> = signature; <ik> = identity key;
-    // <prekeys><pk id='N'> text = prekey.  Values are arbitrary valid base64.
+    // Minimal legacy axolotl bundle stanza (eu.siacs.conversations.axolotl format).
     const std::string bundle_xml = R"(<items>
-      <item id='current'>
-        <bundle xmlns='urn:xmpp:omemo:2'>
-          <spk id='1'>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</spk>
-          <spks>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</spks>
-          <ik>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</ik>
+      <item id='77777'>
+        <bundle xmlns='eu.siacs.conversations.axolotl'>
+          <signedPreKeyPublic signedPreKeyId='1'>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</signedPreKeyPublic>
+          <signedPreKeySignature>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</signedPreKeySignature>
+          <identityKey>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</identityKey>
           <prekeys>
-            <pk id='1'>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pk>
+            <preKeyPublic preKeyId='1'>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</preKeyPublic>
           </prekeys>
         </bundle>
       </item>
@@ -670,7 +668,7 @@ TEST_CASE("handle_bundle sets race guard before clearing pending sets")
     xmpp_stanza_t *items = xmpp_stanza_new_from_string(env.ctx, bundle_xml.c_str());
     REQUIRE(items != nullptr);
 
-    env.omemo->handle_bundle(nullptr, nullptr, remote_jid.c_str(), remote_id, items);
+    env.omemo->handle_axolotl_bundle(nullptr, nullptr, remote_jid.c_str(), remote_id, items);
     xmpp_stanza_release(items);
 
     CHECK(env.omemo->key_transport_bootstrap_attempted.count(key) == 1);

@@ -127,116 +127,21 @@ std::shared_ptr<xmpp_stanza_t> weechat::account::get_devicelist()
     if (omemo.device_id == 0 || omemo.device_id > 0x7fffffffU)
     {
         weechat_printf(buffer,
-                       "%somemo: refusing to publish devicelist: invalid local device id %u",
-                       weechat_prefix("error"), omemo.device_id);
-        return nullptr;
-    }
-
-    using DeviceMap = std::unordered_map<std::uint32_t, weechat::account::device>;
-
-    // <devices xmlns='urn:xmpp:omemo:2'> populated in-constructor to satisfy protected child()
-    struct devices_spec : stanza::spec {
-        devices_spec(std::uint32_t self_id, const DeviceMap& devs,
-                     xmpp_conn_t* /*unused*/, weechat::account* acct)
-            : spec("devices")
-        {
-            attr("xmlns", "urn:xmpp:omemo:2");
-
-            struct device_spec : stanza::spec {
-                device_spec(std::string_view id_sv, std::string_view label_sv) : spec("device") {
-                    attr("id", id_sv);
-                    if (!label_sv.empty())
-                        attr("label", label_sv);
-                }
-            };
-
-            const std::string self_id_s = fmt::format("{}", self_id);
-            device_spec self_dev(self_id_s, "weechat");
-            child(self_dev);
-
-            for (const auto& [dev_id, dev_info] : devs)
-            {
-                if (dev_id == self_id || dev_id == 0 || dev_id > 0x7fffffffU)
-                    continue;
-                if (dev_info.name == "%u")
-                    continue;
-                const auto expected = fmt::format("{}", dev_id);
-                if (dev_info.name != expected)
-                {
-                    weechat_printf(acct->buffer,
-                                   "%somemo: skipping cached device entry %u with mismatched published id '%s'",
-                                   weechat_prefix("error"),
-                                   dev_id,
-                                   dev_info.name.c_str());
-                    continue;
-                }
-                const std::string label = dev_info.label.empty() ? "weechat" : dev_info.label;
-                device_spec peer_dev(dev_info.name, label);
-                child(peer_dev);
-            }
-        }
-    };
-
-    // Publish-options x:data form (4 fields)
-    struct omemo_pub_options : stanza::spec {
-        omemo_pub_options() : spec("x") {
-            attr("xmlns", "jabber:x:data");
-            attr("type", "submit");
-            struct field_spec : stanza::spec {
-                field_spec(std::string_view var, std::string_view val,
-                           std::string_view type_sv = {}) : spec("field") {
-                    attr("var", var);
-                    if (!type_sv.empty()) attr("type", type_sv);
-                    struct value_spec : stanza::spec {
-                        value_spec(std::string_view v) : spec("value") { text(v); }
-                    } v(val);
-                    child(v);
-                }
-            };
-            field_spec f1("FORM_TYPE",
-                "http://jabber.org/protocol/pubsub#publish-options", "hidden");
-            child(f1);
-            field_spec f2("pubsub#max_items", "max");
-            child(f2);
-            field_spec f3("pubsub#access_model", "open");
-            child(f3);
-            field_spec f4("pubsub#persist_items", "true");
-            child(f4);
-        }
-    };
-
-    devices_spec devs_el(omemo.device_id, devices, connection, this);
-    omemo_pub_options pub_opts;
-    auto pubsub_el = stanza::xep0060::pubsub()
-        .publish(stanza::xep0060::publish("urn:xmpp:omemo:2:devices")
-            .item(stanza::xep0060::item().id("current").payload(devs_el)))
-        .publish_options(stanza::xep0060::publish_options().child_spec(pub_opts));
-
-    auto iq_s = stanza::iq().type("set").id(stanza::uuid(context));
-    static_cast<stanza::xep0060::iq&>(iq_s).pubsub(pubsub_el);
-
-    weechat_printf(buffer,
-                   "%somemo: publishing devicelist for device %u with open access model",
-                   weechat_prefix("network"), omemo.device_id);
-
-    return iq_s.build(context);
-}
-
-std::shared_ptr<xmpp_stanza_t> weechat::account::get_legacy_devicelist()
-{
-    if (omemo.device_id == 0 || omemo.device_id > 0x7fffffffU)
-    {
-        weechat_printf(buffer,
                        "%somemo: refusing to publish legacy devicelist: invalid local device id %u",
                        weechat_prefix("error"), omemo.device_id);
         return nullptr;
     }
 
-    using DeviceMap2 = std::unordered_map<std::uint32_t, weechat::account::device>;
+    // Collect peer device IDs from the LMDB-cached axolotl devicelist for our
+    // own JID.  This is the server's last-known list and must be preserved so
+    // we don't overwrite it with only our own device (singleton clobber bug).
+    const std::string own_bare_jid = jid();
+    const auto cached_ids = omemo.get_cached_device_ids(own_bare_jid);
 
-    // <list xmlns='eu.siacs.conversations.axolotl'> populated in-constructor
+    // <list xmlns='eu.siacs.conversations.axolotl'>
     struct list_spec : stanza::spec {
-        list_spec(std::uint32_t self_id, const DeviceMap2& devs, weechat::account* acct)
+        list_spec(std::uint32_t self_id,
+                  const std::vector<std::uint32_t> &cached)
             : spec("list")
         {
             attr("xmlns", "eu.siacs.conversations.axolotl");
@@ -247,27 +152,18 @@ std::shared_ptr<xmpp_stanza_t> weechat::account::get_legacy_devicelist()
                 }
             };
 
-            const std::string self_id_s = fmt::format("{}", self_id);
-            device_spec self_dev(self_id_s);
+            // Always include our own device first.
+            device_spec self_dev(fmt::format("{}", self_id));
             child(self_dev);
 
-            for (const auto& [dev_id, dev_info] : devs)
+            // Re-include all previously published devices from the server list
+            // so we do not clobber them.  This preserves other clients' device
+            // entries (Gajim, Conversations, …) that they registered themselves.
+            for (const auto dev_id : cached)
             {
                 if (dev_id == self_id || dev_id == 0 || dev_id > 0x7fffffffU)
                     continue;
-                if (dev_info.name == "%u")
-                    continue;
-                const auto expected = fmt::format("{}", dev_id);
-                if (dev_info.name != expected)
-                {
-                    weechat_printf(acct->buffer,
-                                   "%somemo: skipping cached device entry %u with mismatched published id '%s' (legacy devicelist)",
-                                   weechat_prefix("error"),
-                                   dev_id,
-                                   dev_info.name.c_str());
-                    continue;
-                }
-                device_spec peer_dev(dev_info.name);
+                device_spec peer_dev(fmt::format("{}", dev_id));
                 child(peer_dev);
             }
         }
@@ -301,7 +197,7 @@ std::shared_ptr<xmpp_stanza_t> weechat::account::get_legacy_devicelist()
         }
     };
 
-    list_spec list_el(omemo.device_id, devices, this);
+    list_spec list_el(omemo.device_id, cached_ids);
 
     // Keep legacy node public/persistent as well so clients still using
     // OMEMO:1 can reliably discover this device.
@@ -315,8 +211,9 @@ std::shared_ptr<xmpp_stanza_t> weechat::account::get_legacy_devicelist()
     static_cast<stanza::xep0060::iq&>(iq_s).pubsub(pubsub_el);
 
     weechat_printf(buffer,
-                   "%somemo: publishing legacy devicelist for device %u with open access model",
-                   weechat_prefix("network"), omemo.device_id);
+                   "%somemo: publishing legacy devicelist for device %u (%zu total device(s)) with open access model",
+                   weechat_prefix("network"), omemo.device_id,
+                   cached_ids.size() + 1);
 
     return iq_s.build(context);
 }

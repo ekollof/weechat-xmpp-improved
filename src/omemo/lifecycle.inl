@@ -10,99 +10,6 @@ XMPP_TEST_EXPORT weechat::xmpp::omemo::~omemo()
     g_signal_store_states.erase(this);
 }
 
-xmpp_stanza_t *weechat::xmpp::omemo::get_bundle(xmpp_ctx_t *context, char *from, char *to)
-{
-    (void) from;
-    (void) to;
-
-    OMEMO_ASSERT(context != nullptr, "xmpp context must be present when publishing our OMEMO bundle");
-
-    if (!*this)
-        return nullptr;
-
-    ensure_local_identity(*this);
-    ensure_registration_id(*this);
-    (void)ensure_prekeys(*this, context);  // return value intentionally discarded: caller is already publishing
-
-    const auto bundle = make_local_bundle_metadata(*this);
-    if (!bundle)
-        return nullptr;
-
-    const auto signed_pre_key_id = parse_uint32(bundle->signed_pre_key_id).value_or(0);
-    if (!is_valid_omemo_device_id(device_id))
-    {
-        weechat_printf(nullptr,
-                       "%somemo: refusing to publish bundle: invalid local device id %u",
-                       weechat_prefix("error"), device_id);
-        return nullptr;
-    }
-    if (signed_pre_key_id == 0)
-    {
-        weechat_printf(nullptr,
-                       "%somemo: refusing to publish bundle for device %u: invalid signed prekey id '%s'",
-                       weechat_prefix("error"), device_id, bundle->signed_pre_key_id.c_str());
-        return nullptr;
-    }
-    if (bundle->prekeys.size() < kMinPreKeyCount)
-    {
-        weechat_printf(nullptr,
-                       "%somemo: refusing to publish bundle for device %u: only %zu prekeys available (minimum %u required by XEP-0384)",
-                       weechat_prefix("error"),
-                       device_id,
-                       bundle->prekeys.size(),
-                       kMinPreKeyCount);
-        return nullptr;
-    }
-
-    XDEBUG("omemo: publishing bundle for device {} with {} prekeys",
-           device_id, bundle->prekeys.size());
-
-    // Build <bundle xmlns='urn:xmpp:omemo:2'>
-    stanza::xep0384::prekeys prekeys_spec;
-    for (const auto &[id, key] : bundle->prekeys)
-        prekeys_spec.add_pk(stanza::xep0384::pk(id, key));
-
-    stanza::xep0384::bundle bundle_spec;
-    bundle_spec.add_spk(stanza::xep0384::spk(bundle->signed_pre_key_id, bundle->signed_pre_key))
-               .add_spks(stanza::xep0384::spks(bundle->signed_pre_key_signature))
-               .add_ik(stanza::xep0384::ik(bundle->identity_key))
-               .add_prekeys(prekeys_spec);
-
-    // Build publish-options xdata form (access_model=open)
-    stanza::xep0384::xdata_form form;
-    form.add_field(stanza::xep0384::xdata_field(
-             "FORM_TYPE",
-             "http://jabber.org/protocol/pubsub#publish-options",
-             "hidden"))
-        .add_field(stanza::xep0384::xdata_field("pubsub#max_items", "max"))
-        .add_field(stanza::xep0384::xdata_field("pubsub#access_model", "open"))
-        .add_field(stanza::xep0384::xdata_field("pubsub#persist_items", "true"));
-
-    stanza::xep0060::publish_options pub_opts;
-    pub_opts.child_spec(form);
-
-    const auto item_id = fmt::format("{}", device_id);
-    stanza::xep0060::item item_spec;
-    item_spec.id(item_id).payload(bundle_spec);
-
-    stanza::xep0060::pubsub pubsub_spec;
-    pubsub_spec.publish(stanza::xep0060::publish(kBundlesNode)
-                            .item(item_spec))
-               .publish_options(pub_opts);
-
-    auto iq_sp = stanza::iq()
-        .type("set")
-        .id("omemo-bundle")
-        .pubsub(pubsub_spec)
-        .build(context);
-
-    if (from) xmpp_stanza_set_attribute(iq_sp.get(), "from", from);
-    if (to)   xmpp_stanza_set_attribute(iq_sp.get(), "to", to);
-
-    xmpp_stanza_clone(iq_sp.get());  // bump refcount; shared_ptr dtor will release its ref
-    return iq_sp.get();              // caller owns one ref; must call xmpp_stanza_release()
-}
-
 XMPP_TEST_EXPORT xmpp_stanza_t *weechat::xmpp::omemo::get_axolotl_bundle(xmpp_ctx_t *context, char *from, char *to)
 {
     (void) from;
@@ -264,7 +171,6 @@ XMPP_TEST_EXPORT void weechat::xmpp::omemo::init(struct t_gui_buffer *buffer, co
         pending_key_transport.clear();
         pending_iq_jid.clear();
         pending_configure_retry.clear();
-        missing_omemo2_devicelist.clear();
         missing_axolotl_devicelist.clear();
         postponed_key_transports.clear();
         key_transport_bootstrap_attempted.clear();
@@ -295,9 +201,8 @@ XMPP_TEST_EXPORT void weechat::xmpp::omemo::init(struct t_gui_buffer *buffer, co
             auto id_in_cached_list = [&](std::uint32_t candidate) -> bool {
                 if (own_jid.empty())
                     return false;
-                // Check both OMEMO:2 and axolotl device lists.
-                for (const auto &dl_key : {key_for_devicelist(own_jid),
-                                           key_for_axolotl_devicelist(own_jid)})
+                // Check the axolotl device list only (axolotl-first policy).
+                for (const auto &dl_key : {key_for_axolotl_devicelist(own_jid)})
                 {
                     const auto cached = load_string(*this, dl_key);
                     if (!cached || cached->empty())

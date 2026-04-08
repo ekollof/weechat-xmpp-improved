@@ -19,7 +19,19 @@ Canonical XEP specs for all implemented XEPs are stored in `docs/specs/xep-NNNN.
 
 - Primary OMEMO specification: `docs/specs/xep-0384.txt` (canonical, fetched from https://xmpp.org/extensions/xep-0384.html)
 - For OMEMO changes, always verify stanza structure, namespaces, and pubsub node behavior against XEP-0384 before finalizing code.
-- Prefer strict OMEMO:2 compliance. If a compatibility fallback is added, keep it explicit, narrow, and documented.
+- **Protocol**: `eu.siacs.conversations.axolotl` (legacy/Gajim-compatible) is the **sole** supported namespace.
+  OMEMO:2 (`urn:xmpp:omemo:2`) must **not** be published, encoded, or treated as a primary path.
+  Any incoming OMEMO:2 stanza may be silently ignored or answered with a key-not-found error.
+- **Trust model**: Blind Trust Before Verification (BTBV) TOFU — mirrors Gajim's `get_default_trust()`.
+  Trust levels: `UNTRUSTED=0`, `VERIFIED=1`, `UNDECIDED=2`, `BLIND=3` (stored in LMDB as `trust:{jid}:{device_id}`).
+  Only `VERIFIED` and `BLIND` devices receive encrypted key material at encode time.
+- **No ATM**: XEP-0450 Automatic Trust Management is removed. Do not add it back.
+- **Reference implementation**: Gajim + python-omemo-dr at
+  `/usr/lib/python3/dist-packages/gajim/common/modules/omemo.py`,
+  `/usr/lib/python3/dist-packages/gajim/common/storage/omemo.py`,
+  `/usr/lib/python3/dist-packages/omemo_dr/`
+- **Current refactor plan**: See `TODO.md` in the repository root for the full phase-by-phase
+  breakdown of the ongoing axolotl-only + BTBV refactor (branch `omemo-axolotl-btbv`).
 
 ## Build System
 
@@ -413,6 +425,16 @@ Or directly inside WeeChat:
 View the buffer:
 ```
 /buffer xmpp.debug
+```
+
+**`XDEBUG(...)` log file**: WeeChat writes the `xmpp.debug` buffer to:
+```
+~/.local/share/weechat/logs/xmpp.debug.weechatlog
+```
+This is the on-disk record of all `XDEBUG` output. Tail it directly to
+monitor debug messages without opening WeeChat:
+```bash
+tail -f ~/.local/share/weechat/logs/xmpp.debug.weechatlog
 ```
 
 #### `xmpp.look.raw_xml_log` — wire-level XML file

@@ -7,7 +7,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
     append_raw_xml_trace(account, "RECV", stanza);
 
     xmpp_stanza_t *reply, *query, *text, *fin;
-    xmpp_stanza_t         *pubsub, *items, *item, *list, *bundle, *device;
+    xmpp_stanza_t         *pubsub, *items, *item;
     xmpp_stanza_t         *storage, *conference, *nick;
 
     auto binding = xml::iq(account.context, stanza);
@@ -3657,7 +3657,6 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
 
     // OMEMO devicelist fetch error handling:
     // - mark missing nodes to avoid request/error loops
-    // - on OMEMO:2 miss, try legacy once
     if (type && weechat_strcasecmp(type, "error") == 0 && id && account.omemo)
     {
         xmpp_stanza_t *dl_err_elem = xmpp_stanza_get_child_by_name(stanza, "error");
@@ -3665,7 +3664,6 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
             stanza, "pubsub", "http://jabber.org/protocol/pubsub");
         bool is_item_not_found = dl_err_elem && xmpp_stanza_get_child_by_name_and_ns(
             dl_err_elem, "item-not-found", "urn:ietf:params:xml:ns:xmpp-stanzas");
-        bool is_omemo2_devicelist_err = false;
         bool is_legacy_devicelist_err = false;
         if (dl_pubsub)
         {
@@ -3673,14 +3671,12 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
             if (dl_items)
             {
                 const char *dl_node = xmpp_stanza_get_attribute(dl_items, "node");
-                if (dl_node && std::string_view(dl_node) == "urn:xmpp:omemo:2:devices")
-                    is_omemo2_devicelist_err = true;
                 if (dl_node && std::string_view(dl_node) == "eu.siacs.conversations.axolotl.devicelist")
                     is_legacy_devicelist_err = true;
             }
         }
 
-        if (is_item_not_found && (is_omemo2_devicelist_err || is_legacy_devicelist_err))
+        if (is_item_not_found && is_legacy_devicelist_err)
         {
             // Resolve which JID this looked up — use pending_iq_jid first,
             // fall back to bare `from` of the error response.
@@ -3700,54 +3696,28 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
 
             if (!dl_target_jid.empty())
             {
-                bool first_omemo2_miss = false;
-                bool first_legacy_miss = false;
-                if (is_omemo2_devicelist_err)
-                {
-                    first_omemo2_miss = account.omemo.missing_omemo2_devicelist.insert(dl_target_jid).second;
-                }
-                if (is_legacy_devicelist_err)
-                {
-                    first_legacy_miss = account.omemo.missing_axolotl_devicelist.insert(dl_target_jid).second;
-                }
+                bool first_legacy_miss = account.omemo.missing_axolotl_devicelist.insert(dl_target_jid).second;
 
                 auto dl_ch_it = account.channels.find(dl_target_jid);
                 if (dl_ch_it != account.channels.end())
                 {
                     auto &dl_ch = dl_ch_it->second;
-                    if (!dl_ch.pending_omemo_messages.empty())
+                    if (!dl_ch.pending_omemo_messages.empty() && first_legacy_miss)
                     {
-                        if (is_omemo2_devicelist_err && first_omemo2_miss)
-                        {
-                            weechat_printf(dl_ch.buffer,
-                                "%sOMEMO: %s has no OMEMO:2 device list (node not found). "
-                                "Keeping %zu queued message(s) and requesting legacy device list.",
-                                weechat_prefix("error"),
-                                dl_target_jid.c_str(),
-                                dl_ch.pending_omemo_messages.size());
-                        }
-                        else if (is_legacy_devicelist_err && first_legacy_miss)
-                        {
-                            weechat_printf(dl_ch.buffer,
-                                "%sOMEMO: %s has no legacy OMEMO device list either. "
-                                "Keeping %zu queued message(s).",
-                                weechat_prefix("error"),
-                                dl_target_jid.c_str(),
-                                dl_ch.pending_omemo_messages.size());
-                        }
+                        weechat_printf(dl_ch.buffer,
+                            "%sOMEMO: %s has no legacy OMEMO device list either. "
+                            "Keeping %zu queued message(s).",
+                            weechat_prefix("error"),
+                            dl_target_jid.c_str(),
+                            dl_ch.pending_omemo_messages.size());
                     }
                 }
-
-                if (is_omemo2_devicelist_err)
-                    account.omemo.request_axolotl_devicelist(account, dl_target_jid);
             }
         }
-        else if (!is_item_not_found && (is_omemo2_devicelist_err || is_legacy_devicelist_err))
+        else if (!is_item_not_found && is_legacy_devicelist_err)
         {
-            // A transient or cross-domain error (service-unavailable, forbidden,
-            // remote-server-not-found, timeout, etc.) — NOT a permanent "node missing"
-            // condition.  Clear the guard entries so the next encode attempt can
-            // retry the devicelist request rather than being permanently blocked.
+            // A transient or cross-domain error — clear guard entries so next
+            // encode attempt can retry.
             std::string dl_target_jid;
             auto dl_jid_it = account.omemo.pending_iq_jid.find(id);
             if (dl_jid_it != account.omemo.pending_iq_jid.end())
@@ -3764,10 +3734,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
 
             if (!dl_target_jid.empty())
             {
-                if (is_omemo2_devicelist_err)
-                    account.omemo.missing_omemo2_devicelist.erase(dl_target_jid);
-                if (is_legacy_devicelist_err)
-                    account.omemo.missing_axolotl_devicelist.erase(dl_target_jid);
+                account.omemo.missing_axolotl_devicelist.erase(dl_target_jid);
 
                 // Log the transient error so the user has visibility.
                 const char *err_text = dl_err_elem
@@ -3796,26 +3763,9 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 "%somemo: node '%s' configured — re-publishing",
                 weechat_prefix("network"), retry_node.c_str());
 
-            if (retry_node == "urn:xmpp:omemo:2:bundles")
-            {
-                std::string jid_str(account.jid());
-                xmpp_stanza_t *bundle_stanza =
-                    account.omemo.get_bundle(account.context, jid_str.data(), nullptr);
-                if (bundle_stanza)
-                {
-                    account.connection.send(bundle_stanza);
-                    xmpp_stanza_release(bundle_stanza);
-                }
-            }
-            else if (retry_node == "urn:xmpp:omemo:2:devices")
+            if (retry_node == "eu.siacs.conversations.axolotl.devicelist")
             {
                 auto dl_stanza = account.get_devicelist();
-                if (dl_stanza)
-                    account.connection.send(dl_stanza.get());
-            }
-            else if (retry_node == "eu.siacs.conversations.axolotl.devicelist")
-            {
-                auto dl_stanza = account.get_legacy_devicelist();
                 if (dl_stanza)
                     account.connection.send(dl_stanza.get());
             }
@@ -3874,329 +3824,6 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
         {
             items_node = xmpp_stanza_get_attribute(items, "node");
             if (items_node
-                && weechat_strcasecmp(items_node,
-                                      "urn:xmpp:omemo:2:devices") == 0)
-            {
-                item = xmpp_stanza_get_child_by_name(items, "item");
-                if (item)
-                {
-                    list = xmpp_stanza_get_child_by_name_and_ns(
-                        item, "devices", "urn:xmpp:omemo:2");
-                    if (list && account.omemo)
-                    {
-                        std::string node_owner_str = resolve_node_owner();
-                        const char *node_owner = node_owner_str.c_str();
-                        const std::string account_bare_s = ::jid(nullptr, account.jid()).bare;
-                        const std::string account_bare = account_bare_s.empty()
-                            ? account.jid() : account_bare_s;
-                        bool is_own_devicelist = (account_bare == node_owner);
-
-                        account.omemo.handle_devicelist(&account, node_owner, items);
-
-                        // If this is our own devicelist and our device_id is
-                        // absent, add it now and re-publish.
-                        if (is_own_devicelist)
-                        {
-                            bool found_self = false;
-                            int valid_device_count = 0;
-
-                            // Rebuild local cache from the server list and keep all valid
-                            // devices. Do not collapse to only our current device: OMEMO
-                            // accounts can legitimately have multiple active devices.
-                            account.devices.clear();
-                            for (device = xmpp_stanza_get_children(list);
-                                 device; device = xmpp_stanza_get_next(device))
-                            {
-                                const char *dname = xmpp_stanza_get_name(device);
-                                if (weechat_strcasecmp(dname, "device") != 0) continue;
-                                const char *did = xmpp_stanza_get_id(device);
-                                if (!did) continue;
-
-                                const auto parsed_did = parse_omemo_device_id(did);
-                                if (!parsed_did)
-                                {
-                                    weechat_printf(account.buffer,
-                                                   "%somemo: ignoring invalid device id '%s' in server devicelist",
-                                                   weechat_prefix("error"), did);
-                                    continue;
-                                }
-
-                                weechat::account::device dev;
-                                dev.id = *parsed_did;
-                                dev.name = fmt::format("{}", dev.id);
-                                dev.label = "weechat";
-                                account.devices[dev.id] = dev;
-
-                                if (dev.id == account.omemo.device_id)
-                                    found_self = true;
-                                ++valid_device_count;
-                            }
-
-                            if (!found_self)
-                            {
-                                weechat_printf(account.buffer,
-                                    "%somemo: our device %u missing from server devicelist — re-publishing",
-                                    weechat_prefix("network"), account.omemo.device_id);
-
-                                weechat::account::device self_dev;
-                                self_dev.id = account.omemo.device_id;
-                                self_dev.name = fmt::format("{}", self_dev.id);
-                                self_dev.label = "weechat";
-                                account.devices[self_dev.id] = self_dev;
-                            }
-
-                            XDEBUG("Server devicelist for {}:", node_owner);
-                            for (const auto &entry : account.devices)
-                            {
-                                XDEBUG("  Device {}{}", entry.first,
-                                       entry.first == account.omemo.device_id
-                                           ? " (weechat - this device)"
-                                           : "");
-                            }
-                            XDEBUG("Server has {} valid OMEMO device(s) for {}",
-                                   valid_device_count, node_owner);
-
-                            if (!found_self)
-                            {
-                                auto dl_stanza = account.get_devicelist();
-                                if (dl_stanza)
-                                    account.connection.send(dl_stanza.get());
-                            }
-                        }
-                        else
-                        {
-                            // Fetch bundles for all devices in the received list
-                            int device_count = 0;
-                            int total_children = 0;
-                            for (device = xmpp_stanza_get_children(list);
-                                 device; device = xmpp_stanza_get_next(device))
-                            {
-                                total_children++;
-                                const char *name = xmpp_stanza_get_name(device);
-                                if (weechat_strcasecmp(name, "device") != 0)
-                                {
-                                    weechat_printf(account.buffer,
-                                                   "%somemo: skipping child element with name '%s' (expected 'device')",
-                                                   weechat_prefix("network"), name ? name : "(null)");
-                                    continue;
-                                }
-
-                                const char *device_id = xmpp_stanza_get_id(device);
-                                if (!device_id) 
-                                {
-                                    weechat_printf(account.buffer,
-                                                   "%somemo: device element %d has no id attribute",
-                                                   weechat_prefix("network"), total_children);
-                                    continue;
-                                }
-
-                                const auto parsed_device_id = parse_omemo_device_id(device_id);
-                                if (!parsed_device_id)
-                                {
-                                    weechat_printf(account.buffer,
-                                                   "%somemo: skipping bundle fetch for invalid device id '%s'",
-                                                   weechat_prefix("error"), device_id);
-                                    continue;
-                                }
-
-                                // If a foreign contact advertises our own local device id,
-                                // ignore it. This prevents self-targeted bundle requests
-                                // under another JID due to stale or malformed remote state.
-                                if (*parsed_device_id == account.omemo.device_id)
-                                {
-                                    weechat_printf(account.buffer,
-                                                   "%somemo: skipping foreign self-device id %u for %s",
-                                                   weechat_prefix("network"),
-                                                   *parsed_device_id,
-                                                   node_owner);
-                                    continue;
-                                }
-
-                                const auto bundle_key =
-                                    std::make_pair(std::string(node_owner), *parsed_device_id);
-                                if (account.omemo.pending_bundle_fetch.count(bundle_key) != 0)
-                                {
-                                    weechat_printf(account.buffer,
-                                                   "%somemo: bundle request for %s/%u already pending (skipping duplicate)",
-                                                   weechat_prefix("network"),
-                                                   node_owner,
-                                                   *parsed_device_id);
-                                    continue;
-                                }
-
-                                device_count++;
-
-                                // Fetch from the node owner (contact), not from ourselves.
-                                std::string uuid = stanza::uuid(account.context);
-                                stanza::xep0060::item it;
-                                it.id(device_id);
-                                stanza::xep0060::items its("urn:xmpp:omemo:2:bundles");
-                                its.item(it);
-                                stanza::xep0060::pubsub ps;
-                                ps.items(its);
-                                stanza::iq iq_s;
-                                iq_s.id(uuid).from(account.jid()).to(node_owner).type("get");
-                                iq_s.pubsub(ps);
-                                // Register IQ id → target JID so the result handler
-                                // can recover the correct JID even if `from` is server domain.
-                                if (account.omemo)
-                                    account.omemo.pending_iq_jid[uuid] = node_owner;
-                                account.omemo.pending_bundle_fetch.insert(bundle_key);
-
-                                weechat_printf(account.buffer,
-                                               "%somemo: requesting bundle for %s/%s",
-                                               weechat_prefix("network"), node_owner, device_id);
-
-                                account.connection.send(iq_s.build(account.context).get());
-                            }
-                            weechat_printf(account.buffer,
-                                           "%somemo: processed %d child elements, initiated %d bundle fetch(es) for %s",
-                                           weechat_prefix("network"), total_children, device_count, node_owner);
-                        }
-                    }
-                }
-            }
-            if (items_node
-                && weechat_strcasecmp(items_node, "urn:xmpp:omemo:2:bundles") == 0)
-            {
-                // Recover the target JID for this bundle IQ early so we can
-                // clear in-flight state even if the server returns no <bundle>.
-                std::string bundle_jid;
-                if (account.omemo && id) {
-                    auto it = account.omemo.pending_iq_jid.find(id);
-                    if (it != account.omemo.pending_iq_jid.end()) {
-                        bundle_jid = it->second;
-                        account.omemo.pending_iq_jid.erase(it);
-                    }
-                }
-                if (bundle_jid.empty())
-                    bundle_jid = from ? from : account.jid().data();
-
-                // Clear all in-flight pending_bundle_fetch entries for a given JID
-                auto clear_pending_fetches_for_jid = [&](const std::string &jid) {
-                    for (auto it = account.omemo.pending_bundle_fetch.begin();
-                         it != account.omemo.pending_bundle_fetch.end();)
-                    {
-                        if (it->first == jid)
-                            it = account.omemo.pending_bundle_fetch.erase(it);
-                        else
-                            ++it;
-                    }
-                };
-
-                if (!items)
-                {
-                    weechat_printf(account.buffer,
-                                   "%somemo: bundle IQ result for %s has no <items> element",
-                                   weechat_prefix("error"), bundle_jid.c_str());
-                    return 1;
-                }
-
-                item = xmpp_stanza_get_child_by_name(items, "item");
-                if (item)
-                {
-                    const char *item_id = xmpp_stanza_get_id(item);
-                    const auto parsed_bundle_device_id = parse_omemo_device_id(item_id);
-                    uint32_t bundle_device_id = parsed_bundle_device_id.value_or(0);
-                    
-                    weechat_printf(account.buffer,
-                                   "%somemo: received bundle IQ result for %s/%s (device %u)",
-                                   weechat_prefix("network"), bundle_jid.c_str(), item_id ? item_id : "?", bundle_device_id);
-                    
-                    if (type && weechat_strcasecmp(type, "result") == 0 && bundle_device_id == 0)
-                    {
-                        weechat_printf(account.buffer,
-                                       "%somemo: bundle result for %s has missing/invalid item id",
-                                       weechat_prefix("error"), bundle_jid.c_str());
-                    }
-
-                    // Mark this fetch as no longer in-flight as soon as we got an IQ
-                    // response for that device, even if bundle parsing fails.
-                    if (account.omemo && bundle_device_id != 0)
-                        account.omemo.pending_bundle_fetch.erase({bundle_jid, bundle_device_id});
-
-                    bundle = xmpp_stanza_get_child_by_name_and_ns(item, "bundle", "urn:xmpp:omemo:2");
-                    if (bundle)
-                    {
-                        if (account.omemo && bundle_device_id != 0)
-                        {
-                            // If this is our own device's bundle, print confirmation
-                            if (bundle_jid == account.jid() &&
-                                bundle_device_id == account.omemo.device_id)
-                            {
-                                weechat_printf(account.buffer,
-                                               "%sBundle found for device %u:",
-                                               weechat_prefix("network"), bundle_device_id);
-                                
-                                // Count prekeys
-                                xmpp_stanza_t *prekeys = xmpp_stanza_get_child_by_name(bundle, "prekeys");
-                                int prekey_count = 0;
-                                if (prekeys)
-                                {
-                                    for (xmpp_stanza_t *pk = xmpp_stanza_get_children(prekeys);
-                                         pk; pk = xmpp_stanza_get_next(pk))
-                                    {
-                                        const char *name = xmpp_stanza_get_name(pk);
-                                        if (weechat_strcasecmp(name, "pk") == 0)
-                                            prekey_count++;
-                                    }
-                                }
-                                
-                                weechat_printf(account.buffer,
-                                               "%s  %d prekeys available",
-                                               weechat_prefix("network"), prekey_count);
-                                weechat_printf(account.buffer,
-                                               "%s  ✓ Bundle is published and available for contacts",
-                                               weechat_prefix("network"));
-                            }
-                            
-                            account.omemo.handle_bundle(
-                                &account,
-                                account.buffer,
-                                bundle_jid.c_str(),
-                                bundle_device_id,
-                                items);
-                        }
-                    }
-                    else if (type && weechat_strcasecmp(type, "result") == 0)
-                    {
-                        weechat_printf(account.buffer,
-                                       "%somemo: bundle result for %s/%u did not contain a valid urn:xmpp:omemo:2 bundle",
-                                       weechat_prefix("error"),
-                                       bundle_jid.c_str(), bundle_device_id);
-                    }
-                    else if (account.omemo && type
-                             && weechat_strcasecmp(type, "error") == 0
-                             && bundle_device_id != 0)
-                    {
-                        account.omemo.clear_cached_bundle(bundle_jid, bundle_device_id);
-                        weechat_printf(account.buffer,
-                                       "%somemo: bundle fetch for %s/%u returned error without bundle; cleared stale cached bundle and allowing retry",
-                                       weechat_prefix("error"),
-                                       bundle_jid.c_str(), bundle_device_id);
-                    }
-                }
-                else if (type && weechat_strcasecmp(type, "result") == 0)
-                {
-                    // Result received but no <item> element means empty result
-                    weechat_printf(account.buffer,
-                                   "%somemo: bundle fetch for %s returned empty result (no <item>)",
-                                   weechat_prefix("error"), bundle_jid.c_str());
-                    // Clear all pending fetches for this JID since the result is empty
-                    if (account.omemo)
-                        clear_pending_fetches_for_jid(bundle_jid);
-                }
-                else if (account.omemo && type && weechat_strcasecmp(type, "error") == 0)
-                {
-                    // No item id available: clear all in-flight entries for this JID so
-                    // subsequent send attempts can retry bundle fetches.
-                    clear_pending_fetches_for_jid(bundle_jid);
-                    weechat_printf(account.buffer,
-                                   "%somemo: bundle fetch for %s returned error without item id; cleared pending fetch state",
-                                   weechat_prefix("error"), bundle_jid.c_str());
-                }
-            }
-            else if (items_node
                      && weechat_strcasecmp(items_node,
                                            "eu.siacs.conversations.axolotl.devicelist") == 0)
             {
@@ -4244,7 +3871,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                             "%somemo: our device %u missing from server legacy devicelist — re-publishing",
                             weechat_prefix("network"), account.omemo.device_id);
 
-                        auto dl_stanza = account.get_legacy_devicelist();
+                        auto dl_stanza = account.get_devicelist();
                         if (dl_stanza)
                             account.connection.send(dl_stanza.get());
                     }

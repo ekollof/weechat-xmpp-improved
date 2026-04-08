@@ -38,12 +38,6 @@ namespace weechat {
 
         struct omemo
         {
-            enum class peer_mode {
-                unknown,
-                omemo2,
-                axolotl,
-            };
-
             // IMPORTANT: C++ destroys members in reverse declaration order.
             // Desired destruction order: store_context first, context second, db_env last.
             // So declare in reverse: db_env first (destroyed last),
@@ -86,9 +80,9 @@ namespace weechat {
 
             // Set to true when a consumed-prekey bundle republish was skipped
             // because global_mam_catchup was active.  A single republish of
-            // both the OMEMO:2 and legacy axolotl bundles is sent once the
-            // global MAM <fin> arrives, collapsing any number of repeated
-            // republish triggers into a single PubSub IQ pair.
+            // the legacy axolotl bundle is sent once the global MAM <fin>
+            // arrives, collapsing any number of repeated republish triggers
+            // into a single PubSub IQ.
             bool bundle_republish_pending = false;
 
             // Devices for which a bundle fetch IQ is currently in-flight.
@@ -108,24 +102,8 @@ namespace weechat {
             // recover the correct JID even when `from` is the server domain.
             std::unordered_map<std::string, std::string> pending_iq_jid;
 
-            // XEP-0450 §5.1: trust decisions received from senders whose own
-            // key has not yet been authenticated.  Keyed by sender bare JID;
-            // each entry is a list of (key_owner_jid, fingerprint_b64, level).
-            // Drained in handle_bundle() / handle_axolotl_bundle() once the
-            // sender's first device becomes ATM-trusted.
-            std::unordered_map<std::string,
-                std::vector<std::tuple<std::string, std::string, std::string>>>
-                pending_atm_trust_from_unauthenticated;
-
-            // XEP-0450 §5.2: trust decisions for keys whose identity bytes have
-            // not yet been fetched (bundle not downloaded yet).
-            // Key: "jid\x00fingerprint_b64" → level ("trusted" or "distrusted").
-            // Applied in identity_save() when the identity key arrives.
-            std::unordered_map<std::string, std::string> pending_atm_trust_for_unknown_key;
-
-            // Peers for which the corresponding devicelist node returned
+            // Peers for which the corresponding axolotl devicelist node returned
             // <item-not-found/>. Used to avoid request/error loops.
-            std::unordered_set<std::string> missing_omemo2_devicelist;
             std::unordered_set<std::string> missing_axolotl_devicelist;
 
             // Maps configure-IQ id → node name for pending precondition-not-met
@@ -155,12 +133,6 @@ namespace weechat {
             // Cleared on disconnect/reconnect together with heartbeat_sent.
             std::set<std::pair<std::string, std::uint32_t>> prekey_reply_sent;
 
-            // XEP-0384 §5.7: bare JIDs that have sent us an <opt-out/> element
-            // inside an SCE envelope.  Outgoing OMEMO messages to these peers are
-            // blocked until the user explicitly acknowledges the switch to
-            // plaintext via /omemo optout-ack <jid>.
-            std::unordered_set<std::string> omemo_opted_out_peers;
-
             class bundle_request
             {
             public:
@@ -182,50 +154,35 @@ namespace weechat {
             inline operator bool() { return this->context && this->store_context &&
                     this->identity && this->device_id != 0; }
 
-            xmpp_stanza_t *get_bundle(xmpp_ctx_t *context, char *from, char *to);
             XMPP_TEST_EXPORT xmpp_stanza_t *get_axolotl_bundle(xmpp_ctx_t *context, char *from, char *to);
 
             XMPP_TEST_EXPORT void init(struct t_gui_buffer *buffer, const char *account_name);
 
-            void handle_devicelist(weechat::account *account,
-                                   const char *jid,
-                                   xmpp_stanza_t *items);
+            XMPP_TEST_EXPORT void handle_axolotl_devicelist(weechat::account *account,
+                                                            const char *jid,
+                                                            xmpp_stanza_t *items);
 
-                        XMPP_TEST_EXPORT void handle_axolotl_devicelist(weechat::account *account,
-                                                                                    const char *jid,
-                                                                                    xmpp_stanza_t *items);
+            // Parse and process a legacy axolotl bundle stanza.
+            XMPP_TEST_EXPORT void handle_axolotl_bundle(weechat::account *account,
+                                                        struct t_gui_buffer *buffer,
+                                                        const char *jid, std::uint32_t device_id,
+                                                        xmpp_stanza_t *items);
 
-                        XMPP_TEST_EXPORT void handle_bundle(weechat::account *account,
-                                                             struct t_gui_buffer *buffer,
-                                                             const char *jid, std::uint32_t device_id,
-                                                             xmpp_stanza_t *items);
+            // Check if a session exists with a particular remote device.
+            XMPP_TEST_EXPORT bool has_session(const char *jid, std::uint32_t remote_device_id);
 
-                        // Like handle_bundle() but parses the legacy Conversations
-                        // (eu.siacs.conversations.axolotl) bundle stanza format.
-                        XMPP_TEST_EXPORT void handle_axolotl_bundle(weechat::account *account,
-                                                                            struct t_gui_buffer *buffer,
-                                                                            const char *jid, std::uint32_t device_id,
-                                                                            xmpp_stanza_t *items);
+            // Decode an OMEMO-encrypted message returning cleartext.
+            // Returns std::nullopt if decryption fails.
+            std::optional<std::string> decode(weechat::account *account,
+                        struct t_gui_buffer *buffer,
+                        const char *jid,
+                        xmpp_stanza_t *encrypted,
+                        bool quiet = false);
 
-                        // Check if a session exists with a particular remote device.
-                        XMPP_TEST_EXPORT bool has_session(const char *jid, std::uint32_t remote_device_id);
-
-                         // Decode an OMEMO-encrypted message returning cleartext.
-                         // Returns std::nullopt if decryption fails.
-                         std::optional<std::string> decode(weechat::account *account,
-                                     struct t_gui_buffer *buffer,
-                                     const char *jid,
-                                     xmpp_stanza_t *encrypted,
-                                     bool quiet = false);
-
-                        xmpp_stanza_t *encode(weechat::account *account, struct t_gui_buffer *buffer,
-                                              const char *jid, const char *unencrypted);
-
-                        // Encode using legacy OMEMO (eu.siacs.conversations.axolotl).
-                        // Produces AES-128-GCM ciphertext with explicit IV.
-                        // Used when the peer only publishes a legacy device list.
-                        xmpp_stanza_t *encode_axolotl(weechat::account *account, struct t_gui_buffer *buffer,
-                                                                                 const char *jid, const char *unencrypted);
+            // Encode a plaintext message using axolotl (eu.siacs.conversations.axolotl).
+            // Produces AES-128-GCM ciphertext with explicit IV.
+            xmpp_stanza_t *encode(weechat::account *account, struct t_gui_buffer *buffer,
+                                  const char *jid, const char *unencrypted);
 
 
             // Key management helpers
@@ -250,22 +207,17 @@ namespace weechat {
             // MAM <fin> arrives and `global_mam_catchup` is cleared.
             void process_postponed_key_transports(weechat::account &account);
 
-            // If `bundle_republish_pending` is set, publish both the OMEMO:2
-            // and legacy axolotl bundles exactly once and clear the flag.
+            // If `bundle_republish_pending` is set, publish the axolotl bundle
+            // exactly once and clear the flag.
             // Called immediately after process_postponed_key_transports() at
             // every MAM <fin> flush point.
             void process_postponed_bundle_republish(weechat::account &account);
 
-            // Proactively fetch the OMEMO devicelist for `jid` from the server.
-            // Safe to call even if a fetch is already in-flight (deduplication is
-            // handled in the IQ result handler via pending_iq_jid).
-            void request_devicelist(weechat::account &account, std::string_view jid);
-
-            // Request only the legacy OMEMO devicelist namespace.
+            // Request the legacy axolotl OMEMO devicelist for `jid` from the server.
             void request_axolotl_devicelist(weechat::account &account, std::string_view jid);
 
-            // Force a metadata refresh for a peer: always requests OMEMO:2 +
-            // legacy devicelists, and optionally requests bundle(s).
+            // Force a metadata refresh for a peer: requests the axolotl devicelist
+            // and optionally requests bundle(s).
             void force_fetch(weechat::account &account,
                              struct t_gui_buffer *buffer,
                              std::string_view jid,
@@ -289,67 +241,28 @@ namespace weechat {
             // encryption to a peer. Returns OMEMO:2 when OMEMO:2 devices are
             // known, legacy when only legacy devices are known, and unknown when
             // no device metadata is available yet.
-            [[nodiscard]] auto select_peer_mode(weechat::account &account,
-                                                std::string_view jid) -> peer_mode;
-
-            // Drop a cached bundle for a remote device after a fresh bundle fetch
-            // proves the server no longer has usable OMEMO:2 data for it.
+            // Drop a cached bundle for a remote device.
             void clear_cached_bundle(std::string_view jid, std::uint32_t device_id);
 
-            // XEP-0450 manual trust management:
-            // approve: mark one (or all) fingerprint(s) for jid as "trusted" and
-            //          broadcast a <trust> ATM message.
-            //   jid      — bare JID whose key(s) to approve
-            //   fp_hex   — colon-separated uppercase hex fingerprint, or nullptr
-            //              to approve all known undecided keys for jid
-            void approve_jid(struct t_gui_buffer *buffer,
-                             weechat::account &account,
-                             const char *jid,
-                             const char *fp_hex);
+            // Return all device IDs cached in the LMDB axolotl devicelist for
+            // `jid`.  Used by get_devicelist() to merge the server's previously
+            // published list so we don't clobber other devices with a singleton.
+            std::vector<std::uint32_t> get_cached_device_ids(std::string_view jid);
 
-            // distrust_fp: mark one (or all) fingerprint(s) for jid as "distrusted"
-            //              and broadcast a <distrust> ATM message.  Does NOT wipe
-            //              stored session/bundle data (use distrust_jid for that).
-            //   jid      — bare JID whose key(s) to distrust
-            //   fp_hex   — colon-separated uppercase hex fingerprint, or nullptr
-            //              to distrust all known keys for jid
+            // BTBV trust management:
+            // trust_jid: set trust level to VERIFIED(1) for all known devices of jid,
+            //            or for a specific device_id if provided.
+            void trust_jid(struct t_gui_buffer *buffer,
+                           weechat::account &account,
+                           const char *jid,
+                           std::optional<std::uint32_t> device_id = std::nullopt);
+
+            // distrust_fp: mark one (or all) device(s) for jid as UNTRUSTED(0).
+            //              Does NOT wipe stored session/bundle data.
             void distrust_fp(struct t_gui_buffer *buffer,
                              weechat::account &account,
                              const char *jid,
-                             const char *fp_hex);
-
-            // XEP-0384 §5.7: send an opt-out message to peer jid (OMEMO:2 only).
-            // reason is optional and may be nullptr.
-            void send_opt_out(weechat::account &account,
-                              struct t_gui_buffer *buffer,
-                              const char *jid,
-                              const char *reason = nullptr);
-
-            // XEP-0384 §5.7: acknowledge a peer's opt-out, removing the block
-            // on outgoing OMEMO messages to that jid.
-            void optout_ack(struct t_gui_buffer *buffer, const char *jid);
-
-            // XEP-0450 §4.2: broadcast a <distrust> trust-message for all known
-            // fingerprints of jid to own devices and to jid's devices.
-            // Called when the user explicitly distrusts a peer via /omemo trust.
-            void send_atm_distrust_pub(weechat::account &account, const char *jid);
-
-            // XEP-0450: Store an ATM trust decision for a key identified by its
-            // Base64-encoded SHA-256 fingerprint. level must be "trusted" or "distrusted".
-            // This is the public API called from the message handler when receiving
-            // an unencrypted trust message (XEP-0434).
-            void store_atm_trust_pub(const char *jid, const char *key_b64, const std::string &level);
-
-            // XEP-0450 §5: return true iff the sender's identity key has ATM
-            // trust level "trusted" for at least one known device.
-            // Used to gate incoming trust message application (§5 MUST).
-            [[nodiscard]] bool sender_atm_trusted_pub(const char *sender_bare_jid);
-
-            // XEP-0450 §4: process a <trust-message> from inside a decrypted SCE envelope,
-            // gate on sender auth, and apply trust decisions.
-            void process_atm_trust_sce_pub(xmpp_ctx_t *ctx,
-                                           const char *sender_bare_jid,
-                                           const char *sce_xml);
+                             std::optional<std::uint32_t> device_id = std::nullopt);
         };
     }
 }

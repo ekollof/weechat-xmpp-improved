@@ -292,9 +292,7 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
                 account.omemo.pending_iq_jid[uid] = std::string(account.jid());
         };
 
-        fetch_devicelist("urn:xmpp:omemo:2:devices");
-        // Query our own legacy (OMEMO:1/axolotl) devicelist as well.
-        // Some sibling clients still publish only this namespace.
+        // Query our own axolotl devicelist on connect.
         fetch_devicelist("eu.siacs.conversations.axolotl.devicelist");
 
         account.omemo.init(account.buffer, account.name.data());
@@ -303,15 +301,8 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         {
             std::string jid_str(account.jid());
 
-            // Publish our bundle unconditionally on connect so remote clients
+            // Publish our axolotl bundle on connect so remote clients
             // always have fresh pre-keys for our device.
-            if (std::shared_ptr<xmpp_stanza_t> bundle_stanza {
-                    account.omemo.get_bundle(account.context, jid_str.data(), nullptr),
-                    xmpp_stanza_release})
-                this->send(bundle_stanza.get());
-
-            // Also publish the legacy bundle node so OMEMO:1 clients can
-            // target our current device id during first-contact bootstrap.
             if (std::shared_ptr<xmpp_stanza_t> legacy_bundle_stanza {
                     account.omemo.get_axolotl_bundle(account.context, jid_str.data(), nullptr),
                     xmpp_stanza_release})
