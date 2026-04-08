@@ -224,7 +224,7 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
 
     if (!legacy_transport_key)
     {
-        if (!quiet)
+        if (!quiet && !suppress_peer_traffic)
         {
             if (!found_keys_elem)
                 print_error(buffer, "OMEMO message has no <keys> element in header.");
@@ -237,9 +237,9 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
         {
             // The sender does not (yet) know our device_id. Request their bundle
             // once per peer device and avoid repeating the same error every message.
-            // During MAM replay (quiet==true) we suppress both the error print and
-            // the bundle fetch.
-            if (!quiet && account && sender_device_id)
+            // During MAM replay (suppress_peer_traffic==true) we suppress both the
+            // error print and the bundle fetch — archived messages are not live traffic.
+            if (!suppress_peer_traffic && account && sender_device_id)
             {
                 const std::string bare_jid = normalize_bare_jid(*account->context, jid);
                 const auto key = std::make_pair(bare_jid, *sender_device_id);
@@ -248,15 +248,16 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
 
                 if (!already_attempted && !already_pending)
                 {
-                    print_error(buffer, fmt::format(
-                        "OMEMO message has no key for our device {} (sender did not encrypt for us).",
-                        device_id));
+                    if (!quiet)
+                        print_error(buffer, fmt::format(
+                            "OMEMO message has no key for our device {} (sender did not encrypt for us).",
+                            device_id));
 
                     pending_key_transport.insert(key);
                     request_axolotl_bundle(*account, bare_jid, *sender_device_id);
                 }
             }
-            else if (!quiet)
+            else if (!quiet && !suppress_peer_traffic)
             {
                 print_error(buffer, fmt::format(
                     "OMEMO message has no key for our device {} (sender did not encrypt for us).",
@@ -270,7 +271,7 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
             // already consumed this message on a prior live delivery.  Skip all
             // recovery actions — there is nothing to recover.
             const bool is_duplicate = out_is_duplicate && *out_is_duplicate;
-            if (!quiet && !is_duplicate)
+            if (!quiet && !suppress_peer_traffic && !is_duplicate)
                 print_error(buffer, "OMEMO transport key decryption failed.");
             if (!is_duplicate && account && sender_device_id)
             {
@@ -279,14 +280,17 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
                 if (bare_jid == own_bare_jid)
                     return std::nullopt;
                 const auto kex_key = std::make_pair(bare_jid, *sender_device_id);
-                if (!quiet)
+                if (!suppress_peer_traffic)
                 {
+                    // Live delivery: aggressively recover — delete stale session and
+                    // immediately request bundle + queue key-transport.
                     if (key_transport_bootstrap_attempted.count(kex_key) == 0)
                     {
                         key_transport_bootstrap_attempted.insert(kex_key);
-                        print_info(buffer, fmt::format(
-                            "OMEMO: queueing key-transport to {}/{} to recover stale session",
-                            bare_jid, *sender_device_id));
+                        if (!quiet)
+                            print_info(buffer, fmt::format(
+                                "OMEMO: queueing key-transport to {}/{} to recover stale session",
+                                bare_jid, *sender_device_id));
                         // Delete the stale session so the key-transport forces a fresh
                         // PreKeySignalMessage exchange from the sender's side.
                         auto addr = make_signal_address(bare_jid,
