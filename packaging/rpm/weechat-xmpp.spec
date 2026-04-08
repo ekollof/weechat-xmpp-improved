@@ -1,7 +1,7 @@
 %global debug_package %{nil}
 
 Name:           xepher
-Version:        0.6.0
+Version:        0.6.1
 Release:        1%{?dist}
 Summary:        Xepher — WeeChat plugin for XMPP/Jabber protocol
 
@@ -70,6 +70,12 @@ install -D -m 0755 xmpp.so %{buildroot}%{_libdir}/weechat/plugins/xmpp.so
 %{_libdir}/weechat/plugins/xmpp.so
 
 %changelog
+* Wed Apr 08 2026 Emiel Kollof <emiel@kollof.nl> - 0.6.1-1
+- Update to v0.6.1
+- Fix(omemo): cache OMEMO plaintext under all three message IDs to fix MAM replay cache miss
+- Fix(user): guard weechat_info_get/weechat_color null returns; fix PM nick fallback
+- Fix(message): PM nick column always shows bare JID
+
 * Wed Apr 08 2026 Emiel Kollof <emiel@kollof.nl> - 0.6.0-1
 - Update to v0.6.0
 - Refactor(omemo): switch to axolotl-only (legacy XEP-0384) OMEMO with BTBV TOFU trust model

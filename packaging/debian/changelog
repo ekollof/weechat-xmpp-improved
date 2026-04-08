@@ -1,3 +1,12 @@
+xepher (0.6.1-1) unstable; urgency=medium
+
+  * Update to v0.6.1
+  * Fix(omemo): cache OMEMO plaintext under all three message IDs to fix MAM replay cache miss
+  * Fix(user): guard weechat_info_get/weechat_color null returns; fix PM nick fallback
+  * Fix(message): PM nick column always shows bare JID
+
+ -- Emiel Kollof <emiel@kollof.nl>  Wed, 08 Apr 2026 23:00:00 +0000
+
 xepher (0.6.0-1) unstable; urgency=medium
 
   * Update to v0.6.0
