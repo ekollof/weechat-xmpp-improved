@@ -3668,6 +3668,10 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, std::optional
         "urn:xmpp:ephemeral:0",
         // XEP-0448: Encrypted File Sharing
         "urn:xmpp:esfs:0",
+        // Legacy OMEMO (eu.siacs.conversations.axolotl) PEP push subscription.
+        // Advertising this tells the server to push devicelist updates to us,
+        // and signals to Conversations/Gajim that we speak axolotl-namespace OMEMO.
+        "eu.siacs.conversations.axolotl.devicelist+notify",
     };
 
     std::vector<std::string> sorted_features;
