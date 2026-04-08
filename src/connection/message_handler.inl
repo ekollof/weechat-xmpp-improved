@@ -29,12 +29,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
     auto binding = xml::message(account.context, stanza);
     body = xmpp_stanza_get_child_by_name(stanza, "body");
     xmpp_stanza_t *encrypted_without_body = xmpp_stanza_get_child_by_name_and_ns(
-        stanza, "encrypted", "urn:xmpp:omemo:2");
-    if (!encrypted_without_body)
-    {
-        encrypted_without_body = xmpp_stanza_get_child_by_name_and_ns(
-            stanza, "encrypted", "eu.siacs.conversations.axolotl");
-    }
+        stanza, "encrypted", "eu.siacs.conversations.axolotl");
     xmpp_stanza_t *pgp_without_body = xmpp_stanza_get_child_by_name_and_ns(
         stanza, "x", "jabber:x:encrypted");
 
@@ -52,12 +47,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
         }
 
         xmpp_stanza_t *msg_encrypted = xmpp_stanza_get_child_by_name_and_ns(
-            msg, "encrypted", "urn:xmpp:omemo:2");
-        if (!msg_encrypted)
-        {
-            msg_encrypted = xmpp_stanza_get_child_by_name_and_ns(
-                msg, "encrypted", "eu.siacs.conversations.axolotl");
-        }
+            msg, "encrypted", "eu.siacs.conversations.axolotl");
         if (msg_encrypted)
         {
             xmpp_stanza_t *payload = xmpp_stanza_get_child_by_name(msg_encrypted, "payload");
@@ -1774,14 +1764,8 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
         return 1;
     }
 
-    encrypted = xmpp_stanza_get_child_by_name_and_ns(stanza, "encrypted",
-                                                     "urn:xmpp:omemo:2");
-    if (!encrypted)
-    {
-        // Narrow compatibility fallback for legacy OMEMO clients.
-        encrypted = xmpp_stanza_get_child_by_name_and_ns(
-            stanza, "encrypted", "eu.siacs.conversations.axolotl");
-    }
+    encrypted = xmpp_stanza_get_child_by_name_and_ns(
+        stanza, "encrypted", "eu.siacs.conversations.axolotl");
 
     // Record that this peer actively speaks OMEMO — but only for genuine
     // inbound encrypted messages (not self-outbound copies or plaintext).
@@ -3620,8 +3604,6 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, std::optional
     xmpp_stanza_add_child(query, id_sp.get());
 
     const std::vector<std::string_view> advertised_features {
-        "urn:xmpp:omemo:2",
-        "urn:xmpp:omemo:2:devices+notify",
         "http://jabber.org/protocol/caps",
         "http://jabber.org/protocol/chatstates",
         "http://jabber.org/protocol/disco#info",

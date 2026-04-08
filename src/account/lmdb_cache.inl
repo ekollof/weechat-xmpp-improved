@@ -778,10 +778,7 @@ bool weechat::account::peer_supports_feature(const std::string& jid,
 bool weechat::account::peer_has_legacy_axolotl_only(const std::string& jid) const
 {
     static const std::string legacy_axolotl = "eu.siacs.conversations.axolotl";
-    static const std::string omemo2 = "urn:xmpp:omemo:2";
-
-    return peer_supports_feature(jid, legacy_axolotl)
-        && !peer_supports_feature(jid, omemo2);
+    return peer_supports_feature(jid, legacy_axolotl);
 }
 
 // Client State Indication (XEP-0352) - Idle timer callback

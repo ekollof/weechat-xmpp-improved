@@ -57,26 +57,20 @@ std::optional<std::string> weechat::xmpp::omemo::decode(weechat::account *accoun
 
     const std::string own_bare_jid = ::jid(nullptr, account->jid().data()).bare;
 
-    // Detect legacy (eu.siacs.conversations.axolotl) format.
-    // Primary signal: xmlns on <encrypted>; secondary fallback: <iv> in header.
-    {
-        const char *enc_ns = xmpp_stanza_get_ns(encrypted);
-        if (enc_ns)
-            XDEBUG("OMEMO decode: <encrypted> xmlns='{}'", enc_ns);
-    }
     const char *enc_ns = xmpp_stanza_get_ns(encrypted);
-    xmpp_stanza_t *iv_stanza = xmpp_stanza_get_child_by_name(header, "iv");
-    const bool is_axolotl_format = (enc_ns != nullptr
-        && std::string_view {enc_ns} == kLegacyOmemoNs)
-        || (enc_ns == nullptr && iv_stanza != nullptr);
+    if (enc_ns)
+        XDEBUG("OMEMO decode: <encrypted> xmlns='{}'", enc_ns);
 
-    // Only accept axolotl-format messages (we no longer support OMEMO:2 decoding).
-    if (!is_axolotl_format)
+    if (!enc_ns || std::string_view {enc_ns} != kLegacyOmemoNs)
     {
         if (!quiet)
-            print_error(buffer, "OMEMO: received non-axolotl (OMEMO:2) encrypted message; ignoring.");
+            print_error(buffer, fmt::format(
+                "OMEMO: unexpected <encrypted> namespace '{}'; expected '{}'.",
+                enc_ns ? enc_ns : "(none)", kLegacyOmemoNs));
         return std::nullopt;
     }
+
+    xmpp_stanza_t *iv_stanza = xmpp_stanza_get_child_by_name(header, "iv");
 
     // Receiving an OMEMO message from a peer counts as observed traffic for
     // that peer — this unblocks bundle requests (which check has_peer_traffic)

@@ -3576,13 +3576,9 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 // Also match by known publish IQ id (e.g. "omemo-bundle").
                 if (target_node.empty() && id)
                 {
-                    if (std::string_view(id) == "omemo-bundle")
-                        target_node = "urn:xmpp:omemo:2:bundles";
-                    else if (std::string_view(id) == "omemo-legacy-bundle")
+                    if (std::string_view(id) == "omemo-legacy-bundle")
                         target_node = fmt::format("eu.siacs.conversations.axolotl.bundles:{}",
                                                   account.omemo.device_id);
-                    else if (std::string_view(id) == "announce1")
-                        target_node = "urn:xmpp:omemo:2:devices";
                     else if (std::string_view(id) == "announce-legacy1")
                         target_node = "eu.siacs.conversations.axolotl.devicelist";
                 }
