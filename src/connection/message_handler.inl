@@ -1919,14 +1919,15 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
 
             if (is_mam_replay)
             {
-                if (omemo_is_duplicate)
-                {
-                    // Already decrypted on live delivery; ratchet has advanced past
-                    // this counter.  Skip silently — it was already displayed.
-                    goto message_handler_after_omemo;
-                }
-                // Genuine MAM decryption failure: show a placeholder so the user
-                // knows a message exists but could not be decrypted (matches what
+                // Show a placeholder for all MAM decryption failures, including
+                // SG_ERR_DUPLICATE_MESSAGE (omemo_is_duplicate).  The within-session
+                // case (live delivery then MAM replay in the same WeeChat run) is
+                // already handled by stanza-id dedup above, which fires first and
+                // returns early.  Reaching here with omemo_is_duplicate means the
+                // Signal ratchet was consumed in a prior WeeChat session — the buffer
+                // is empty (fresh start) and the message was never displayed in this
+                // session.  The plaintext is irrecoverable either way, so show a
+                // placeholder so the user knows a message exists (matches what
                 // Conversations / Gajim show for undecryptable archived messages).
                 if (intext)
                     xmpp_free(account.context, intext);
@@ -1956,17 +1957,17 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
     }
 message_handler_after_omemo:
     // If OMEMO decryption produced no cleartext and this is a self-outbound copy
-    // (MAM replay of a message we sent from another device, or a live carbon copy)
-    // or a MAM-replayed inbound message whose decryption was a duplicate (already
-    // seen live), there is nothing to display.  Key-transport messages (null
-    // payload, all-zero IV) are the common case here — they establish the session
-    // but carry no user-visible content.  Falling through to the display path with
-    // text==nullptr would print a blank line (or crash on weechat_string_match(nullptr)).
+    // (MAM replay of a message we sent from another device, or a live carbon copy),
+    // there is nothing to display.  Key-transport messages (null payload, all-zero IV)
+    // are the common case here — they establish the session but carry no user-visible
+    // content.  Falling through to the display path with text==nullptr would print a
+    // blank line (or crash on weechat_string_match(nullptr)).
     // Note: MAM replays of messages sent from THIS device have |encrypted| cleared
     // above so they bypass this check and flow to the display path with
     // intext=OMEMO_ADVICE (showing the user their sent history).
-    // Note: MAM replays with genuine decryption failure set intext=[undecryptable]
-    // and clear |encrypted|, so they also bypass this check and display the placeholder.
+    // Note: MAM replays with decryption failure (including cross-session duplicates)
+    // set intext=[undecryptable] and clear |encrypted|, so they bypass this check
+    // and display the placeholder.
     if (encrypted && !cleartext && (is_self_outbound_copy || is_mam_replay))
         return 1;
 
