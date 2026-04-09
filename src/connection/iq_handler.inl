@@ -3012,7 +3012,9 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 {
                     const char *cat  = xmpp_stanza_get_attribute(id_elem, "category");
                     const char *typ  = xmpp_stanza_get_attribute(id_elem, "type");
-                    const char *lang = xmpp_stanza_get_attribute(id_elem, "xml:lang");
+                    // libstrophe strips the "xml:" namespace prefix when storing
+                    // attributes, so xml:lang is stored under the key "lang".
+                    const char *lang = xmpp_stanza_get_attribute(id_elem, "lang");
                     const char *name = xmpp_stanza_get_attribute(id_elem, "name");
                     identities.push_back(
                         std::string(cat  ? cat  : "") + "/" +
