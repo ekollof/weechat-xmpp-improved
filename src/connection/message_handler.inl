@@ -3885,15 +3885,20 @@ xmpp_stanza_t *weechat::connection::get_caps(xmpp_stanza_t *reply, std::optional
         *osinfo.release = 0;
     }
 
-    // Add a single-value x-data field and append it to the XEP-0115 serial
+    // Add a single-value x-data field and append it to the XEP-0115 serial.
+    // XEP-0115 §5.1: the S string for a form is:
+    //   form_type_value< (FORM_TYPE value only, NOT "FORM_TYPE<value")
+    //   then for each non-FORM_TYPE field sorted by var: var<val<
     auto add_feature1 = [&](const char *var, const char *type, const char *val) {
         xmpp_stanza_t *f = stanza_make_field(account.context, var, val, type);
         xmpp_stanza_add_child(x, f);
         xmpp_stanza_release(f);
-        if (std::string_view(var) == "FORM_TYPE") {
+        if (std::string_view(var) != "FORM_TYPE") {
+            // non-FORM_TYPE fields: var<val<
             weechat_string_dyn_concat(serial, var, -1);
             weechat_string_dyn_concat(serial, "<", -1);
         }
+        // FORM_TYPE field: just the value (the form type URI); non-FORM_TYPE: the value
         weechat_string_dyn_concat(serial, val, -1);
         weechat_string_dyn_concat(serial, "<", -1);
     };
