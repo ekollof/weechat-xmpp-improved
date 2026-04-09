@@ -3046,7 +3046,11 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                     if (xmlns_x && std::string_view(xmlns_x) == "jabber:x:data")
                     {
                         FormData fd;
-                        // find FORM_TYPE value
+                        bool has_form_type = false;
+                        // find FORM_TYPE value (XEP-0115 §5: skip form if missing or not hidden)
+                        // NOTE: xmpp_stanza_get_text_ptr only works on raw XMPP_STANZA_TEXT
+                        // nodes; for element nodes like <value> we must use xmpp_stanza_get_text
+                        // which allocates and concatenates all text-node children.
                         for (xmpp_stanza_t *f = xmpp_stanza_get_child_by_name(x_elem, "field");
                              f; f = next_named(f, "field"))
                         {
@@ -3054,11 +3058,18 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                             if (fvar && std::string_view(fvar) == "FORM_TYPE")
                             {
                                 xmpp_stanza_t *vnode = xmpp_stanza_get_child_by_name(f, "value");
-                                const char *vtext = vnode ? xmpp_stanza_get_text_ptr(vnode) : nullptr;
-                                fd.form_type = vtext ? vtext : "";
+                                if (vnode) {
+                                    std::unique_ptr<char, decltype(&free)> vtext(
+                                        xmpp_stanza_get_text(vnode), free);
+                                    fd.form_type = vtext ? vtext.get() : "";
+                                }
+                                has_form_type = true;
                                 break;
                             }
                         }
+                        // XEP-0115 §5: if no FORM_TYPE field, ignore this form entirely
+                        if (!has_form_type)
+                            continue;
                         // collect non-FORM_TYPE fields
                         for (xmpp_stanza_t *f = xmpp_stanza_get_child_by_name(x_elem, "field");
                              f; f = next_named(f, "field"))
@@ -3070,8 +3081,9 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                                 for (xmpp_stanza_t *vnode = xmpp_stanza_get_child_by_name(f, "value");
                                      vnode; vnode = next_named(vnode, "value"))
                                 {
-                                    const char *vtext = xmpp_stanza_get_text_ptr(vnode);
-                                    if (vtext) vals.push_back(vtext);
+                                    std::unique_ptr<char, decltype(&free)> vtext(
+                                        xmpp_stanza_get_text(vnode), free);
+                                    if (vtext) vals.push_back(vtext.get());
                                 }
                                 std::sort(vals.begin(), vals.end());
                                 fd.fields.emplace_back(fvar, std::move(vals));
@@ -3097,6 +3109,8 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 }
 
                 // --- hash S with SHA-1 and base64-encode ---
+                XDEBUG("caps: S string for {} (len={}): '{}'",
+                       from ? from : "?", S.size(), S);
                 unsigned char digest[20];
                 unsigned int  digest_len = sizeof(digest);
                 EVP_Digest(S.data(), S.size(), digest, &digest_len, EVP_sha1(), nullptr);
