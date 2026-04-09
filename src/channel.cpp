@@ -1896,6 +1896,29 @@ void weechat::channel::fetch_mam(const char *id, time_t *start, time_t *end, con
         }
     }
 
+    // Print a "Fetching history from X to Y" banner on the initial fetch only
+    // (not on RSM continuation pages).  This mirrors what Profanity and Gajim do
+    // to let the user see which time range is being loaded from the server archive.
+    if (!after && buffer)
+    {
+        char start_str[32] = "the beginning";
+        char end_str[32]   = "now";
+        if (start)
+        {
+            struct tm *lt = localtime(start);
+            strftime(start_str, sizeof(start_str), "%Y-%m-%d %H:%M", lt);
+        }
+        if (end)
+        {
+            struct tm *lt = localtime(end);
+            strftime(end_str, sizeof(end_str), "%Y-%m-%d %H:%M", lt);
+        }
+        weechat_printf_date_tags(buffer, 0, "xmpp_mam_fetch,notify_none,no_log",
+                                 "%sFetching history: %s → %s",
+                                 weechat_prefix("network"),
+                                 start_str, end_str);
+    }
+
     // XEP-0313: MUC MAM is addressed to the room JID; PM MAM goes to the
     // user's own bare JID (personal archive), NOT the bare server domain.
     // Sending to the bare domain causes <service-unavailable/> errors.

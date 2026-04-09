@@ -532,12 +532,11 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
                     const char *debug_type = xmpp_stanza_get_type(message);
                     
                     // For global MAM queries, create PM channels based on conversation partners.
-                    // We create the channel for any non-groupchat stanza (including receipts,
-                    // chat-states, and reactions) — not just messages with a body — so that
-                    // contacts whose most-recent archived stanza had no payload (e.g. a read
-                    // receipt) still get their buffer restored on reconnect.
-                    // Payloadless OMEMO key-transport stanzas are already dropped at the top
-                    // of this function (lines ~76-77) before reaching here.
+                    // Only create a channel if the archived stanza contains actual user content
+                    // (a plaintext body, an OMEMO encrypted payload, or a PGP payload).
+                    // This prevents pure control stanzas — OMEMO key-transport messages,
+                    // chat-state notifications, read receipts — from spuriously opening PM
+                    // buffers for contacts who haven't sent a real message in >7 days.
                     if (!debug_type || weechat_strcasecmp(debug_type, "groupchat") != 0)
                     {
                         const std::string from_bare_s = debug_from ? ::jid(nullptr, debug_from).bare : std::string {};
@@ -552,10 +551,11 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
                         else if (to_bare_cs && weechat_strcasecmp(to_bare_cs, account.jid().data()) != 0)
                             partner_jid = to_bare_cs;  // Message TO someone else (sent by us)
                         
-                        // Create PM channel if it doesn't exist and the user hasn't
-                        // deliberately closed it (last_mam_fetch == -1 in LMDB).
+                        // Create PM channel only if the stanza carries real user content AND
+                        // the user hasn't deliberately closed it (last_mam_fetch == -1 in LMDB).
                         if (partner_jid && !account.channels.contains(partner_jid)
-                            && account.mam_cache_get_last_timestamp(partner_jid) != static_cast<time_t>(-1))
+                            && account.mam_cache_get_last_timestamp(partner_jid) != static_cast<time_t>(-1)
+                            && stanza_has_user_message_payload(message))
                         {
                             XDEBUG("MAM: discovered conversation with {}", partner_jid);
 
@@ -564,7 +564,6 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
                                         account, weechat::channel::chat_type::PM,
                                         partner_jid, partner_jid
                                     }));
-
                         }
                     }
                     
@@ -590,18 +589,37 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
                         msg_timestamp = timegm(&time);
                     }
                     
-                    // Cache the message if we have all required fields
-                    if (msg_id && msg_from && msg_text && msg_timestamp > 0)
+                    // Cache the message if we have all required fields.
+                    // For OMEMO messages there is no plaintext <body> in the stanza, so
+                    // fall back to the omemo_plaintext LMDB table (populated at live
+                    // delivery) to get the decrypted body.  This lets mam_cache_load_messages
+                    // replay OMEMO conversations on the next restart without needing to
+                    // re-decrypt from the server archive (which would fail due to ratchet
+                    // state having advanced).
+                    if (msg_id && msg_from && msg_timestamp > 0)
                     {
-                        std::string from_bare_s2 = ::jid(nullptr, msg_from).bare;                        std::string to_bare_s2 = msg_to ? ::jid(nullptr, msg_to).bare : std::string{};
+                        std::string from_bare_s2 = ::jid(nullptr, msg_from).bare;
+                        std::string to_bare_s2 = msg_to ? ::jid(nullptr, msg_to).bare : std::string{};
                         
                         // Determine channel JID (from_bare for received, to_bare for sent)
                         const char *channel_jid = from_bare_s2.c_str();
                         if (!to_bare_s2.empty() && weechat_strcasecmp(to_bare_s2.c_str(), account.jid().data()) != 0)
                             channel_jid = to_bare_s2.c_str();
-                        
-                        account.mam_cache_message(channel_jid, msg_id, from_bare_s2.c_str(), 
-                                                  msg_timestamp, msg_text);
+
+                        // Use plaintext body if available; otherwise check omemo_plaintext cache.
+                        std::optional<std::string> omemo_body;
+                        if (!msg_text)
+                            omemo_body = account.mam_cache_lookup_omemo_plaintext(channel_jid, msg_id);
+
+                        const char *effective_body = msg_text
+                            ? msg_text
+                            : (omemo_body ? omemo_body->c_str() : nullptr);
+
+                        if (effective_body)
+                        {
+                            account.mam_cache_message(channel_jid, msg_id, from_bare_s2.c_str(),
+                                                      msg_timestamp, effective_body);
+                        }
                     }
                     
                     // XEP-0313: Dedup MAM results against already-displayed live messages.

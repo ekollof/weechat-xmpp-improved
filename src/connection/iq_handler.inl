@@ -4104,6 +4104,31 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                     if (channel->second.type == weechat::channel::chat_type::PM)
                         account.pm_open_register(channel->second.id);
                     account.mam_query_remove(mam_query.id);
+
+                    // Print "History loaded" completion banner matching the fetch banner
+                    // printed at the start of fetch_mam().
+                    if (channel->second.buffer)
+                    {
+                        char start_str[32] = "the beginning";
+                        char end_str[32]   = "now";
+                        if (mam_query.start)
+                        {
+                            time_t tval = *mam_query.start;
+                            struct tm *lt = localtime(&tval);
+                            strftime(start_str, sizeof(start_str), "%Y-%m-%d %H:%M", lt);
+                        }
+                        if (mam_query.end)
+                        {
+                            time_t tval = *mam_query.end;
+                            struct tm *lt = localtime(&tval);
+                            strftime(end_str, sizeof(end_str), "%Y-%m-%d %H:%M", lt);
+                        }
+                        weechat_printf_date_tags(channel->second.buffer, 0,
+                                                 "xmpp_mam_fin,notify_none,no_log",
+                                                 "%sHistory loaded: %s → %s",
+                                                 weechat_prefix("network"),
+                                                 start_str, end_str);
+                    }
                 }
             }
             else if (is_global_query)
