@@ -617,7 +617,22 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
 
                         if (effective_body)
                         {
-                            account.mam_cache_message(channel_jid, msg_id, from_bare_s2.c_str(),
+                            // For MUC messages, store the occupant nick (resource part of the
+                            // full JID, e.g. "Nick" from "room@service/Nick") so that
+                            // mam_cache_load_messages displays the sender correctly.
+                            // For PM messages, the bare JID is the right display string.
+                            std::string cache_from;
+                            if (debug_type && weechat_strcasecmp(debug_type, "groupchat") == 0)
+                            {
+                                cache_from = ::jid(nullptr, msg_from).resource;
+                                if (cache_from.empty())
+                                    cache_from = from_bare_s2; // fallback if resource missing
+                            }
+                            else
+                            {
+                                cache_from = from_bare_s2;
+                            }
+                            account.mam_cache_message(channel_jid, msg_id, cache_from,
                                                       msg_timestamp, effective_body);
                         }
                     }
