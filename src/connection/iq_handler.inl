@@ -15,6 +15,10 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
     const char *from = xmpp_stanza_get_from(stanza);
     const char *to = xmpp_stanza_get_to(stanza);
     const char *type = xmpp_stanza_get_attribute(stanza, "type");
+    // Keep own JID alive for the duration of this handler.
+    // account.jid() returns a temporary std::string; storing .data() on it
+    // immediately produces a dangling pointer.  Cache it once here.
+    const std::string own_jid = account.jid();
 
     // XEP-0060: on publish success, re-fetch so the feed buffer updates
     // immediately without a manual /feed refresh.
@@ -90,7 +94,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
 
             account.user_ping_queries.erase(ping_it);
 
-            const char *from_jid = from ? from : account.jid().data();
+            const char *from_jid = from ? from : own_jid.c_str();
 
             // Check if this is a MUC self-ping (XEP-0410)
             bool is_muc_selfping = false;
@@ -307,7 +311,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
         stanza, "vCard", "vcard-temp");
     if (vcard && type && weechat_strcasecmp(type, "result") == 0)
     {
-        const char *from_jid = from ? from : account.jid().data();
+        const char *from_jid = from ? from : own_jid.c_str();
 
         // Check if this is a /setvcard read-merge response (self-fetch before update).
         if (id)
@@ -510,7 +514,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                 const char *node = xmpp_stanza_get_attribute(items, "node");
                 if (node && std::string_view(node) == NS_VCARD4_PUBSUB)
                 {
-                    const char *from_jid = from ? from : account.jid().data();
+                    const char *from_jid = from ? from : own_jid.c_str();
 
                     struct t_gui_buffer *target_buf = account.buffer;
                     bool is_whois4 = false;
@@ -3954,7 +3958,7 @@ bool weechat::connection::iq_handler(xmpp_stanza_t *stanza, bool top_level)
                     }
                 }
                 if (bundle_jid.empty())
-                    bundle_jid = from ? from : account.jid().data();
+                    bundle_jid = from ? from : own_jid.c_str();
 
                 const std::string_view node(items_node);
                 const auto pos = node.find_last_of(':');

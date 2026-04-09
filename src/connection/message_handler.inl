@@ -20,6 +20,9 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
     char *&intext = intext_g.ptr;
     std::string from_bare_main_storage; // owns main from_bare string
     std::string to_bare_main_storage;   // owns main to_bare string
+    // Cache own JID for use when stanza 'from' is absent (e.g. self-messages).
+    // account.jid() returns a temporary; taking .data() on it is a dangling pointer.
+    const std::string own_jid_str = account.jid();
      std::string omemo_cleartext_storage; // owns OMEMO-decrypted text
      std::string pgp_cleartext_storage; // owns PGP-decrypted text (avoids strdup)
      char *cleartext = nullptr;
@@ -732,7 +735,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
                 if (items_node)
                 {
                     XDEBUG("PEP event from {}: {}",
-                           from ? from : account.jid().data(),
+                           from ? from : own_jid_str.c_str(),
                            items_node);
                 }
                 
@@ -757,7 +760,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
                                 
                                  if (info_id)
                                  {
-                                     const char *from_jid = from ? from : account.jid().data();
+                                     const char *from_jid = from ? from : own_jid_str.c_str();
 
                                      // Update user's avatar hash
                                      weechat::user *user = weechat::user::search(&account, from_jid);
@@ -819,7 +822,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
                                 {
                                     image_data.resize(actual_len);
                                     
-                                    const char *from_jid = from ? from : account.jid().data();
+                                    const char *from_jid = from ? from : own_jid_str.c_str();
                                     std::string hash = weechat::avatar::calculate_hash(image_data);
                                     
                                     // Save to cache
@@ -1064,8 +1067,8 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
                             ? xmpp_stanza_get_id(sid_elem) : nullptr;
 
                         // Only act on events from other devices of our own account
-                        const char *event_from = from ? from : account.jid().data();
-                        std::string own_bare_s  = ::jid(nullptr, account.jid().data()).bare;
+                        const char *event_from = from ? from : own_jid_str.c_str();
+                        std::string own_bare_s  = ::jid(nullptr, own_jid_str.c_str()).bare;
                         std::string event_bare_s = ::jid(nullptr, event_from).bare;
                         bool is_own = !own_bare_s.empty() && !event_bare_s.empty() &&
                             (weechat_strcasecmp(own_bare_s.c_str(), event_bare_s.c_str()) == 0);
@@ -1668,7 +1671,7 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
     from_bare = from_bare_main_storage.c_str();
     to = xmpp_stanza_get_to(stanza);
     if (to == nullptr)
-        to = account.jid().data();
+        to = own_jid_str.c_str();
     to_bare_main_storage = to ? ::jid(nullptr, to).bare : std::string{};
     to_bare = !to_bare_main_storage.empty() ? to_bare_main_storage.c_str() : nullptr;
     const bool is_self_outbound_copy = from_bare && to_bare
