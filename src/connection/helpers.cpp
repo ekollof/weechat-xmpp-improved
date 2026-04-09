@@ -293,16 +293,33 @@ void esfs_start_download(const std::string &cipher_url,
 
     std::string downloads_dir;
     {
+        // Determine base downloads directory from XDG or HOME.
+        std::string base;
         const char *xdg = getenv("XDG_DOWNLOAD_DIR");
         if (xdg && *xdg)
         {
-            downloads_dir = xdg;
+            base = xdg;
         }
         else
         {
             const char *home = getenv("HOME");
-            downloads_dir = home ? std::string(home) + "/Downloads" : "/tmp";
+            base = home ? std::string(home) + "/Downloads" : "/tmp";
         }
+
+        // Build date subfolder (local wall-clock time at download).
+        time_t now = time(nullptr);
+        struct tm tm_now{};
+        localtime_r(&now, &tm_now);
+        char date_buf[16];
+        strftime(date_buf, sizeof(date_buf), "%Y-%m-%d", &tm_now);
+
+        // Sanitize JID for use as a directory name: replace '/' with '_'
+        // (bare JIDs don't contain '/' but be defensive; '\0' can't appear).
+        std::string safe_jid = ctx.channel_jid;
+        for (char &c : safe_jid)
+            if (c == '/') c = '_';
+
+        downloads_dir = base + "/xmpp/" + safe_jid + "/" + date_buf;
     }
 
     ctx.worker = std::thread([&ctx, downloads_dir]()
@@ -421,7 +438,7 @@ void esfs_start_download(const std::string &cipher_url,
             out_path = candidate;
         }
 
-        mkdir(downloads_dir.c_str(), 0755);
+        std::filesystem::create_directories(downloads_dir);
 
         {
             auto file_deleter = [](FILE *f) { if (f) fclose(f); };
