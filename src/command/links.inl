@@ -127,10 +127,10 @@ int command__links(COMMAND_ARGS)
         return WEECHAT_RC_OK;
     }
 
-    // Sort newest-first (stable to preserve insertion order for same timestamp).
+    // Sort oldest-first so newest links appear last (chat-scroll convention).
     std::stable_sort(urls.begin(), urls.end(),
                      [](const url_entry &a, const url_entry &b) {
-                         return a.date > b.date;
+                         return a.date < b.date;
                      });
 
     // ── Print the list ────────────────────────────────────────────────────────
