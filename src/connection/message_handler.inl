@@ -3086,133 +3086,129 @@ message_handler_after_omemo:
     
     if (reply_to_id)
     {
-        // Find the original message being replied to
+        // Find the original message being replied to.
+        // WeeChat splits messages on '\n' into multiple consecutive buffer lines,
+        // all sharing the same id tags.  Scanning backwards from last_line means
+        // we hit the OG-preview/OOB suffix lines first.  We must find the *first*
+        // (body) line that carries the tag by scanning backwards past all lines
+        // in the group, then stepping one line forward.
         void *lines = weechat_hdata_pointer(hdata_buffer,
                                             channel->buffer, "lines");
         if (lines)
         {
-            void *last_line = weechat_hdata_pointer(hdata_lines,
-                                                    lines, "last_line");
-            while (last_line)
+            void *body_line = nullptr; // the first (body) line of the matched group
+            void *scan = weechat_hdata_pointer(hdata_lines, lines, "last_line");
+            bool in_group = false;
+            while (scan)
             {
-                void *line_data = weechat_hdata_pointer(hdata_line,
-                                                        last_line, "data");
+                void *ld = weechat_hdata_pointer(hdata_line, scan, "data");
+                bool has_tag = false;
+                if (ld)
+                {
+                    int tc = weechat_hdata_integer(hdata_line_data, ld, "tags_count");
+                    for (int ti = 0; ti < tc; ++ti)
+                    {
+                        std::string stag = fmt::format("{}|tags_array", ti);
+                        const char *t = weechat_hdata_string(hdata_line_data, ld, stag.c_str());
+                        if (id_matches_any(t, reply_to_id)) { has_tag = true; break; }
+                    }
+                }
+                if (has_tag)
+                {
+                    in_group = true;
+                    body_line = scan; // keep updating — the earliest match wins
+                }
+                else if (in_group)
+                {
+                    // We have walked past the beginning of the tag group; body_line
+                    // is already the first (body) line.
+                    break;
+                }
+                scan = weechat_hdata_pointer(hdata_line, scan, "prev_line");
+            }
+
+            if (body_line)
+            {
+                void *line_data = weechat_hdata_pointer(hdata_line, body_line, "data");
                 if (line_data)
                 {
                     int tags_count = weechat_hdata_integer(hdata_line_data,
                                                            line_data, "tags_count");
-                    std::string str_tag;
-                    for (int n_tag = 0; n_tag < tags_count; n_tag++)
+                    const char *orig_message = weechat_hdata_string(
+                        hdata_line_data, line_data, "message");
+
+                    if (orig_message)
                     {
-                        str_tag = fmt::format("{}|tags_array", n_tag);
-                        const char *tag = weechat_hdata_string(hdata_line_data,
-                                                               line_data, str_tag.c_str());
-                        if (id_matches_any(tag, reply_to_id))
+                        // Extract just the text part (after tab if present)
+                        std::string_view msg_sv(orig_message);
+                        auto tab_pos = msg_sv.find('\t');
+                        if (tab_pos != std::string_view::npos)
+                            msg_sv = msg_sv.substr(tab_pos + 1);
+
+                        // Strip embedded color codes so we get plain text
+                        std::string msg_owned(msg_sv);
+                        std::unique_ptr<char, decltype(&free)>
+                            plain_text_guard(weechat_string_remove_color(msg_owned.c_str(), nullptr), &free);
+                        std::string_view clean_text = plain_text_guard ? plain_text_guard.get() : msg_sv;
+
+                        // Skip any leading reply prefix(es) (↪ …) from a prior reply chain.
+                        // UTF-8 encoding of ↪ is 3 bytes: e2 86 aa.
                         {
-                            // Found the original message - get excerpt
-                            const char *orig_message = weechat_hdata_string(
-                                hdata_line_data, line_data, "message");
-                            
-                            if (orig_message)
+                            constexpr std::string_view arrow = "\xE2\x86\xAA"; // ↪
+                            auto pos = clean_text.find(arrow);
+                            while (pos != std::string_view::npos)
                             {
-                                // Extract just the text part (after tab if present)
-                                std::string_view msg_sv(orig_message);
-                                auto tab_pos = msg_sv.find('\t');
-                                if (tab_pos != std::string_view::npos)
-                                    msg_sv = msg_sv.substr(tab_pos + 1);
-
-                                // Strip embedded color codes so we get plain text
-                                std::string msg_owned(msg_sv);
-                                std::unique_ptr<char, decltype(&free)>
-                                    plain_text_guard(weechat_string_remove_color(msg_owned.c_str(), nullptr), &free);
-                                std::string_view clean_text = plain_text_guard ? plain_text_guard.get() : msg_sv;
-
-                                // Skip any leading reply prefix(es) (↪ …) from a prior reply chain.
-                                // UTF-8 encoding of ↪ is 3 bytes: e2 86 aa.
-                                // The rendered prefix format is "↪ <excerpt> " so we find the last
-                                // ↪ in the string and jump past it and its excerpt word(s).
-                                // Simpler: repeatedly consume "↪ <everything up to next ↪ or end>"
-                                // by scanning forward for the next ↪ occurrence.
+                                std::string_view after = clean_text.substr(pos + arrow.size());
+                                after = after.substr(after.find_first_not_of(' '));
+                                auto further = after.find(arrow);
+                                if (further != std::string_view::npos)
                                 {
-                                    constexpr std::string_view arrow = "\xE2\x86\xAA"; // ↪
-                                    auto pos = clean_text.find(arrow);
-                                    while (pos != std::string_view::npos)
-                                    {
-                                        // advance past this ↪ and any trailing spaces
-                                        std::string_view after = clean_text.substr(pos + arrow.size());
-                                        after = after.substr(after.find_first_not_of(' '));
-                                        auto further = after.find(arrow);
-                                        if (further != std::string_view::npos)
-                                        {
-                                            // there is another ↪ ahead — skip to it
-                                            clean_text = after.substr(further);
-                                            pos = 0;
-                                        }
-                                        else
-                                        {
-                                            // this was the last ↪; skip past its excerpt to the real body
-                                            // The excerpt ends at the space before the actual message.
-                                            // Our format: "↪ <excerpt> <body>" — excerpt has no trailing ↪.
-                                            // We can't reliably split excerpt from body here, so just
-                                            // use `after` as the start of content (skips "↪ ").
-                                            clean_text = after;
-                                            break;
-                                        }
-                                    }
+                                    clean_text = after.substr(further);
+                                    pos = 0;
                                 }
-
-                                // Decide whether to truncate to a 40-char excerpt.
-                                // Truncate if: more than 5 newlines, OR any single line
-                                // (segment between newlines) exceeds 200 characters.
-                                bool do_truncate = false;
+                                else
                                 {
-                                    int newline_count = 0;
-                                    int line_len = 0;
-                                    for (char c : clean_text)
-                                    {
-                                        if (c == '\n')
-                                        {
-                                            ++newline_count;
-                                            line_len = 0;
-                                        }
-                                        else
-                                        {
-                                            ++line_len;
-                                        }
-                                        if (newline_count > 5 || line_len > 200)
-                                        {
-                                            do_truncate = true;
-                                            break;
-                                        }
-                                    }
+                                    clean_text = after;
+                                    break;
                                 }
-
-                                std::string excerpt = (do_truncate && clean_text.size() > 40)
-                                    ? std::string(clean_text.substr(0, 40)) + "..."
-                                    : std::string(clean_text);
-
-                                // Extract the original sender's nick from the line tags.
-                                for (int nn = 0; nn < tags_count; nn++)
-                                {
-                                    str_tag = fmt::format("{}|tags_array", nn);
-                                    const char *ntag = weechat_hdata_string(
-                                        hdata_line_data, line_data, str_tag.c_str());
-                                    if (ntag && std::string_view(ntag).starts_with("nick_"))
-                                    {
-                                        reply_quote_nick = ntag + 5;
-                                        break;
-                                    }
-                                }
-
-                                reply_prefix = excerpt;
                             }
-                            break;
                         }
+
+                        // Decide whether to truncate to a 40-char excerpt.
+                        bool do_truncate = false;
+                        {
+                            int newline_count = 0;
+                            int line_len = 0;
+                            for (char c : clean_text)
+                            {
+                                if (c == '\n') { ++newline_count; line_len = 0; }
+                                else           { ++line_len; }
+                                if (newline_count > 5 || line_len > 200)
+                                { do_truncate = true; break; }
+                            }
+                        }
+
+                        std::string excerpt = (do_truncate && clean_text.size() > 40)
+                            ? std::string(clean_text.substr(0, 40)) + "..."
+                            : std::string(clean_text);
+
+                        // Extract the original sender's nick from the line tags.
+                        std::string str_tag2;
+                        for (int nn = 0; nn < tags_count; nn++)
+                        {
+                            str_tag2 = fmt::format("{}|tags_array", nn);
+                            const char *ntag = weechat_hdata_string(
+                                hdata_line_data, line_data, str_tag2.c_str());
+                            if (ntag && std::string_view(ntag).starts_with("nick_"))
+                            {
+                                reply_quote_nick = ntag + 5;
+                                break;
+                            }
+                        }
+
+                        reply_prefix = excerpt;
                     }
                 }
-
-                last_line = weechat_hdata_pointer(hdata_line,
-                                                  last_line, "prev_line");
             }
         }
         
