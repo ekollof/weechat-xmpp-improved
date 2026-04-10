@@ -30,6 +30,7 @@ int command__ephemeral(COMMAND_ARGS);
 int command__feed(COMMAND_ARGS);
 int command__invite(COMMAND_ARGS);
 int command__kick(COMMAND_ARGS);
+int command__links(COMMAND_ARGS);
 int command__list(COMMAND_ARGS);
 int command__mam(COMMAND_ARGS);
 int command__me(COMMAND_ARGS);

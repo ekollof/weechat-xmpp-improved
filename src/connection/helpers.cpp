@@ -465,7 +465,8 @@ void esfs_start_download(const std::string &cipher_url,
 
 // ── OG / HTML-title async URL preview fetch ───────────────────────────────────
 
-std::list<og_fetch_ctx> g_og_fetches;
+std::list<og_fetch_ctx>    g_og_fetches;
+std::list<og_pending_entry> g_og_pending;
 
 // Case-insensitive ASCII substring search.
 static size_t ifinds(const std::string &hay, const std::string &needle, size_t from = 0)
@@ -625,6 +626,9 @@ static og_fetch_ctx::preview_t parse_og_from_html(const std::string &html)
     return p;
 }
 
+// Forward declaration — defined after og_fetch_cb (mutual recursion via drain).
+static void og_launch_one(og_pending_entry entry);
+
 static int og_fetch_cb(const void * /*pointer*/, void * /*data*/, int fd)
 {
     if (weechat::g_plugin_unloading || !weechat::plugin::instance)
@@ -652,62 +656,86 @@ static int og_fetch_cb(const void * /*pointer*/, void * /*data*/, int fd)
     if (ctx.success && ctx.account_ptr
         && (!ctx.preview.title.empty() || !ctx.preview.description.empty()))
     {
-        // Build display line
         auto &p = ctx.preview;
-        std::string line;
-        line += weechat_color("darkgray");
-        line += "┌ ";
-        line += weechat_color("bold");
-        line += p.title.empty() ? (p.url.empty() ? ctx.url : p.url) : p.title;
-        line += weechat_color("-bold");
-        if (!p.description.empty())
-        {
-            line += "\n\t";
-            line += weechat_color("darkgray");
-            line += "│ ";
-            line += weechat_color("resetcolor");
-            line += weechat_color("darkgray");
-            if (p.description.size() > 120)
-            {
-                line += p.description.substr(0, 117);
-                line += "...";
-            }
-            else
-            {
-                line += p.description;
-            }
-        }
         const std::string &display_url = p.url.empty() ? ctx.url : p.url;
-        if (!display_url.empty() && display_url != p.title)
-        {
-            line += "\n\t";
-            line += weechat_color("darkgray");
-            line += "└ ";
-            line += weechat_color("blue");
-            line += display_url;
-        }
-        if (!p.image.empty())
-        {
-            line += " ";
-            line += weechat_color("darkgray");
-            line += "[img]";
-        }
-        line += weechat_color("resetcolor");
 
-        weechat_printf_date_tags(ctx.buffer, ctx.date,
-            "notify_none,no_log,xmpp_og_preview",
-            "%s\t%s", ctx.display_prefix.c_str(), line.c_str());
-
-        // Persist to LMDB cache
+        // Persist to LMDB cache (always — silent or not).
         weechat::account::og_preview cached;
         cached.title       = p.title;
         cached.description = p.description;
         cached.url         = display_url;
         cached.image       = p.image;
         ctx.account_ptr->og_cache_store(ctx.url, cached);
+
+        if (!ctx.silent)
+        {
+            // Build and display the inline preview card.
+            std::string line;
+            line += weechat_color("darkgray");
+            line += "┌ ";
+            line += weechat_color("bold");
+            line += p.title.empty() ? display_url : p.title;
+            line += weechat_color("-bold");
+            if (!p.description.empty())
+            {
+                line += "\n\t";
+                line += weechat_color("darkgray");
+                line += "│ ";
+                line += weechat_color("resetcolor");
+                line += weechat_color("darkgray");
+                if (p.description.size() > 120)
+                {
+                    line += p.description.substr(0, 117);
+                    line += "...";
+                }
+                else
+                {
+                    line += p.description;
+                }
+            }
+            if (!display_url.empty() && display_url != p.title)
+            {
+                line += "\n\t";
+                line += weechat_color("darkgray");
+                line += "└ ";
+                line += weechat_color("blue");
+                line += display_url;
+            }
+            if (!p.image.empty())
+            {
+                line += " ";
+                line += weechat_color("darkgray");
+                line += "[img]";
+            }
+            line += weechat_color("resetcolor");
+
+            weechat_printf_date_tags(ctx.buffer, ctx.date,
+                "notify_none,no_log,xmpp_og_preview",
+                "%s\t%s", ctx.display_prefix.c_str(), line.c_str());
+        }
+        else
+        {
+            // Silent fetch: print a one-line progress note to the account buffer.
+            struct t_gui_buffer *acct_buf = ctx.account_ptr->buffer;
+            const std::string &title_str = p.title.empty() ? display_url : p.title;
+            weechat_printf(acct_buf,
+                "%sxmpp/links: fetched %s \u2014 %s",
+                weechat_prefix("network"),
+                ctx.url.c_str(),
+                title_str.c_str());
+        }
     }
 
     g_og_fetches.erase(it);
+
+    // Drain one entry from the pending queue now that a slot is free.
+    if (!g_og_pending.empty())
+    {
+        og_pending_entry next = std::move(g_og_pending.front());
+        g_og_pending.pop_front();
+        og_launch_one(std::move(next));
+    }
+
     return WEECHAT_RC_OK;
 }
 
@@ -715,7 +743,8 @@ void og_start_fetch(const std::string &url,
                     struct t_gui_buffer *buf,
                     weechat::account *account_ptr,
                     const std::string &display_prefix,
-                    time_t date)
+                    time_t date,
+                    bool silent)
 {
     if (url.empty() || !account_ptr) return;
 
@@ -724,21 +753,47 @@ void og_start_fetch(const std::string &url,
         && !std::string_view(url).starts_with("https://"))
         return;
 
-    // In-flight dedup
-    bool already = std::any_of(g_og_fetches.begin(), g_og_fetches.end(),
-                               [&](const og_fetch_ctx &c) { return c.url == url; });
-    if (already) return;
+    // Dedup: already in-flight?
+    if (std::any_of(g_og_fetches.begin(), g_og_fetches.end(),
+                    [&](const og_fetch_ctx &c) { return c.url == url; }))
+        return;
 
+    // Dedup: already pending?
+    if (std::any_of(g_og_pending.begin(), g_og_pending.end(),
+                    [&](const og_pending_entry &p) { return p.url == url; }))
+        return;
+
+    og_pending_entry entry;
+    entry.url            = url;
+    entry.buffer         = buf;
+    entry.account_ptr    = account_ptr;
+    entry.display_prefix = display_prefix;
+    entry.date           = date;
+    entry.silent         = silent;
+
+    if (static_cast<int>(g_og_fetches.size()) < OG_MAX_CONCURRENT)
+        og_launch_one(std::move(entry));
+    else
+        g_og_pending.push_back(std::move(entry));
+}
+
+// ── og_launch_one ─────────────────────────────────────────────────────────────
+// Extract one pending entry and launch its fetch thread.
+// Called by og_start_fetch (when a slot is free) and by og_fetch_cb (drain).
+
+static void og_launch_one(og_pending_entry entry)
+{
     int pipe_fds[2];
     if (pipe(pipe_fds) != 0) return;
 
     g_og_fetches.push_back({});
     og_fetch_ctx &ctx = g_og_fetches.back();
-    ctx.url            = url;
-    ctx.buffer         = buf;
-    ctx.account_ptr    = account_ptr;
-    ctx.display_prefix = display_prefix;
-    ctx.date           = date;
+    ctx.url            = std::move(entry.url);
+    ctx.buffer         = entry.buffer;
+    ctx.account_ptr    = entry.account_ptr;
+    ctx.display_prefix = std::move(entry.display_prefix);
+    ctx.date           = entry.date;
+    ctx.silent         = entry.silent;
     ctx.pipe_read_fd   = pipe_fds[0];
     ctx.pipe_write_fd  = pipe_fds[1];
 
@@ -777,7 +832,8 @@ void og_start_fetch(const std::string &url,
             curl_easy_setopt(curl, CURLOPT_USERAGENT,      "xepher-og-preview/1.0");
             // Only accept text/html
             struct curl_slist *headers = nullptr;
-            headers = curl_slist_append(headers, "Accept: text/html,application/xhtml+xml;q=0.9,*/*;q=0.1");
+            headers = curl_slist_append(headers,
+                "Accept: text/html,application/xhtml+xml;q=0.9,*/*;q=0.1");
             curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
             curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,
                 static_cast<size_t(*)(char*,size_t,size_t,void*)>(write_cb));

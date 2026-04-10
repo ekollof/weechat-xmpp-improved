@@ -165,6 +165,7 @@ SRCS=src/plugin.cpp \
 	 src/command/roster.cpp \
 	 src/command/rooms.cpp \
 	 src/command/muc_admin.cpp \
+	 src/command/links.cpp \
 	 src/input.cpp \
 	 src/message.cpp \
 	 src/omemo/api.cpp \

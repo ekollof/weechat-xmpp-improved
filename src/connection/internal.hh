@@ -98,7 +98,12 @@ void esfs_start_download(const std::string &cipher_url,
 // notify_none,no_log,xmpp_og_preview line in the target buffer and stores it
 // in the LMDB og_previews cache.
 //
-// URLs that are already cached or currently in-flight are silently skipped.
+// At most OG_MAX_CONCURRENT threads run at once; excess calls are held in
+// g_og_pending and drained one-by-one as active fetches complete.
+// URLs that are already cached, in-flight, or pending are silently skipped.
+
+static constexpr int OG_MAX_CONCURRENT = 4;
+
 struct og_fetch_ctx {
     // Inputs
     std::string url;
@@ -106,6 +111,7 @@ struct og_fetch_ctx {
     weechat::account   *account_ptr = nullptr; // non-owning
     std::string display_prefix;   // left column (nick) for weechat_printf
     time_t      date = 0;         // timestamp for weechat_printf_date_tags
+    bool        silent = false;   // cache-only: fetch+store but do not display preview
 
     // Pipe (read-end watched by weechat_hook_fd)
     int pipe_read_fd  = -1;
@@ -124,15 +130,32 @@ struct og_fetch_ctx {
     std::thread worker;
 };
 
+// Active (in-flight) fetches — each has a running thread + pipe watched by weechat_hook_fd.
 extern std::list<og_fetch_ctx> g_og_fetches;
 
+// Pending fetch descriptors waiting for a slot below OG_MAX_CONCURRENT.
+struct og_pending_entry {
+    std::string          url;
+    struct t_gui_buffer *buffer      = nullptr;
+    weechat::account    *account_ptr = nullptr;
+    std::string          display_prefix;
+    time_t               date        = 0;
+    bool                 silent      = false;
+};
+extern std::list<og_pending_entry> g_og_pending;
+
 // Kick off an async OG preview fetch for a URL.
-// Silently no-ops if the URL is already cached or in-flight.
+// If OG_MAX_CONCURRENT active fetches are already running the request is
+// queued in g_og_pending and started when a slot opens up.
+// Silently no-ops if the URL is already cached, in-flight, or pending.
+// When silent=true the result is stored to LMDB but not displayed; instead
+// a one-line progress note is printed to the account buffer.
 void og_start_fetch(const std::string &url,
                     struct t_gui_buffer *buf,
                     weechat::account *account_ptr,
                     const std::string &display_prefix,
-                    time_t date);
+                    time_t date,
+                    bool silent = false);
 
 // ── XEP-0004: Data Forms renderer ─────────────────────────────────────────────
 // Render a <x xmlns='jabber:x:data'> form to a WeeChat buffer.

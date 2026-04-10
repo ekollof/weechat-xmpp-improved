@@ -753,6 +753,19 @@ void command__init()
     if (!hook)
         weechat_printf(nullptr, "Failed to setup command /feed");
 
+    hook = weechat_hook_command(
+        "links",
+        N_("show URL link previews for this buffer"),
+        N_("[fetch]"),
+        N_("List all unique URLs posted in this buffer with their OG titles from\n"
+           "the LMDB cache, then queue silent background fetches for any URL not\n"
+           "yet cached. Re-run /links once fetches complete to see updated titles.\n"
+           "    fetch: alias for /links (kept for discoverability)"),
+        "fetch",
+        &command__links, nullptr, nullptr);
+    if (!hook)
+        weechat_printf(nullptr, "Failed to setup command /links");
+
     // Internal hidden command used by picker key bindings.
     // Not listed in /help — the leading space makes WeeChat treat it as internal.
     hook = weechat_hook_command(
