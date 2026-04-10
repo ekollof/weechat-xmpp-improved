@@ -3665,6 +3665,8 @@ message_handler_after_omemo:
             while (end < body_sv.size() && !std::isspace((unsigned char)body_sv[end]))
                 ++end;
             std::string url(body_sv.substr(found, end - found));
+            strip_url_trailing_punct(url);
+            if (url.empty()) { pos = end; continue; }
             if (auto cached = account.og_cache_lookup(url))
                 og_previews_to_show.push_back(std::move(*cached));
             pos = end;
@@ -3858,6 +3860,8 @@ message_handler_after_omemo:
             while (end < body_sv.size() && !std::isspace((unsigned char)body_sv[end]))
                 ++end;
             std::string url(body_sv.substr(found, end - found));
+            strip_url_trailing_punct(url);
+            if (url.empty()) { pos = end; continue; }
             pos = end;
 
             if (already_shown.count(url)) continue;

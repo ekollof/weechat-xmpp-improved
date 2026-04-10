@@ -653,8 +653,8 @@ static int og_fetch_cb(const void * /*pointer*/, void * /*data*/, int fd)
     if (ctx.pipe_write_fd >= 0)
         close(ctx.pipe_write_fd);
 
-    XDEBUG("og_fetch_cb: url={} success={} title='{}'",
-           ctx.url, (int)ctx.success,
+    XDEBUG("og_fetch_cb: url={} http={} curl={} success={} title='{}'",
+           ctx.url, ctx.http_code, ctx.curl_res, (int)ctx.success,
            ctx.preview.title.empty() ? "(none)" : ctx.preview.title);
 
     if (ctx.success && ctx.account_ptr
@@ -669,6 +669,9 @@ static int og_fetch_cb(const void * /*pointer*/, void * /*data*/, int fd)
         cached.url         = display_url;
         cached.image       = p.image;
         ctx.account_ptr->og_cache_store(ctx.url, cached);
+        auto verify = ctx.account_ptr->og_cache_lookup(ctx.url);
+        XDEBUG("og_cache_store: url={} verify={}",
+               ctx.url, verify ? "ok" : "FAILED");
 
         if (!ctx.silent)
         {
@@ -740,6 +743,39 @@ static int og_fetch_cb(const void * /*pointer*/, void * /*data*/, int fd)
     }
 
     return WEECHAT_RC_OK;
+}
+
+void strip_url_trailing_punct(std::string &url)
+{
+    // Characters that should not appear at the end of a URL when extracted
+    // from natural-language text.  We strip them iteratively because a URL
+    // could be wrapped in multiple layers, e.g. ("https://x.com/foo]").
+    static constexpr std::string_view kTrailing = "\"'.,;:!?)>]}\u00bb";
+    while (!url.empty())
+    {
+        // Check for single-byte punctuation
+        unsigned char last = static_cast<unsigned char>(url.back());
+        if (last < 0x80)
+        {
+            if (kTrailing.find(static_cast<char>(last)) != std::string_view::npos)
+            {
+                url.pop_back();
+                continue;
+            }
+        }
+        else
+        {
+            // Multi-byte: check for UTF-8 encoded » (U+00BB = 0xC2 0xBB)
+            if (url.size() >= 2
+                && static_cast<unsigned char>(url[url.size()-2]) == 0xC2
+                && static_cast<unsigned char>(url[url.size()-1]) == 0xBB)
+            {
+                url.resize(url.size() - 2);
+                continue;
+            }
+        }
+        break;
+    }
 }
 
 void og_start_fetch(const std::string &url,
@@ -826,16 +862,54 @@ static void og_launch_one(og_pending_entry entry)
                 return;
             }
 
-            // Collect response bytes; cap at 128 KB to avoid reading huge pages
-            struct write_ctx { std::string data; size_t limit; };
-            write_ctx wctx{ {}, 128 * 1024 };
+            // Collect response bytes.
+            // Stop as soon as we've buffered past </head> — OG tags are always
+            // in the <head> section.  Some sites (e.g. YouTube) put 600+ KB of
+            // inline JS before the OG meta tags, so we must read that far.
+            // Hard safety cap: 2 MB.  Return CURL_WRITEFUNC_ERROR to abort the
+            // transfer early once </head> is seen; we treat CURLE_WRITE_ERROR
+            // as a successful partial read in that case.
+            struct write_ctx {
+                std::string data;
+                bool head_done = false;
+            };
+            static constexpr size_t kWriteHardLimit = 2 * 1024 * 1024; // 2 MB
+            write_ctx wctx;
+            // Case-insensitive needle search reused from parse_og_from_html.
             auto write_cb = [](char *ptr, size_t size, size_t nmemb, void *ud) -> size_t {
                 auto *wc = static_cast<write_ctx *>(ud);
                 size_t n = size * nmemb;
-                if (wc->data.size() + n > wc->limit)
-                    n = wc->limit - wc->data.size();
+                if (wc->head_done)
+                    return 0; // abort: already found </head>
+                if (wc->data.size() + n > kWriteHardLimit)
+                    n = kWriteHardLimit - wc->data.size();
                 wc->data.append(ptr, n);
-                return size * nmemb; // always claim full read to keep curl happy
+                // Check if </head> or <body appeared in the accumulated data
+                // (only scan the new tail to avoid O(n²) behaviour).
+                size_t scan_start = wc->data.size() > n + 8
+                                    ? wc->data.size() - n - 8 : 0;
+                std::string_view tail(wc->data.c_str() + scan_start,
+                                      wc->data.size() - scan_start);
+                auto ipos = [&](std::string_view needle) -> bool {
+                    if (tail.size() < needle.size()) return false;
+                    for (size_t i = 0; i + needle.size() <= tail.size(); ++i)
+                    {
+                        bool ok = true;
+                        for (size_t j = 0; j < needle.size() && ok; ++j)
+                            ok = std::tolower((unsigned char)tail[i+j])
+                                 == (unsigned char)needle[j];
+                        if (ok) return true;
+                    }
+                    return false;
+                };
+                if (ipos("</head>") || ipos("<body"))
+                {
+                    wc->head_done = true;
+                    return 0; // signal early-abort to curl
+                }
+                if (wc->data.size() >= kWriteHardLimit)
+                    return 0; // hard cap reached, abort
+                return size * nmemb;
             };
 
             curl_easy_setopt(curl, CURLOPT_NOSIGNAL,       1L);
@@ -857,10 +931,12 @@ static void og_launch_one(og_pending_entry entry)
             CURLcode res = curl_easy_perform(curl);
             long http_code = 0;
             curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+            ctx.http_code = http_code;
+            ctx.curl_res  = static_cast<int>(res);
             curl_slist_free_all(headers);
             curl_easy_cleanup(curl);
 
-            if (res != CURLE_OK || http_code != 200)
+            if ((res != CURLE_OK && res != CURLE_WRITE_ERROR) || http_code != 200)
             {
                 ::write(ctx.pipe_write_fd, "x", 1);
                 return;

@@ -120,6 +120,8 @@ struct og_fetch_ctx {
 
     // Result (written by thread, read by callback) — mirrors account::og_preview
     bool success = false;
+    long http_code = 0;    // HTTP response code (diagnostic)
+    int  curl_res  = 0;    // CURLcode cast to int (diagnostic)
     struct preview_t {
         std::string title;
         std::string description;
@@ -143,6 +145,11 @@ struct og_pending_entry {
     bool                 silent      = false;
 };
 extern std::list<og_pending_entry> g_og_pending;
+
+// Strip trailing punctuation characters that are commonly appended to URLs
+// when they appear inside quoted strings, markdown links, or IRC messages.
+// Modifies the string in-place.  Safe to call on already-clean URLs.
+void strip_url_trailing_punct(std::string &url);
 
 // Kick off an async OG preview fetch for a URL.
 // If OG_MAX_CONCURRENT active fetches are already running the request is

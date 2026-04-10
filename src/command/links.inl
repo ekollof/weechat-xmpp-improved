@@ -33,7 +33,10 @@ static void scan_urls(std::string_view msg, std::vector<std::string> &out)
         size_t end = found;
         while (end < msg.size() && !std::isspace((unsigned char)msg[end]))
             ++end;
-        out.emplace_back(msg.substr(found, end - found));
+        std::string url(msg.substr(found, end - found));
+        strip_url_trailing_punct(url);
+        if (!url.empty())
+            out.emplace_back(std::move(url));
         pos = end;
     }
 }
