@@ -3096,6 +3096,44 @@ message_handler_after_omemo:
                                             channel->buffer, "lines");
         if (lines)
         {
+            // Helper: given a raw hdata message field, return the plain-text body.
+            // WeeChat's message hdata stores only the right-column text (no leading \t).
+            // For messages with OG/OOB/SIMS previews the full "\nbody\n\t┌ title..."
+            // string is stored; we truncate at the first \n.
+            // Returns empty string if the line looks like an OG/OOB continuation
+            // sub-line (starts with ┌ │ └ box-drawing chars after color stripping).
+            auto extract_body_text = [](const char *raw) -> std::string {
+                if (!raw) return {};
+                std::string_view sv(raw);
+                // Strip a leading \t if present (WeeChat continuation-line indent).
+                if (!sv.empty() && sv[0] == '\t')
+                    sv = sv.substr(1);
+                // Truncate at the first \n to discard OG/OOB/SIMS suffix.
+                auto nl = sv.find('\n');
+                if (nl != std::string_view::npos)
+                    sv = sv.substr(0, nl);
+                // Strip color codes.
+                std::string owned(sv);
+                std::unique_ptr<char, decltype(&free)>
+                    guard(weechat_string_remove_color(owned.c_str(), nullptr), &free);
+                std::string plain = guard ? guard.get() : owned;
+                // Trim leading whitespace.
+                auto first = plain.find_first_not_of(" \t");
+                if (first == std::string::npos) return {};
+                plain = plain.substr(first);
+                // Reject OG/OOB box-drawing continuation lines.
+                // UTF-8: ┌ = E2 94 8C, │ = E2 94 82, └ = E2 94 94, ┐ = E2 94 90
+                static constexpr std::string_view og_glyphs[] = {
+                    "\xE2\x94\x8C", // ┌
+                    "\xE2\x94\x82", // │
+                    "\xE2\x94\x94", // └
+                    "\xE2\x94\x90", // ┐
+                };
+                for (auto &g : og_glyphs)
+                    if (plain.starts_with(g)) return {};
+                return plain;
+            };
+
             void *body_line = nullptr; // the first (body) line of the matched group
             void *scan = weechat_hdata_pointer(hdata_lines, lines, "last_line");
             bool in_group = false;
@@ -3116,12 +3154,15 @@ message_handler_after_omemo:
                 if (has_tag)
                 {
                     in_group = true;
-                    body_line = scan; // keep updating — the earliest match wins
+                    // Only accept lines that look like a real message body
+                    // (not OG/OOB box-drawing continuation sub-lines).
+                    const char *msg = weechat_hdata_string(hdata_line_data, ld, "message");
+                    if (!extract_body_text(msg).empty())
+                        body_line = scan; // keep updating — earliest non-continuation wins
                 }
                 else if (in_group)
                 {
-                    // We have walked past the beginning of the tag group; body_line
-                    // is already the first (body) line.
+                    // We have walked past the beginning of the tag group.
                     break;
                 }
                 scan = weechat_hdata_pointer(hdata_line, scan, "prev_line");
@@ -3139,17 +3180,9 @@ message_handler_after_omemo:
 
                     if (orig_message)
                     {
-                        // Extract just the text part (after tab if present)
-                        std::string_view msg_sv(orig_message);
-                        auto tab_pos = msg_sv.find('\t');
-                        if (tab_pos != std::string_view::npos)
-                            msg_sv = msg_sv.substr(tab_pos + 1);
-
-                        // Strip embedded color codes so we get plain text
-                        std::string msg_owned(msg_sv);
-                        std::unique_ptr<char, decltype(&free)>
-                            plain_text_guard(weechat_string_remove_color(msg_owned.c_str(), nullptr), &free);
-                        std::string_view clean_text = plain_text_guard ? plain_text_guard.get() : msg_sv;
+                        // Use the shared helper to get clean body text.
+                        std::string clean_body = extract_body_text(orig_message);
+                        std::string_view clean_text(clean_body);
 
                         // Skip any leading reply prefix(es) (↪ …) from a prior reply chain.
                         // UTF-8 encoding of ↪ is 3 bytes: e2 86 aa.
