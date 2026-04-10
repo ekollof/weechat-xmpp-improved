@@ -12,6 +12,30 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
     static struct t_hdata *hdata_lines     = weechat_hdata_get("lines");
     static struct t_hdata *hdata_buffer    = weechat_hdata_get("buffer");
 
+    // Helper: match a buffer-line tag against a target message ID regardless of
+    // which ID namespace was used to tag the line.  Lines receive up to three
+    // ID tags on live delivery:
+    //   id_<stable_id>       — stable_id = stanza_id ?? origin_id ?? msg_id
+    //   stanza_id_<sid>      — server-assigned archive ID (XEP-0359)
+    //   origin_id_<oid>      — sender-assigned stable ID (XEP-0359)
+    // On MAM replay the server strips <stanza-id> from the forwarded copy, so
+    // stable_id resolves to origin_id or msg_id, and id_ will NOT equal the
+    // archive ID.  XEP-0461 <reply>, XEP-0424 <retract>, XEP-0308 <replace>,
+    // XEP-0425 moderation, and XEP-0444 <reactions> all carry stanza-IDs, so
+    // without this broadened check they silently fail to find their target line
+    // during MAM replay.
+    auto id_matches_any = [](const char *tag, const char *target) noexcept -> bool {
+        if (!tag || !target || !*target) return false;
+        std::string_view tv(tag);
+        if (tv.starts_with("id_"))
+            return weechat_strcasecmp(tag + 3, target) == 0;
+        if (tv.starts_with("stanza_id_"))
+            return weechat_strcasecmp(tag + 10, target) == 0;
+        if (tv.starts_with("origin_id_"))
+            return weechat_strcasecmp(tag + 10, target) == 0;
+        return false;
+    };
+
     weechat::channel *channel, *parent_channel;
     xmpp_stanza_t *x, *body, *delay, *topic, *replace, *request, *markable, *composing, *sent, *received, *result, *forwarded, *event, *items, *item, *encrypted;
     const char *type, *from, *nick, *from_bare, *to, *to_bare, *id, *thread, *replace_id, *timestamp;
@@ -2180,9 +2204,8 @@ message_handler_after_omemo:
                         str_tag = fmt::format("{}|tags_array", n_tag);
                         const char *tag = weechat_hdata_string(hdata_line_data,
                                                                line_data, str_tag.c_str());
-                         if (tag && std::string_view(tag).starts_with("id_") &&
-                             weechat_strcasecmp(tag + 3, replace_id) == 0)
-                         {
+                         if (id_matches_any(tag, replace_id))
+                          {
                              // XEP-0308 §3: Verify the correcting sender matches
                               // the original message author before applying the edit.
                               // For MUC: compare MUC nick (resource part of full JID).
@@ -2248,8 +2271,7 @@ message_handler_after_omemo:
                                         str_tag = fmt::format("{}|tags_array", n_tag);
                                         tag = weechat_hdata_string(hdata_line_data,
                                                                    line_data, str_tag.c_str());
-                                         if (tag && std::string_view(tag).starts_with("id_") &&
-                                            weechat_strcasecmp(tag + 3, replace_id) == 0)
+                                         if (id_matches_any(tag, replace_id))
                                         {
                                             msg = (char*)weechat_hdata_string(hdata_line_data,
                                                                               line_data, "message");
@@ -2357,8 +2379,7 @@ message_handler_after_omemo:
                         str_tag = fmt::format("{}|tags_array", n_tag);
                         const char *tag = weechat_hdata_string(hdata_line_data,
                                                                line_data, str_tag.c_str());
-                        if (tag && std::string_view(tag).starts_with("id_") &&
-                            weechat_strcasecmp(tag + 3, moderate_id) == 0)
+                        if (id_matches_any(tag, moderate_id))
                         {
                             // Found the message to moderate - update it with tombstone
                             std::string tombstone = moderate_reason
@@ -2478,8 +2499,7 @@ message_handler_after_omemo:
                         str_tag = fmt::format("{}|tags_array", n_tag);
                         const char *tag = weechat_hdata_string(hdata_line_data,
                                                                line_data, str_tag.c_str());
-                        if (tag && std::string_view(tag).starts_with("id_") &&
-                            weechat_strcasecmp(tag + 3, retract_id) == 0)
+                        if (id_matches_any(tag, retract_id))
                         {
                             id_matched = true;
                             break;
@@ -2620,8 +2640,7 @@ message_handler_after_omemo:
                             str_tag = fmt::format("{}|tags_array", n_tag);
                             const char *tag = weechat_hdata_string(hdata_line_data,
                                                                    line_data, str_tag.c_str());
-                            if (tag && std::string_view(tag).starts_with("id_") &&
-                                weechat_strcasecmp(tag + 3, reactions_id) == 0)
+                            if (id_matches_any(tag, reactions_id))
                             {
                                 // Found the message.
                                 // XEP-0444: a new <reactions> from a sender REPLACES their
@@ -3072,8 +3091,7 @@ message_handler_after_omemo:
                         str_tag = fmt::format("{}|tags_array", n_tag);
                         const char *tag = weechat_hdata_string(hdata_line_data,
                                                                line_data, str_tag.c_str());
-                        if (tag && std::string_view(tag).starts_with("id_") &&
-                            weechat_strcasecmp(tag + 3, reply_to_id) == 0)
+                        if (id_matches_any(tag, reply_to_id))
                         {
                             // Found the original message - get excerpt
                             const char *orig_message = weechat_hdata_string(
