@@ -3826,9 +3826,16 @@ message_handler_after_omemo:
 
     // For any http(s):// URL in the message body that wasn't already shown
     // (from the rdf:Description stanza or the LMDB cache), kick off an async
-    // fetch to get OG/title metadata.  og_start_fetch() handles LMDB cache
-    // dedup internally, so it will no-op if the URL is already cached.
-    if (text)
+    // fetch to get OG/title metadata.
+    //
+    // Only do this for LIVE messages (not MAM replay).  WeeChat always appends
+    // new lines at the end of the buffer regardless of the date parameter, so
+    // async fetch results for MAM-replayed messages would appear below "History
+    // loaded" rather than inline with the original message.  For MAM, the LMDB
+    // cache lookup (in the is_mam_replay branch above) already handles URLs
+    // that were fetched during a previous live session.  First-time-seen URLs
+    // in MAM will be fetched when the same URL appears in a live message later.
+    if (text && !is_mam_replay)
     {
         // Collect URLs that were already shown so we don't double-print.
         std::unordered_set<std::string> already_shown;
