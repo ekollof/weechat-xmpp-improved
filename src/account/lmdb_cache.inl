@@ -28,6 +28,7 @@ void weechat::account::mam_cache_init()
         mam_dbi.cursors = lmdb::dbi::open(transaction, "cursors", MDB_CREATE);
         mam_dbi.omemo_plaintext = lmdb::dbi::open(transaction, "omemo_plaintext", MDB_CREATE);
         mam_dbi.esfs_downloads  = lmdb::dbi::open(transaction, "esfs_downloads",  MDB_CREATE);
+        mam_dbi.og_previews     = lmdb::dbi::open(transaction, "og_previews",     MDB_CREATE);
 
         transaction.commit();
         
@@ -879,6 +880,64 @@ bool weechat::account::peer_has_legacy_axolotl_only(const std::string& jid) cons
 {
     static const std::string legacy_axolotl = "eu.siacs.conversations.axolotl";
     return peer_supports_feature(jid, legacy_axolotl);
+}
+
+// OG preview cache (XEP-0511) — keyed by URL, value is TAB-delimited title\tdesc\turl\timage
+// TAB is used as delimiter because OG fields never legitimately contain raw TAB.
+
+void weechat::account::og_cache_store(const std::string& url,
+                                       const og_preview& preview)
+{
+    if (!mam_db_env || url.empty()) return;
+    try {
+        // Encode: replace any literal \t in field values with a space (safe lossy).
+        auto sanitize = [](const std::string& s) {
+            std::string out = s;
+            for (char& c : out) if (c == '\t') c = ' ';
+            return out;
+        };
+        std::string value = fmt::format("{}\t{}\t{}\t{}",
+            sanitize(preview.title),
+            sanitize(preview.description),
+            sanitize(preview.url),
+            sanitize(preview.image));
+
+        lmdb::txn parentTransaction{nullptr};
+        lmdb::txn txn = lmdb::txn::begin(mam_db_env, parentTransaction, 0);
+        MDB_val k = {url.size(),   (void*)url.data()};
+        MDB_val v = {value.size(), (void*)value.data()};
+        mdb_put(txn.handle(), mam_dbi.og_previews.handle(), &k, &v, 0);
+        txn.commit();
+    } catch (const lmdb::error&) {}
+}
+
+std::optional<weechat::account::og_preview>
+weechat::account::og_cache_lookup(const std::string& url)
+{
+    if (!mam_db_env || url.empty()) return std::nullopt;
+    try {
+        lmdb::txn parentTransaction{nullptr};
+        lmdb::txn txn = lmdb::txn::begin(mam_db_env, parentTransaction, MDB_RDONLY);
+        MDB_val k = {url.size(), (void*)url.data()};
+        MDB_val v{};
+        if (mdb_get(txn.handle(), mam_dbi.og_previews.handle(), &k, &v) != 0)
+            return std::nullopt;
+        std::string_view sv(static_cast<const char*>(v.mv_data), v.mv_size);
+        // Split on \t into up to 4 fields: title, description, url, image
+        og_preview p;
+        std::array<std::string*, 4> fields = {&p.title, &p.description, &p.url, &p.image};
+        size_t field_idx = 0;
+        size_t start = 0;
+        for (size_t i = 0; i <= sv.size() && field_idx < 4; ++i) {
+            if (i == sv.size() || sv[i] == '\t') {
+                *fields[field_idx++] = std::string(sv.substr(start, i - start));
+                start = i + 1;
+            }
+        }
+        return p;
+    } catch (const lmdb::error&) {
+        return std::nullopt;
+    }
 }
 
 // Client State Indication (XEP-0352) - Idle timer callback

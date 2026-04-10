@@ -345,6 +345,7 @@ namespace weechat
             lmdb::dbi cursors = 0;         // RSM cursor persistence for MAM queries
             lmdb::dbi omemo_plaintext = 0; // decrypted OMEMO body cache (keyed channel_jid:msg_id)
             lmdb::dbi esfs_downloads = 0;  // ESFS downloaded file paths (keyed channel_jid:stable_id → saved_path)
+            lmdb::dbi og_previews = 0;     // XEP-0511 OG preview cache (keyed by URL)
         } mam_dbi;
         std::string mam_db_path;
 
@@ -483,6 +484,16 @@ namespace weechat
         void peer_features_update(const std::string& jid, const std::vector<std::string>& features);
         bool peer_supports_feature(const std::string& jid, const std::string& feature) const;
         bool peer_has_legacy_axolotl_only(const std::string& jid) const;
+
+        // OG preview cache methods (XEP-0511)
+        struct og_preview {
+            std::string title;
+            std::string description;
+            std::string url;
+            std::string image;
+        };
+        void og_cache_store(const std::string& url, const og_preview& preview);
+        std::optional<og_preview> og_cache_lookup(const std::string& url);
 
         struct t_gui_buffer* create_buffer();
 

@@ -3587,10 +3587,13 @@ message_handler_after_omemo:
         }
     }
 
-    // XEP-0511: Link Metadata — parse <rdf:Description> containing OpenGraph metadata
+    // XEP-0511: Link Metadata — parse <rdf:Description> containing OpenGraph metadata.
+    // Previews are collected here and printed as separate buffer lines after the main message.
+    // Live messages populate the LMDB og_previews cache; MAM replays look up the cache.
+    std::vector<account::og_preview> og_previews_to_show;
+
     xmpp_stanza_t *rdf_desc = xmpp_stanza_get_child_by_name_and_ns(
         stanza, "Description", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
-    std::string og_preview;
     if (rdf_desc)
     {
         // Multiple <rdf:Description> children may appear (one per URL); collect all previews
@@ -3604,7 +3607,7 @@ message_handler_after_omemo:
                 || std::string_view(desc_ns) != "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
                 continue;
 
-            std::string og_title, og_desc, og_url, og_image;
+            account::og_preview p;
             for (xmpp_stanza_t *prop = xmpp_stanza_get_children(desc);
                  prop; prop = xmpp_stanza_get_next(prop))
             {
@@ -3617,62 +3620,54 @@ message_handler_after_omemo:
                 const char *val = val_g.ptr;
                 if (!val) continue;
 
-                if (std::string_view(prop_name) == "title" && og_title.empty())
-                    og_title = val;
-                else if (std::string_view(prop_name) == "description" && og_desc.empty())
-                    og_desc = val;
-                else if (std::string_view(prop_name) == "url" && og_url.empty())
-                    og_url = val;
-                else if (std::string_view(prop_name) == "image" && og_image.empty())
+                if (std::string_view(prop_name) == "title" && p.title.empty())
+                    p.title = val;
+                else if (std::string_view(prop_name) == "description" && p.description.empty())
+                    p.description = val;
+                else if (std::string_view(prop_name) == "url" && p.url.empty())
+                    p.url = val;
+                else if (std::string_view(prop_name) == "image" && p.image.empty())
                 {
                     // Only store HTTP(S) image URLs; skip cid:, ni:, data: URIs
                     if (std::string_view(val).starts_with("http"))
-                        og_image = val;
+                        p.image = val;
                 }
             }
 
-            if (!og_title.empty() || !og_desc.empty() || !og_url.empty())
+            if (!p.title.empty() || !p.description.empty() || !p.url.empty())
             {
-                og_preview += "\n\t";
-                og_preview += weechat_color("darkgray");
-                og_preview += "┌ ";
-                og_preview += weechat_color("bold");
-                og_preview += og_title.empty() ? (og_url.empty() ? "Link" : og_url) : og_title;
-                og_preview += weechat_color("-bold");
-                if (!og_desc.empty())
-                {
-                    og_preview += "\n\t";
-                    og_preview += weechat_color("darkgray");
-                    og_preview += "│ ";
-                    og_preview += weechat_color("resetcolor");
-                    og_preview += weechat_color("darkgray");
-                    // Truncate long descriptions to ~120 chars
-                    if (og_desc.size() > 120)
-                    {
-                        og_preview += og_desc.substr(0, 117);
-                        og_preview += "...";
-                    }
-                    else
-                    {
-                        og_preview += og_desc;
-                    }
-                }
-                if (!og_url.empty() && og_url != og_title)
-                {
-                    og_preview += "\n\t";
-                    og_preview += weechat_color("darkgray");
-                    og_preview += "└ ";
-                    og_preview += weechat_color("blue");
-                    og_preview += og_url;
-                }
-                if (!og_image.empty())
-                {
-                    og_preview += " ";
-                    og_preview += weechat_color("darkgray");
-                    og_preview += "[img]";
-                }
-                og_preview += weechat_color("resetcolor");
+                // Persist to LMDB cache so MAM replay can redisplay without network fetch
+                if (!p.url.empty())
+                    account.og_cache_store(p.url, p);
+                og_previews_to_show.push_back(std::move(p));
             }
+        }
+    }
+    else if (is_mam_replay && text)
+    {
+        // MAM replay: no <rdf:Description> in stanza — look up any URLs in the body from cache.
+        // Simple scanner: find "http://" or "https://" and scan to first whitespace or end.
+        std::string_view body_sv(text);
+        size_t pos = 0;
+        while (pos < body_sv.size())
+        {
+            size_t found = body_sv.find("http", pos);
+            if (found == std::string_view::npos) break;
+            // Confirm it's http:// or https://
+            std::string_view rest = body_sv.substr(found);
+            if (!rest.starts_with("http://") && !rest.starts_with("https://"))
+            {
+                pos = found + 4;
+                continue;
+            }
+            // Scan URL to first whitespace or end
+            size_t end = found;
+            while (end < body_sv.size() && !std::isspace((unsigned char)body_sv[end]))
+                ++end;
+            std::string url(body_sv.substr(found, end - found));
+            if (auto cached = account.og_cache_lookup(url))
+                og_previews_to_show.push_back(std::move(*cached));
+            pos = end;
         }
     }
 
@@ -3756,15 +3751,6 @@ message_handler_after_omemo:
         display_text = final_text.c_str();
     }
 
-    // Append XEP-0511 link preview if present
-    if (!og_preview.empty())
-    {
-        if (final_text.empty())
-            final_text = display_text ? display_text : "";
-        final_text += og_preview;
-        display_text = final_text.c_str();
-    }
-
     const char *encrypted_glyph = (encrypted || x) ? "🔒 " : "";
 
     if (channel_id == from_bare && to == channel->id)
@@ -3781,8 +3767,62 @@ message_handler_after_omemo:
     else
         weechat_printf_date_tags(channel->buffer, date, *dyn_tags, "%s\t%s%s%s",
                                  display_prefix.data(),
-                                 edit, encrypted_glyph,
-                                 display_text ? display_text : "");
+                                  edit, encrypted_glyph,
+                                  display_text ? display_text : "");
+
+    // XEP-0511: print each collected OG preview as a separate buffer line.
+    // Using notify_none,no_log,xmpp_og_preview so these lines are never logged
+    // or highlighted, and can be identified/skipped by the reply-excerpt scanner.
+    if (!og_previews_to_show.empty())
+    {
+        auto format_og_line = [&](const account::og_preview& p) -> std::string {
+            std::string line;
+            line += weechat_color("darkgray");
+            line += "┌ ";
+            line += weechat_color("bold");
+            line += p.title.empty() ? (p.url.empty() ? "Link" : p.url) : p.title;
+            line += weechat_color("-bold");
+            if (!p.description.empty())
+            {
+                line += "\n\t";
+                line += weechat_color("darkgray");
+                line += "│ ";
+                line += weechat_color("resetcolor");
+                line += weechat_color("darkgray");
+                if (p.description.size() > 120)
+                {
+                    line += p.description.substr(0, 117);
+                    line += "...";
+                }
+                else
+                {
+                    line += p.description;
+                }
+            }
+            if (!p.url.empty() && p.url != p.title)
+            {
+                line += "\n\t";
+                line += weechat_color("darkgray");
+                line += "└ ";
+                line += weechat_color("blue");
+                line += p.url;
+            }
+            if (!p.image.empty())
+            {
+                line += " ";
+                line += weechat_color("darkgray");
+                line += "[img]";
+            }
+            line += weechat_color("resetcolor");
+            return line;
+        };
+        for (const auto& p : og_previews_to_show)
+        {
+            weechat_printf_date_tags(channel->buffer, date,
+                "notify_none,no_log,xmpp_og_preview",
+                "%s\t%s", display_prefix.data(), format_og_line(p).c_str());
+        }
+    }
 
     // Smart filter: record that this nick spoke, so future presence lines are shown.
     // Only for live (non-delayed) messages not sent by self.
