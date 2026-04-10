@@ -659,7 +659,6 @@ static int og_fetch_cb(const void * /*pointer*/, void * /*data*/, int fd)
         auto &p = ctx.preview;
         const std::string &display_url = p.url.empty() ? ctx.url : p.url;
 
-        // Persist to LMDB cache (always — silent or not).
         weechat::account::og_preview cached;
         cached.title       = p.title;
         cached.description = p.description;
@@ -746,7 +745,8 @@ void og_start_fetch(const std::string &url,
                     time_t date,
                     bool silent)
 {
-    if (url.empty() || !account_ptr) return;
+    if (url.empty() || !account_ptr)
+        return;
 
     // Skip non-HTTP URLs
     if (!std::string_view(url).starts_with("http://")
@@ -800,8 +800,13 @@ static void og_launch_one(og_pending_entry entry)
     ctx.hook = weechat_hook_fd(pipe_fds[0], 1, 0, 0,
                                og_fetch_cb, nullptr, nullptr);
 
-    ctx.worker = std::thread([&ctx]()
+    // Capture a raw pointer to the list node — std::list iterators/references
+    // are stable across insertions and erasures of other elements, so this
+    // pointer remains valid for the entire lifetime of the thread.
+    og_fetch_ctx *ctx_ptr = &ctx;
+    ctx.worker = std::thread([ctx_ptr]()
     {
+        og_fetch_ctx &ctx = *ctx_ptr;
         std::string body;
         {
             CURL *curl = curl_easy_init();

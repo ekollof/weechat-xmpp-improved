@@ -182,7 +182,8 @@ int command__links(COMMAND_ARGS)
 
     for (auto &e : urls)
     {
-        if (ptr_account->og_cache_lookup(e.url))
+        auto cached = ptr_account->og_cache_lookup(e.url);
+        if (cached)
             continue; // already cached
 
         bool already_fetching =
