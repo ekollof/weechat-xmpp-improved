@@ -4,7 +4,9 @@
 
 #include <optional>
 #include <charconv>
+#include <cctype>
 #include <string>
+#include <unordered_set>
 #include <vector>
 #include <list>
 #include <array>

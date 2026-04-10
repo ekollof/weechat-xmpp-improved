@@ -5,7 +5,9 @@
 // Shared helper implementations used by connection handler translation units.
 // Definitions of everything declared in connection/internal.hh.
 
+#include <algorithm>
 #include <charconv>
+#include <cctype>
 #include <filesystem>
 #include <list>
 #include <string>
@@ -457,6 +459,346 @@ void esfs_start_download(const std::string &cipher_url,
 
         ctx.saved_path = out_path;
         ctx.success    = true;
+        ::write(ctx.pipe_write_fd, "x", 1);
+    });
+}
+
+// ── OG / HTML-title async URL preview fetch ───────────────────────────────────
+
+std::list<og_fetch_ctx> g_og_fetches;
+
+// Case-insensitive ASCII substring search.
+static size_t ifinds(const std::string &hay, const std::string &needle, size_t from = 0)
+{
+    if (needle.empty()) return from;
+    auto it = std::search(hay.begin() + static_cast<std::ptrdiff_t>(from), hay.end(),
+                          needle.begin(), needle.end(),
+                          [](unsigned char a, unsigned char b) {
+                              return std::tolower(a) == std::tolower(b);
+                          });
+    if (it == hay.end()) return std::string::npos;
+    return static_cast<size_t>(it - hay.begin());
+}
+
+// Extract the value of an HTML attribute from a tag string.
+// e.g. attr_value("<meta property=\"og:title\" content=\"Hello\">", "content") → "Hello"
+static std::string attr_value(const std::string &tag, const std::string &attr)
+{
+    std::string needle = attr + "=";
+    size_t pos = ifinds(tag, needle);
+    if (pos == std::string::npos) return {};
+    pos += needle.size();
+    if (pos >= tag.size()) return {};
+    char q = tag[pos];
+    if (q == '"' || q == '\'')
+    {
+        ++pos;
+        size_t end = tag.find(q, pos);
+        if (end == std::string::npos) end = tag.size();
+        return tag.substr(pos, end - pos);
+    }
+    // Unquoted attribute value: scan to next whitespace or >
+    size_t end = pos;
+    while (end < tag.size() && tag[end] != '>' && !std::isspace((unsigned char)tag[end]))
+        ++end;
+    return tag.substr(pos, end - pos);
+}
+
+// Decode basic HTML entities: &amp; &lt; &gt; &quot; &apos; &#NNN; &#xNNN;
+static std::string decode_html_entities(const std::string &s)
+{
+    std::string out;
+    out.reserve(s.size());
+    for (size_t i = 0; i < s.size(); )
+    {
+        if (s[i] != '&')
+        {
+            out += s[i++];
+            continue;
+        }
+        size_t semi = s.find(';', i);
+        if (semi == std::string::npos || semi - i > 10)
+        {
+            out += s[i++];
+            continue;
+        }
+        std::string ent = s.substr(i + 1, semi - i - 1);
+        if (ent == "amp")       out += '&';
+        else if (ent == "lt")   out += '<';
+        else if (ent == "gt")   out += '>';
+        else if (ent == "quot") out += '"';
+        else if (ent == "apos") out += '\'';
+        else if (!ent.empty() && ent[0] == '#')
+        {
+            unsigned long cp = 0;
+            if (ent.size() > 1 && (ent[1] == 'x' || ent[1] == 'X'))
+                cp = std::strtoul(ent.c_str() + 2, nullptr, 16);
+            else
+                cp = std::strtoul(ent.c_str() + 1, nullptr, 10);
+            // Encode as UTF-8 (only BMP for simplicity)
+            if (cp < 0x80)        out += static_cast<char>(cp);
+            else if (cp < 0x800)  { out += static_cast<char>(0xC0 | (cp >> 6));   out += static_cast<char>(0x80 | (cp & 0x3F)); }
+            else if (cp < 0x10000){ out += static_cast<char>(0xE0 | (cp >> 12));  out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F)); out += static_cast<char>(0x80 | (cp & 0x3F)); }
+            else                   out += '?';
+        }
+        else out += s.substr(i, semi - i + 1); // unknown entity: pass through
+        i = semi + 1;
+    }
+    return out;
+}
+
+// Parse OG meta tags and <title> from an HTML string.
+// Scans only the <head> section (up to </head> or <body>) for speed.
+static og_fetch_ctx::preview_t parse_og_from_html(const std::string &html)
+{
+    og_fetch_ctx::preview_t p;
+
+    // Limit scan to <head> region
+    size_t head_end = html.size();
+    {
+        size_t he = ifinds(html, "</head>");
+        if (he != std::string::npos) head_end = he;
+        size_t be = ifinds(html, "<body");
+        if (be != std::string::npos && be < head_end) head_end = be;
+    }
+    const std::string head = html.substr(0, head_end);
+
+    // Scan <meta ...> tags
+    size_t pos = 0;
+    while (pos < head.size())
+    {
+        size_t tag_start = ifinds(head, "<meta", pos);
+        if (tag_start == std::string::npos) break;
+        size_t tag_end = head.find('>', tag_start);
+        if (tag_end == std::string::npos) break;
+        std::string tag = head.substr(tag_start, tag_end - tag_start + 1);
+        pos = tag_end + 1;
+
+        // OpenGraph: <meta property="og:X" content="...">
+        std::string prop = attr_value(tag, "property");
+        if (!prop.empty())
+        {
+            std::string content = decode_html_entities(attr_value(tag, "content"));
+            if (prop == "og:title" && p.title.empty())            p.title       = content;
+            else if (prop == "og:description" && p.description.empty()) p.description = content;
+            else if (prop == "og:url" && p.url.empty())           p.url         = content;
+            else if (prop == "og:image" && p.image.empty()
+                     && std::string_view(content).starts_with("http")) p.image = content;
+            continue;
+        }
+        // Twitter Card: <meta name="twitter:title" content="..."> etc.
+        std::string name = attr_value(tag, "name");
+        if (!name.empty())
+        {
+            std::string content = decode_html_entities(attr_value(tag, "content"));
+            if (name == "twitter:title" && p.title.empty())            p.title       = content;
+            else if (name == "twitter:description" && p.description.empty()) p.description = content;
+            else if (name == "twitter:image" && p.image.empty()
+                     && std::string_view(content).starts_with("http"))  p.image = content;
+            // Also handle plain <meta name="description">
+            else if (name == "description" && p.description.empty())    p.description = content;
+        }
+    }
+
+    // Fallback: <title>...</title>
+    if (p.title.empty())
+    {
+        size_t ts = ifinds(head, "<title");
+        if (ts != std::string::npos)
+        {
+            size_t te = head.find('>', ts);
+            if (te != std::string::npos)
+            {
+                size_t content_start = te + 1;
+                size_t content_end   = ifinds(head, "</title>", content_start);
+                if (content_end == std::string::npos) content_end = head.size();
+                std::string raw = head.substr(content_start, content_end - content_start);
+                // Trim whitespace
+                size_t first = raw.find_first_not_of(" \t\r\n");
+                size_t last  = raw.find_last_not_of(" \t\r\n");
+                if (first != std::string::npos)
+                    p.title = decode_html_entities(raw.substr(first, last - first + 1));
+            }
+        }
+    }
+
+    return p;
+}
+
+static int og_fetch_cb(const void * /*pointer*/, void * /*data*/, int fd)
+{
+    if (weechat::g_plugin_unloading || !weechat::plugin::instance)
+        return WEECHAT_RC_OK;
+
+    char sig[1];
+    (void)::read(fd, sig, sizeof(sig));
+
+    auto it = std::find_if(g_og_fetches.begin(), g_og_fetches.end(),
+                           [fd](const og_fetch_ctx &c) { return c.pipe_read_fd == fd; });
+    if (it == g_og_fetches.end())
+        return WEECHAT_RC_ERROR;
+
+    og_fetch_ctx &ctx = *it;
+
+    if (ctx.worker.joinable())
+        ctx.worker.join();
+
+    if (ctx.hook)
+        weechat_unhook(ctx.hook);
+    close(ctx.pipe_read_fd);
+    if (ctx.pipe_write_fd >= 0)
+        close(ctx.pipe_write_fd);
+
+    if (ctx.success && ctx.account_ptr
+        && (!ctx.preview.title.empty() || !ctx.preview.description.empty()))
+    {
+        // Build display line
+        auto &p = ctx.preview;
+        std::string line;
+        line += weechat_color("darkgray");
+        line += "┌ ";
+        line += weechat_color("bold");
+        line += p.title.empty() ? (p.url.empty() ? ctx.url : p.url) : p.title;
+        line += weechat_color("-bold");
+        if (!p.description.empty())
+        {
+            line += "\n\t";
+            line += weechat_color("darkgray");
+            line += "│ ";
+            line += weechat_color("resetcolor");
+            line += weechat_color("darkgray");
+            if (p.description.size() > 120)
+            {
+                line += p.description.substr(0, 117);
+                line += "...";
+            }
+            else
+            {
+                line += p.description;
+            }
+        }
+        const std::string &display_url = p.url.empty() ? ctx.url : p.url;
+        if (!display_url.empty() && display_url != p.title)
+        {
+            line += "\n\t";
+            line += weechat_color("darkgray");
+            line += "└ ";
+            line += weechat_color("blue");
+            line += display_url;
+        }
+        if (!p.image.empty())
+        {
+            line += " ";
+            line += weechat_color("darkgray");
+            line += "[img]";
+        }
+        line += weechat_color("resetcolor");
+
+        weechat_printf_date_tags(ctx.buffer, ctx.date,
+            "notify_none,no_log,xmpp_og_preview",
+            "%s\t%s", ctx.display_prefix.c_str(), line.c_str());
+
+        // Persist to LMDB cache
+        weechat::account::og_preview cached;
+        cached.title       = p.title;
+        cached.description = p.description;
+        cached.url         = display_url;
+        cached.image       = p.image;
+        ctx.account_ptr->og_cache_store(ctx.url, cached);
+    }
+
+    g_og_fetches.erase(it);
+    return WEECHAT_RC_OK;
+}
+
+void og_start_fetch(const std::string &url,
+                    struct t_gui_buffer *buf,
+                    weechat::account *account_ptr,
+                    const std::string &display_prefix,
+                    time_t date)
+{
+    if (url.empty() || !account_ptr) return;
+
+    // Skip non-HTTP URLs
+    if (!std::string_view(url).starts_with("http://")
+        && !std::string_view(url).starts_with("https://"))
+        return;
+
+    // In-flight dedup
+    bool already = std::any_of(g_og_fetches.begin(), g_og_fetches.end(),
+                               [&](const og_fetch_ctx &c) { return c.url == url; });
+    if (already) return;
+
+    int pipe_fds[2];
+    if (pipe(pipe_fds) != 0) return;
+
+    g_og_fetches.push_back({});
+    og_fetch_ctx &ctx = g_og_fetches.back();
+    ctx.url            = url;
+    ctx.buffer         = buf;
+    ctx.account_ptr    = account_ptr;
+    ctx.display_prefix = display_prefix;
+    ctx.date           = date;
+    ctx.pipe_read_fd   = pipe_fds[0];
+    ctx.pipe_write_fd  = pipe_fds[1];
+
+    ctx.hook = weechat_hook_fd(pipe_fds[0], 1, 0, 0,
+                               og_fetch_cb, nullptr, nullptr);
+
+    ctx.worker = std::thread([&ctx]()
+    {
+        std::string body;
+        {
+            CURL *curl = curl_easy_init();
+            if (!curl)
+            {
+                ::write(ctx.pipe_write_fd, "x", 1);
+                return;
+            }
+
+            // Collect response bytes; cap at 128 KB to avoid reading huge pages
+            struct write_ctx { std::string data; size_t limit; };
+            write_ctx wctx{ {}, 128 * 1024 };
+            auto write_cb = [](char *ptr, size_t size, size_t nmemb, void *ud) -> size_t {
+                auto *wc = static_cast<write_ctx *>(ud);
+                size_t n = size * nmemb;
+                if (wc->data.size() + n > wc->limit)
+                    n = wc->limit - wc->data.size();
+                wc->data.append(ptr, n);
+                return size * nmemb; // always claim full read to keep curl happy
+            };
+
+            curl_easy_setopt(curl, CURLOPT_NOSIGNAL,       1L);
+            curl_easy_setopt(curl, CURLOPT_URL,            ctx.url.c_str());
+            curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+            curl_easy_setopt(curl, CURLOPT_MAXREDIRS,      5L);
+            curl_easy_setopt(curl, CURLOPT_TIMEOUT,        10L);
+            curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
+            curl_easy_setopt(curl, CURLOPT_USERAGENT,      "xepher-og-preview/1.0");
+            // Only accept text/html
+            struct curl_slist *headers = nullptr;
+            headers = curl_slist_append(headers, "Accept: text/html,application/xhtml+xml;q=0.9,*/*;q=0.1");
+            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,
+                static_cast<size_t(*)(char*,size_t,size_t,void*)>(write_cb));
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, &wctx);
+
+            CURLcode res = curl_easy_perform(curl);
+            long http_code = 0;
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+            curl_slist_free_all(headers);
+            curl_easy_cleanup(curl);
+
+            if (res != CURLE_OK || http_code != 200)
+            {
+                ::write(ctx.pipe_write_fd, "x", 1);
+                return;
+            }
+            body = std::move(wctx.data);
+        }
+
+        ctx.preview = parse_og_from_html(body);
+        ctx.success = !ctx.preview.title.empty() || !ctx.preview.description.empty();
         ::write(ctx.pipe_write_fd, "x", 1);
     });
 }

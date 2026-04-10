@@ -3820,7 +3820,42 @@ message_handler_after_omemo:
         {
             weechat_printf_date_tags(channel->buffer, date,
                 "notify_none,no_log,xmpp_og_preview",
-                "%s\t%s", display_prefix.data(), format_og_line(p).c_str());
+                 "%s\t%s", display_prefix.data(), format_og_line(p).c_str());
+        }
+    }
+
+    // For any http(s):// URL in the message body that wasn't already shown
+    // (from the rdf:Description stanza or the LMDB cache), kick off an async
+    // fetch to get OG/title metadata.  og_start_fetch() handles LMDB cache
+    // dedup internally, so it will no-op if the URL is already cached.
+    if (text)
+    {
+        // Collect URLs that were already shown so we don't double-print.
+        std::unordered_set<std::string> already_shown;
+        for (const auto& p : og_previews_to_show)
+            if (!p.url.empty()) already_shown.insert(p.url);
+
+        std::string_view body_sv(text);
+        size_t pos = 0;
+        while (pos < body_sv.size())
+        {
+            size_t found = body_sv.find("http", pos);
+            if (found == std::string_view::npos) break;
+            std::string_view rest = body_sv.substr(found);
+            if (!rest.starts_with("http://") && !rest.starts_with("https://"))
+            {
+                pos = found + 4;
+                continue;
+            }
+            size_t end = found;
+            while (end < body_sv.size() && !std::isspace((unsigned char)body_sv[end]))
+                ++end;
+            std::string url(body_sv.substr(found, end - found));
+            pos = end;
+
+            if (already_shown.count(url)) continue;
+            og_start_fetch(url, channel->buffer, &account,
+                           std::string(display_prefix), date);
         }
     }
 

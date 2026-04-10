@@ -92,6 +92,48 @@ void esfs_start_download(const std::string &cipher_url,
                          const std::string &channel_jid,
                          const std::string &stable_id);
 
+// ── OG / HTML-title async URL preview fetch ───────────────────────────────────
+// Fetches a URL in a background thread, parses OpenGraph meta tags (and falls
+// back to <title>) from the HTML head, then prints the result as a
+// notify_none,no_log,xmpp_og_preview line in the target buffer and stores it
+// in the LMDB og_previews cache.
+//
+// URLs that are already cached or currently in-flight are silently skipped.
+struct og_fetch_ctx {
+    // Inputs
+    std::string url;
+    struct t_gui_buffer *buffer = nullptr;
+    weechat::account   *account_ptr = nullptr; // non-owning
+    std::string display_prefix;   // left column (nick) for weechat_printf
+    time_t      date = 0;         // timestamp for weechat_printf_date_tags
+
+    // Pipe (read-end watched by weechat_hook_fd)
+    int pipe_read_fd  = -1;
+    int pipe_write_fd = -1;
+    struct t_hook *hook = nullptr;
+
+    // Result (written by thread, read by callback) — mirrors account::og_preview
+    bool success = false;
+    struct preview_t {
+        std::string title;
+        std::string description;
+        std::string url;
+        std::string image;
+    } preview;
+
+    std::thread worker;
+};
+
+extern std::list<og_fetch_ctx> g_og_fetches;
+
+// Kick off an async OG preview fetch for a URL.
+// Silently no-ops if the URL is already cached or in-flight.
+void og_start_fetch(const std::string &url,
+                    struct t_gui_buffer *buf,
+                    weechat::account *account_ptr,
+                    const std::string &display_prefix,
+                    time_t date);
+
 // ── XEP-0004: Data Forms renderer ─────────────────────────────────────────────
 // Render a <x xmlns='jabber:x:data'> form to a WeeChat buffer.
 // Defined in message_handler.cpp; called from iq_handler.cpp.
