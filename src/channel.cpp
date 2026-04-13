@@ -1966,7 +1966,15 @@ void weechat::channel::fetch_mam(const char *id, time_t *start, time_t *end, con
     // else: PM — leave mam_to empty; iq_s.to() is only called when non-empty.
 
     stanza::xep0313::x_filter xf;
-    xf.with(this->id);
+    // XEP-0313 §4: In a MUC archive, <with> filters by occupant publisher JID —
+    // not the room JID itself.  Setting <with> to the room JID would ask the server
+    // to return only messages sent *by the room JID as an occupant*, which is
+    // nonsensical and returns zero results.  For MUC, the IQ is already addressed
+    // to the room via the 'to' attribute; omit <with> entirely.
+    // For PM (personal archive), <with> correctly filters messages exchanged with
+    // a specific peer JID.
+    if (type != weechat::channel::chat_type::MUC)
+        xf.with(this->id);
     if (start)
     {
         std::ostringstream oss;
