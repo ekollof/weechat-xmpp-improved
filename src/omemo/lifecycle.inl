@@ -10,6 +10,16 @@ XMPP_TEST_EXPORT weechat::xmpp::omemo::~omemo()
     g_signal_store_states.erase(this);
 }
 
+XMPP_TEST_EXPORT bool weechat::xmpp::omemo::needs_bundle_publish(xmpp_ctx_t *context)
+{
+    if (!*this)
+        return false;
+
+    ensure_local_identity(*this);
+    ensure_registration_id(*this);
+    return ensure_prekeys(*this, context);
+}
+
 XMPP_TEST_EXPORT xmpp_stanza_t *weechat::xmpp::omemo::get_axolotl_bundle(xmpp_ctx_t *context, char *from, char *to)
 {
     (void) from;
@@ -22,7 +32,7 @@ XMPP_TEST_EXPORT xmpp_stanza_t *weechat::xmpp::omemo::get_axolotl_bundle(xmpp_ct
 
     ensure_local_identity(*this);
     ensure_registration_id(*this);
-    (void)ensure_prekeys(*this, context);  // return value intentionally discarded: caller is already publishing
+    (void)ensure_prekeys(*this, context);
 
     const auto bundle = make_local_bundle_metadata(*this);
     if (!bundle)

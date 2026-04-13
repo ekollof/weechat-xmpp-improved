@@ -156,6 +156,14 @@ namespace weechat {
 
             XMPP_TEST_EXPORT xmpp_stanza_t *get_axolotl_bundle(xmpp_ctx_t *context, char *from, char *to);
 
+            // Returns true when the local prekey pool has changed since the last
+            // call (new keys generated, repaired, or signed-prekey rotated) and
+            // the bundle should be published to PEP.  Returns false when the
+            // server already holds an up-to-date copy — callers should skip the
+            // publish to avoid spurious PEP push notifications that cause other
+            // clients to fetch MAM.
+            XMPP_TEST_EXPORT bool needs_bundle_publish(xmpp_ctx_t *context);
+
             XMPP_TEST_EXPORT void init(struct t_gui_buffer *buffer, const char *account_name);
 
             XMPP_TEST_EXPORT void handle_axolotl_devicelist(weechat::account *account,

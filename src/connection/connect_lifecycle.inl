@@ -330,12 +330,18 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         {
             std::string jid_str(account.jid());
 
-            // Publish our axolotl bundle on connect so remote clients
-            // always have fresh pre-keys for our device.
-            if (std::shared_ptr<xmpp_stanza_t> legacy_bundle_stanza {
-                    account.omemo.get_axolotl_bundle(account.context, jid_str.data(), nullptr),
-                    xmpp_stanza_release})
-                this->send(legacy_bundle_stanza.get());
+            // Only publish our axolotl bundle when the local prekey pool has
+            // actually changed (newly generated, repaired, or signed-prekey
+            // rotated).  Unconditional publishing every reconnect sends a PEP
+            // push notification to all subscribed sessions, triggering an
+            // unnecessary MAM catchup on every other active client.
+            if (account.omemo.needs_bundle_publish(account.context))
+            {
+                if (std::shared_ptr<xmpp_stanza_t> legacy_bundle_stanza {
+                        account.omemo.get_axolotl_bundle(account.context, jid_str.data(), nullptr),
+                        xmpp_stanza_release})
+                    this->send(legacy_bundle_stanza.get());
+            }
 
             // Do NOT publish our devicelist here.  We first fetch the server's
             // current list (IQ sent above).  The IQ result handler merges our
