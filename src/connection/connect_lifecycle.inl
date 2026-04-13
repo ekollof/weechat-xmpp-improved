@@ -219,8 +219,15 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
         // process; unconditional publishing every reconnect sends a PEP push
         // notification to all subscribed sessions, triggering an unnecessary MAM
         // catchup on every other active client.
+        //
+        // Seed last_published_nick_ from LMDB on the first connect after a
+        // WeeChat restart (cache is empty then).  This prevents a spurious
+        // re-publish on every restart when the nick hasn't actually changed.
         {
             std::string nick_str(account.nickname());
+            if (!nick_str.empty() && account.last_published_nick_.empty())
+                account.last_published_nick_ = account.mam_cursor_get("pep:nick");
+
             if (!nick_str.empty() && nick_str != account.last_published_nick_)
             {
                 XDEBUG("Publishing XEP-0172 nick (changed: '{}' → '{}')",
@@ -246,6 +253,8 @@ bool weechat::connection::conn_handler(event status, int error, xmpp_stream_erro
                             .build(account.context)
                             .get());
                 account.last_published_nick_ = nick_str;
+                // Persist so the guard survives a WeeChat restart.
+                account.mam_cursor_set("pep:nick", nick_str);
             }
             else if (!nick_str.empty())
             {
