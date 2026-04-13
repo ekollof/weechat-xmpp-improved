@@ -1950,18 +1950,20 @@ void weechat::channel::fetch_mam(const char *id, time_t *start, time_t *end, con
                                  start_str, end_str);
     }
 
-    // XEP-0313: MUC MAM is addressed to the room JID; PM MAM goes to the
-    // user's own bare JID (personal archive), NOT the bare server domain.
-    // Sending to the bare domain causes <service-unavailable/> errors.
+    // XEP-0313: MUC MAM is addressed to the room JID.
+    // PM MAM (personal archive): omit the 'to' attribute entirely.
+    // Sending to the user's bare JID (user@domain) would cause the server to
+    // fan-out the IQ to ALL connected resources (Gajim, Conversations, etc.),
+    // triggering a MAM catchup on every other active client on the account.
+    // With no 'to', the server routes the IQ only to the requesting resource's
+    // full JID and processes it against the user's personal archive — identical
+    // behaviour to the global MAM query in connect_lifecycle.inl.
     std::string mam_to;
     if (type == weechat::channel::chat_type::MUC)
     {
         mam_to = this->id;
     }
-    else
-    {
-        mam_to = ::jid(nullptr, account.jid()).bare;
-    }
+    // else: PM — leave mam_to empty; iq_s.to() is only called when non-empty.
 
     stanza::xep0313::x_filter xf;
     xf.with(this->id);
