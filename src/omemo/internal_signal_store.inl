@@ -401,15 +401,26 @@ static std::size_t repair_prekeys_index(omemo &self, xmpp_ctx_t *context)
             const auto parts = split(*existing_index, ';');
             if (parts.size() < kPreKeyCount)
             {
+                // Index is shorter than expected.  Two cases:
+                //   a) Index is stale/wrong — actual LMDB records exist for more IDs
+                //      than the index lists (e.g. after a partial-write bug).
+                //      → repair and republish so peers get the correct bundle.
+                //   b) Prekeys were legitimately consumed (pre_key_remove deleted
+                //      their records).  The repair will confirm the same count as
+                //      the index, meaning nothing changed on disk — no republish.
+                const auto old_count = parts.size();
                 weechat_printf(nullptr,
                                "%somemo: prekeys index has only %zu entries (expected %u); repairing",
                                weechat_prefix("network"),
-                               parts.size(),
+                               old_count,
                                kPreKeyCount);
-                repair_prekeys_index(self, context);
-                // Repaired from existing on-disk records — no new keys generated,
-                // but the bundle needs to be republished to reflect the repaired index.
-                return true;
+                const auto repaired_count = repair_prekeys_index(self, context);
+                // Only republish if the repair found more records than were in
+                // the index (case a).  If the count is the same or lower the
+                // index was already accurate; prekeys were consumed at session
+                // setup time and a bundle republish already happened then.
+                if (repaired_count > old_count)
+                    return true;
             }
             return false;
         }
