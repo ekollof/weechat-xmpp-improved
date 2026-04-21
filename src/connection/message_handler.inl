@@ -2013,17 +2013,19 @@ bool weechat::connection::message_handler(xmpp_stanza_t *stanza, bool top_level,
             omemo_cleartext_storage = std::move(*omemo_result);
             cleartext = omemo_cleartext_storage.data();
             // Cache decrypted plaintext for MAM replay in future sessions.
-            // Only store on live inbound delivery — not for MAM replays themselves
-            // (the cache hit path below handles those) and not for self outbound
-            // copies (carbons of our own sent messages).
-            if (!is_mam_replay && !is_self_outbound_copy && channel_id)
+            // Store on both live inbound delivery and MAM replays where decryption
+            // succeeds (ratchet not yet advanced).  This ensures the plaintext is
+            // available on the next WeeChat restart even when the first successful
+            // decryption happened during a MAM catchup rather than live delivery.
+            // Skip only self outbound carbon copies (no useful plaintext to cache).
+            if (!is_self_outbound_copy && channel_id)
             {
                 // Store under all three IDs so the MAM replay lookup always hits.
-                // On live delivery the server injects <stanza-id> (server-assigned);
-                // on MAM replay the server strips <stanza-id> from the forwarded copy,
+                // On live delivery the server injects <stanza-id> (server-assigned).
+                // On MAM replay the server strips <stanza-id> from the forwarded copy,
                 // so stable_id on replay resolves to origin-id or the message id=
-                // attribute instead — a different value.  Storing all three guarantees
-                // a cache hit regardless of which one the replay uses as its stable_id.
+                // attribute instead.  Storing all three guarantees a cache hit
+                // regardless of which ID the next MAM replay uses as its stable_id.
                 std::string ch(channel_id);
                 std::string sid   = stanza_id  ? std::string(stanza_id)  : "";
                 std::string oid   = origin_id  ? std::string(origin_id)  : "";
