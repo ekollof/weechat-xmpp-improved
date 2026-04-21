@@ -26,7 +26,7 @@ Archive Management, HTTP file upload, microblogging via PubSub, and more.
 | libsignal-protocol-c | runtime | ✅ package | ⚠️ build from source |
 | gpgme | runtime | ✅ package | ✅ `brew install gpgme` |
 | libfmt | runtime | ✅ package | ✅ `brew install fmt` |
-| g++ >= GCC 12 / clang >= 15 | build | ✅ | ✅ `brew install llvm` |
+| g++ >= GCC 12 / clang >= 15 (Linux/macOS); clang >= 13 (BSD) | build | ✅ | ✅ `brew install llvm` |
 | bison | build | ✅ package | ✅ `brew install bison` |
 | flex | build | ✅ package | ✅ `brew install flex` |
 | doctest | test | ✅ | ✅ |
@@ -45,12 +45,17 @@ and scripts have been ported to POSIX sh and BSD-compatible make, but these
 platforms are **not routinely tested**. Known considerations:
 
 - Use `gmake` instead of `make` on BSD (BSD make has different syntax).
-- `libsignal-protocol-c` and `libfmt` may not be available in base package
-  repositories on OpenBSD/NetBSD and may need to be built from ports/pkgsrc.
+- **Minimum compiler: Clang ≥ 13.** The codebase uses C++23 mode with C++20
+  features (`std::ranges`, `std::span`, abbreviated function templates).
+  FreeBSD 13+/14 and OpenBSD 7.x ship Clang 14–17 and are fine. NetBSD 9.x
+  ships Clang 7 and **cannot build this plugin** — upgrade to NetBSD 10.x
+  (ships Clang 13+) or install a newer Clang from pkgsrc.
+- `libsignal-protocol-c` and `libomemo-c` are not available in base package
+  repositories on OpenBSD/NetBSD and must be built from ports/pkgsrc source.
 - The `DEBUG=1` address-sanitizer flags (`-lasan -lrt`) are Linux-only and are
   automatically skipped on other platforms.
-- `objcopy` is Linux-specific; the `.source` section embedding step is silently
-  skipped when `objcopy`/`llvm-objcopy` is not found.
+- The `.source` ELF section embedding step (`objcopy --add-section`) is
+  Linux-only and is automatically skipped on BSD.
 
 ### Build
 
