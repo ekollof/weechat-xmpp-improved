@@ -3,6 +3,9 @@
 
 ifeq ($(UNAME_S),Darwin)
 TEST_LDFLAGS := -Wl,-undefined,dynamic_lookup -Wl,-rpath,$(PWD)/tests
+else ifneq (,$(filter $(UNAME_S),FreeBSD OpenBSD NetBSD))
+# BSD lld does not support --allow-shlib-undefined; use -undefined,dynamic_lookup instead
+TEST_LDFLAGS := -Wl,-undefined,dynamic_lookup -Wl,-rpath,$(PWD)/tests
 else
 TEST_LDFLAGS := -Wl,--allow-shlib-undefined -Wl,-rpath,$$PWD/tests
 endif
@@ -12,6 +15,10 @@ ifeq ($(UNAME_S),Darwin)
 debug: xmpp.so
 	@echo "debug target: use lldb on macOS"
 	env DYLD_INSERT_LIBRARIES=$(DEBUG) lldb -- \
+		weechat -a -P 'alias,buflist,exec,irc,relay' -r '/plugin load ./xmpp.so'
+else ifneq (,$(filter $(UNAME_S),FreeBSD OpenBSD NetBSD))
+debug: xmpp.so
+	env LD_PRELOAD=$(DEBUG) lldb -- \
 		weechat -a -P 'alias,buflist,exec,irc,relay' -r '/plugin load ./xmpp.so'
 else
 debug: xmpp.so

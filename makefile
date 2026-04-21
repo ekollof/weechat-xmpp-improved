@@ -39,6 +39,9 @@ INCLUDES=-Ilibstrophe -Ideps/lmdbxx -Ideps -Isrc -I. \
 	 $(shell pkg-config --cflags libomemo-c)
 ifeq ($(UNAME_S),Darwin)
 DWARF_FLAG := -g
+else ifneq (,$(filter $(UNAME_S),FreeBSD OpenBSD NetBSD))
+# BSDs with Clang 13+ support DWARF 4; use it for consistent debug info
+DWARF_FLAG := -gdwarf-4
 else
 DWARF_FLAG := -gdwarf-4
 endif
@@ -47,7 +50,7 @@ CFLAGS+=$(DBGCFLAGS) \
 	-fno-omit-frame-pointer -fPIC \
 	-fvisibility=hidden -fvisibility-inlines-hidden \
 	-fdebug-prefix-map=.=$(CURDIR) \
-	-std=gnu99 $(DWARF_FLAG) \
+	-std=c11 $(DWARF_FLAG) \
 	-Wall -Wextra -pedantic -Werror\
 	-Werror-implicit-function-declaration \
 	-Wno-missing-field-initializers \
@@ -213,8 +216,10 @@ weechat-xmpp: $(DEPS) xmpp.so
 
 xmpp.so: $(DEPS) $(OBJS) $(HDRS)
 	$(CXX) $(SHARED_FLAG) $(LDFLAGS) -o $@ $(AS_NEEDED) $(OBJS) $(DEPS) $(LDLIBS)
+ifeq ($(UNAME_S),Linux)
 ifneq ($(OBJCOPY),)
 	git ls-files | xargs ls -d | xargs tar cz | $(OBJCOPY) --add-section .source=/dev/stdin xmpp.so
+endif
 endif
 
 sexp/sexp.a: sexp/parser.o sexp/lexer.o sexp/driver.o
